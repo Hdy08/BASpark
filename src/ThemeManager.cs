@@ -214,9 +214,6 @@ namespace BASpark
             SetResource(window, "ThemeSecondaryButtonHoverForegroundBrush", dark ? "#F8FBFF" : "#333333");
             SetResource(window, "ThemeSecondaryButtonPressedBrush", dark ? "#2A3745" : "#E8F1FB");
             SetResource(window, "ThemeSecondaryButtonPressedBorderBrush", dark ? "#4E5D71" : "#AFC8E2");
-            SetResource(window, "ThemeDangerButtonHoverBrush", dark ? "#3C2931" : "#FFE6E6");
-            SetResource(window, "ThemeDangerButtonHoverBorderBrush", dark ? "#8B4A5A" : "#FFBDBD");
-            SetResource(window, "ThemeDangerButtonHoverForegroundBrush", dark ? "#FFD7D7" : "#B91C1C");
         }
 
         private static void ApplyDarkText(

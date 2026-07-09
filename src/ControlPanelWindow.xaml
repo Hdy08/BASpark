@@ -29,9 +29,6 @@
         <SolidColorBrush x:Key="ThemeSecondaryButtonHoverForegroundBrush" Color="#333333"/>
         <SolidColorBrush x:Key="ThemeSecondaryButtonPressedBrush" Color="#E8F1FB"/>
         <SolidColorBrush x:Key="ThemeSecondaryButtonPressedBorderBrush" Color="#AFC8E2"/>
-        <SolidColorBrush x:Key="ThemeDangerButtonHoverBrush" Color="#FFE6E6"/>
-        <SolidColorBrush x:Key="ThemeDangerButtonHoverBorderBrush" Color="#FFBDBD"/>
-        <SolidColorBrush x:Key="ThemeDangerButtonHoverForegroundBrush" Color="#B91C1C"/>
 
         <Style TargetType="{x:Type ComboBoxItem}">
             <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
