@@ -83,6 +83,8 @@ namespace BASpark
         private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
         private bool _autoNetworkFailurePromptShown;
         private bool _logViewInitialized;
+        private bool _preloadingDarkTheme;
+        private bool _darkSettingsThemePreloaded;
         private readonly object _networkPromptLock = new();
 
         public ObservableCollection<FilterProfile> Profiles { get; set; } = new ObservableCollection<FilterProfile>();
@@ -119,7 +121,12 @@ namespace BASpark
             ApplyScrollbarSettings();
             UiLocalizer.ApplyControlPanel(this);
             LoadScreenOptions();
-            Loaded += (_, _) => RefreshThemeSoon();
+            ApplyDarkMode();
+            Loaded += (_, _) =>
+            {
+                PreloadDarkSettingsTheme();
+                RefreshThemeSoon();
+            };
             ContentRendered += (_, _) => RefreshThemeSoon();
             RefreshThemeSoon();
             CheckAdminStatus();
@@ -662,6 +669,97 @@ namespace BASpark
             ThemeManager.ApplyControlPanel(this);
         }
 
+        private void RefreshThemeAfterLayout()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(RefreshThemeAfterLayout), DispatcherPriority.Loaded);
+                return;
+            }
+
+            ApplyDarkMode();
+            UpdateLayout();
+            ApplyDarkMode();
+            RefreshThemeSoon();
+        }
+
+        private void PreloadDarkSettingsTheme()
+        {
+            if (_darkSettingsThemePreloaded || !ThemeManager.IsDarkModeEnabled() || PageSettings == null)
+            {
+                return;
+            }
+
+            var subTabs = new[] { SubTabBasic, SubTabVisual, SubTabFilter, SubTabMultiScreen, SubTabMore };
+            var selectedSubTab = subTabs.FirstOrDefault(tab => tab.IsChecked == true) ?? SubTabBasic;
+            var originalVisibility = PageSettings.Visibility;
+            var originalOpacity = PageSettings.Opacity;
+            bool originalHitTest = PageSettings.IsHitTestVisible;
+
+            _preloadingDarkTheme = true;
+            try
+            {
+                PageSettings.Visibility = Visibility.Visible;
+                PageSettings.Opacity = 0;
+                PageSettings.IsHitTestVisible = false;
+
+                ApplyDarkMode();
+                foreach (var subTab in subTabs)
+                {
+                    subTab.IsChecked = true;
+                    UpdateLayout();
+                    ApplyTemplates(PageSettings, new HashSet<DependencyObject>());
+                }
+
+                ApplyDarkMode();
+                _darkSettingsThemePreloaded = true;
+            }
+            finally
+            {
+                selectedSubTab.IsChecked = true;
+                PageSettings.Visibility = originalVisibility;
+                PageSettings.Opacity = originalOpacity;
+                PageSettings.IsHitTestVisible = originalHitTest;
+                _preloadingDarkTheme = false;
+            }
+        }
+
+        private void ApplyTemplates(DependencyObject root, HashSet<DependencyObject> visited)
+        {
+            if (!visited.Add(root))
+            {
+                return;
+            }
+
+            if (root is System.Windows.Controls.Control control)
+            {
+                control.ApplyTemplate();
+            }
+
+            int visualChildren = 0;
+            try
+            {
+                visualChildren = VisualTreeHelper.GetChildrenCount(root);
+            }
+            catch
+            {
+                visualChildren = 0;
+            }
+
+            for (int i = 0; i < visualChildren; i++)
+            {
+                ApplyTemplates(VisualTreeHelper.GetChild(root, i), visited);
+            }
+
+            foreach (object child in LogicalTreeHelper.GetChildren(root))
+            {
+                if (child is DependencyObject dependencyObject)
+                {
+                    ApplyTemplates(dependencyObject, visited);
+                }
+            }
+        }
+
         private void RefreshThemeSoon()
         {
             if (!Dispatcher.CheckAccess())
@@ -953,12 +1051,17 @@ namespace BASpark
             else if (TabLog.IsChecked == true) PageLog.Visibility = Visibility.Visible;
             else if (TabAbout.IsChecked == true) PageAbout.Visibility = Visibility.Visible;
 
-            RefreshThemeSoon();
+            RefreshThemeAfterLayout();
         }
 
         private void SettingsSubTab_Checked(object sender, RoutedEventArgs e)
         {
-            RefreshThemeSoon();
+            if (_preloadingDarkTheme)
+            {
+                return;
+            }
+
+            RefreshThemeAfterLayout();
         }
 
         private void InitLogView()

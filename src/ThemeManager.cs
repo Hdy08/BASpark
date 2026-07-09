@@ -190,6 +190,16 @@ namespace BASpark
 
         private static void ApplyControlPanelResources(ControlPanelWindow window, bool dark)
         {
+            if (dark)
+            {
+                ApplyInheritedDarkControlResources(
+                    window,
+                    CreateBrush("#1B222B"),
+                    CreateBrush("#3A4654"),
+                    CreateBrush("#E7EDF4"),
+                    CreateBrush("#8793A0"));
+            }
+
             SetResource(window, "NavForegroundBrush", dark ? "#C5CED8" : "#666666");
             SetResource(window, "NavHoverBrush", dark ? "#263847" : "#E0F2FF");
             SetResource(window, "SegmentNormalForegroundBrush", dark ? "#E7EDF4" : "#333333");
@@ -214,6 +224,23 @@ namespace BASpark
             SetResource(window, "ThemeSecondaryButtonHoverForegroundBrush", dark ? "#F8FBFF" : "#333333");
             SetResource(window, "ThemeSecondaryButtonPressedBrush", dark ? "#2A3745" : "#E8F1FB");
             SetResource(window, "ThemeSecondaryButtonPressedBorderBrush", dark ? "#4E5D71" : "#AFC8E2");
+        }
+
+        private static void ApplyInheritedDarkControlResources(
+            FrameworkElement element,
+            MediaBrush background,
+            MediaBrush border,
+            MediaBrush primaryText,
+            MediaBrush mutedText)
+        {
+            SetThemeResource(element, SystemColors.WindowBrushKey, background);
+            SetThemeResource(element, SystemColors.ControlBrushKey, background);
+            SetThemeResource(element, SystemColors.ControlLightBrushKey, background);
+            SetThemeResource(element, SystemColors.ControlDarkBrushKey, border);
+            SetThemeResource(element, SystemColors.ControlTextBrushKey, primaryText);
+            SetThemeResource(element, SystemColors.GrayTextBrushKey, mutedText);
+            SetThemeResource(element, SystemColors.HighlightBrushKey, CreateBrush("#263847"));
+            SetThemeResource(element, SystemColors.HighlightTextBrushKey, primaryText);
         }
 
         private static void ApplyDarkText(
@@ -242,14 +269,7 @@ namespace BASpark
             MediaBrush primaryText,
             MediaBrush mutedText)
         {
-            SetThemeResource(element, SystemColors.WindowBrushKey, background);
-            SetThemeResource(element, SystemColors.ControlBrushKey, background);
-            SetThemeResource(element, SystemColors.ControlLightBrushKey, background);
-            SetThemeResource(element, SystemColors.ControlDarkBrushKey, border);
-            SetThemeResource(element, SystemColors.ControlTextBrushKey, primaryText);
-            SetThemeResource(element, SystemColors.GrayTextBrushKey, mutedText);
-            SetThemeResource(element, SystemColors.HighlightBrushKey, CreateBrush("#263847"));
-            SetThemeResource(element, SystemColors.HighlightTextBrushKey, primaryText);
+            ApplyInheritedDarkControlResources(element, background, border, primaryText, mutedText);
         }
 
         private static bool IsSystemAppDarkMode()
