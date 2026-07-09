@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Linq;
 using System.Management;
 using System.Net.Http;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -100,7 +99,7 @@ namespace BASpark
         private static HttpClient CreateHttpClient()
         {
             var client = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BASparkClient/1.0");
+            client.DefaultRequestHeaders.Add("User-Agent", AppVersionInfo.UserAgent);
             return client;
         }
 
@@ -124,12 +123,10 @@ namespace BASpark
 
         private static object BuildPayload(string clientId, string trigger)
         {
-            Version? version = Assembly.GetExecutingAssembly().GetName().Version;
-            string versionText = version == null ? "unknown" : $"{version.Major}.{version.Minor}.{version.Build}";
-
             var screensInfo = new List<string>();
             try
             {
+                int? fallbackRefreshRate = null;
                 foreach (var screen in Screen.AllScreens)
                 {
                     var dm = new DEVMODE();
@@ -141,8 +138,8 @@ namespace BASpark
                     }
                     else
                     {
-                        int fallbackRate = GetRefreshRateViaWmiFallback();
-                        screensInfo.Add($"{screen.Bounds.Width}x{screen.Bounds.Height}@{fallbackRate}Hz");
+                        fallbackRefreshRate ??= GetRefreshRateViaWmiFallback();
+                        screensInfo.Add($"{screen.Bounds.Width}x{screen.Bounds.Height}@{fallbackRefreshRate.Value}Hz");
                     }
                 }
             }
@@ -156,7 +153,7 @@ namespace BASpark
                 clientId = Sanitize(clientId, 36),
                 trigger = Sanitize(trigger, 32),
                 app = "BASpark",
-                appVersion = Sanitize(versionText, 32),
+                appVersion = Sanitize(AppVersionInfo.DisplayVersion, 32),
                 osVersion = Sanitize(GetOsVersion(), 64),
                 osArchitecture = RuntimeInformation.OSArchitecture.ToString().ToUpper(),
                 dotNetVersion = Sanitize(GetCleanDotNetVersion(), 32),

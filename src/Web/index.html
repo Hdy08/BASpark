@@ -31,50 +31,441 @@
 <body>
     <canvas id="sparkCanvas"></canvas>
     <script>
-        // re: 动画常量集中定义，避免每帧 new 对象
-        const FILLED_CIRCLE_CFG = { rAddRate: 26, maxLife: 16 };
-        const RINGS_ANIM_CFG = {
-            rsList: [0, 0.08, 0.1],
-            rRoundRateList: [0, 1, 1.5, 2],
-            len: 1.1 * Math.PI,
-            maxLife: 23,
-            segNum: 10,
-            minW: 0.4,
-            maxW: 3.3,
-            lenStopAddPoint: 0.1,
-            lenStartDimPoint: 0.4,
-        };
-        const CREATE_CLICK_CFG = {
-            rings: {
-                rsList: [0, 0.03, 0.06],
-                rRoundRateList: [0, 1, 1.5, 2],
-                len: 1.1 * Math.PI,
-            },
-            sparksCount: 4,
-        };
+        const UNITY_SIZE_TO_PX = 180.0;
+        const UNITY_RATE_DISTANCE_BASE = 5.0;
+        const DEFAULT_COLOR = "45,175,255";
+        const DEFAULT_COLOR_RGB = [45 / 255, 175 / 255, 1.0];
+        const UI_DEFAULT_SCALE = 1.0;
+        const TRAIL_SMOOTHING_RADIUS_PX = 9.0;
+        const TRAIL_MAX_POINTS = 320;
+        const MAX_TRAIL_STEPS_PER_MOVE = TRAIL_MAX_POINTS;
+        const MAX_CLICK_EFFECTS = 16;
+        const MAX_DISTANCE_EFFECTS = 24;
+        const MAX_DISTANCE_EMIT_EVENTS_PER_MOVE = 8;
+        const TRAIL_MASK_LUT_SIZE = 128;
 
-        function ringsEndColorFromRgb(rgbString) {
-            return rgbString.split(',').map(Number).map((n) => (n + 255 * 2) / 3);
+        function clamp(value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function buildTrailMaskLut() {
+            return Array.from({ length: TRAIL_MASK_LUT_SIZE + 1 }, (_, index) => {
+                const t = index / TRAIL_MASK_LUT_SIZE;
+                return clamp(1.0 - Math.pow(t, 0.62) * 1.55, 0.0, 1.0);
+            });
+        }
+
+        const TRAIL_MASK_LUT = buildTrailMaskLut();
+
+        function randomRange(min, max) {
+            return min + Math.random() * (max - min);
+        }
+
+        function parseRgb(text, fallback) {
+            const parts = `${text}`.split(",").map(part => Number.parseInt(part.trim(), 10));
+            if (parts.length !== 3 || parts.some(part => Number.isNaN(part))) {
+                return fallback;
+            }
+            return parts.map(part => clamp(part, 0, 255) / 255);
+        }
+
+        function makeDeepRgb(rgb) {
+            return [
+                clamp(rgb[0] * 0.27, 0, 1),
+                clamp(rgb[1] * 0.58, 0, 1),
+                clamp(rgb[2] * 0.86, 0, 1),
+            ];
+        }
+
+        function rgba(rgb, alpha) {
+            const r = Math.round(clamp(rgb[0], 0, 1) * 255);
+            const g = Math.round(clamp(rgb[1], 0, 1) * 255);
+            const b = Math.round(clamp(rgb[2], 0, 1) * 255);
+            return `rgba(${r},${g},${b},${clamp(alpha, 0, 1)})`;
+        }
+
+        function rgbCss(rgb) {
+            const r = Math.round(clamp(rgb[0], 0, 1) * 255);
+            const g = Math.round(clamp(rgb[1], 0, 1) * 255);
+            const b = Math.round(clamp(rgb[2], 0, 1) * 255);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function colorsNearlyEqual(a, b) {
+            return Math.abs(a[0] - b[0]) < 1e-6 &&
+                Math.abs(a[1] - b[1]) < 1e-6 &&
+                Math.abs(a[2] - b[2]) < 1e-6;
+        }
+
+        function rgbToHsl(rgb) {
+            const r = clamp(rgb[0], 0, 1);
+            const g = clamp(rgb[1], 0, 1);
+            const b = clamp(rgb[2], 0, 1);
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const l = (max + min) * 0.5;
+            if (max === min) {
+                return [0, 0, l];
+            }
+
+            const d = max - min;
+            const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            let h;
+            if (max === r) {
+                h = (g - b) / d + (g < b ? 6 : 0);
+            } else if (max === g) {
+                h = (b - r) / d + 2;
+            } else {
+                h = (r - g) / d + 4;
+            }
+
+            return [h / 6, s, l];
+        }
+
+        function hslToRgb(hsl) {
+            const h = ((hsl[0] % 1) + 1) % 1;
+            const s = clamp(hsl[1], 0, 1);
+            const l = clamp(hsl[2], 0, 1);
+            if (s <= 1e-6) {
+                return [l, l, l];
+            }
+
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            const hueToRgb = t => {
+                let tt = ((t % 1) + 1) % 1;
+                if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+                if (tt < 1 / 2) return q;
+                if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+                return p;
+            };
+
+            return [hueToRgb(h + 1 / 3), hueToRgb(h), hueToRgb(h - 1 / 3)];
+        }
+
+        function mapThemeRgb(rgb, hueShift, satScale, lightnessOffset) {
+            const sourceHsl = rgbToHsl(rgb);
+            if (sourceHsl[1] <= 0.015) {
+                return rgb;
+            }
+
+            const lightnessInfluence = clamp(sourceHsl[1] * 1.25, 0, 1);
+            return hslToRgb([
+                sourceHsl[0] + hueShift,
+                sourceHsl[1] * satScale,
+                sourceHsl[2] + lightnessOffset * lightnessInfluence,
+            ]);
+        }
+
+        function evalScalarStops(stops, t, fallback = 1.0) {
+            if (!Array.isArray(stops) || stops.length === 0) {
+                return fallback;
+            }
+
+            if (t <= stops[0].t) {
+                return stops[0].v;
+            }
+
+            for (let i = 1; i < stops.length; i++) {
+                if (t <= stops[i].t) {
+                    return evalScalarSegment(stops[i - 1], stops[i], t);
+                }
+            }
+
+            return stops[stops.length - 1].v;
+        }
+
+        function evalScalarSegment(a, b, t) {
+            const dt = Math.max(1e-6, b.t - a.t);
+            const s = clamp((t - a.t) / dt, 0, 1);
+            if (!Number.isFinite(a.outSlope) || !Number.isFinite(b.inSlope)) {
+                return lerp(a.v, b.v, s);
+            }
+
+            const s2 = s * s;
+            const s3 = s2 * s;
+            const h00 = 2 * s3 - 3 * s2 + 1;
+            const h10 = s3 - 2 * s2 + s;
+            const h01 = -2 * s3 + 3 * s2;
+            const h11 = s3 - s2;
+            return h00 * a.v + h10 * dt * a.outSlope + h01 * b.v + h11 * dt * b.inSlope;
+        }
+
+        function evalColorStops(stops, t, fallback) {
+            if (!Array.isArray(stops) || stops.length === 0) {
+                return fallback;
+            }
+
+            if (t <= stops[0].t) {
+                return stops[0].c;
+            }
+
+            for (let i = 1; i < stops.length; i++) {
+                if (t <= stops[i].t) {
+                    const a = stops[i - 1];
+                    const b = stops[i];
+                    const lt = (t - a.t) / Math.max(1e-6, b.t - a.t);
+                    return [
+                        lerp(a.c[0], b.c[0], lt),
+                        lerp(a.c[1], b.c[1], lt),
+                        lerp(a.c[2], b.c[2], lt),
+                    ];
+                }
+            }
+
+            return stops[stops.length - 1].c;
+        }
+
+        function buildSubsystemMap(globalScale) {
+            const raw = {
+                ring: {
+                    lifetimeSec: 0.2,
+                    size: 0.12,
+                    localScale: 1.0,
+                    startSizeMode: 0,
+                    startSizeScalar: 0.11999999731779099,
+                    startSizeMinScalar: 0.14000000059604645,
+                    startRotationMode: 3,
+                    startRotationScalar: 6.283185005187988,
+                    startRotationMinScalar: 0.0,
+                    sizeCurve: [
+                        { t: 0.0, v: 0.32583582401275635, inSlope: 2.4004733562469482, outSlope: 2.4004733562469482 },
+                        { t: 0.21392822265625, v: 0.7159773111343384, inSlope: 0.9115744829177856, outSlope: 0.9115744829177856 },
+                        { t: 1.0, v: 1.0, inSlope: 0.0, outSlope: 0.0 },
+                    ],
+                    colorStops: [
+                        { t: 0.0, c: [1.0, 1.0, 1.0] },
+                        { t: 7903 / 65535, c: [0.24056601524353027, 0.39061814546585083, 1.0] },
+                        { t: 1.0, c: [0.24056601524353027, 0.39061814546585083, 1.0] },
+                    ],
+                    alphaStops: [
+                        { t: 0.0, v: 1.0 },
+                        { t: 7132 / 65535, v: 1.0 },
+                        { t: 1.0, v: 0.0 },
+                    ],
+                },
+                ring3: {
+                    lifetimeSec: 0.6,
+                    startLifetimeMode: 3,
+                    startLifetimeScalar: 0.6000000238418579,
+                    startLifetimeMinScalar: 0.699999988079071,
+                    size: 0.2,
+                    localScale: 0.3078823983669281,
+                    startSpeedMode: 3,
+                    startSpeedScalar: 0.4000000059604645,
+                    startSpeedMinScalar: 0.30000001192092896,
+                    startSizeMode: 3,
+                    startSizeScalar: 0.20000000298023224,
+                    startSizeMinScalar: 0.10000000149011612,
+                    shapeScale: 0.30000001192092896,
+                    clickBurst: 4,
+                    sizeCurve: [
+                        { t: 0.0, v: 0.0, inSlope: 0.0, outSlope: 0.0 },
+                        { t: 0.15445095300674438, v: 1.0, inSlope: 0.0, outSlope: 0.0 },
+                        { t: 1.0, v: 0.0, inSlope: -2.1621501445770264, outSlope: -2.1621501445770264 },
+                    ],
+                    colorStops: [
+                        { t: 11951 / 65535, c: [1.0, 1.0, 1.0] },
+                        { t: 18504 / 65535, c: [0.37264150381088257, 0.7731872797012329, 1.0] },
+                        { t: 30262 / 65535, c: [0.37254902720451355, 0.7725490927696228, 1.0] },
+                        { t: 43369 / 65535, c: [0.3529411852359772, 0.729411780834198, 0.9450981020927429] },
+                        { t: 54163 / 65535, c: [0.37254902720451355, 0.7725490927696228, 1.0] },
+                        { t: 1.0, c: [0.37254902720451355, 0.7725490927696228, 1.0] },
+                    ],
+                    alphaStops: [
+                        { t: 18890 / 65535, v: 1.0 },
+                        { t: 23901 / 65535, v: 0.0 },
+                        { t: 30840 / 65535, v: 1.0 },
+                        { t: 37586 / 65535, v: 0.0 },
+                        { t: 43754 / 65535, v: 1.0 },
+                        { t: 49537 / 65535, v: 0.0 },
+                        { t: 55898 / 65535, v: 1.0 },
+                        { t: 1.0, v: 1.0 },
+                    ],
+                    uvEnabled: true,
+                    uvTilesX: 2,
+                    uvTilesY: 1,
+                    uvCycles: 1.0,
+                    uvStartFrameMode: 3,
+                    uvStartFrameScalar: 0.5,
+                    uvStartFrameMinScalar: 0.0,
+                    uvFrameOverTimeMode: 3,
+                    uvFrameOverTimeScalar: 0.5,
+                    uvFrameOverTimeMinScalar: 0.0,
+                },
+                ring4: {
+                    lifetimeSec: 0.2,
+                    startLifetimeMode: 3,
+                    startLifetimeScalar: 0.20000000298023224,
+                    startLifetimeMinScalar: 0.4000000059604645,
+                    size: 0.2,
+                    localScale: 0.3078823983669281,
+                    startSpeedMode: 3,
+                    startSpeedScalar: 0.20000000298023224,
+                    startSpeedMinScalar: 0.30000001192092896,
+                    startSizeMode: 3,
+                    startSizeScalar: 0.20000000298023224,
+                    startSizeMinScalar: 0.10000000149011612,
+                    rateOverDistance: 5.0,
+                    shapeScale: 0.15000000596046448,
+                    distanceBurst: 1,
+                    sizeCurve: [
+                        { t: 0.0, v: 0.0, inSlope: 0.0, outSlope: 0.0 },
+                        { t: 0.15445095300674438, v: 1.0, inSlope: 0.0, outSlope: 0.0 },
+                        { t: 1.0, v: 0.0, inSlope: -2.1621501445770264, outSlope: -2.1621501445770264 },
+                    ],
+                    colorStops: [
+                        { t: 11951 / 65535, c: [1.0, 1.0, 1.0] },
+                        { t: 18504 / 65535, c: [0.37264150381088257, 0.7731872797012329, 1.0] },
+                        { t: 30262 / 65535, c: [0.37254902720451355, 0.7725490927696228, 1.0] },
+                        { t: 43369 / 65535, c: [0.3529411852359772, 0.729411780834198, 0.9450981020927429] },
+                        { t: 54163 / 65535, c: [0.37254902720451355, 0.7725490927696228, 1.0] },
+                        { t: 1.0, c: [0.37254902720451355, 0.7725490927696228, 1.0] },
+                    ],
+                    alphaStops: [
+                        { t: 18890 / 65535, v: 1.0 },
+                        { t: 23901 / 65535, v: 0.0 },
+                        { t: 30840 / 65535, v: 1.0 },
+                        { t: 37586 / 65535, v: 0.0 },
+                        { t: 43754 / 65535, v: 1.0 },
+                        { t: 49537 / 65535, v: 0.0 },
+                        { t: 55898 / 65535, v: 1.0 },
+                        { t: 1.0, v: 1.0 },
+                    ],
+                    uvEnabled: true,
+                    uvTilesX: 2,
+                    uvTilesY: 1,
+                    uvCycles: 1.0,
+                    uvStartFrameMode: 3,
+                    uvStartFrameScalar: 0.5,
+                    uvStartFrameMinScalar: 0.0,
+                    uvFrameOverTimeMode: 3,
+                    uvFrameOverTimeScalar: 0.5,
+                    uvFrameOverTimeMinScalar: 0.0,
+                },
+                meshTri: {
+                    lifetimeSec: 0.6,
+                    size: 0.12,
+                    localScale: 1.0,
+                    startSizeMode: 3,
+                    startSizeScalar: 0.11999999731779099,
+                    startSizeMinScalar: 0.14000000059604645,
+                    startRotationMode: 3,
+                    startRotationScalar: 6.283185005187988,
+                    startRotationMinScalar: 0.0,
+                    clickBurst: 2,
+                    rotationEnabled: true,
+                    rotationScalar: 11.170106887817383,
+                    rotationCurveMin: [
+                        { t: 0.14903903007507324, v: 1.0 },
+                        { t: 1.0, v: 0.4556182622909546 },
+                    ],
+                    rotationCurveMax: [
+                        { t: 0.1586538404226303, v: 0.7988165616989136 },
+                        { t: 1.0, v: -0.0650913417339325 },
+                    ],
+                    customData0Curve: [
+                        { t: 0.0, v: 1.0, inSlope: 0.0, outSlope: 0.0 },
+                        { t: 0.20000000298023224, v: 0.0, inSlope: 0.0, outSlope: 2.4249367713928223 },
+                        { t: 1.0, v: 1.0, inSlope: 0.27735635638237, outSlope: 0.27735635638237 },
+                    ],
+                    sizeCurve: [
+                        { t: 0.00720977783203125, v: 0.4205089807510376, inSlope: 2.4004733562469482, outSlope: 2.4004733562469482 },
+                        { t: 0.21392822265625, v: 0.7159773111343384, inSlope: 0.9115744829177856, outSlope: 0.9115744829177856 },
+                        { t: 1.0, v: 1.0, inSlope: 0.0, outSlope: 0.0 },
+                    ],
+                    colorStops: [
+                        { t: 7325 / 65535, c: [1.0, 1.0, 1.0] },
+                        { t: 32768 / 65535, c: [0.2971698045730591, 0.6532865166664124, 1.0] },
+                        { t: 1.0, c: [0.0, 0.08176128566265106, 0.801886796951294] },
+                    ],
+                    alphaStops: [
+                        { t: 0.0, v: 1.0 },
+                        { t: 7132 / 65535, v: 1.0 },
+                        { t: 1.0, v: 1.0 },
+                    ],
+                },
+                trail: {
+                    lifetimeSec: 0.30000001192092896,
+                    widthMultiplier: 0.004999999888241291,
+                    minVertexDistance: 0.009999999776482582,
+                    numCornerVertices: 4,
+                    numCapVertices: 1,
+                    killUnderTimeScale: 0.19,
+                    hdrColor: [23.968628, 23.968628, 23.968628],
+                    gradientMode: 0,
+                    colorKeys: [
+                        { t: 1349 / 65535, c: [0.0, 0.3905813694000244, 1.0] },
+                        { t: 27563 / 65535, c: [0.0, 0.09486991167068481, 0.2823529541492462] },
+                        { t: 1.0, c: [0.0, 0.0, 0.0] },
+                    ],
+                    alphaKeys: [
+                        { t: 0.0, v: 1.0 },
+                        { t: 1.0, v: 1.0 },
+                    ],
+                },
+            };
+
+            const mapped = {};
+            for (const [key, value] of Object.entries(raw)) {
+                const size = value.size ?? 0.0;
+                const localScale = value.localScale ?? 1.0;
+                const lifetimeSec = value.lifetimeSec ?? 0.0001;
+                mapped[key] = {
+                    ...value,
+                    lifetimeSec,
+                    size,
+                    rateOverDistance: value.rateOverDistance ?? 0.0,
+                    clickBurst: value.clickBurst ?? 0,
+                    distanceBurst: value.distanceBurst ?? 1,
+                    startLifetimeMode: value.startLifetimeMode ?? 0,
+                    startLifetimeScalar: value.startLifetimeScalar ?? lifetimeSec,
+                    startLifetimeMinScalar: value.startLifetimeMinScalar ?? lifetimeSec,
+                    startSpeedMode: value.startSpeedMode ?? 0,
+                    startSpeedScalar: value.startSpeedScalar ?? 0.0,
+                    startSpeedMinScalar: value.startSpeedMinScalar ?? 0.0,
+                    startSizeMode: value.startSizeMode ?? 0,
+                    startSizeScalar: value.startSizeScalar ?? size,
+                    startSizeMinScalar: value.startSizeMinScalar ?? size,
+                    startRotationMode: value.startRotationMode ?? 0,
+                    startRotationScalar: value.startRotationScalar ?? 0,
+                    startRotationMinScalar: value.startRotationMinScalar ?? 0,
+                    uvEnabled: value.uvEnabled ?? false,
+                    uvTilesX: value.uvTilesX ?? 1,
+                    uvTilesY: value.uvTilesY ?? 1,
+                    uvCycles: value.uvCycles ?? 1.0,
+                    localScalePx: localScale * UNITY_SIZE_TO_PX * globalScale,
+                    sizePx: size * localScale * UNITY_SIZE_TO_PX * globalScale,
+                    widthPx: (value.widthMultiplier ?? 0.0) * UNITY_SIZE_TO_PX * globalScale,
+                    minVertexDistancePx: (value.minVertexDistance ?? 0.0) * UNITY_SIZE_TO_PX * globalScale,
+                    hdrGain: ((value.hdrColor?.[0] ?? 1) + (value.hdrColor?.[1] ?? 1) + (value.hdrColor?.[2] ?? 1)) / 3,
+                };
+            }
+
+            return mapped;
         }
 
         class MouseSpark {
             constructor(opts = {}) {
-                this.color = opts.color || '45,175,255';
-                this.scale = opts.scale || 1.5;
+                this.color = opts.color || DEFAULT_COLOR;
+                this.scale = opts.scale || UI_DEFAULT_SCALE;
                 this.opacity = opts.opacity || 1.0;
                 this.trailSpeed = opts.trailSpeed != null ? opts.trailSpeed : (opts.speed || 1.0);
                 this.clickSpeed = opts.clickSpeed != null ? opts.clickSpeed : (opts.speed || 1.0);
-                this.maxTrail = opts.maxTrail || 16;
+                this.trailThickness = opts.trailThickness != null ? opts.trailThickness : 1.0;
+                this.trailFrameIntervalMs = 1000 / 40;
+                this.trailRenderAccumulator = 1.0;
+                this.lastTrailRenderGateMs = performance.now();
 
-                this.sparksPool = [];
-                this.wavesPool = [];
-
-                this.waves = [];
-                this.sparks = [];
+                this.clickEffects = [];
+                this.distanceEffects = [];
                 this.trail = [];
                 this.isDown = false;
                 this.lastPos = null;
-                this.baseFrameMs = 1000 / 60;
                 this.maxDeltaMs = 100;
                 this.lastFrameTime = performance.now();
                 this.dpr = 1;
@@ -83,98 +474,144 @@
                 this.previousDirtyRects = [];
                 this.forceFullRedraw = true;
 
+                this.trailDistanceAccumulator = 0;
+                this.trailEmitX = Number.NaN;
+                this.trailEmitY = Number.NaN;
+                this.trailLastPos = null;
+                this.trailSmoothX = Number.NaN;
+                this.trailSmoothY = Number.NaN;
+                this.distanceAccumulator = 0;
 
-                this.ringsStartColor = [250, 252, 252];
-                //this.ringsEndColor = [200, 250, 255];
-                this.ringsEndColor = ringsEndColorFromRgb(this.color);
-
+                this.rebuildConfig();
                 this.initCanvas();
                 this.bindEvents();
             }
 
+            rebuildConfig() {
+                const base = parseRgb(this.color, DEFAULT_COLOR_RGB);
+                const defaultHsl = rgbToHsl(DEFAULT_COLOR_RGB);
+                const themeHsl = rgbToHsl(base);
+                const globalScale = clamp(this.scale / UI_DEFAULT_SCALE, 0.5, 3.0);
+                const colorMapActive = !colorsNearlyEqual(base, DEFAULT_COLOR_RGB);
+                const themeHueShift = themeHsl[0] - defaultHsl[0];
+                const themeSatScale = defaultHsl[1] > 1e-6 ? themeHsl[1] / defaultHsl[1] : 1.0;
+                const themeLightnessOffset = themeHsl[2] - defaultHsl[2];
+                this.cfg = {
+                    globalScale,
+                    colorBase: base,
+                    colorDeep: colorMapActive ? mapThemeRgb(makeDeepRgb(DEFAULT_COLOR_RGB), themeHueShift, themeSatScale, themeLightnessOffset) : makeDeepRgb(base),
+                    colorWhite: [1, 1, 1],
+                    trailThickness: clamp(this.trailThickness, 0.5, 3.0),
+                    colorMapActive,
+                    themeHueShift,
+                    themeSatScale,
+                    themeLightnessOffset,
+                    distanceEmitStepPx: 100,
+                };
+                this.subsystems = buildSubsystemMap(globalScale);
+            }
+
+            themeRgb(rgb) {
+                if (!this.cfg.colorMapActive) {
+                    return rgb;
+                }
+
+                return mapThemeRgb(rgb, this.cfg.themeHueShift, this.cfg.themeSatScale, this.cfg.themeLightnessOffset);
+            }
+
             bindEvents() {
-                const getPos = (e) => ({ x: e.clientX, y: e.clientY });
+                const getPos = e => ({ x: e.clientX, y: e.clientY });
                 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-                window.addEventListener("mousedown", (e) => {
+                window.addEventListener("mousedown", e => {
+                    if (this.clickEffects.length === 0 && this.distanceEffects.length === 0 && this.trail.length === 0) {
+                        this.lastFrameTime = performance.now();
+                    }
                     this.isDown = true;
                     this.lastPos = getPos(e);
+                    this.trailDistanceAccumulator = 0;
+                    this.distanceAccumulator = 0;
+                    this.trailEmitX = this.lastPos.x;
+                    this.trailEmitY = this.lastPos.y;
+                    this.resetTrailSmoothing(this.lastPos);
+                    this.beginTrailStroke(this.lastPos.x, this.lastPos.y);
                     this.createEffects(this.lastPos.x, this.lastPos.y);
                 });
 
-                window.addEventListener("mousemove", (e) => {
+                window.addEventListener("mousemove", e => {
                     if (!this.isDown && !window.effectiveAlwaysTrail) return;
+
                     const p = getPos(e);
                     const prev = this.lastPos;
                     if (!prev) {
                         this.lastPos = p;
+                        const trailP = this.resetTrailSmoothing(p);
+                        if (window.effectiveAlwaysTrail) {
+                            this.beginTrailStroke(trailP.x, trailP.y);
+                        }
                         return;
                     }
-                    if (dist(p, prev) > 2) {
-                        this.trail.push({ x: p.x, y: p.y, life: 1 });
-                        if (this.trail.length > this.maxTrail) this.trail.shift();
 
-                        if (Math.random() < 0.3) {
-                            const a = Math.random() * Math.PI * 2;
-                            const speedAdjust = this.scale / 1.5;
-                            this.sparks.push({
-                                x: p.x + Math.cos(a) * 10 * this.scale,
-                                y: p.y + Math.sin(a) * 10 * this.scale,
-                                vx: Math.cos(a) * 1.3 * speedAdjust,
-                                vy: Math.sin(a) * 1.3 * speedAdjust,
-                                rot: Math.random() * Math.PI * 2,
-                                rs: 0.16,
-                                s: 9 * this.scale,
-                                a: 0.7,
-                                f: 0.95,
-                                fromClick: false,
-                            });
+                    const d = dist(p, prev);
+                    if (d > 0) {
+                        const prevTrail = this.trailLastPos ?? this.resetTrailSmoothing(prev);
+                        const trailP = this.smoothTrailPoint(p);
+                        const trailD = dist(trailP, prevTrail);
+                        if (trailD > 0.01) {
+                            this.handleTrailMove(prevTrail, trailP, trailD);
+                        }
+                        this.trailLastPos = trailP;
+                        if (this.isDown) {
+                            this.handleDistanceEmitter(p, d);
                         }
                     }
+
                     this.lastPos = p;
                 });
 
                 window.addEventListener("mouseup", () => {
                     this.isDown = false;
+                    this.trailDistanceAccumulator = 0;
+                    this.trailEmitX = Number.NaN;
+                    this.trailEmitY = Number.NaN;
+                    if (!window.effectiveAlwaysTrail) {
+                        this.trailLastPos = null;
+                        this.trailSmoothX = Number.NaN;
+                        this.trailSmoothY = Number.NaN;
+                    }
+                    this.distanceAccumulator = 0;
                 });
             }
 
-            // 初始化画布 可见层 + 离屏缓冲
-            // lighter合成后贴回，减轻主画布混合开销
             initCanvas() {
-                // 主画布
                 this.mainCanvas = document.getElementById("sparkCanvas");
                 this.mainCtx = this.mainCanvas.getContext("2d");
-
-                // 缓冲画布
                 this.bufferCanvas = document.createElement("canvas");
                 this.bufferCtx = this.bufferCanvas.getContext("2d");
-
                 this.resize();
-
-                // 监听窗口缩放
                 window.addEventListener("resize", () => this.resize());
             }
 
             clearEffects() {
-                this.waves = [];
-                this.sparks = [];
+                this.clickEffects = [];
+                this.distanceEffects = [];
                 this.trail = [];
                 this.isDown = false;
                 this.lastPos = null;
+                this.trailLastPos = null;
+                this.trailSmoothX = Number.NaN;
+                this.trailSmoothY = Number.NaN;
+                this.trailRenderAccumulator = 1.0;
+                this.lastTrailRenderGateMs = performance.now();
                 this.previousDirtyRects = [];
                 this.forceFullRedraw = true;
                 this.lastFrameTime = performance.now();
-                if (this.mainCtx && this.mainCanvas) {
-                    this.mainCtx.clearRect(0, 0, this.mainCanvas.width, this.mainCanvas.height);
-                }
-                if (this.bufferCtx && this.bufferCanvas) {
-                    this.bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
-                }
+                this.mainCtx?.clearRect(0, 0, this.mainCanvas.width, this.mainCanvas.height);
+                this.bufferCtx?.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
             }
 
             alpha(value) {
-                return Math.max(0, Math.min(1, value * this.opacity));
+                return clamp(value * this.opacity, 0, 1);
             }
 
             resize() {
@@ -193,75 +630,579 @@
                 this.bufferCanvas.height = h;
                 this.previousDirtyRects = [];
                 this.forceFullRedraw = true;
-
                 this.bufferCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
             }
 
-            // 中间的填充叫 filledCircle
-            // 外围的弧线叫 ring
-            // 它们合起来叫 wave
+            resetTrailSmoothing(point) {
+                this.trailSmoothX = point.x;
+                this.trailSmoothY = point.y;
+                this.trailLastPos = { x: point.x, y: point.y };
+                return this.trailLastPos;
+            }
 
+            smoothTrailPoint(point) {
+                if (!Number.isFinite(this.trailSmoothX) || !Number.isFinite(this.trailSmoothY)) {
+                    return this.resetTrailSmoothing(point);
+                }
 
-            // -=创建点击效果=-
+                const dx = point.x - this.trailSmoothX;
+                const dy = point.y - this.trailSmoothY;
+                const d = Math.hypot(dx, dy);
+                if (d < 0.25) {
+                    return { x: this.trailSmoothX, y: this.trailSmoothY };
+                }
+
+                const alpha = clamp(d / (d + TRAIL_SMOOTHING_RADIUS_PX), 0.18, 0.72);
+                this.trailSmoothX += dx * alpha;
+                this.trailSmoothY += dy * alpha;
+                return { x: this.trailSmoothX, y: this.trailSmoothY };
+            }
+
+            sampleMinMaxConstant(mode, scalar, minScalar) {
+                if (mode === 3) {
+                    const lo = Math.min(minScalar, scalar);
+                    const hi = Math.max(minScalar, scalar);
+                    return randomRange(lo, hi);
+                }
+                return scalar;
+            }
+
+            sampleStartLifetimeSec(params) {
+                return Math.max(0.0001, this.sampleMinMaxConstant(
+                    params.startLifetimeMode,
+                    params.startLifetimeScalar,
+                    params.startLifetimeMinScalar
+                ));
+            }
+
+            sampleStartSizeMul(params) {
+                return this.sampleMinMaxConstant(
+                    params.startSizeMode,
+                    params.startSizeScalar,
+                    params.startSizeMinScalar
+                ) / Math.max(1e-6, params.size);
+            }
+
+            sampleStartRotation(params) {
+                return this.sampleMinMaxConstant(
+                    params.startRotationMode,
+                    params.startRotationScalar,
+                    params.startRotationMinScalar
+                );
+            }
+
+            sampleUvStartFrameNorm(params) {
+                return clamp(this.sampleMinMaxConstant(
+                    params.uvStartFrameMode,
+                    params.uvStartFrameScalar,
+                    params.uvStartFrameMinScalar
+                ), 0, 1);
+            }
+
+            sampleUvFrameOverTimeNorm(params) {
+                return Math.max(0, this.sampleMinMaxConstant(
+                    params.uvFrameOverTimeMode,
+                    params.uvFrameOverTimeScalar,
+                    params.uvFrameOverTimeMinScalar
+                ));
+            }
+
+            emitRing() {
+                const params = this.subsystems.ring;
+                return {
+                    params,
+                    lifetimeSec: params.lifetimeSec,
+                    lifetimeMs: Math.max(16, Math.round(params.lifetimeSec * 1000)),
+                    startRotationRad: this.sampleStartRotation(params),
+                };
+            }
+
+            emitTriangleParticles(params, countOverride = null) {
+                const count = Math.max(0, Math.round(countOverride ?? params.clickBurst));
+                const particles = [];
+
+                for (let i = 0; i < count; i++) {
+                    const itemLifetimeSec = this.sampleStartLifetimeSec(params);
+                    particles.push({
+                        angle: Math.random() * Math.PI * 2,
+                        orientBase: Math.random() < 0.5 ? Math.PI * 0.5 : Math.PI * 1.5,
+                        spin: 0,
+                        lifetimeSec: itemLifetimeSec,
+                        lifetimeMs: Math.max(16, Math.round(itemLifetimeSec * 1000)),
+                        speedPxPerSec: this.sampleMinMaxConstant(
+                            params.startSpeedMode,
+                            params.startSpeedScalar,
+                            params.startSpeedMinScalar
+                        ),
+                        sizeMul: this.sampleStartSizeMul(params),
+                        uvStartFrameNorm: this.sampleUvStartFrameNorm(params),
+                        uvFrameOverTimeNorm: this.sampleUvFrameOverTimeNorm(params),
+                    });
+                }
+
+                const fallbackMs = Math.max(16, Math.round(params.lifetimeSec * 1000));
+                const lifetimeMs = particles.reduce((maxMs, item) => Math.max(maxMs, item.lifetimeMs), fallbackMs);
+                return { params, lifetimeMs, lifetimeSec: lifetimeMs / 1000, particles };
+            }
+
+            emitMeshTri() {
+                const params = this.subsystems.meshTri;
+                const rings = [];
+                for (let i = 0; i < Math.max(0, Math.round(params.clickBurst)); i++) {
+                    rings.push({
+                        angle: this.sampleStartRotation(params),
+                        rotMix: Math.random(),
+                        radiusMul: this.sampleStartSizeMul(params),
+                        widthMul: 1.0,
+                        phase: 0.0,
+                    });
+                }
+
+                return {
+                    params,
+                    lifetimeMs: Math.max(16, Math.round(params.lifetimeSec * 1000)),
+                    lifetimeSec: params.lifetimeSec,
+                    rings,
+                };
+            }
+
             createEffects(x, y) {
-                const rc = CREATE_CLICK_CFG.rings;
-                const sparksCount = CREATE_CLICK_CFG.sparksCount;
+                const parts = {
+                    ring: this.emitRing(),
+                    ring3: this.emitTriangleParticles(this.subsystems.ring3),
+                    meshTri: this.emitMeshTri(),
+                };
+                const durationMs = Math.max(
+                    parts.ring.lifetimeMs,
+                    parts.ring3.lifetimeMs,
+                    parts.meshTri.lifetimeMs
+                );
+                this.clickEffects.push({ x, y, tMs: 0, durationMs, parts });
+                if (this.clickEffects.length > MAX_CLICK_EFFECTS) {
+                    this.clickEffects.splice(0, this.clickEffects.length - MAX_CLICK_EFFECTS);
+                }
+            }
 
-                let wave;
-                if (this.wavesPool.length > 0) {
-                    wave = this.wavesPool.pop();
+            beginTrailStroke(x, y) {
+                const trail = this.subsystems.trail;
+                if (!trail) return;
+
+                const now = performance.now();
+                const last = this.trail[this.trail.length - 1];
+                if (last && last.penUp && Math.hypot(last.x - x, last.y - y) < 0.35) {
+                    last.x = x;
+                    last.y = y;
+                    last.tMs = now;
                 } else {
-                    wave = {};
+                    this.trail.push({ x, y, tMs: now, penUp: true });
                 }
-                if (!wave.ring) wave.ring = { segs: [] };
 
-                // 赋值
-                wave.x = x;
-                wave.y = y;
-                wave.r = 0;
-                wave.life = 0;
-                wave.ring.ang = Math.random() * Math.PI * 2;
-                wave.ring.rs = rc.rsList[Math.floor(Math.random() * rc.rsList.length)];
-                wave.ring.segs[0] = {
-                    off: 0,
-                    len: rc.len,
-                    rRoundRate: rc.rRoundRateList[Math.floor(Math.random() * rc.rRoundRateList.length)],
-                };
-                wave.ring.segs[1] = {
-                    off: (Math.random() * 3 - 1.5) * Math.PI,
-                    len: rc.len,
-                    rRoundRate: rc.rRoundRateList[Math.floor(Math.random() * rc.rRoundRateList.length)],
-                };
+                this.trimTrailPoints();
+            }
 
-                // 进入循环
-                this.waves.push(wave);
-
-                const speedAdjust = this.scale / 1.5;
-                for (let i = 0; i < sparksCount; i++) {
-                    const a = Math.random() * Math.PI * 2;
-                    const speed = (4.8 + Math.random() * 2) * speedAdjust;
-
-                    // 创建
-                    let spark;
-                    if (this.sparksPool.length > 0) {
-                        spark = this.sparksPool.pop();
-                    } else {
-                        spark = {};
+            spawnTrailSegment(x1, y1, x2, y2) {
+                const now = performance.now();
+                const pushPoint = (x, y, penUp = false) => {
+                    const last = this.trail[this.trail.length - 1];
+                    if (last && !last.penUp && !penUp && Math.hypot(last.x - x, last.y - y) < 0.35) {
+                        last.tMs = now;
+                        return;
                     }
+                    this.trail.push({ x, y, tMs: now, penUp });
+                };
 
-                    // 赋值
-                    spark.x = x;
-                    spark.y = y;
-                    spark.vx = Math.cos(a) * speed;
-                    spark.vy = Math.sin(a) * speed;
-                    spark.rot = Math.random() * Math.PI * 2;
-                    spark.rs = (Math.random() - 0.5) * 0.28;
-                    spark.s = (4 + Math.random() * 3) * this.scale;
-                    spark.a = 1;
-                    spark.f = 0.9;
-                    spark.fromClick = true;
-                    this.sparks.push(spark);
+                if (this.trail.length === 0) {
+                    pushPoint(x1, y1, true);
                 }
+                pushPoint(x2, y2);
+            }
+
+            trimTrailPoints() {
+                if (this.trail.length > TRAIL_MAX_POINTS) {
+                    this.trail.splice(0, this.trail.length - TRAIL_MAX_POINTS);
+                }
+            }
+
+            handleTrailMove(prev, current, distance) {
+                const trail = this.subsystems.trail;
+                if (!trail) return;
+
+                const minStep = Math.max(1e-3, trail.minVertexDistancePx);
+                const dirX = (current.x - prev.x) / distance;
+                const dirY = (current.y - prev.y) / distance;
+                let remain = distance;
+                let walkX = prev.x;
+                let walkY = prev.y;
+                let emittedSteps = 0;
+
+                while (this.trailDistanceAccumulator + remain >= minStep && emittedSteps < MAX_TRAIL_STEPS_PER_MOVE) {
+                    const step = minStep - this.trailDistanceAccumulator;
+                    const nx = walkX + dirX * step;
+                    const ny = walkY + dirY * step;
+                    if (Number.isFinite(this.trailEmitX) && Number.isFinite(this.trailEmitY)) {
+                        this.spawnTrailSegment(this.trailEmitX, this.trailEmitY, nx, ny);
+                    }
+                    this.trailEmitX = nx;
+                    this.trailEmitY = ny;
+                    walkX = nx;
+                    walkY = ny;
+                    remain -= step;
+                    this.trailDistanceAccumulator = 0;
+                    emittedSteps++;
+                }
+
+                if (emittedSteps >= MAX_TRAIL_STEPS_PER_MOVE && this.trailDistanceAccumulator + remain >= minStep) {
+                    if (Number.isFinite(this.trailEmitX) && Number.isFinite(this.trailEmitY)) {
+                        this.spawnTrailSegment(this.trailEmitX, this.trailEmitY, current.x, current.y);
+                    }
+                    this.trailEmitX = current.x;
+                    this.trailEmitY = current.y;
+                    this.trailDistanceAccumulator = 0;
+                    this.trimTrailPoints();
+                    return;
+                }
+
+                this.trailDistanceAccumulator += remain;
+                this.trimTrailPoints();
+            }
+
+            handleDistanceEmitter(current, distance) {
+                const ring4 = this.subsystems.ring4;
+                if (!ring4 || ring4.rateOverDistance <= 0) return;
+
+                const stepPx = clamp(this.cfg.distanceEmitStepPx * (UNITY_RATE_DISTANCE_BASE / ring4.rateOverDistance), 2, 240);
+                this.distanceAccumulator += distance;
+                let emitEvents = 0;
+                while (this.distanceAccumulator >= stepPx && emitEvents < MAX_DISTANCE_EMIT_EVENTS_PER_MOVE) {
+                    this.distanceAccumulator -= stepPx;
+                    emitEvents++;
+                }
+                if (emitEvents >= MAX_DISTANCE_EMIT_EVENTS_PER_MOVE && this.distanceAccumulator >= stepPx) {
+                    this.distanceAccumulator = 0;
+                }
+
+                if (emitEvents > 0) {
+                    const burstCount = Math.max(1, Math.round((ring4.distanceBurst ?? 1) * emitEvents));
+                    const part = this.emitTriangleParticles(ring4, burstCount);
+                    this.distanceEffects.push({
+                        x: current.x,
+                        y: current.y,
+                        tMs: 0,
+                        durationMs: part.lifetimeMs,
+                        part,
+                    });
+                    if (this.distanceEffects.length > MAX_DISTANCE_EFFECTS) {
+                        this.distanceEffects.splice(0, this.distanceEffects.length - MAX_DISTANCE_EFFECTS);
+                    }
+                }
+            }
+
+            subProgress(sub, tMs) {
+                return clamp(tMs / (sub.lifetimeMs ?? sub.params.lifetimeMs), 0, 1);
+            }
+
+            subSizeCurve(sub, p) {
+                return evalScalarStops(sub.params.sizeCurve, p, 1.0);
+            }
+
+            subColor(sub, p, fallbackRgb, fallbackAlpha = 1.0) {
+                const hasStops = Array.isArray(sub.params.colorStops) && sub.params.colorStops.length > 0;
+                const rgb = hasStops ? evalColorStops(sub.params.colorStops, p, fallbackRgb) : fallbackRgb;
+                const alpha = evalScalarStops(sub.params.alphaStops, p, fallbackAlpha);
+                const mapped = hasStops ? this.themeRgb(rgb) : rgb;
+                return [mapped[0], mapped[1], mapped[2], alpha];
+            }
+
+            uvFrameFactor(sub, p, item) {
+                if (!sub.params.uvEnabled || sub.params.uvTilesX <= 1) {
+                    return 1.0;
+                }
+
+                const tilesX = Math.max(1, Math.round(sub.params.uvTilesX ?? 1));
+                const tilesY = Math.max(1, Math.round(sub.params.uvTilesY ?? 1));
+                const totalFrames = tilesX * tilesY;
+                const cycles = Math.max(0.001, sub.params.uvCycles ?? 1.0);
+                const frameNorm = item.uvStartFrameNorm + item.uvFrameOverTimeNorm * p * cycles;
+                const wrapped = ((frameNorm % 1) + 1) % 1;
+                const framePos = wrapped * totalFrames;
+                const frame0 = Math.floor(framePos) % totalFrames;
+                const frame1 = (frame0 + 1) % totalFrames;
+                const blend = framePos - Math.floor(framePos);
+                const uvLut = totalFrames === 2 ? [0.78, 1.0] : [1.0];
+                return lerp(uvLut[frame0 % uvLut.length] ?? 1.0, uvLut[frame1 % uvLut.length] ?? 1.0, blend);
+            }
+
+            drawClickEffect(effect) {
+                this.renderRing(effect);
+                this.renderTriangleLayer(effect.x, effect.y, effect.parts.ring3, effect.tMs);
+                this.renderMeshTri(effect);
+            }
+
+            renderRing(effect) {
+                const ctx = this.bufferCtx;
+                const sub = effect.parts.ring;
+                const p = this.subProgress(sub, effect.tMs);
+                if (p >= 1) return;
+                const colorSettleP = 7903 / 65535;
+                if (p < colorSettleP) return;
+
+                const curve = this.subSizeCurve(sub, p);
+                const col = this.subColor(sub, p, this.cfg.colorBase, 1.0);
+                const radius = sub.params.sizePx * Math.max(0, curve);
+                const entryFade = clamp((p - colorSettleP) / 0.04, 0, 1);
+
+                ctx.save();
+                ctx.translate(effect.x, effect.y);
+                ctx.rotate(sub.startRotationRad ?? 0);
+                ctx.scale(1.0, 0.94);
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                ctx.fillStyle = rgba([col[0], col[1], col[2]], this.alpha(0.58 * col[3] * entryFade));
+                ctx.fill();
+                ctx.restore();
+            }
+
+            renderTriangleLayer(cx, cy, sub, tMs) {
+                if (!sub.particles || sub.particles.length === 0) return;
+
+                for (const item of sub.particles) {
+                    const p = clamp(tMs / (item.lifetimeMs ?? sub.lifetimeMs), 0, 1);
+                    if (p >= 1) continue;
+
+                    const lifeSec = item.lifetimeSec ?? sub.lifetimeSec;
+                    const curve = this.subSizeCurve(sub, p);
+                    const col = this.subColor(sub, p, this.cfg.colorBase, 1.0);
+                    const dist = item.speedPxPerSec * lifeSec * p;
+                    const radius = sub.params.localScalePx * (sub.params.shapeScale + dist);
+                    const x = cx + Math.cos(item.angle) * radius;
+                    const y = cy + Math.sin(item.angle) * radius;
+                    const alpha = clamp(col[3] * this.uvFrameFactor(sub, p, item), 0, 1);
+                    const size = sub.params.sizePx * item.sizeMul * Math.max(0, curve);
+                    const rot = (item.orientBase ?? 0) + item.spin * p;
+                    this.drawTriangle(x, y, size, rot, [col[0], col[1], col[2]], this.cfg.colorWhite, alpha);
+                }
+            }
+
+            drawTriangle(x, y, size, orient, baseCol, highlightCol, alpha) {
+                const ctx = this.bufferCtx;
+                const side = size * 1.35;
+                const h = side * 0.8660254;
+
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(orient);
+
+                ctx.beginPath();
+                ctx.moveTo(0, -2 * h / 3);
+                ctx.lineTo(-side / 2, h / 3);
+                ctx.lineTo(side / 2, h / 3);
+                ctx.closePath();
+                ctx.fillStyle = rgba(baseCol, this.alpha(alpha));
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(0, -2 * h / 3);
+                ctx.lineTo(-side * 0.25, -h * 0.02);
+                ctx.lineTo(side * 0.25, -h * 0.02);
+                ctx.closePath();
+                ctx.fillStyle = rgba(highlightCol, this.alpha(alpha * 0.25));
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            meshTriAngularVelocity(sub, p, blend, scalar) {
+                const minV = evalScalarStops(sub.params.rotationCurveMin, p, 0);
+                const maxV = evalScalarStops(sub.params.rotationCurveMax, p, 0);
+                return lerp(minV, maxV, blend) * scalar;
+            }
+
+            meshTriRotation(sub, p, mix) {
+                if (!sub.params.rotationEnabled || p <= 0) return 0;
+                const lifeSec = sub.lifetimeSec ?? sub.params.lifetimeSec ?? 0;
+                if (lifeSec <= 0) return 0;
+
+                const blend = clamp(mix, 0, 1);
+                const scalar = sub.params.rotationScalar ?? 0;
+                const steps = 8;
+                let integral = 0;
+                let prev = this.meshTriAngularVelocity(sub, 0, blend, scalar);
+                for (let i = 1; i <= steps; i++) {
+                    const u = (p * i) / steps;
+                    const curr = this.meshTriAngularVelocity(sub, u, blend, scalar);
+                    integral += (prev + curr) * 0.5 * (p / steps);
+                    prev = curr;
+                }
+                return -integral * lifeSec;
+            }
+
+            meshTriCustom0(sub, p) {
+                return evalScalarStops(sub.params.customData0Curve, p, 1.0);
+            }
+
+            renderMeshTri(effect) {
+                const ctx = this.bufferCtx;
+                const sub = effect.parts.meshTri;
+                const p = this.subProgress(sub, effect.tMs);
+                if (p >= 1) return;
+
+                const profile = { innerRadiusNorm: 1.0, outerRadiusNorm: 1.0636685 };
+                for (const item of sub.rings) {
+                    const localP = clamp(p + item.phase * 0.08, 0, 1);
+                    const curve = this.subSizeCurve(sub, localP);
+                    const col = this.subColor(sub, localP, this.cfg.colorBase, 1.0);
+                    const baseRadius = sub.params.sizePx * item.radiusMul * Math.max(0, curve);
+                    const innerR = baseRadius * profile.innerRadiusNorm;
+                    const outerR = baseRadius * profile.outerRadiusNorm;
+                    const width = Math.max(0.9, (outerR - innerR) * item.widthMul);
+                    const custom0 = this.meshTriCustom0(sub, localP);
+                    const dynamicLen = lerp(0, Math.PI * 2, clamp(1 - custom0, 0, 1));
+                    if (dynamicLen <= 0.04) continue;
+
+                    const center = item.angle + this.meshTriRotation(sub, localP, item.rotMix);
+                    const start = center;
+                    const end = center + dynamicLen;
+                    const endFade = localP < 0.84 ? 1.0 : clamp((1 - localP) / 0.16, 0, 1);
+                    const brightness = clamp((0.34 + (1 - custom0) * 0.96) * endFade, 0, 1.4);
+                    const mid = [
+                        lerp(col[0], this.cfg.colorWhite[0], 0.32),
+                        lerp(col[1], this.cfg.colorWhite[1], 0.32),
+                        lerp(col[2], this.cfg.colorWhite[2], 0.32),
+                    ];
+
+                    ctx.beginPath();
+                    ctx.arc(effect.x, effect.y, outerR, start, end, false);
+                    ctx.arc(effect.x, effect.y, innerR, end, start, true);
+                    ctx.closePath();
+
+                    const grad = ctx.createRadialGradient(effect.x, effect.y, innerR, effect.x, effect.y, outerR);
+                    grad.addColorStop(0.00, rgba(this.cfg.colorDeep, this.alpha(0.14 * col[3] * brightness)));
+                    grad.addColorStop(0.45, rgba(mid, this.alpha(0.78 * col[3] * brightness)));
+                    grad.addColorStop(0.55, rgba(this.cfg.colorWhite, this.alpha(0.95 * col[3] * brightness)));
+                    grad.addColorStop(1.00, rgba(this.cfg.colorDeep, this.alpha(0.14 * col[3] * brightness)));
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.arc(effect.x, effect.y, (innerR + outerR) * 0.5, start, end);
+                    ctx.lineWidth = Math.max(0.7, width * 0.20);
+                    ctx.strokeStyle = rgba(this.cfg.colorWhite, this.alpha(0.60 * col[3] * brightness));
+                    ctx.stroke();
+                }
+            }
+
+            pruneTrail(nowMs) {
+                const trail = this.subsystems.trail;
+                const lifeMs = Math.max(1, Math.round((trail?.lifetimeSec ?? 0.3) * 1000));
+                let firstAlive = 0;
+                while (firstAlive < this.trail.length && (nowMs - this.trail[firstAlive].tMs) * this.trailSpeed > lifeMs) {
+                    firstAlive++;
+                }
+                if (firstAlive > 0) {
+                    this.trail.splice(0, firstAlive);
+                }
+            }
+
+            evalTrailGradientColor(trail, tNorm) {
+                const t = clamp(tNorm, 0, 1);
+                const keys = trail.colorKeys ?? [];
+                if (keys.length === 0) return [0, 0, 0];
+                if ((trail.gradientMode ?? 0) === 1) {
+                    let out = keys[0].c ?? [0, 0, 0];
+                    for (let i = 1; i < keys.length; i++) {
+                        if (keys[i].t > t) break;
+                        out = keys[i].c ?? out;
+                    }
+                    return this.themeRgb(out);
+                }
+                return this.themeRgb(evalColorStops(keys, t, keys[0].c ?? [0, 0, 0]));
+            }
+
+            evalTrailGradientAlpha(trail, tNorm) {
+                const t = clamp(tNorm, 0, 1);
+                const keys = trail.alphaKeys ?? [];
+                if (keys.length === 0) return 1.0;
+                return evalScalarStops(keys, t, Number.isFinite(keys[0].v) ? keys[0].v : 1.0);
+            }
+
+            sampleTrailTextureMask(tNorm) {
+                const index = clamp(tNorm, 0, 1) * TRAIL_MASK_LUT_SIZE;
+                const i0 = Math.floor(index);
+                const i1 = Math.min(TRAIL_MASK_LUT_SIZE, i0 + 1);
+                return lerp(TRAIL_MASK_LUT[i0], TRAIL_MASK_LUT[i1], index - i0);
+            }
+
+            shouldSkipTrailOnlyFrame(now) {
+                if (this.clickEffects.length > 0 || this.distanceEffects.length > 0 || this.trail.length === 0) {
+                    this.trailRenderAccumulator = 1.0;
+                    this.lastTrailRenderGateMs = now;
+                    return false;
+                }
+
+                const elapsed = Math.max(0, now - this.lastTrailRenderGateMs);
+                this.lastTrailRenderGateMs = now;
+                this.trailRenderAccumulator = Math.min(2.0, this.trailRenderAccumulator + elapsed / this.trailFrameIntervalMs);
+                if (this.trailRenderAccumulator < 1.0) {
+                    return true;
+                }
+
+                this.trailRenderAccumulator -= 1.0;
+                return false;
+            }
+
+            drawTrail(nowMs) {
+                if (this.trail.length < 2) return;
+
+                const ctx = this.bufferCtx;
+                const trail = this.subsystems.trail;
+                const baseWidth = Math.max(0.2, (trail.widthPx ?? 1.0) * this.cfg.trailThickness);
+                const hdrScale = clamp(Math.max(1.0, trail.hdrGain ?? 1.0) / 8.0, 0.6, 3.0);
+                const lifeMs = Math.max(1, Math.round((trail.lifetimeSec ?? 0.3) * 1000));
+                const bright = this.evalTrailGradientColor(trail, 0);
+                const brightCss = rgbCss(bright);
+                const bloomAlphaMul = 0.16 + 0.12 * hdrScale;
+                const coreAlphaMul = 0.50 + 0.26 * hdrScale;
+
+                ctx.save();
+                ctx.globalCompositeOperation = "lighter";
+                ctx.lineCap = (trail.numCapVertices ?? 0) > 0 ? "round" : "butt";
+                ctx.lineJoin = (trail.numCornerVertices ?? 0) > 0 ? "round" : "miter";
+                ctx.strokeStyle = brightCss;
+
+                for (let i = 1; i < this.trail.length; i++) {
+                    const p0 = this.trail[i - 1];
+                    const p1 = this.trail[i];
+                    if (p1.penUp) continue;
+                    if (Math.hypot(p1.x - p0.x, p1.y - p0.y) < 1e-3) continue;
+
+                    const age0 = clamp(((nowMs - p0.tMs) * this.trailSpeed) / lifeMs, 0, 1);
+                    const age1 = clamp(((nowMs - p1.tMs) * this.trailSpeed) / lifeMs, 0, 1);
+                    const mask0 = this.sampleTrailTextureMask(age0);
+                    const mask1 = this.sampleTrailTextureMask(age1);
+                    const maskMid = Math.max(0.02, (mask0 + mask1) * 0.5);
+                    if (maskMid <= 0.005) continue;
+
+                    const a0 = this.evalTrailGradientAlpha(trail, age0) * mask0;
+                    const a1 = this.evalTrailGradientAlpha(trail, age1) * mask1;
+                    const alphaMid = (a0 + a1) * 0.5;
+                    if (alphaMid <= 0.005) continue;
+
+                    ctx.lineWidth = baseWidth * maskMid * (1.6 + 0.24 * hdrScale);
+                    ctx.globalAlpha = this.alpha(alphaMid * bloomAlphaMul);
+                    ctx.beginPath();
+                    ctx.moveTo(p0.x, p0.y);
+                    ctx.lineTo(p1.x, p1.y);
+                    ctx.stroke();
+
+                    ctx.lineWidth = baseWidth * maskMid;
+                    ctx.globalAlpha = this.alpha(alphaMid * coreAlphaMul);
+                    ctx.beginPath();
+                    ctx.moveTo(p0.x, p0.y);
+                    ctx.lineTo(p1.x, p1.y);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
             }
 
             _clearBuffer(rect) {
@@ -274,219 +1215,9 @@
             }
 
             _clearBufferRects(rects) {
-                if (!rects || rects.length === 0) {
-                    return;
-                }
-
+                if (!rects || rects.length === 0) return;
                 for (const rect of rects) {
                     this._clearBuffer(rect);
-                }
-            }
-
-            _updateTrail(frameScale) {
-                const ctx = this.bufferCtx;
-                const n = this.trail.length;
-                let baseDecay;
-                if (window.effectiveAlwaysTrail) {
-                    baseDecay = 0.085 * frameScale;
-                } else {
-                    baseDecay = (this.isDown ? 0.085 : 0.18) * frameScale;
-                }
-                const maxStep = 0.42;
-                for (let i = n - 1; i >= 0; i--) {
-                    const t = this.trail[i];
-                    const span = Math.max(1, n - 1);
-                    const along = n > 1 ? i / span : 1;
-                    const towardCursorBias = 1.25 - 0.55 * along;
-                    let step = baseDecay * towardCursorBias;
-                    if (step > maxStep) step = maxStep;
-                    t.life -= step;
-                    if (t.life <= 0) this.trail.splice(i, 1);
-                }
-
-                const head = this.lastPos;
-                const pts =
-                    head && this.trail.length > 0
-                        ? this.trail.concat([{ x: head.x, y: head.y, life: 1 }])
-                        : this.trail.slice();
-
-                if (pts.length < 2) {
-                    return;
-                }
-
-                const gap = Math.hypot(
-                    pts[pts.length - 1].x - pts[pts.length - 2].x,
-                    pts[pts.length - 1].y - pts[pts.length - 2].y
-                );
-                if (gap < 0.75 && this.trail.length === 1) {
-                    const fade = Math.max(0, this.trail[0].life);
-                    ctx.shadowColor = 'transparent';
-                    ctx.beginPath();
-                    ctx.arc(pts[0].x, pts[0].y, 2.5 + 2 * fade, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(${this.color}, ${fade * 0.85})`;
-                    ctx.fill();
-                    return;
-                }
-
-                // 逐段渲染：每段的透明度基于数组索引位置，而非空间位置
-                // 防止当鼠标锐角转动时，尾迹变淡后突然出现的问题
-                ctx.lineWidth = 5.0;
-                ctx.shadowColor = `rgba(${this.color}, 0.6)`;
-                ctx.shadowBlur = 3;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-
-                const lastIdx = pts.length - 1;
-                for (let i = 0; i < lastIdx; i++) {
-                    const alphaStart = i / lastIdx;
-                    const alphaEnd = (i + 1) / lastIdx;
-                    const a0 = pts[i];
-                    const a1 = pts[i + 1];
-
-                    const segGrad = ctx.createLinearGradient(a0.x, a0.y, a1.x, a1.y);
-                    segGrad.addColorStop(0, `rgba(${this.color}, ${alphaStart})`);
-                    segGrad.addColorStop(1, `rgba(${this.color}, ${alphaEnd})`);
-
-                    ctx.beginPath();
-                    ctx.moveTo(a0.x, a0.y);
-                    ctx.lineTo(a1.x, a1.y);
-                    ctx.strokeStyle = segGrad;
-                    ctx.stroke();
-                }
-
-                ctx.shadowColor = 'transparent';
-            }
-
-            _strokeRingSegment(wx, wy, radius, a0, a1, lineWidth, strokeStyle) {
-                const ctx = this.bufferCtx;
-                ctx.beginPath();
-                ctx.arc(wx, wy, radius, a0, a1);
-                ctx.lineWidth = lineWidth;
-                ctx.strokeStyle = strokeStyle;
-                ctx.stroke();
-            }
-
-            _updateWaves(clickFrameScale) {
-                const filled = FILLED_CIRCLE_CFG;
-                const rings = RINGS_ANIM_CFG;
-                const ctx = this.bufferCtx;
-
-                const updateFilledCircle = (w, waveProg) => {
-                    w.life += clickFrameScale;
-                    const ease = 1 - Math.pow(1 - waveProg, 3);
-                    w.r = filled.rAddRate * this.scale * ease;
-                    const alpha = Math.max(0, 1 - waveProg);
-                    if (alpha > 0) {
-                        ctx.beginPath();
-                        ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
-                        ctx.fillStyle = `rgba(${this.color},${this.alpha(alpha)})`;
-                        // 优化：减少阴影效果
-                        ctx.fill();
-                    }
-                };
-
-                const updateRings = (w, ringProg) => {
-                    const getWeightProp = (t) => Math.min(2 - Math.abs(4 * (t - 0.5)), 1);
-                    const ringRgbAt = (rProg) => {
-                        const t = Math.min(1.2 * rProg, 1);
-                        const r = this.ringsStartColor[0] * (1 - t) + this.ringsEndColor[0] * t;
-                        const g = this.ringsStartColor[1] * (1 - t) + this.ringsEndColor[1] * t;
-                        const b = this.ringsStartColor[2] * (1 - t) + this.ringsEndColor[2] * t;
-                        return [Math.round(r), Math.round(g), Math.round(b)];
-                    };
-                    const getAlpha = (rProg) => Math.min(1.1 - 0.3 * rProg, 1);
-
-                    const r = w.ring;
-                    r.ang -= r.rs * clickFrameScale;
-
-                    let start = 0;
-                    let end = 0;
-                    let len = 0;
-                    let seg;
-
-                    for (let i = 0; i < 2; i++) {
-                        seg = r.segs[i];
-                        const base = r.ang + seg.off;
-
-                        if (ringProg <= rings.lenStopAddPoint) {
-                            len = seg.len * (ringProg / rings.lenStopAddPoint);
-                            end = base + seg.len;
-                            start = end - len;
-                        } else if (ringProg > rings.lenStartDimPoint) {
-                            len = seg.len * (1 - (ringProg - rings.lenStartDimPoint) / (1 - rings.lenStartDimPoint));
-                            start = base;
-                            end = start + len;
-                        } else {
-                            len = seg.len;
-                            start = base;
-                            end = start + len;
-                        }
-
-                        const lineWidthMul = Math.min(-0.8 * (ringProg - 0.8) + 1, 1);
-                        const [rr, gg, bb] = ringRgbAt(ringProg);
-                        const alphaRing = getAlpha(ringProg);
-
-                        for (let k = 0; k < rings.segNum; k++) {
-                            const t0 = k / rings.segNum;
-                            const t1 = (k + 1) / rings.segNum;
-                            const a0 = start + (end - start) * t0;
-                            const a1 = start + (end - start) * t1;
-
-                            if (Math.abs(a1 - a0) < 0.01) continue;
-
-                            const wT = getWeightProp(t0);
-                            const lw = (rings.minW * (1 - wT) + rings.maxW * wT) * lineWidthMul;
-                            const strokeStyle = `rgba(${rr},${gg},${bb},${alphaRing})`;
-                            const radius = w.r + seg.rRoundRate * this.scale;
-                            // 光弧
-                            this._strokeRingSegment(w.x, w.y, radius, a0, a1, lw, strokeStyle);
-                        }
-                    }
-                };
-
-                for (let i = this.waves.length - 1; i >= 0; i--) {
-                    const w = this.waves[i];
-                    const waveProg = Math.min(w.life / filled.maxLife, 1);
-                    const ringProg = Math.min(w.life / rings.maxLife, 1);
-
-                    updateFilledCircle(w, waveProg);
-                    updateRings(w, ringProg);
-
-                    // 回收对象到对象池
-                    if (ringProg >= 1 && waveProg >= 1) {
-                        this.wavesPool.push(this.waves[i]);
-                        this.waves.splice(i, 1);
-                    }
-                }
-            }
-
-            _updateSparks(clickFrameScale, trailFrameScale) {
-                const ctx = this.bufferCtx;
-                for (let i = this.sparks.length - 1; i >= 0; i--) {
-                    const s = this.sparks[i];
-                    const fs = s.fromClick ? clickFrameScale : trailFrameScale;
-                    s.x += s.vx * fs;
-                    s.y += s.vy * fs;
-                    s.vx *= Math.pow(s.f, fs);
-                    s.vy *= Math.pow(s.f, fs);
-                    s.rot += s.rs * fs;
-                    s.a -= 0.032 * fs;
-                    if (s.a <= 0) {
-                        this.sparksPool.push(this.sparks[i]);
-                        this.sparks.splice(i, 1);
-                        continue;
-                    }
-
-                    ctx.save();
-                    ctx.translate(s.x, s.y);
-                    ctx.rotate(s.rot);
-                    ctx.beginPath();
-                    ctx.moveTo(0, -s.s);
-                    ctx.lineTo(s.s * 0.6, s.s * 0.6);
-                    ctx.lineTo(-s.s * 0.6, s.s * 0.6);
-                    ctx.fillStyle = `rgba(255,255,255,${this.alpha(s.a)})`;
-                    ctx.fill();
-                    ctx.restore();
                 }
             }
 
@@ -505,29 +1236,32 @@
             }
 
             _pointRect(x, y, padding) {
-                return {
-                    x: x - padding,
-                    y: y - padding,
-                    w: padding * 2,
-                    h: padding * 2,
-                };
+                return { x: x - padding, y: y - padding, w: padding * 2, h: padding * 2 };
             }
 
-            _segmentRect(a, b, padding) {
-                const x0 = Math.min(a.x, b.x) - padding;
-                const y0 = Math.min(a.y, b.y) - padding;
-                const x1 = Math.max(a.x, b.x) + padding;
-                const y1 = Math.max(a.y, b.y) + padding;
-                return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+            _trailRect(padding) {
+                if (this.trail.length === 0) return null;
+
+                let x0 = Infinity;
+                let y0 = Infinity;
+                let x1 = -Infinity;
+                let y1 = -Infinity;
+                for (const point of this.trail) {
+                    x0 = Math.min(x0, point.x);
+                    y0 = Math.min(y0, point.y);
+                    x1 = Math.max(x1, point.x);
+                    y1 = Math.max(y1, point.y);
+                }
+
+                if (!Number.isFinite(x0) || !Number.isFinite(y0) || !Number.isFinite(x1) || !Number.isFinite(y1)) {
+                    return null;
+                }
+
+                return { x: x0 - padding, y: y0 - padding, w: x1 - x0 + padding * 2, h: y1 - y0 + padding * 2 };
             }
 
             _intersects(a, b) {
-                return (
-                    a.x <= b.x + b.w &&
-                    a.x + a.w >= b.x &&
-                    a.y <= b.y + b.h &&
-                    a.y + a.h >= b.y
-                );
+                return a.x <= b.x + b.w && a.x + a.w >= b.x && a.y <= b.y + b.h && a.y + a.h >= b.y;
             }
 
             _unionRect(a, b) {
@@ -551,42 +1285,28 @@
                             i = -1;
                         }
                     }
-
                     merged.push(rect);
                 }
-
                 return merged;
             }
 
             _getEffectRects() {
                 const rects = [];
-                const trailPad = 18 * this.scale + 12;
-                const trailPoints =
-                    this.lastPos && this.trail.length > 0
-                        ? this.trail.concat([{ x: this.lastPos.x, y: this.lastPos.y }])
-                        : this.trail;
+                const effectPad = 210 * this.cfg.globalScale + 20;
+                const distancePad = 90 * this.cfg.globalScale + 20;
+                const trailPad = 22 * this.cfg.globalScale * this.cfg.trailThickness + 12;
 
-                if (trailPoints.length === 1) {
-                    rects.push(this._pointRect(trailPoints[0].x, trailPoints[0].y, trailPad));
-                } else {
-                    for (let i = 0; i < trailPoints.length - 1; i++) {
-                        rects.push(this._segmentRect(trailPoints[i], trailPoints[i + 1], trailPad));
-                    }
+                for (const effect of this.clickEffects) {
+                    rects.push(this._pointRect(effect.x, effect.y, effectPad));
                 }
 
-                const wavePad = 34 * this.scale + RINGS_ANIM_CFG.maxW + 16;
-                for (const wave of this.waves) {
-                    const radius = Math.max(wave.r || 0, FILLED_CIRCLE_CFG.rAddRate * this.scale) + wavePad;
-                    rects.push(this._pointRect(wave.x, wave.y, radius));
+                for (const effect of this.distanceEffects) {
+                    rects.push(this._pointRect(effect.x, effect.y, distancePad));
                 }
 
-                const maxFrameScale = this.maxDeltaMs / this.baseFrameMs;
-                for (const spark of this.sparks) {
-                    const speed = Math.hypot(spark.vx || 0, spark.vy || 0);
-                    const speedScale = spark.fromClick ? this.clickSpeed : this.trailSpeed;
-                    const motionPad = speed * maxFrameScale * speedScale;
-                    const sparkPad = Math.max(spark.s || 0, 9 * this.scale) * 2 + motionPad + 12;
-                    rects.push(this._pointRect(spark.x, spark.y, sparkPad));
+                if (this.trail.length > 0) {
+                    const trailRect = this._trailRect(trailPad);
+                    if (trailRect) rects.push(trailRect);
                 }
 
                 return this._mergeRects(rects);
@@ -596,7 +1316,6 @@
                 if (this.forceFullRedraw) {
                     return [this._canvasRect()];
                 }
-
                 return this._mergeRects(this.previousDirtyRects.concat(this._getEffectRects()));
             }
 
@@ -622,30 +1341,21 @@
                     const sy = Math.max(0, Math.floor(rect.y * dpr));
                     const sw = Math.min(mainCanvas.width - sx, Math.ceil(rect.w * dpr));
                     const sh = Math.min(mainCanvas.height - sy, Math.ceil(rect.h * dpr));
-                    if (sw <= 0 || sh <= 0) {
-                        continue;
-                    }
+                    if (sw <= 0 || sh <= 0) continue;
 
                     mainCtx.clearRect(sx, sy, sw, sh);
                     mainCtx.drawImage(bufferCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
                 }
             }
 
-            // 执行动画循环
             animationLoops(now) {
                 if (window.renderingPaused) {
                     this.lastFrameTime = now;
                     return;
                 }
 
-                const hasWork =
-                    this.waves.length > 0 ||
-                    this.sparks.length > 0 ||
-                    this.trail.length > 0;
-
-                // 无粒子时不持续占用rAF 有外部事件时唤醒
+                const hasWork = this.clickEffects.length > 0 || this.distanceEffects.length > 0 || this.trail.length > 0;
                 if (!hasWork) {
-                    // 同步时间基准，避免静止后再出现拖尾/波纹时首帧 delta 被顶到 maxDeltaMs
                     this.lastFrameTime = now;
                     if (this.previousDirtyRects.length > 0) {
                         this._clearBufferRects(this.previousDirtyRects);
@@ -655,23 +1365,47 @@
                     return;
                 }
 
+                if (this.shouldSkipTrailOnlyFrame(now)) {
+                    this.lastFrameTime = now;
+                    window.scheduleNextAnimationFrame();
+                    return;
+                }
+
                 const deltaMs = Math.min(now - this.lastFrameTime, this.maxDeltaMs);
                 this.lastFrameTime = now;
-                const baseScale = deltaMs / this.baseFrameMs;
-                const trailFrameScale = baseScale * this.trailSpeed;
-                const clickFrameScale = baseScale * this.clickSpeed;
+
+                for (let i = this.clickEffects.length - 1; i >= 0; i--) {
+                    const effect = this.clickEffects[i];
+                    effect.tMs += deltaMs * this.clickSpeed;
+                    if (effect.tMs >= effect.durationMs) {
+                        this.clickEffects.splice(i, 1);
+                    }
+                }
+
+                for (let i = this.distanceEffects.length - 1; i >= 0; i--) {
+                    const effect = this.distanceEffects[i];
+                    effect.tMs += deltaMs * this.trailSpeed;
+                    if (effect.tMs >= effect.durationMs) {
+                        this.distanceEffects.splice(i, 1);
+                    }
+                }
+
+                this.pruneTrail(now);
 
                 const bctx = this.bufferCtx;
                 const renderRects = this._getRenderRects();
-                // 优化：减少全局合成模式的影响范围，仅在缓冲层使用 lighter
                 bctx.save();
                 this._clipToRects(bctx, renderRects);
                 bctx.globalCompositeOperation = "lighter";
 
                 this._clearBufferRects(renderRects);
-                this._updateTrail(trailFrameScale);
-                this._updateWaves(clickFrameScale);
-                this._updateSparks(clickFrameScale, trailFrameScale);
+                for (const effect of this.clickEffects) {
+                    this.drawClickEffect(effect);
+                }
+                this.drawTrail(now);
+                for (const effect of this.distanceEffects) {
+                    this.renderTriangleLayer(effect.x, effect.y, effect.part, effect.tMs);
+                }
 
                 bctx.globalCompositeOperation = "source-over";
                 bctx.restore();
@@ -698,13 +1432,13 @@
             }
 
             window.animationFramePending = true;
-            requestAnimationFrame((nextNow) => {
+            requestAnimationFrame(nextNow => {
                 window.animationFramePending = false;
                 window.spark.animationLoops(nextNow);
             });
         };
 
-        window.setRenderingPaused = (paused) => {
+        window.setRenderingPaused = paused => {
             window.renderingPaused = Boolean(paused);
             if (window.renderingPaused) {
                 window.animationFramePending = false;
@@ -712,16 +1446,12 @@
                 lastBoomY = -1;
                 lastMoveX = -1;
                 lastMoveY = -1;
-                if (window.spark) {
-                    window.spark.clearEffects();
-                }
+                window.spark?.clearEffects();
                 return;
             }
 
             window.scheduleNextAnimationFrame();
         };
-
-        // C# 通信接口
 
         window.currentInputMode = "mouse";
         window.enableAlwaysTrailEffect = false;
@@ -735,7 +1465,6 @@
 
         window.setInputContext("mouse", false);
 
-        // 接收 C# 传来的物理百分比 (0.0 ~ 1.0)，由前端根据真实的画布宽度自行计算
         window.externalBoom = (percentX, percentY) => {
             if (window.renderingPaused) return;
             const now = Date.now();
@@ -744,10 +1473,9 @@
             lastBoomY = percentY;
             lastBoomTime = now;
 
-            // 百分比乘以 WebView 当前真实的内部宽度
             const cx = percentX * window.innerWidth;
             const cy = percentY * window.innerHeight;
-            window.dispatchEvent(new MouseEvent('mousedown', { clientX: cx, clientY: cy, bubbles: true }));
+            window.dispatchEvent(new MouseEvent("mousedown", { clientX: cx, clientY: cy, bubbles: true }));
             window.scheduleNextAnimationFrame();
         };
 
@@ -757,36 +1485,44 @@
             lastMoveX = percentX;
             lastMoveY = percentY;
 
-            // 方法与上述相同
             const cx = percentX * window.innerWidth;
             const cy = percentY * window.innerHeight;
-            window.dispatchEvent(new MouseEvent('mousemove', { clientX: cx, clientY: cy, bubbles: true }));
+            window.dispatchEvent(new MouseEvent("mousemove", { clientX: cx, clientY: cy, bubbles: true }));
             window.scheduleNextAnimationFrame();
         };
 
         window.externalUp = () => {
             if (window.renderingPaused) return;
-            window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+            window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
             window.scheduleNextAnimationFrame();
         };
 
-        window.updateColor = (rgbString) => {
-            if (window.spark) {
-                window.spark.color = rgbString;
-                window.spark.ringsEndColor = ringsEndColorFromRgb(rgbString);
-            }
+        window.updateColor = rgbString => {
+            if (!window.spark) return;
+            window.spark.color = rgbString || DEFAULT_COLOR;
+            window.spark.rebuildConfig();
         };
 
-        window.updateEffectSettings = (scale, opacity, trailSpeed, clickSpeed) => {
+        window.updateEffectSettings = (scale, opacity, trailSpeed, clickSpeed, trailThickness) => {
             if (!window.spark) return;
-            window.spark.scale = Math.max(0.5, Math.min(3, Number(scale) || 1.5));
+            window.spark.scale = Math.max(0.5, Math.min(3, Number(scale) || UI_DEFAULT_SCALE));
             window.spark.opacity = Math.max(0.1, Math.min(1, Number(opacity) || 1.0));
+            window.spark.trailThickness = Math.max(0.5, Math.min(3, Number(trailThickness) || 1.0));
             let t = Number(trailSpeed);
             if (!Number.isFinite(t)) t = 1.0;
             let c = Number(clickSpeed);
             if (!Number.isFinite(c)) c = t;
             window.spark.trailSpeed = Math.max(0.2, Math.min(3, t));
             window.spark.clickSpeed = Math.max(0.2, Math.min(3, c));
+            window.spark.rebuildConfig();
+        };
+
+        window.updateTrailRefreshRate = hz => {
+            if (!window.spark) return;
+            const value = Number(hz);
+            const refreshHz = Math.max(10, Math.min(240, Number.isFinite(value) ? value : 40));
+            window.spark.trailFrameIntervalMs = 1000 / refreshHz;
+            window.spark.trailRenderAccumulator = 1.0;
         };
     </script>
 </body>

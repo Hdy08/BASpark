@@ -557,7 +557,13 @@
       <value>拡大率</value>
     </data>
     <data name="VisualReset_Scale_Sub" xml:space="preserve">
-      <value>既定 1.50 ×</value>
+      <value>既定 1.00 ×</value>
+    </data>
+    <data name="VisualReset_TrailThickness" xml:space="preserve">
+      <value>トレイルの太さ</value>
+    </data>
+    <data name="VisualReset_TrailThickness_Sub" xml:space="preserve">
+      <value>既定 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>トレイル更新率</value>
@@ -606,6 +612,9 @@
     </data>
     <data name="Visual_Scale" xml:space="preserve">
       <value>拡大率</value>
+    </data>
+    <data name="Visual_TrailThickness" xml:space="preserve">
+      <value>トレイルの太さ</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>ビジュアル</value>

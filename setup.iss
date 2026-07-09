@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "0.0.1-dev"
+  #define AppVersion "1.6.2-beta"
 #endif
 
 [Setup]
@@ -42,7 +42,7 @@ Name: "{autodesktop}\BASpark"; Filename: "{app}\BASpark.exe"; Tasks: desktopicon
 Root: HKCU; Subkey: "Software\BASpark"; Flags: uninsdeletekey
 
 [UninstallRun]
-Filename: "taskkill"; Parameters: "/F /IM BASpark.exe /T"; Flags: runhidden
+Filename: "taskkill"; Parameters: "/F /IM BASpark.exe /T"; Flags: runhidden; RunOnceId: "StopBASpark"
 
 [Run]
 Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent

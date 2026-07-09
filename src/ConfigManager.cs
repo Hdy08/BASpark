@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Reflection;
 
 namespace BASpark
@@ -14,7 +15,8 @@ namespace BASpark
         TrailRefreshRate = 1 << 3,
         ParticleColor = 1 << 4,
         TrailAnimationSpeed = 1 << 5,
-        ClickAnimationSpeed = 1 << 6
+        ClickAnimationSpeed = 1 << 6,
+        TrailThickness = 1 << 7
     }
 
     public enum ProcessFilterModeOption
@@ -75,7 +77,8 @@ namespace BASpark
         public static bool EnableAlwaysTrailEffect { get; set; } = false;
         public static bool StartSilent { get; set; } = false;
         public static bool RunAsAdmin { get; set; } = false;
-        public static double EffectScale { get; set; } = 1.5;
+        public static double EffectScale { get; set; } = 1.0;
+        public static double TrailThickness { get; set; } = 1.0;
         public static double EffectOpacity { get; set; } = 1.0;
         public static double EffectSpeed { get; set; } = 1.0;
         public static bool UseLinkedAnimationSpeed { get; set; } = true;
@@ -125,29 +128,30 @@ namespace BASpark
                     {
                         ParticleColor = key.GetValue("ParticleColor", "45,175,255")?.ToString() ?? "45,175,255";
 
-                        IsEffectEnabled = Convert.ToBoolean(key.GetValue("IsEffectEnabled", true));
-                        AutoStart = Convert.ToBoolean(key.GetValue("AutoStart", false));
-                        AgreedToPrivacy = Convert.ToBoolean(key.GetValue("AgreedToPrivacy", false));
-                        EnableTelemetry = Convert.ToBoolean(key.GetValue("EnableTelemetry", false));
-                        TotalClicks = Convert.ToInt32(key.GetValue("TotalClicks", 0));
+                        IsEffectEnabled = ReadBool(key, "IsEffectEnabled", true);
+                        AutoStart = ReadBool(key, "AutoStart", false);
+                        AgreedToPrivacy = ReadBool(key, "AgreedToPrivacy", false);
+                        EnableTelemetry = ReadBool(key, "EnableTelemetry", false);
+                        TotalClicks = ReadClampedInt(key, "TotalClicks", 0, 0, int.MaxValue);
                         LastNoticeContent = key.GetValue("LastNoticeContent", "")?.ToString() ?? "";
-                        EnableAlwaysTrailEffect = Convert.ToBoolean(key.GetValue("EnableAlwaysTrailEffect", false));
-                        StartSilent = Convert.ToBoolean(key.GetValue("StartSilent", false));
-                        RunAsAdmin = Convert.ToBoolean(key.GetValue("RunAsAdmin", false));
-                        EffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("EffectScale", 1.5)), 0.5, 3.0);
-                        EffectOpacity = Math.Clamp(Convert.ToDouble(key.GetValue("EffectOpacity", 1.0)), 0.1, 1.0);
-                        EffectSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("EffectSpeed", 1.0)), 0.2, 3.0);
-                        UseLinkedAnimationSpeed = Convert.ToBoolean(key.GetValue("UseLinkedAnimationSpeed", true));
-                        TrailAnimationSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("TrailAnimationSpeed", EffectSpeed)), 0.2, 3.0);
-                        ClickAnimationSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("ClickAnimationSpeed", EffectSpeed)), 0.2, 3.0);
-                        TrailRefreshRate = Math.Clamp(Convert.ToInt32(key.GetValue("TrailRefreshRate", 40)), 10, 240);
-                        EnableEnvironmentFilter = Convert.ToBoolean(key.GetValue("EnableEnvironmentFilter", false));
-                        HideInFullscreen = Convert.ToBoolean(key.GetValue("HideInFullscreen", true));
-                        ShowEffectOnDesktop = Convert.ToBoolean(key.GetValue("ShowEffectOnDesktop", true));
-                        IsTouchscreenMode = Convert.ToBoolean(key.GetValue("IsTouchscreenMode", false));
-                        ClickTriggerType = Convert.ToInt32(key.GetValue("ClickTriggerType", 0));
-                        EnableMiddleClickTrigger = Convert.ToBoolean(key.GetValue("EnableMiddleClickTrigger", false));
-                        ScreenshotCompatibilityMode = Convert.ToBoolean(key.GetValue("ScreenshotCompatibilityMode", false));
+                        EnableAlwaysTrailEffect = ReadBool(key, "EnableAlwaysTrailEffect", false);
+                        StartSilent = ReadBool(key, "StartSilent", false);
+                        RunAsAdmin = ReadBool(key, "RunAsAdmin", false);
+                        EffectScale = ReadClampedDouble(key, "EffectScale", 1.0, 0.5, 3.0);
+                        TrailThickness = ReadClampedDouble(key, "TrailThickness", 1.0, 0.5, 3.0);
+                        EffectOpacity = ReadClampedDouble(key, "EffectOpacity", 1.0, 0.1, 1.0);
+                        EffectSpeed = ReadClampedDouble(key, "EffectSpeed", 1.0, 0.2, 3.0);
+                        UseLinkedAnimationSpeed = ReadBool(key, "UseLinkedAnimationSpeed", true);
+                        TrailAnimationSpeed = ReadClampedDouble(key, "TrailAnimationSpeed", EffectSpeed, 0.2, 3.0);
+                        ClickAnimationSpeed = ReadClampedDouble(key, "ClickAnimationSpeed", EffectSpeed, 0.2, 3.0);
+                        TrailRefreshRate = ReadClampedInt(key, "TrailRefreshRate", 40, 10, 240);
+                        EnableEnvironmentFilter = ReadBool(key, "EnableEnvironmentFilter", false);
+                        HideInFullscreen = ReadBool(key, "HideInFullscreen", true);
+                        ShowEffectOnDesktop = ReadBool(key, "ShowEffectOnDesktop", true);
+                        IsTouchscreenMode = ReadBool(key, "IsTouchscreenMode", false);
+                        ClickTriggerType = ReadClampedInt(key, "ClickTriggerType", 0, 0, 2);
+                        EnableMiddleClickTrigger = ReadBool(key, "EnableMiddleClickTrigger", false);
+                        ScreenshotCompatibilityMode = ReadBool(key, "ScreenshotCompatibilityMode", false);
                         EnabledScreenIds = key.GetValue("EnabledScreenIds", "")?.ToString() ?? "";
                         ScreenSelections = key.GetValue("ScreenSelections", "")?.ToString() ?? "";
                         UiLanguage = key.GetValue("UiLanguage", "")?.ToString() ?? "";
@@ -214,6 +218,82 @@ namespace BASpark
             catch (Exception ex)
             {
                 AppLogger.Warn($"Failed to load config; some values may be missing: {ex.Message}");
+            }
+        }
+
+        private static bool ReadBool(RegistryKey key, string name, bool fallback)
+        {
+            object? value = key.GetValue(name, fallback);
+            if (value is string text)
+            {
+                if (bool.TryParse(text, out bool parsedBool))
+                {
+                    return parsedBool;
+                }
+
+                if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedInt))
+                {
+                    return parsedInt != 0;
+                }
+            }
+
+            try
+            {
+                return Convert.ToBoolean(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private static int ReadInt(RegistryKey key, string name, int fallback)
+        {
+            object? value = key.GetValue(name, fallback);
+            try
+            {
+                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private static int ReadClampedInt(RegistryKey key, string name, int fallback, int min, int max)
+        {
+            return Math.Clamp(ReadInt(key, name, fallback), min, max);
+        }
+
+        private static double ReadClampedDouble(RegistryKey key, string name, double fallback, double min, double max)
+        {
+            object? value = key.GetValue(name, fallback);
+            double parsed = TryReadDouble(value, out double result) ? result : fallback;
+            if (!double.IsFinite(parsed))
+            {
+                parsed = fallback;
+            }
+
+            return Math.Clamp(parsed, min, max);
+        }
+
+        private static bool TryReadDouble(object? value, out double result)
+        {
+            if (value is string text)
+            {
+                return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out result) ||
+                       double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out result);
+            }
+
+            try
+            {
+                result = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch
+            {
+                result = 0;
+                return false;
             }
         }
 
@@ -306,12 +386,17 @@ namespace BASpark
 
             if (flags.HasFlag(VisualAppearanceResetFlags.EffectScale))
             {
-                Save("EffectScale", 1.5);
+                Save("EffectScale", 1.0);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.EffectOpacity))
             {
                 Save("EffectOpacity", 1.0);
+            }
+
+            if (flags.HasFlag(VisualAppearanceResetFlags.TrailThickness))
+            {
+                Save("TrailThickness", 1.0);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.UnifiedAnimationSpeed))
@@ -349,15 +434,14 @@ namespace BASpark
             {
                 lock (_syncLock)
                 {
-                    using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegPath);
-                    if (value is Enum enumValue)
+                    using RegistryKey? key = Registry.CurrentUser.CreateSubKey(RegPath);
+                    if (key == null)
                     {
-                        key.SetValue(name, enumValue.ToString());
+                        AppLogger.Warn($"Failed to open config registry key while saving '{name}'.");
+                        return;
                     }
-                    else
-                    {
-                        key.SetValue(name, value);
-                    }
+
+                    key.SetValue(name, ToRegistryValue(value));
 
                     var prop = _propertyCache.GetOrAdd(name, n => typeof(ConfigManager).GetProperty(n));
                     if (prop != null)
@@ -383,6 +467,18 @@ namespace BASpark
             {
                 AppLogger.Warn($"Failed to save config entry '{name}': {ex.Message}");
             }
+        }
+
+        private static object ToRegistryValue(object value)
+        {
+            return value switch
+            {
+                Enum enumValue => enumValue.ToString(),
+                double doubleValue => doubleValue.ToString("R", CultureInfo.InvariantCulture),
+                float floatValue => floatValue.ToString("R", CultureInfo.InvariantCulture),
+                decimal decimalValue => decimalValue.ToString(CultureInfo.InvariantCulture),
+                _ => value
+            };
         }
 
         public static IReadOnlySet<string> GetProcessFilterEntries()
@@ -552,7 +648,8 @@ namespace BASpark
                     EnableAlwaysTrailEffect = false;
                     StartSilent = false;
                     RunAsAdmin = false;
-                    EffectScale = 1.5;
+                    EffectScale = 1.0;
+                    TrailThickness = 1.0;
                     EffectOpacity = 1.0;
                     EffectSpeed = 1.0;
                     UseLinkedAnimationSpeed = true;

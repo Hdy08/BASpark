@@ -30,7 +30,7 @@
                 <TextBlock Text="✨ BASpark" FontSize="30" FontWeight="Black" Foreground="White" HorizontalAlignment="Center"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
                     <TextBlock Text="Version" FontSize="11" Foreground="#CCFFFFFF" VerticalAlignment="Bottom"/>
-                    <TextBlock x:Name="VersionText" Text="1.0.0-release" FontSize="12" FontWeight="Bold" Foreground="White" Margin="5,0,0,0"/>
+                    <TextBlock x:Name="VersionText" Text="1.6.2-beta" FontSize="12" FontWeight="Bold" Foreground="White" Margin="5,0,0,0"/>
                 </StackPanel>
                 <TextBlock x:Name="TxtTagline" Text="Sensei, welcome back to Schale." FontSize="11" Foreground="#AAFFFFFF" HorizontalAlignment="Center" Margin="0,5,0,0"/>
             </StackPanel>

@@ -201,20 +201,25 @@ namespace BASpark
             {
                 using HttpClient client = new HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(5);
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BASparkClient/1.0");
+                client.DefaultRequestHeaders.Add("User-Agent", AppVersionInfo.UserAgent);
 
                 string json = await client.GetStringAsync(updateUrl);
                 using JsonDocument doc = JsonDocument.Parse(json);
                 JsonElement root = doc.RootElement;
 
-                string latestVersionStr = root.GetProperty("version").GetString() ?? "0.0.0.0";
-                string downloadUrl = root.GetProperty("url").GetString() ?? "";
-                string updateNotes = root.GetProperty("notes").GetString() ?? Localization.Get("Msg_NoUpdateNotes");
+                string latestVersionStr = ReadJsonString(root, "version");
+                string downloadUrl = ReadJsonString(root, "url");
+                string updateNotes = ReadJsonString(root, "notes");
+                if (string.IsNullOrWhiteSpace(updateNotes))
+                {
+                    updateNotes = Localization.Get("Msg_NoUpdateNotes");
+                }
 
-                Version latestVersion = new Version(latestVersionStr);
-                Version? currentVersion = Assembly.GetExecutingAssembly().GetName().Version;
-
-                if (currentVersion != null && latestVersion > currentVersion)
+                if (!AppVersionInfo.TryCompare(latestVersionStr, AppVersionInfo.DisplayVersion, out int versionCompare))
+                {
+                    throw new FormatException($"Invalid update version: {latestVersionStr}");
+                }
+                if (versionCompare > 0)
                 {
                     Dispatcher.Invoke(() =>
                     {
@@ -224,9 +229,9 @@ namespace BASpark
                             MessageBoxButton.YesNo,
                             MessageBoxImage.Information);
 
-                        if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(downloadUrl))
+                        if (result == MessageBoxResult.Yes && TryCreateHttpUri(downloadUrl, out Uri? uri))
                         {
-                            Process.Start(new ProcessStartInfo(downloadUrl) { UseShellExecute = true });
+                            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
                         }
                     });
                 }
@@ -247,6 +252,30 @@ namespace BASpark
                 AppLogger.Warn($"Update check failed: {ex.Message}");
                 HandleNetworkFetchFailure(isManual, ex.Message);
             }
+        }
+
+        private static string ReadJsonString(JsonElement root, string propertyName)
+        {
+            return root.TryGetProperty(propertyName, out JsonElement value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString() ?? string.Empty
+                : string.Empty;
+        }
+
+        private static bool TryCreateHttpUri(string value, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Uri? uri)
+        {
+            uri = null;
+            if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? parsed))
+            {
+                return false;
+            }
+
+            if (parsed.Scheme != Uri.UriSchemeHttps && parsed.Scheme != Uri.UriSchemeHttp)
+            {
+                return false;
+            }
+
+            uri = parsed;
+            return true;
         }
 
         private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
@@ -281,14 +310,18 @@ namespace BASpark
             {
                 using HttpClient client = new HttpClient();
                 client.Timeout = TimeSpan.FromSeconds(5);
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BASparkClient/1.0");
+                client.DefaultRequestHeaders.Add("User-Agent", AppVersionInfo.UserAgent);
                 string json = await client.GetStringAsync(noticeUrl);
                 using JsonDocument doc = JsonDocument.Parse(json);
                 JsonElement root = doc.RootElement;
 
-                string title = root.GetProperty("title").GetString() ?? Localization.Get("Msg_DefaultNoticeTitle");
-                string content = root.GetProperty("content").GetString() ?? "";
-                string date = root.GetProperty("date").GetString() ?? "";
+                string title = ReadJsonString(root, "title");
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    title = Localization.Get("Msg_DefaultNoticeTitle");
+                }
+                string content = ReadJsonString(root, "content");
+                string date = ReadJsonString(root, "date");
                 string lastContent = ConfigManager.LastNoticeContent;
 
                 Dispatcher.Invoke(() =>
@@ -404,11 +437,11 @@ namespace BASpark
         {
             try
             {
-                Version? version = Assembly.GetExecutingAssembly().GetName().Version;
-                if (version != null)
+                string version = AppVersionInfo.DisplayVersion;
+                if (!string.IsNullOrWhiteSpace(version))
                 {
-                    string versionNum = $"V{version.Major}.{version.Minor}.{version.Build}";
-                    string versionText = $"BASpark V{version.Major}.{version.Minor}.{version.Build}";
+                    string versionNum = $"V{version}";
+                    string versionText = $"BASpark V{version}";
 
                     if (VersionText != null)
                     {
@@ -608,6 +641,7 @@ namespace BASpark
             UpdateEnvironmentFilterInterlock();
 
             SliderScale.Value = ConfigManager.EffectScale;
+            SliderTrailThickness.Value = ConfigManager.TrailThickness;
             SliderOpacity.Value = ConfigManager.EffectOpacity * 100;
             CheckLinkedAnimationSpeed.IsChecked = ConfigManager.UseLinkedAnimationSpeed;
             SliderSpeed.Value = ConfigManager.EffectSpeed;
@@ -1433,6 +1467,7 @@ namespace BASpark
         {
             VisualResetItems.Clear();
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectScale, Localization.Get("VisualReset_Scale"), Localization.Get("VisualReset_Scale_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailThickness, Localization.Get("VisualReset_TrailThickness"), Localization.Get("VisualReset_TrailThickness_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectOpacity, Localization.Get("VisualReset_Opacity"), Localization.Get("VisualReset_Opacity_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), Localization.Get("VisualReset_UnifiedSpeed_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), Localization.Get("VisualReset_TrailSpeed_Sub")));
@@ -1520,9 +1555,10 @@ namespace BASpark
             int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
             double effectScale = Math.Round(SliderScale.Value, 2);
+            double trailThickness = Math.Round(SliderTrailThickness.Value, 2);
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
-            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, trailSp, clickSp);
+            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, trailSp, clickSp, trailThickness);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
 
             VisualResetOverlay.Visibility = Visibility.Collapsed;
@@ -1559,13 +1595,8 @@ namespace BASpark
             bool networkRegionChanged = selectedNetworkRegion != _networkRegionAtLoad;
             DarkModeOption selectedDarkMode = GetSelectedDarkMode();
 
-            if (!string.IsNullOrWhiteSpace(selectedLanguage))
-            {
-                ConfigManager.Save("UiLanguage", selectedLanguage);
-                Localization.ApplyCulture(selectedLanguage);
-            }
-
             double effectScale = Math.Round(SliderScale.Value, 2);
+            double trailThickness = Math.Round(SliderTrailThickness.Value, 2);
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsChecked == true;
             double trailAnimSpeed;
@@ -1599,6 +1630,43 @@ namespace BASpark
             bool telemetryEnabled = CheckTelemetry.IsChecked ?? false;
             bool telemetryWasEnabled = ConfigManager.EnableTelemetry;
 
+            string sidebarBackgroundPath = TxtSidebarBackgroundPath?.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(sidebarBackgroundPath))
+            {
+                if (!SidebarBackgroundHelper.IsSupportedImage(sidebarBackgroundPath) || !System.IO.File.Exists(sidebarBackgroundPath))
+                {
+                    System.Windows.MessageBox.Show(
+                        this,
+                        Localization.Get("Msg_InvalidSidebarBackground"),
+                        Localization.Get("More_Title"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
+            var selectedIds = ScreenOptions
+                .Where(s => s.IsEnabled)
+                .Select(s => s.DeviceName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (selectedIds.Count == 0)
+            {
+                System.Windows.MessageBox.Show(
+                    this,
+                    Localization.Get("Msg_MinOneScreen"),
+                    Localization.Get("Msg_MultiScreen_Title"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedLanguage))
+            {
+                ConfigManager.Save("UiLanguage", selectedLanguage);
+                Localization.ApplyCulture(selectedLanguage);
+            }
+
             // 保存配置组
             string activeId = (ComboProfiles.SelectedItem as FilterProfile)?.Id ?? "";
             ConfigManager.SaveProfiles(Profiles.ToList(), activeId);
@@ -1610,6 +1678,7 @@ namespace BASpark
             ConfigManager.Save("EnableTelemetry", telemetryEnabled);
             ConfigManager.Save("ParticleColor", ConfigManager.ParticleColor);
             ConfigManager.Save("EffectScale", effectScale);
+            ConfigManager.Save("TrailThickness", trailThickness);
             ConfigManager.Save("EffectOpacity", effectOpacity);
             ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
             ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
@@ -1635,21 +1704,6 @@ namespace BASpark
             ConfigManager.Save("EnableMiddleClickTrigger", middleClickEnabled);
             ConfigManager.Save("ScreenshotCompatibilityMode", screenshotCompatibilityEnabled);
 
-            string sidebarBackgroundPath = TxtSidebarBackgroundPath?.Text?.Trim() ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(sidebarBackgroundPath))
-            {
-                if (!SidebarBackgroundHelper.IsSupportedImage(sidebarBackgroundPath) || !System.IO.File.Exists(sidebarBackgroundPath))
-                {
-                    System.Windows.MessageBox.Show(
-                        this,
-                        Localization.Get("Msg_InvalidSidebarBackground"),
-                        Localization.Get("More_Title"),
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-            }
-
             bool sidebarBackgroundChanged = !string.Equals(
                 sidebarBackgroundPath,
                 ConfigManager.SidebarBackgroundImagePath,
@@ -1661,21 +1715,6 @@ namespace BASpark
             }
 
             var previousEnabledScreenIds = ConfigManager.ResolveEnabledScreenDeviceNames(ScreenOptions.Select(CreateScreenIdentityInfo));
-            var selectedIds = ScreenOptions
-                .Where(s => s.IsEnabled)
-                .Select(s => s.DeviceName)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            if (selectedIds.Count == 0)
-            {
-                System.Windows.MessageBox.Show(
-                    this,
-                    Localization.Get("Msg_MinOneScreen"),
-                    Localization.Get("Msg_MultiScreen_Title"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
 
             // 保存当前可见屏幕的启用状态，离线屏幕的旧设置会在 ConfigManager 中保留
             ConfigManager.SaveScreenSelections(ScreenOptions.Select(item => new ScreenSelectionState
@@ -1690,7 +1729,7 @@ namespace BASpark
 
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             GetUiAnimationSpeeds(out double overlayTrail, out double overlayClick);
-            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, overlayTrail, overlayClick);
+            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, overlayTrail, overlayClick, trailThickness);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
             App.Overlay?.RefreshEnvironmentFilterState();
             App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);

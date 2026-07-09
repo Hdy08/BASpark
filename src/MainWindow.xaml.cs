@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Interop;
@@ -195,22 +196,32 @@ namespace BASpark
 
         public void UpdateColor(string color)
         {
-            ExecuteScript($"if(window.updateColor) window.updateColor('{color}');");
+            string colorJson = JsonSerializer.Serialize(color ?? string.Empty);
+            ExecuteScript($"if(window.updateColor) window.updateColor({colorJson});");
         }
 
-        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed)
+        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness)
         {
-            string scaleStr = scale.ToString("F2", CultureInfo.InvariantCulture);
-            string opacityStr = opacity.ToString("F2", CultureInfo.InvariantCulture);
-            string trailStr = trailSpeed.ToString("F2", CultureInfo.InvariantCulture);
-            string clickStr = clickSpeed.ToString("F2", CultureInfo.InvariantCulture);
+            string scaleStr = FormatScriptNumber(scale, 0.5, 3.0, 1.0);
+            string opacityStr = FormatScriptNumber(opacity, 0.1, 1.0, 1.0);
+            string trailStr = FormatScriptNumber(trailSpeed, 0.2, 3.0, 1.0);
+            string clickStr = FormatScriptNumber(clickSpeed, 0.2, 3.0, 1.0);
+            string trailThicknessStr = FormatScriptNumber(trailThickness, 0.5, 3.0, 1.0);
 
-            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr});");
+            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr}, {trailThicknessStr});");
+        }
+
+        private static string FormatScriptNumber(double value, double min, double max, double fallback)
+        {
+            double safeValue = double.IsFinite(value) ? value : fallback;
+            safeValue = Math.Clamp(safeValue, min, max);
+            return safeValue.ToString("F2", CultureInfo.InvariantCulture);
         }
 
         public void UpdateTrailRefreshRate(int hz)
         {
-            _ = hz;
+            int clampedHz = Math.Clamp(hz, 10, 240);
+            ExecuteScript($"if(window.updateTrailRefreshRate) window.updateTrailRefreshRate({clampedHz});");
         }
 
         public void UpdateTouchMode(bool enabled)
@@ -437,7 +448,8 @@ namespace BASpark
                         _lastReportedAlwaysTrail = null;
                         UpdateColor(ConfigManager.ParticleColor);
                         ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
-                        UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp);
+                        UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness);
+                        UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
                         SyncInputContext(InputModeMouse);
                         if (_overlayRuntimePaused)
                         {
@@ -501,8 +513,9 @@ namespace BASpark
 
             _lastReportedInputMode = inputMode;
             _lastReportedAlwaysTrail = alwaysTrailEnabled;
+            string inputModeJson = JsonSerializer.Serialize(inputMode);
             string alwaysTrailLiteral = alwaysTrailEnabled ? "true" : "false";
-            return $"if(window.setInputContext) window.setInputContext('{inputMode}', {alwaysTrailLiteral});";
+            return $"if(window.setInputContext) window.setInputContext({inputModeJson}, {alwaysTrailLiteral});";
         }
 
         private void SyncInputContext(string inputMode)

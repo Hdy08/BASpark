@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using System.Windows;
 
 namespace BASpark
@@ -16,11 +15,10 @@ namespace BASpark
         {
             try
             {
-                Version? version = Assembly.GetExecutingAssembly().GetName().Version;
-                
-                if (version != null)
+                string version = AppVersionInfo.DisplayVersion;
+                if (!string.IsNullOrWhiteSpace(version))
                 {
-                    VersionText.Text = $"{version.Major}.{version.Minor}.{version.Build}-release";
+                    VersionText.Text = version;
                 }
             }
             catch
