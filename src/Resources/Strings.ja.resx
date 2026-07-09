@@ -132,6 +132,18 @@
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>マウスの常時トレイルを有効にする</value>
     </data>
+    <data name="Basic_DarkMode" xml:space="preserve">
+      <value>ダークモード</value>
+    </data>
+    <data name="Basic_DarkModeOff" xml:space="preserve">
+      <value>オフ</value>
+    </data>
+    <data name="Basic_DarkModeOn" xml:space="preserve">
+      <value>オン</value>
+    </data>
+    <data name="Basic_DarkModeSystem" xml:space="preserve">
+      <value>システムに合わせる</value>
+    </data>
     <data name="Basic_ScrollbarVisibility" xml:space="preserve">
       <value>スクロールバーの表示</value>
     </data>

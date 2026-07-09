@@ -5,10 +5,112 @@
         WindowStartupLocation="CenterScreen" Background="#F5F7FA" Icon="app.ico">
 
     <Window.Resources>
+        <SolidColorBrush x:Key="NavForegroundBrush" Color="#666666"/>
+        <SolidColorBrush x:Key="NavHoverBrush" Color="#E0F2FF"/>
+        <SolidColorBrush x:Key="SegmentNormalForegroundBrush" Color="#333333"/>
+        <SolidColorBrush x:Key="SegmentSelectedBackgroundBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SegmentSelectedForegroundBrush" Color="#45AFFF"/>
+        <SolidColorBrush x:Key="ThemeInputBackgroundBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ThemeItemHoverBrush" Color="#E0F2FF"/>
+        <SolidColorBrush x:Key="ThemeItemSelectedBrush" Color="#EBF5FF"/>
+        <SolidColorBrush x:Key="ThemePrimaryTextBrush" Color="#333333"/>
+        <SolidColorBrush x:Key="ThemeSecondaryTextBrush" Color="#666666"/>
+        <SolidColorBrush x:Key="ThemeMutedTextBrush" Color="#999999"/>
+        <SolidColorBrush x:Key="ThemeCardBackgroundBrush" Color="#FAFCFF"/>
+        <SolidColorBrush x:Key="ThemeCardBorderBrush" Color="#DCE5F2"/>
+        <SolidColorBrush x:Key="ThemeCardTitleBrush" Color="#263238"/>
+        <SolidColorBrush x:Key="ThemeCardSecondaryTextBrush" Color="#455A64"/>
+        <SolidColorBrush x:Key="ThemeCardDetailBrush" Color="#78909C"/>
+        <SolidColorBrush x:Key="ThemeDangerButtonBackgroundBrush" Color="#FFF0F0"/>
+        <SolidColorBrush x:Key="ThemeDangerButtonForegroundBrush" Color="#CC0000"/>
+        <SolidColorBrush x:Key="ThemeDangerButtonBorderBrush" Color="#FFCCCC"/>
+        <SolidColorBrush x:Key="ThemeSecondaryButtonHoverBrush" Color="#F2F7FF"/>
+        <SolidColorBrush x:Key="ThemeSecondaryButtonHoverBorderBrush" Color="#BFD6EC"/>
+        <SolidColorBrush x:Key="ThemeSecondaryButtonHoverForegroundBrush" Color="#333333"/>
+        <SolidColorBrush x:Key="ThemeSecondaryButtonPressedBrush" Color="#E8F1FB"/>
+        <SolidColorBrush x:Key="ThemeSecondaryButtonPressedBorderBrush" Color="#AFC8E2"/>
+        <SolidColorBrush x:Key="ThemeDangerButtonHoverBrush" Color="#FFE6E6"/>
+        <SolidColorBrush x:Key="ThemeDangerButtonHoverBorderBrush" Color="#FFBDBD"/>
+        <SolidColorBrush x:Key="ThemeDangerButtonHoverForegroundBrush" Color="#B91C1C"/>
+
+        <Style TargetType="{x:Type ComboBoxItem}">
+            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeInputBackgroundBrush}"/>
+            <Setter Property="Padding" Value="6,3"/>
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ThemeItemHoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ThemeItemSelectedBrush}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="{DynamicResource ThemeMutedTextBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryActionButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource ThemeSecondaryButtonHoverBrush}"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource ThemeSecondaryButtonHoverBorderBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeSecondaryButtonHoverForegroundBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource ThemeSecondaryButtonPressedBrush}"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource ThemeSecondaryButtonPressedBorderBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeSecondaryButtonHoverForegroundBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Border" Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DangerActionButton" TargetType="Button" BasedOn="{StaticResource SecondaryActionButton}">
+            <Setter Property="Background" Value="{DynamicResource ThemeDangerButtonBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeDangerButtonForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeDangerButtonBorderBrush}"/>
+        </Style>
+
+        <Style TargetType="{x:Type ListBoxItem}">
+            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ThemeItemHoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ThemeItemSelectedBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="NavBtn" TargetType="RadioButton">
             <Setter Property="Height" Value="40"/>
             <Setter Property="Margin" Value="10,2"/>
-            <Setter Property="Foreground" Value="#666"/>
+            <Setter Property="Foreground" Value="{DynamicResource NavForegroundBrush}"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -22,7 +124,7 @@
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="#E0F2FF"/>
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -47,7 +149,7 @@
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="#E0F2FF"/>
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -140,16 +242,17 @@
         <Style x:Key="SegmentBtn" TargetType="RadioButton">
             <Setter Property="Width" Value="70"/>
             <Setter Property="Height" Value="28"/>
+            <Setter Property="Foreground" Value="{DynamicResource SegmentNormalForegroundBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border Name="bg" CornerRadius="6" Background="Transparent">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="bg" Property="Background" Value="White"/>
-                                <Setter Property="Foreground" Value="#45AFFF"/>
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource SegmentSelectedBackgroundBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource SegmentSelectedForegroundBrush}"/>
                                 <Setter TargetName="bg" Property="Effect">
                                     <Setter.Value>
                                         <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.1"/>
@@ -310,7 +413,7 @@
                             <Run Text="BASpark "/>
                             <Run x:Name="VersionText" Text="v1.1.0" Foreground="#45AFFF" FontSize="24"/>
                         </TextBlock>
-                        <Button x:Name="BtnCheckUpdate" Content="检查更新" Click="CheckUpdate_Click" Margin="18,0,0,0" Padding="12,3" Height="30" FontSize="12" Background="#E3F2FD" Foreground="#45AFFF" BorderBrush="#45AFFF" BorderThickness="1" Cursor="Hand">
+                        <Button x:Name="BtnCheckUpdate" Content="检查更新" Click="CheckUpdate_Click" Margin="18,0,0,0" Padding="12,3" Height="30" FontSize="12" Background="#E3F2FD" Foreground="#45AFFF" BorderBrush="#45AFFF" BorderThickness="1" Cursor="Hand" Style="{StaticResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
                         </Button>
                     </StackPanel>
@@ -341,7 +444,7 @@
                     <TextBlock x:Name="TxtLogTitle" Text="运行日志" FontSize="24" FontWeight="Bold" Foreground="#333" Margin="0,0,0,8"/>
                     <TextBlock x:Name="TxtLogHint" Text="实时显示软件运行状态与错误信息。" FontSize="12" Foreground="#888" Margin="0,0,0,16" TextWrapping="Wrap"/>
                     <DockPanel Margin="0,0,0,10" LastChildFill="False">
-                        <Button x:Name="BtnClearLog" Content="清空日志" Click="ClearLog_Click" DockPanel.Dock="Right" Padding="12,4" Height="30" Background="White" BorderBrush="#D6DEE8" Cursor="Hand">
+                        <Button x:Name="BtnClearLog" Content="清空日志" Click="ClearLog_Click" DockPanel.Dock="Right" Padding="12,4" Height="30" Background="White" BorderBrush="#D6DEE8" Cursor="Hand" Style="{StaticResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
                     </DockPanel>
@@ -364,7 +467,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Background="#F5F7FA" Padding="0,0,0,16">
+                <Border x:Name="SettingsHeaderBackground" Grid.Row="0" Background="#F5F7FA" Padding="0,0,0,16">
                     <Border BorderBrush="#E3E8EF" BorderThickness="0,0,0,1" Padding="0,0,0,16">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -415,6 +518,16 @@
                                     <StackPanel Margin="0,0,0,12">
                                         <TextBlock x:Name="TxtBasicLanguage" Text="界面语言" Foreground="#666" Margin="0,0,0,8" FontSize="12"/>
                                         <ComboBox x:Name="ComboLanguage" Width="220" HorizontalAlignment="Left" Height="28" VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,0,12">
+                                        <TextBlock x:Name="TxtDarkMode" Text="深色模式" Foreground="#666" Margin="0,0,0,8" FontSize="12"/>
+                                        <Border Background="#F0F2F5" CornerRadius="8" Padding="2" HorizontalAlignment="Left">
+                                            <StackPanel Orientation="Horizontal">
+                                                <RadioButton x:Name="RadioDarkModeOff" Content="关闭" GroupName="DarkMode" Width="72" Style="{StaticResource SegmentBtn}"/>
+                                                <RadioButton x:Name="RadioDarkModeOn" Content="开启" GroupName="DarkMode" Width="72" Style="{StaticResource SegmentBtn}"/>
+                                                <RadioButton x:Name="RadioDarkModeSystem" Content="跟随系统" GroupName="DarkMode" IsChecked="True" Width="140" Style="{StaticResource SegmentBtn}"/>
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
                                     <StackPanel Margin="0,0,0,12">
                                         <TextBlock x:Name="TxtBasicNetworkRegion" Text="网络源" Foreground="#666" Margin="0,0,0,8" FontSize="12"/>
@@ -479,7 +592,7 @@
                                                 <StackPanel>
                                                     <DockPanel LastChildFill="False" Margin="0,0,0,8">
                                                         <TextBlock x:Name="TxtVisualTitle" Text="视觉表现" FontSize="14" FontWeight="Bold" Foreground="#45AFFF" VerticalAlignment="Center" DockPanel.Dock="Left"/>
-                                                        <Button x:Name="BtnVisualReset" Content="恢复默认设置" Click="OpenVisualResetOverlay_Click" DockPanel.Dock="Right" Padding="10,4" Height="28" FontSize="12" Background="White" BorderBrush="#D6DEE8" Cursor="Hand" VerticalAlignment="Center">
+                                                        <Button x:Name="BtnVisualReset" Content="恢复默认设置" Click="OpenVisualResetOverlay_Click" DockPanel.Dock="Right" Padding="10,4" Height="28" FontSize="12" Background="White" BorderBrush="#D6DEE8" Cursor="Hand" VerticalAlignment="Center" Style="{StaticResource SecondaryActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
                                                         </Button>
                                                     </DockPanel>
@@ -597,7 +710,7 @@
                                                     <TextBlock x:Name="TxtEffectColor" Text="特效主题颜色" Foreground="#666" Margin="0,0,0,8" FontSize="12"/>
                                                     <StackPanel Orientation="Horizontal">
                                                         <Border Name="ColorPreview" Width="40" Height="28" CornerRadius="6" BorderBrush="#DDD" BorderThickness="1" Margin="0,0,10,0"/>
-                                                        <Button x:Name="BtnPickColor" Content="更改颜色" Click="PickColor_Click" Width="90" Height="28" Background="#F8FAFF" BorderBrush="#45AFFF" Foreground="#45AFFF" Cursor="Hand" FontSize="12">
+                                                        <Button x:Name="BtnPickColor" Content="更改颜色" Click="PickColor_Click" Width="90" Height="28" Background="#F8FAFF" BorderBrush="#45AFFF" Foreground="#45AFFF" Cursor="Hand" FontSize="12" Style="{StaticResource SecondaryActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
                                                         </Button>
                                                     </StackPanel>
@@ -629,13 +742,13 @@
 
                                                     <TextBlock x:Name="TxtFilterProfiles" Text="配置组管理" FontWeight="SemiBold" Foreground="#333" Margin="0,0,0,10"/>
                                                     <DockPanel Margin="0,0,0,12">
-                                                        <Button x:Name="BtnDeleteProfile" Content="删除" Click="DeleteProfile_Click" DockPanel.Dock="Right" Margin="5,0,0,0" Padding="8,0" Height="28" Background="#FFF0F0" Foreground="#CC0000" BorderBrush="#FFCCCC">
+                                                        <Button x:Name="BtnDeleteProfile" Content="删除" Click="DeleteProfile_Click" DockPanel.Dock="Right" Margin="5,0,0,0" Padding="8,0" Height="28" Style="{StaticResource DangerActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
                                                         </Button>
-                                                        <Button x:Name="BtnRenameProfile" Content="重命名" Click="RenameProfile_Click" DockPanel.Dock="Right" Margin="5,0,0,0" Padding="8,0" Height="28" Background="#F8FAFF" BorderBrush="#D6DEE8">
+                                                        <Button x:Name="BtnRenameProfile" Content="重命名" Click="RenameProfile_Click" DockPanel.Dock="Right" Margin="5,0,0,0" Padding="8,0" Height="28" Background="#F8FAFF" BorderBrush="#D6DEE8" Style="{StaticResource SecondaryActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
                                                         </Button>
-                                                        <Button x:Name="BtnAddProfile" Content="新建" Click="AddProfile_Click" DockPanel.Dock="Right" Margin="5,0,0,0" Padding="8,0" Height="28" Background="#F8FAFF" BorderBrush="#D6DEE8">
+                                                        <Button x:Name="BtnAddProfile" Content="新建" Click="AddProfile_Click" DockPanel.Dock="Right" Margin="5,0,0,0" Padding="8,0" Height="28" Background="#F8FAFF" BorderBrush="#D6DEE8" Style="{StaticResource SecondaryActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
                                                         </Button>
                                                         <ComboBox Name="ComboProfiles" SelectionChanged="ComboProfiles_SelectionChanged" Height="28" VerticalContentAlignment="Center">
@@ -655,14 +768,14 @@
                                                     </ComboBox>
 
                                                     <TextBlock x:Name="TxtProcessList" Text="已配置进程列表" FontWeight="SemiBold" Foreground="#333" Margin="0,0,0,10"/>
-                                                    <ListBox Name="ListConfiguredProcesses" Height="120" Background="#FDFDFF" BorderBrush="#E0E8F0" BorderThickness="1" Margin="0,0,0,10">
+                                                    <ListBox Name="ListConfiguredProcesses" Height="120" Background="{DynamicResource ThemeInputBackgroundBrush}" BorderBrush="{DynamicResource ThemeCardBorderBrush}" BorderThickness="1" Margin="0,0,0,10">
                                                         <ListBox.ItemTemplate>
                                                             <DataTemplate>
                                                                 <DockPanel LastChildFill="True" Margin="2">
-                                                                    <Button Content="移除" Click="RemoveProcess_Click" DockPanel.Dock="Right" Padding="5,0" Height="22" FontSize="11" Background="#FFF0F0" Foreground="#CC0000" BorderBrush="#FFCCCC">
+                                                                    <Button Content="移除" Click="RemoveProcess_Click" DockPanel.Dock="Right" Padding="5,0" Height="22" FontSize="11" Style="{StaticResource DangerActionButton}">
                                                                         <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="3"/></Style></Button.Resources>
                                                                     </Button>
-                                                                    <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="5,0"/>
+                                                                    <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="5,0" Foreground="{DynamicResource ThemePrimaryTextBrush}"/>
                                                                 </DockPanel>
                                                             </DataTemplate>
                                                         </ListBox.ItemTemplate>
@@ -682,10 +795,10 @@
                                                         <Button x:Name="BtnAddProcess" Grid.Column="1" Content="添加" Margin="5,0,0,0" Padding="12,0" Height="30" Click="AddManualProcess_Click" Background="#45AFFF" Foreground="White">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                                                         </Button>
-                                                        <Button x:Name="BtnBrowseProcess" Grid.Column="2" Content="浏览..." Margin="5,0,0,0" Padding="12,0" Height="30" Click="BrowseProcess_Click" Background="White">
+                                                        <Button x:Name="BtnBrowseProcess" Grid.Column="2" Content="浏览..." Margin="5,0,0,0" Padding="12,0" Height="30" Click="BrowseProcess_Click" Background="White" BorderBrush="#D6DEE8" Style="{StaticResource SecondaryActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                                                         </Button>
-                                                        <Button x:Name="BtnSelectRunningProcess" Grid.Column="3" Content="从运行中选择" Margin="5,0,0,0" Padding="12,0" Height="30" Click="SelectRunningProcess_Click" Background="White">
+                                                        <Button x:Name="BtnSelectRunningProcess" Grid.Column="3" Content="从运行中选择" Margin="5,0,0,0" Padding="12,0" Height="30" Click="SelectRunningProcess_Click" Background="White" BorderBrush="#D6DEE8" Style="{StaticResource SecondaryActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                                                         </Button>
                                                     </Grid>
@@ -709,27 +822,44 @@
                                                 <StackPanel>
                                                     <DockPanel Margin="0,0,0,8">
                                                         <TextBlock x:Name="TxtMultiScreenTitle" Text="多屏显示管理" FontSize="14" FontWeight="Bold" Foreground="#45AFFF" VerticalAlignment="Center"/>
-                                                        <Button x:Name="BtnRefreshScreens" DockPanel.Dock="Right" Content="刷新显示器" Click="RefreshScreenOptions_Click" Padding="10,4" Height="28" Width="200" Background="#F8FAFF" BorderBrush="#D6DEE8" Cursor="Hand">
+                                                        <Button x:Name="BtnRefreshScreens" DockPanel.Dock="Right" Content="刷新显示器" Click="RefreshScreenOptions_Click" Padding="10,4" Height="28" Width="200" Background="#F8FAFF" BorderBrush="#D6DEE8" Cursor="Hand" Style="{StaticResource SecondaryActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                                                         </Button>
                                                     </DockPanel>
                                                     <TextBlock x:Name="TxtMultiScreenHint" Text="勾选要启用特效窗口的显示器。设置会按显示器名称和硬件 ID 记忆，显示屏变更后自动恢复。" FontSize="12" Foreground="#666" Margin="0,0,0,12" TextWrapping="Wrap"/>
 
                                                     <ListBox Name="ListScreenOptions" Background="Transparent" BorderThickness="0" MinHeight="180">
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="{x:Type ListBoxItem}">
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="BorderThickness" Value="0"/>
+                                                                <Setter Property="Padding" Value="0"/>
+                                                                <Setter Property="Margin" Value="0"/>
+                                                                <Setter Property="Focusable" Value="False"/>
+                                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                                                                            <ContentPresenter/>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
                                                         <ListBox.ItemTemplate>
                                                             <DataTemplate>
-                                                                <Border CornerRadius="10" BorderBrush="#DCE5F2" BorderThickness="1" Background="#FAFCFF" Padding="12" Margin="0,0,0,10">
+                                                                <Border CornerRadius="10" BorderBrush="{DynamicResource ThemeCardBorderBrush}" BorderThickness="1" Background="{DynamicResource ThemeCardBackgroundBrush}" Padding="12" Margin="0,0,0,10">
                                                                     <Grid>
                                                                         <Grid.ColumnDefinitions>
                                                                             <ColumnDefinition Width="*"/>
                                                                             <ColumnDefinition Width="Auto"/>
                                                                         </Grid.ColumnDefinitions>
                                                                         <StackPanel>
-                                                                            <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="#263238"/>
-                                                                            <TextBlock Text="{Binding ResolutionText}" FontSize="12" Foreground="#455A64" Margin="0,4,0,0"/>
-                                                                            <TextBlock Text="{Binding DetailText}" FontSize="11" Foreground="#78909C" Margin="0,4,0,0"/>
+                                                                            <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource ThemeCardTitleBrush}"/>
+                                                                            <TextBlock Text="{Binding ResolutionText}" FontSize="12" Foreground="{DynamicResource ThemeCardSecondaryTextBrush}" Margin="0,4,0,0"/>
+                                                                            <TextBlock Text="{Binding DetailText}" FontSize="11" Foreground="{DynamicResource ThemeCardDetailBrush}" Margin="0,4,0,0"/>
                                                                         </StackPanel>
-                                                                        <CheckBox Grid.Column="1" IsChecked="{Binding IsEnabled}" Content="{Binding EnableLabel}" VerticalAlignment="Center" Style="{StaticResource ToggleSwitch}" Margin="16,0,0,0"/>
+                                                                        <CheckBox Grid.Column="1" IsChecked="{Binding IsEnabled}" Content="{Binding EnableLabel}" VerticalAlignment="Center" Style="{StaticResource ToggleSwitch}" Margin="16,0,0,0" Foreground="{DynamicResource ThemePrimaryTextBrush}"/>
                                                                     </Grid>
                                                                 </Border>
                                                             </DataTemplate>
@@ -761,10 +891,10 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox x:Name="TxtSidebarBackgroundPath" Height="30" VerticalContentAlignment="Center" IsReadOnly="True" Background="#F8FAFF" BorderBrush="#E0E8F0" Padding="8,0"/>
-                                        <Button x:Name="BtnBrowseSidebarBackground" Grid.Column="1" Content="浏览..." Margin="8,0,0,0" Padding="12,0" Height="30" Click="BrowseSidebarBackground_Click" Background="White" BorderBrush="#D6DEE8" Cursor="Hand">
+                                        <Button x:Name="BtnBrowseSidebarBackground" Grid.Column="1" Content="浏览..." Margin="8,0,0,0" Padding="12,0" Height="30" Click="BrowseSidebarBackground_Click" Background="White" BorderBrush="#D6DEE8" Cursor="Hand" Style="{StaticResource SecondaryActionButton}">
                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                                         </Button>
-                                        <Button x:Name="BtnClearSidebarBackground" Grid.Column="2" Content="清除" Margin="8,0,0,0" Padding="12,0" Height="30" Click="ClearSidebarBackground_Click" Background="#FFF5F5" BorderBrush="#FFCCCC" Foreground="#CC0000" Cursor="Hand">
+                                        <Button x:Name="BtnClearSidebarBackground" Grid.Column="2" Content="清除" Margin="8,0,0,0" Padding="12,0" Height="30" Click="ClearSidebarBackground_Click" Cursor="Hand" Style="{StaticResource DangerActionButton}">
                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                                         </Button>
                                     </Grid>
@@ -798,13 +928,13 @@
                         <TextBlock Text="🔍" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="8,0,0,0" Foreground="#AAA" IsHitTestVisible="False"/>
                     </Grid>
 
-                    <ListBox Name="ListRunningProcesses" Grid.Row="2" Background="#FDFDFF" BorderBrush="#E0E8F0" BorderThickness="1">
+                    <ListBox Name="ListRunningProcesses" Grid.Row="2" Background="{DynamicResource ThemeInputBackgroundBrush}" BorderBrush="{DynamicResource ThemeCardBorderBrush}" BorderThickness="1">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <CheckBox IsChecked="{Binding IsSelected}" Margin="2,4" VerticalContentAlignment="Center">
                                     <StackPanel Orientation="Vertical" Margin="8,0,0,0">
-                                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="#333"/>
-                                        <TextBlock Text="{Binding ProcessName}" FontSize="10" Foreground="#999"/>
+                                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource ThemePrimaryTextBrush}"/>
+                                        <TextBlock Text="{Binding ProcessName}" FontSize="10" Foreground="{DynamicResource ThemeSecondaryTextBrush}"/>
                                     </StackPanel>
                                 </CheckBox>
                             </DataTemplate>
@@ -812,7 +942,7 @@
                     </ListBox>
 
                     <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-                        <Button x:Name="BtnOverlayCancel" Content="取消" Click="CloseRunningProcessOverlay_Click" Width="80" Height="32" Background="White" BorderBrush="#DDD" Margin="0,0,10,0">
+                        <Button x:Name="BtnOverlayCancel" Content="取消" Click="CloseRunningProcessOverlay_Click" Width="80" Height="32" Background="White" BorderBrush="#DDD" Margin="0,0,10,0" Style="{StaticResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
                         <Button x:Name="BtnOverlayConfirmAdd" Content="确认添加" Click="ConfirmAddRunningProcesses_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0">
@@ -857,7 +987,7 @@
                     </ListBox>
 
                     <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
-                        <Button x:Name="BtnOverlayVisualCancel" Content="取消" Click="CloseVisualResetOverlay_Click" Width="80" Height="32" Background="White" BorderBrush="#DDD" Margin="0,0,10,0">
+                        <Button x:Name="BtnOverlayVisualCancel" Content="取消" Click="CloseVisualResetOverlay_Click" Width="80" Height="32" Background="White" BorderBrush="#DDD" Margin="0,0,10,0" Style="{StaticResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
                         <Button x:Name="BtnOverlayVisualConfirm" Content="确认重置" Click="ConfirmVisualReset_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0">
@@ -877,7 +1007,7 @@
                         <TextBox.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></TextBox.Resources>
                     </TextBox>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-                        <Button x:Name="BtnOverlayRenameCancel" Content="取消" Click="CloseRenameOverlay_Click" Width="80" Height="32" Background="White" BorderBrush="#DDD" Margin="0,0,10,0">
+                        <Button x:Name="BtnOverlayRenameCancel" Content="取消" Click="CloseRenameOverlay_Click" Width="80" Height="32" Background="White" BorderBrush="#DDD" Margin="0,0,10,0" Style="{StaticResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
                         <Button x:Name="BtnOverlayRenameConfirm" Content="确认修改" Click="ConfirmRenameProfile_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0">

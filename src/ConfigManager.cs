@@ -37,6 +37,13 @@ namespace BASpark
         Global
     }
 
+    public enum DarkModeOption
+    {
+        Off,
+        On,
+        System
+    }
+
     public class FilterProfile
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
@@ -88,6 +95,7 @@ namespace BASpark
         public static string ScreenSelections { get; set; } = "";
         public static string UiLanguage { get; set; } = "";
         public static NetworkRegionOption NetworkRegion { get; set; } = NetworkRegionOption.Auto;
+        public static DarkModeOption DarkMode { get; set; } = DarkModeOption.System;
         public static PanelScrollbarVisibility ScrollbarVisibility { get; set; } = PanelScrollbarVisibility.OnScroll;
         public static string SidebarBackgroundImagePath { get; set; } = "";
         public static string TelemetryClientId { get; set; } = "";
@@ -144,6 +152,7 @@ namespace BASpark
                         ScreenSelections = key.GetValue("ScreenSelections", "")?.ToString() ?? "";
                         UiLanguage = key.GetValue("UiLanguage", "")?.ToString() ?? "";
                         NetworkRegion = ParseNetworkRegion(key.GetValue("NetworkRegion", "Auto")?.ToString());
+                        DarkMode = ParseDarkMode(key.GetValue("DarkMode", "System")?.ToString());
                         ScrollbarVisibility = ParseScrollbarVisibility(key.GetValue("ScrollbarVisibility", "OnScroll")?.ToString());
                         SidebarBackgroundImagePath = key.GetValue("SidebarBackgroundImagePath", "")?.ToString() ?? "";
                         TelemetryClientId = key.GetValue("TelemetryClientId", "")?.ToString() ?? "";
@@ -231,6 +240,21 @@ namespace BASpark
             }
 
             return NetworkRegionOption.Auto;
+        }
+
+        public static DarkModeOption ParseDarkMode(string? raw)
+        {
+            if (string.Equals(raw, "Off", StringComparison.OrdinalIgnoreCase))
+            {
+                return DarkModeOption.Off;
+            }
+
+            if (string.Equals(raw, "On", StringComparison.OrdinalIgnoreCase))
+            {
+                return DarkModeOption.On;
+            }
+
+            return DarkModeOption.System;
         }
 
         public static void GetAnimationSpeedsForOverlay(out double trailSpeed, out double clickSpeed)
@@ -549,6 +573,7 @@ namespace BASpark
                     ScreenSelections = "";
                     UiLanguage = "";
                     NetworkRegion = NetworkRegionOption.Auto;
+                    DarkMode = DarkModeOption.System;
                     SidebarBackgroundImagePath = "";
                     TelemetryClientId = "";
                     LastTelemetrySentUtc = "";

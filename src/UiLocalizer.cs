@@ -60,6 +60,10 @@ namespace BASpark
 
             w.TxtBasicTitle.Text = Localization.Get("Basic_Title");
             w.TxtBasicLanguage.Text = Localization.Get("Basic_Language");
+            w.TxtDarkMode.Text = Localization.Get("Basic_DarkMode");
+            w.RadioDarkModeOff.Content = Localization.Get("Basic_DarkModeOff");
+            w.RadioDarkModeOn.Content = Localization.Get("Basic_DarkModeOn");
+            w.RadioDarkModeSystem.Content = Localization.Get("Basic_DarkModeSystem");
             w.TxtBasicNetworkRegion.Text = Localization.Get("Basic_NetworkRegion");
             w.RadioNetworkRegionAuto.Content = Localization.Get("Basic_NetworkRegionAuto");
             w.RadioNetworkRegionChina.Content = Localization.Get("Basic_NetworkRegionChina");

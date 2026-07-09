@@ -94,6 +94,9 @@ namespace BASpark
         public ControlPanelWindow()
         {
             InitializeComponent();
+            SourceInitialized += (_, _) => ThemeManager.ApplyTitleBar(this);
+            Activated += (_, _) => ThemeManager.ApplyTitleBar(this);
+            Deactivated += (_, _) => ThemeManager.ApplyTitleBar(this);
 
             _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
                 ? Localization.CurrentCultureName
@@ -105,16 +108,29 @@ namespace BASpark
             ListRunningProcesses.ItemsSource = RunningProcessList;
             ListVisualResetItems.ItemsSource = VisualResetItems;
             ListScreenOptions.ItemsSource = ScreenOptions;
+            SubTabBasic.Checked += SettingsSubTab_Checked;
+            SubTabVisual.Checked += SettingsSubTab_Checked;
+            SubTabFilter.Checked += SettingsSubTab_Checked;
+            SubTabMultiScreen.Checked += SettingsSubTab_Checked;
+            SubTabMore.Checked += SettingsSubTab_Checked;
 
             LoadVersion();
             LoadSettings();
             ApplyScrollbarSettings();
             UiLocalizer.ApplyControlPanel(this);
             LoadScreenOptions();
+            Loaded += (_, _) => RefreshThemeSoon();
+            ContentRendered += (_, _) => RefreshThemeSoon();
+            RefreshThemeSoon();
             CheckAdminStatus();
             InitLogView();
             AppLogger.EntryAdded += OnAppLogEntryAdded;
-            Closed += (_, _) => AppLogger.EntryAdded -= OnAppLogEntryAdded;
+            SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
+            Closed += (_, _) =>
+            {
+                AppLogger.EntryAdded -= OnAppLogEntryAdded;
+                SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
+            };
             _ = ApplySidebarBackgroundAsync(ConfigManager.SidebarBackgroundImagePath);
             _ = LoadRemoteNoticeAsync(isManual: false);
 
@@ -276,6 +292,7 @@ namespace BASpark
                         NoticeContent.Text = content;
                         NoticeDate.Text = date;
                         NoticeBar.Visibility = Visibility.Visible;
+                        RefreshThemeSoon();
                         if (content != lastContent)
                         {
                             ShowWindowsNotification(title, content);
@@ -292,6 +309,7 @@ namespace BASpark
                     if (string.IsNullOrEmpty(NoticeContent.Text) || NoticeContent.Text == "...")
                     {
                         NoticeBar.Visibility = Visibility.Collapsed;
+                        RefreshThemeSoon();
                     }
                 });
                 HandleNetworkFetchFailure(isManual, ex.Message);
@@ -600,10 +618,74 @@ namespace BASpark
                 RadioScrollbarOnScroll.IsChecked = true;
             }
 
+            SelectDarkMode(ConfigManager.DarkMode);
             SelectNetworkRegion(ConfigManager.NetworkRegion);
             if (TxtSidebarBackgroundPath != null)
             {
                 TxtSidebarBackgroundPath.Text = ConfigManager.SidebarBackgroundImagePath;
+            }
+        }
+
+        private void SelectDarkMode(DarkModeOption mode)
+        {
+            switch (mode)
+            {
+                case DarkModeOption.Off:
+                    RadioDarkModeOff.IsChecked = true;
+                    break;
+                case DarkModeOption.On:
+                    RadioDarkModeOn.IsChecked = true;
+                    break;
+                default:
+                    RadioDarkModeSystem.IsChecked = true;
+                    break;
+            }
+        }
+
+        private DarkModeOption GetSelectedDarkMode()
+        {
+            if (RadioDarkModeOff.IsChecked == true)
+            {
+                return DarkModeOption.Off;
+            }
+
+            if (RadioDarkModeOn.IsChecked == true)
+            {
+                return DarkModeOption.On;
+            }
+
+            return DarkModeOption.System;
+        }
+
+        private void ApplyDarkMode()
+        {
+            ThemeManager.ApplyControlPanel(this);
+        }
+
+        private void RefreshThemeSoon()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(RefreshThemeSoon), DispatcherPriority.Loaded);
+                return;
+            }
+
+            Dispatcher.BeginInvoke(new Action(ApplyDarkMode), DispatcherPriority.Loaded);
+            Dispatcher.BeginInvoke(new Action(ApplyDarkMode), DispatcherPriority.ContextIdle);
+        }
+
+        private void SystemEvents_UserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (ConfigManager.DarkMode != DarkModeOption.System)
+            {
+                return;
+            }
+
+            if (e.Category == UserPreferenceCategory.General ||
+                e.Category == UserPreferenceCategory.VisualStyle ||
+                e.Category == UserPreferenceCategory.Color)
+            {
+                Dispatcher.Invoke(RefreshThemeSoon);
             }
         }
 
@@ -833,9 +915,10 @@ namespace BASpark
             if (ListConfiguredProcesses != null)
             {
                 ListConfiguredProcesses.IsEnabled = processFilterEnabled;
-                ListConfiguredProcesses.Opacity = processFilterEnabled ? 1.0 : 0.65;
+                ListConfiguredProcesses.Opacity = processFilterEnabled || ThemeManager.IsDarkModeEnabled() ? 1.0 : 0.65;
             }
             ManualProcessInput.IsEnabled = processFilterEnabled;
+            RefreshThemeSoon();
         }
 
         private void SelectProcessFilterMode(ProcessFilterModeOption mode)
@@ -869,6 +952,13 @@ namespace BASpark
             else if (TabSettings.IsChecked == true) PageSettings.Visibility = Visibility.Visible;
             else if (TabLog.IsChecked == true) PageLog.Visibility = Visibility.Visible;
             else if (TabAbout.IsChecked == true) PageAbout.Visibility = Visibility.Visible;
+
+            RefreshThemeSoon();
+        }
+
+        private void SettingsSubTab_Checked(object sender, RoutedEventArgs e)
+        {
+            RefreshThemeSoon();
         }
 
         private void InitLogView()
@@ -881,6 +971,7 @@ namespace BASpark
             _logViewInitialized = true;
             TxtAppLog.Text = string.Join(Environment.NewLine, AppLogger.GetEntries());
             TxtAppLog.ScrollToEnd();
+            RefreshThemeSoon();
         }
 
         private void OnAppLogEntryAdded(string line)
@@ -938,6 +1029,7 @@ namespace BASpark
                     }
 
                     SidebarBackgroundHost.Background = (System.Windows.Media.Brush?)brush ?? System.Windows.Media.Brushes.White;
+                    RefreshThemeSoon();
                 });
             }
             catch (Exception ex)
@@ -1362,6 +1454,7 @@ namespace BASpark
                 !string.Equals(selectedLanguage, _languageAtLoad, StringComparison.OrdinalIgnoreCase);
             NetworkRegionOption selectedNetworkRegion = GetSelectedNetworkRegion();
             bool networkRegionChanged = selectedNetworkRegion != _networkRegionAtLoad;
+            DarkModeOption selectedDarkMode = GetSelectedDarkMode();
 
             if (!string.IsNullOrWhiteSpace(selectedLanguage))
             {
@@ -1428,6 +1521,9 @@ namespace BASpark
             ConfigManager.Save("ScrollbarVisibility", scrollbarVisibility);
             ApplyScrollbarSettings();
             ConfigManager.Save("NetworkRegion", selectedNetworkRegion);
+            ConfigManager.Save("DarkMode", selectedDarkMode);
+            ApplyDarkMode();
+            RefreshThemeSoon();
             ConfigManager.Save("StartSilent", startSilentEnabled);
             ConfigManager.Save("EnableEnvironmentFilter", CheckEnvironmentFilter.IsChecked ?? false);
             ConfigManager.Save("HideInFullscreen", CheckHideInFullscreen.IsChecked ?? true);

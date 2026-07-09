@@ -132,6 +132,18 @@
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>Enable mouse trail</value>
     </data>
+    <data name="Basic_DarkMode" xml:space="preserve">
+      <value>Dark mode</value>
+    </data>
+    <data name="Basic_DarkModeOff" xml:space="preserve">
+      <value>Off</value>
+    </data>
+    <data name="Basic_DarkModeOn" xml:space="preserve">
+      <value>On</value>
+    </data>
+    <data name="Basic_DarkModeSystem" xml:space="preserve">
+      <value>System</value>
+    </data>
     <data name="Basic_ScrollbarVisibility" xml:space="preserve">
       <value>Scrollbar visibility</value>
     </data>
