@@ -37,8 +37,9 @@
         const DEFAULT_COLOR_RGB = [45 / 255, 175 / 255, 1.0];
         const UI_DEFAULT_SCALE = 1.0;
         const TRAIL_SMOOTHING_RADIUS_PX = 9.0;
+        const TRAIL_TARGET_SEGMENT_PX = 10.0;
         const TRAIL_MAX_POINTS = 320;
-        const MAX_TRAIL_STEPS_PER_MOVE = TRAIL_MAX_POINTS;
+        const MAX_TRAIL_SEGMENTS_PER_MOVE = 8;
         const MAX_CLICK_EFFECTS = 16;
         const MAX_DISTANCE_EFFECTS = 24;
         const MAX_DISTANCE_EMIT_EVENTS_PER_MOVE = 8;
@@ -457,6 +458,7 @@
                 this.trailSpeed = opts.trailSpeed != null ? opts.trailSpeed : (opts.speed || 1.0);
                 this.clickSpeed = opts.clickSpeed != null ? opts.clickSpeed : (opts.speed || 1.0);
                 this.trailThickness = opts.trailThickness != null ? opts.trailThickness : 1.0;
+                this.trailDelayMs = opts.trailDelayMs != null ? opts.trailDelayMs : 100;
                 this.trailFrameIntervalMs = 1000 / 40;
                 this.trailRenderAccumulator = 1.0;
                 this.lastTrailRenderGateMs = performance.now();
@@ -474,12 +476,15 @@
                 this.previousDirtyRects = [];
                 this.forceFullRedraw = true;
 
-                this.trailDistanceAccumulator = 0;
                 this.trailEmitX = Number.NaN;
                 this.trailEmitY = Number.NaN;
+                this.trailEmitTimeMs = Number.NaN;
                 this.trailLastPos = null;
                 this.trailSmoothX = Number.NaN;
                 this.trailSmoothY = Number.NaN;
+                this.trailLastSmoothTime = Number.NaN;
+                this.trailMaskBuffer = new Float32Array(TRAIL_MAX_POINTS);
+                this.trailAlphaBuffer = new Float32Array(TRAIL_MAX_POINTS);
                 this.distanceAccumulator = 0;
 
                 this.rebuildConfig();
@@ -540,7 +545,6 @@
 
                 this.isDown = true;
                 this.lastPos = { x, y };
-                this.trailDistanceAccumulator = 0;
                 this.distanceAccumulator = 0;
                 this.trailEmitX = x;
                 this.trailEmitY = y;
@@ -569,7 +573,7 @@
                     const trailPoint = this.smoothTrailPoint(point);
                     const trailDistance = Math.hypot(trailPoint.x - previousTrail.x, trailPoint.y - previousTrail.y);
                     if (trailDistance > 0.01) {
-                        this.handleTrailMove(previousTrail, trailPoint, trailDistance);
+                        this.handleTrailMove(trailPoint);
                     }
                     this.trailLastPos = trailPoint;
                     if (this.isDown) {
@@ -582,13 +586,14 @@
 
             pointerUp() {
                 this.isDown = false;
-                this.trailDistanceAccumulator = 0;
                 this.trailEmitX = Number.NaN;
                 this.trailEmitY = Number.NaN;
+                this.trailEmitTimeMs = Number.NaN;
                 if (!window.effectiveAlwaysTrail) {
                     this.trailLastPos = null;
                     this.trailSmoothX = Number.NaN;
                     this.trailSmoothY = Number.NaN;
+                    this.trailLastSmoothTime = Number.NaN;
                 }
                 this.distanceAccumulator = 0;
             }
@@ -607,9 +612,13 @@
                 this.trail = [];
                 this.isDown = false;
                 this.lastPos = null;
+                this.trailEmitX = Number.NaN;
+                this.trailEmitY = Number.NaN;
+                this.trailEmitTimeMs = Number.NaN;
                 this.trailLastPos = null;
                 this.trailSmoothX = Number.NaN;
                 this.trailSmoothY = Number.NaN;
+                this.trailLastSmoothTime = Number.NaN;
                 this.trailRenderAccumulator = 1.0;
                 this.lastTrailRenderGateMs = performance.now();
                 this.previousDirtyRects = [];
@@ -642,6 +651,7 @@
             resetTrailSmoothing(point) {
                 this.trailSmoothX = point.x;
                 this.trailSmoothY = point.y;
+                this.trailLastSmoothTime = performance.now();
                 this.trailLastPos = { x: point.x, y: point.y };
                 return this.trailLastPos;
             }
@@ -654,11 +664,18 @@
                 const dx = point.x - this.trailSmoothX;
                 const dy = point.y - this.trailSmoothY;
                 const d = Math.hypot(dx, dy);
+                const now = performance.now();
+                const elapsedMs = Number.isFinite(this.trailLastSmoothTime)
+                    ? Math.max(0, now - this.trailLastSmoothTime)
+                    : 1000 / 40;
+                this.trailLastSmoothTime = now;
                 if (d < 0.25) {
                     return { x: this.trailSmoothX, y: this.trailSmoothY };
                 }
 
-                const alpha = clamp(d / (d + TRAIL_SMOOTHING_RADIUS_PX), 0.18, 0.72);
+                const baseAlpha = clamp(d / (d + TRAIL_SMOOTHING_RADIUS_PX), 0.18, 0.72);
+                const timeScale = clamp(elapsedMs / (1000 / 40), 0.1, 4.0);
+                const alpha = 1 - Math.pow(1 - baseAlpha, timeScale);
                 this.trailSmoothX += dx * alpha;
                 this.trailSmoothY += dy * alpha;
                 return { x: this.trailSmoothX, y: this.trailSmoothY };
@@ -731,7 +748,7 @@
                     const itemLifetimeSec = this.sampleStartLifetimeSec(params);
                     particles.push({
                         angle: Math.random() * Math.PI * 2,
-                        orientBase: Math.random() < 0.5 ? Math.PI * 0.5 : Math.PI * 1.5,
+                        orientBase: Math.random() < 0.5 ? 0 : Math.PI,
                         spin: 0,
                         lifetimeSec: itemLifetimeSec,
                         lifetimeMs: Math.max(16, Math.round(itemLifetimeSec * 1000)),
@@ -790,37 +807,25 @@
             }
 
             beginTrailStroke(x, y) {
-                const trail = this.subsystems.trail;
-                if (!trail) return;
+                if (!this.subsystems.trail) return;
 
                 const now = performance.now();
-                const last = this.trail[this.trail.length - 1];
-                if (last && last.penUp && Math.hypot(last.x - x, last.y - y) < 0.35) {
-                    last.x = x;
-                    last.y = y;
-                    last.tMs = now;
-                } else {
-                    this.trail.push({ x, y, tMs: now, penUp: true });
-                }
-
+                this.appendTrailPoint(x, y, now, true);
+                this.trailEmitX = x;
+                this.trailEmitY = y;
+                this.trailEmitTimeMs = now;
                 this.trimTrailPoints();
             }
 
-            spawnTrailSegment(x1, y1, x2, y2) {
-                const now = performance.now();
-                const pushPoint = (x, y, penUp = false) => {
-                    const last = this.trail[this.trail.length - 1];
-                    if (last && !last.penUp && !penUp && Math.hypot(last.x - x, last.y - y) < 0.35) {
-                        last.tMs = now;
-                        return;
-                    }
-                    this.trail.push({ x, y, tMs: now, penUp });
-                };
-
-                if (this.trail.length === 0) {
-                    pushPoint(x1, y1, true);
+            appendTrailPoint(x, y, tMs, penUp = false) {
+                const last = this.trail[this.trail.length - 1];
+                if (last && last.penUp === penUp && Math.hypot(last.x - x, last.y - y) < 0.35) {
+                    last.x = x;
+                    last.y = y;
+                    last.tMs = tMs;
+                    return;
                 }
-                pushPoint(x2, y2);
+                this.trail.push({ x, y, tMs, penUp });
             }
 
             trimTrailPoints() {
@@ -829,46 +834,47 @@
                 }
             }
 
-            handleTrailMove(prev, current, distance) {
+            handleTrailMove(current) {
                 const trail = this.subsystems.trail;
                 if (!trail) return;
 
+                const now = performance.now();
                 const minStep = Math.max(1e-3, trail.minVertexDistancePx);
-                const dirX = (current.x - prev.x) / distance;
-                const dirY = (current.y - prev.y) / distance;
-                let remain = distance;
-                let walkX = prev.x;
-                let walkY = prev.y;
-                let emittedSteps = 0;
-
-                while (this.trailDistanceAccumulator + remain >= minStep && emittedSteps < MAX_TRAIL_STEPS_PER_MOVE) {
-                    const step = minStep - this.trailDistanceAccumulator;
-                    const nx = walkX + dirX * step;
-                    const ny = walkY + dirY * step;
-                    if (Number.isFinite(this.trailEmitX) && Number.isFinite(this.trailEmitY)) {
-                        this.spawnTrailSegment(this.trailEmitX, this.trailEmitY, nx, ny);
-                    }
-                    this.trailEmitX = nx;
-                    this.trailEmitY = ny;
-                    walkX = nx;
-                    walkY = ny;
-                    remain -= step;
-                    this.trailDistanceAccumulator = 0;
-                    emittedSteps++;
-                }
-
-                if (emittedSteps >= MAX_TRAIL_STEPS_PER_MOVE && this.trailDistanceAccumulator + remain >= minStep) {
-                    if (Number.isFinite(this.trailEmitX) && Number.isFinite(this.trailEmitY)) {
-                        this.spawnTrailSegment(this.trailEmitX, this.trailEmitY, current.x, current.y);
-                    }
+                if (!Number.isFinite(this.trailEmitX) || !Number.isFinite(this.trailEmitY)) {
                     this.trailEmitX = current.x;
                     this.trailEmitY = current.y;
-                    this.trailDistanceAccumulator = 0;
-                    this.trimTrailPoints();
+                    this.trailEmitTimeMs = now;
                     return;
                 }
 
-                this.trailDistanceAccumulator += remain;
+                const startX = this.trailEmitX;
+                const startY = this.trailEmitY;
+                const distance = Math.hypot(current.x - startX, current.y - startY);
+                if (distance < minStep) {
+                    return;
+                }
+
+                let startTimeMs = Number.isFinite(this.trailEmitTimeMs) ? this.trailEmitTimeMs : now;
+                const segmentCount = Math.min(
+                    MAX_TRAIL_SEGMENTS_PER_MOVE,
+                    Math.max(1, Math.ceil(distance / Math.max(minStep, TRAIL_TARGET_SEGMENT_PX)))
+                );
+                if (this.trail.length === 0) {
+                    startTimeMs = now;
+                    this.appendTrailPoint(startX, startY, startTimeMs, true);
+                }
+                for (let i = 1; i <= segmentCount; i++) {
+                    const ratio = i / segmentCount;
+                    this.appendTrailPoint(
+                        lerp(startX, current.x, ratio),
+                        lerp(startY, current.y, ratio),
+                        lerp(startTimeMs, now, ratio)
+                    );
+                }
+
+                this.trailEmitX = current.x;
+                this.trailEmitY = current.y;
+                this.trailEmitTimeMs = now;
                 this.trimTrailPoints();
             }
 
@@ -984,8 +990,7 @@
                     const y = cy + Math.sin(item.angle) * radius;
                     const alpha = clamp(col[3] * this.uvFrameFactor(sub, p, item), 0, 1);
                     const size = sub.params.sizePx * item.sizeMul * Math.max(0, curve);
-                    const rot = (item.orientBase ?? 0) + item.spin * p;
-                    this.drawTriangle(x, y, size, rot, [col[0], col[1], col[2]], this.cfg.colorWhite, alpha);
+                    this.drawTriangle(x, y, size, item.orientBase ?? 0, [col[0], col[1], col[2]], this.cfg.colorWhite, alpha);
                 }
             }
 
@@ -1097,11 +1102,15 @@
                 }
             }
 
+            trailPointAgeMs(point, nowMs) {
+                return Math.max(0, nowMs - point.tMs - this.trailDelayMs) * this.trailSpeed;
+            }
+
             pruneTrail(nowMs) {
                 const trail = this.subsystems.trail;
                 const lifeMs = Math.max(1, Math.round((trail?.lifetimeSec ?? 0.3) * 1000));
                 let firstAlive = 0;
-                while (firstAlive < this.trail.length && (nowMs - this.trail[firstAlive].tMs) * this.trailSpeed > lifeMs) {
+                while (firstAlive < this.trail.length && this.trailPointAgeMs(this.trail[firstAlive], nowMs) > lifeMs) {
                     firstAlive++;
                 }
                 if (firstAlive > 0) {
@@ -1156,6 +1165,34 @@
                 return false;
             }
 
+            _drawTrailPiece(x0, y0, controlX, controlY, x1, y1, curved, mask, alpha, baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul) {
+                const maskValue = Math.max(0.02, mask);
+                if (alpha <= 0.005) return;
+
+                const ctx = this.bufferCtx;
+                ctx.lineWidth = baseWidth * maskValue * (1.6 + 0.24 * hdrScale);
+                ctx.globalAlpha = this.alpha(alpha * bloomAlphaMul);
+                ctx.beginPath();
+                ctx.moveTo(x0, y0);
+                if (curved) {
+                    ctx.quadraticCurveTo(controlX, controlY, x1, y1);
+                } else {
+                    ctx.lineTo(x1, y1);
+                }
+                ctx.stroke();
+
+                ctx.lineWidth = baseWidth * maskValue;
+                ctx.globalAlpha = this.alpha(alpha * coreAlphaMul);
+                ctx.beginPath();
+                ctx.moveTo(x0, y0);
+                if (curved) {
+                    ctx.quadraticCurveTo(controlX, controlY, x1, y1);
+                } else {
+                    ctx.lineTo(x1, y1);
+                }
+                ctx.stroke();
+            }
+
             drawTrail(nowMs) {
                 if (this.trail.length < 2) return;
 
@@ -1168,44 +1205,75 @@
                 const brightCss = rgbCss(bright);
                 const bloomAlphaMul = 0.16 + 0.12 * hdrScale;
                 const coreAlphaMul = 0.50 + 0.26 * hdrScale;
+                const count = this.trail.length;
+
+                for (let i = 0; i < count; i++) {
+                    const age = clamp(this.trailPointAgeMs(this.trail[i], nowMs) / lifeMs, 0, 1);
+                    const mask = this.sampleTrailTextureMask(age);
+                    this.trailMaskBuffer[i] = mask;
+                    this.trailAlphaBuffer[i] = this.evalTrailGradientAlpha(trail, age) * mask;
+                }
 
                 ctx.save();
                 ctx.globalCompositeOperation = "lighter";
-                ctx.lineCap = (trail.numCapVertices ?? 0) > 0 ? "round" : "butt";
-                ctx.lineJoin = (trail.numCornerVertices ?? 0) > 0 ? "round" : "miter";
+                ctx.lineCap = "butt";
+                ctx.lineJoin = "round";
                 ctx.strokeStyle = brightCss;
 
-                for (let i = 1; i < this.trail.length; i++) {
-                    const p0 = this.trail[i - 1];
-                    const p1 = this.trail[i];
-                    if (p1.penUp) continue;
-                    if (Math.hypot(p1.x - p0.x, p1.y - p0.y) < 1e-3) continue;
+                let strokeStart = 0;
+                while (strokeStart < count) {
+                    let strokeEnd = strokeStart + 1;
+                    while (strokeEnd < count && !this.trail[strokeEnd].penUp) {
+                        strokeEnd++;
+                    }
 
-                    const age0 = clamp(((nowMs - p0.tMs) * this.trailSpeed) / lifeMs, 0, 1);
-                    const age1 = clamp(((nowMs - p1.tMs) * this.trailSpeed) / lifeMs, 0, 1);
-                    const mask0 = this.sampleTrailTextureMask(age0);
-                    const mask1 = this.sampleTrailTextureMask(age1);
-                    const maskMid = Math.max(0.02, (mask0 + mask1) * 0.5);
-                    if (maskMid <= 0.005) continue;
+                    const last = strokeEnd - 1;
+                    if (last > strokeStart) {
+                        const firstPoint = this.trail[strokeStart];
+                        const secondPoint = this.trail[strokeStart + 1];
+                        if (last === strokeStart + 1) {
+                            this._drawTrailPiece(
+                                firstPoint.x, firstPoint.y, 0, 0, secondPoint.x, secondPoint.y, false,
+                                (this.trailMaskBuffer[strokeStart] + this.trailMaskBuffer[last]) * 0.5,
+                                (this.trailAlphaBuffer[strokeStart] + this.trailAlphaBuffer[last]) * 0.5,
+                                baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul
+                            );
+                        } else {
+                            let midpointX = (firstPoint.x + secondPoint.x) * 0.5;
+                            let midpointY = (firstPoint.y + secondPoint.y) * 0.5;
+                            this._drawTrailPiece(
+                                firstPoint.x, firstPoint.y, 0, 0, midpointX, midpointY, false,
+                                (this.trailMaskBuffer[strokeStart] * 3 + this.trailMaskBuffer[strokeStart + 1]) * 0.25,
+                                (this.trailAlphaBuffer[strokeStart] * 3 + this.trailAlphaBuffer[strokeStart + 1]) * 0.25,
+                                baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul
+                            );
 
-                    const a0 = this.evalTrailGradientAlpha(trail, age0) * mask0;
-                    const a1 = this.evalTrailGradientAlpha(trail, age1) * mask1;
-                    const alphaMid = (a0 + a1) * 0.5;
-                    if (alphaMid <= 0.005) continue;
+                            for (let i = strokeStart + 1; i < last; i++) {
+                                const point = this.trail[i];
+                                const next = this.trail[i + 1];
+                                const nextMidpointX = (point.x + next.x) * 0.5;
+                                const nextMidpointY = (point.y + next.y) * 0.5;
+                                this._drawTrailPiece(
+                                    midpointX, midpointY, point.x, point.y, nextMidpointX, nextMidpointY, true,
+                                    (this.trailMaskBuffer[i - 1] + this.trailMaskBuffer[i] * 2 + this.trailMaskBuffer[i + 1]) * 0.25,
+                                    (this.trailAlphaBuffer[i - 1] + this.trailAlphaBuffer[i] * 2 + this.trailAlphaBuffer[i + 1]) * 0.25,
+                                    baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul
+                                );
+                                midpointX = nextMidpointX;
+                                midpointY = nextMidpointY;
+                            }
 
-                    ctx.lineWidth = baseWidth * maskMid * (1.6 + 0.24 * hdrScale);
-                    ctx.globalAlpha = this.alpha(alphaMid * bloomAlphaMul);
-                    ctx.beginPath();
-                    ctx.moveTo(p0.x, p0.y);
-                    ctx.lineTo(p1.x, p1.y);
-                    ctx.stroke();
+                            const lastPoint = this.trail[last];
+                            this._drawTrailPiece(
+                                midpointX, midpointY, 0, 0, lastPoint.x, lastPoint.y, false,
+                                (this.trailMaskBuffer[last - 1] + this.trailMaskBuffer[last] * 3) * 0.25,
+                                (this.trailAlphaBuffer[last - 1] + this.trailAlphaBuffer[last] * 3) * 0.25,
+                                baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul
+                            );
+                        }
+                    }
 
-                    ctx.lineWidth = baseWidth * maskMid;
-                    ctx.globalAlpha = this.alpha(alphaMid * coreAlphaMul);
-                    ctx.beginPath();
-                    ctx.moveTo(p0.x, p0.y);
-                    ctx.lineTo(p1.x, p1.y);
-                    ctx.stroke();
+                    strokeStart = strokeEnd;
                 }
 
                 ctx.restore();
@@ -1486,11 +1554,13 @@
             window.spark.rebuildConfig();
         };
 
-        window.updateEffectSettings = (scale, opacity, trailSpeed, clickSpeed, trailThickness) => {
+        window.updateEffectSettings = (scale, opacity, trailSpeed, clickSpeed, trailThickness, trailDelay) => {
             if (!window.spark) return;
             window.spark.scale = Math.max(0.5, Math.min(3, Number(scale) || UI_DEFAULT_SCALE));
             window.spark.opacity = Math.max(0.1, Math.min(1, Number(opacity) || 1.0));
             window.spark.trailThickness = Math.max(0.5, Math.min(3, Number(trailThickness) || 1.0));
+            const delay = Number(trailDelay);
+            window.spark.trailDelayMs = Math.max(0, Math.min(500, Number.isFinite(delay) ? delay * 1000 : 100));
             let t = Number(trailSpeed);
             if (!Number.isFinite(t)) t = 1.0;
             let c = Number(clickSpeed);

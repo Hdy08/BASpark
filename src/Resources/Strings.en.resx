@@ -565,6 +565,12 @@ Download now?</value>
     <data name="VisualReset_TrailThickness_Sub" xml:space="preserve">
       <value>Default 1.00 ×</value>
     </data>
+    <data name="VisualReset_TrailDelay" xml:space="preserve">
+      <value>Trail delay</value>
+    </data>
+    <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
+      <value>Default 0.10 s</value>
+    </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>Trail refresh rate</value>
     </data>
@@ -615,6 +621,9 @@ Download now?</value>
     </data>
     <data name="Visual_TrailThickness" xml:space="preserve">
       <value>Trail thickness</value>
+    </data>
+    <data name="Visual_TrailDelay" xml:space="preserve">
+      <value>Trail delay</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>Visual</value>

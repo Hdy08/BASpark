@@ -200,15 +200,16 @@ namespace BASpark
             ExecuteScript($"if(window.updateColor) window.updateColor({colorJson});");
         }
 
-        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness)
+        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness, double trailDelay)
         {
             string scaleStr = FormatScriptNumber(scale, 0.5, 3.0, 1.0);
             string opacityStr = FormatScriptNumber(opacity, 0.1, 1.0, 1.0);
             string trailStr = FormatScriptNumber(trailSpeed, 0.2, 3.0, 1.0);
             string clickStr = FormatScriptNumber(clickSpeed, 0.2, 3.0, 1.0);
             string trailThicknessStr = FormatScriptNumber(trailThickness, 0.5, 3.0, 1.0);
+            string trailDelayStr = FormatScriptNumber(trailDelay, 0.0, 0.5, 0.10);
 
-            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr}, {trailThicknessStr});");
+            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr}, {trailThicknessStr}, {trailDelayStr});");
         }
 
         private static string FormatScriptNumber(double value, double min, double max, double fallback)
@@ -454,7 +455,7 @@ namespace BASpark
                         _lastReportedAlwaysTrail = null;
                         UpdateColor(ConfigManager.ParticleColor);
                         ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
-                        UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness);
+                        UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness, ConfigManager.TrailDelay);
                         UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
                         SyncInputContext(InputModeMouse);
                         if (_overlayRuntimePaused)

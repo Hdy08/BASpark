@@ -104,6 +104,7 @@ namespace BASpark
             w.TxtTrailRefresh.Text = Localization.Get("Visual_TrailRefresh");
             w.TxtEffectColor.Text = Localization.Get("Visual_Color");
             w.BtnPickColor.Content = Localization.Get("Visual_ChangeColor");
+            w.TxtTrailDelay.Text = Localization.Get("Visual_TrailDelay");
 
             w.TxtFilterTitle.Text = Localization.Get("Filter_Title");
             w.CheckEnvironmentFilter.Content = Localization.Get("Filter_Enable");
