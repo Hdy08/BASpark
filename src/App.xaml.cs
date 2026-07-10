@@ -135,9 +135,12 @@ namespace BASpark
             {
                 FileName = exePath,
                 UseShellExecute = true,
-                Verb = "runas",
-                Arguments = string.Join(" ", args.Select(a => $"\"{a}\""))
+                Verb = "runas"
             };
+            foreach (string argument in args)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
 
             try
             {
@@ -158,7 +161,10 @@ namespace BASpark
 
         private static bool IsAutoStartLaunch(string[] args)
         {
-            return args.Any(arg => string.Equals(arg, "--autostart", StringComparison.OrdinalIgnoreCase));
+            return args.Any(arg =>
+                string.Equals(arg, "--autostart", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, "--silent", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, "/silent", StringComparison.OrdinalIgnoreCase));
         }
 
         private void OnSessionEnding(object sender, SessionEndingEventArgs e)

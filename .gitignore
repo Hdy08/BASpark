@@ -438,3 +438,7 @@ Thumbs.db
 desktop.ini
 
 config.json
+
+# Local release outputs
+dist/
+src/publish_full/

@@ -14,378 +14,378 @@ LanguageCodePage=932
 [Messages]
 
 ; *** Application titles
-SetupAppTitle=セットアップ
-SetupWindowTitle=%1 セットアップ
-UninstallAppTitle=アンインストール
-UninstallAppFullTitle=%1 アンインストール
+SetupAppTitle=セチE��アチE�E
+SetupWindowTitle=%1 セチE��アチE�E
+UninstallAppTitle=アンインスト�Eル
+UninstallAppFullTitle=%1 アンインスト�Eル
 
 ; *** Misc. common
-InformationTitle=情報
-ConfirmTitle=確認
+InformationTitle=惁E��
+ConfirmTitle=確誁E
 ErrorTitle=エラー
 
 ; *** SetupLdr messages
-SetupLdrStartupMessage=%1 をインストールします。続行しますか？
-LdrCannotCreateTemp=一時ファイルを作成できません。セットアップを中止します。
-LdrCannotExecTemp=一時フォルダーのファイルを実行できません。セットアップを中止します。
+SetupLdrStartupMessage=%1 をインスト�Eルします。続行しますか�E�E
+LdrCannotCreateTemp=一時ファイルを作�Eできません。セチE��アチE�Eを中止します、E
+LdrCannotExecTemp=一時フォルダーのファイルを実行できません。セチE��アチE�Eを中止します、E
 
 ; *** Startup error messages
 LastErrorMessage=%1.%n%nエラー %2: %3
-SetupFileMissing=ファイル %1 が見つかりません。問題を解決するか新しいセットアッププログラムを入手してください。
-SetupFileCorrupt=セットアップファイルが壊れています。新しいセットアッププログラムを入手してください。
-SetupFileCorruptOrWrongVer=セットアップファイルが壊れているか、このバージョンのセットアップと互換性がありません。問題を解決するか新しいセットアッププログラムを入手してください。
+SetupFileMissing=ファイル %1 が見つかりません。問題を解決するか新しいセチE��アチE�Eプログラムを�E手してください、E
+SetupFileCorrupt=セチE��アチE�Eファイルが壊れてぁE��す。新しいセチE��アチE�Eプログラムを�E手してください、E
+SetupFileCorruptOrWrongVer=セチE��アチE�Eファイルが壊れてぁE��か、このバ�EジョンのセチE��アチE�Eと互換性がありません。問題を解決するか新しいセチE��アチE�Eプログラムを�E手してください、E
 InvalidParameter=コマンドラインに不正なパラメーターが渡されました:%n%n%1
-SetupAlreadyRunning=セットアップは既に実行中です。
-WindowsVersionNotSupported=このプログラムはお使いのバージョンの Windows をサポートしていません。
-WindowsServicePackRequired=このプログラムの実行には %1 Service Pack %2 以降が必要です。
-NotOnThisPlatform=このプログラムは %1 では動作しません。
-OnlyOnThisPlatform=このプログラムの実行には %1 が必要です。
-OnlyOnTheseArchitectures=このプログラムは%n%n%1プロセッサー向けの Windows にしかインストールできません。
-WinVersionTooLowError=このプログラムの実行には %1 %2 以降が必要です。
-WinVersionTooHighError=このプログラムは %1 %2 以降では動作しません。
-AdminPrivilegesRequired=このプログラムをインストールするためには管理者としてログインする必要があります。
-PowerUserPrivilegesRequired=このプログラムをインストールするためには管理者またはパワーユーザーとしてログインする必要があります。
-SetupAppRunningError=セットアップは実行中の %1 を検出しました。%n%n開いているアプリケーションをすべて閉じてから「OK」をクリックしてください。「キャンセル」をクリックすると、セットアップを終了します。
-UninstallAppRunningError=アンインストールは実行中の %1 を検出しました。%n%n開いているアプリケーションをすべて閉じてから「OK」をクリックしてください。「キャンセル」をクリックすると、セットアップを終了します。
+SetupAlreadyRunning=セチE��アチE�Eは既に実行中です、E
+WindowsVersionNotSupported=こ�Eプログラムはお使ぁE�Eバ�Eジョンの Windows をサポ�EトしてぁE��せん、E
+WindowsServicePackRequired=こ�Eプログラムの実行には %1 Service Pack %2 以降が忁E��です、E
+NotOnThisPlatform=こ�Eプログラムは %1 では動作しません、E
+OnlyOnThisPlatform=こ�Eプログラムの実行には %1 が忁E��です、E
+OnlyOnTheseArchitectures=こ�Eプログラムは%n%n%1プロセチE��ー向けの Windows にしかインスト�Eルできません、E
+WinVersionTooLowError=こ�Eプログラムの実行には %1 %2 以降が忁E��です、E
+WinVersionTooHighError=こ�Eプログラムは %1 %2 以降では動作しません、E
+AdminPrivilegesRequired=こ�Eプログラムをインスト�Eルするためには管琁E��E��してログインする忁E��があります、E
+PowerUserPrivilegesRequired=こ�Eプログラムをインスト�Eルするためには管琁E��E��た�Eパワーユーザーとしてログインする忁E��があります、E
+SetupAppRunningError=セチE��アチE�Eは実行中の %1 を検�Eしました、En%n開いてぁE��アプリケーションをすべて閉じてから「OK」をクリチE��してください。「キャンセル」をクリチE��すると、セチE��アチE�Eを終亁E��ます、E
+UninstallAppRunningError=アンインスト�Eルは実行中の %1 を検�Eしました、En%n開いてぁE��アプリケーションをすべて閉じてから「OK」をクリチE��してください。「キャンセル」をクリチE��すると、セチE��アチE�Eを終亁E��ます、E
 
 ; *** Startup questions
-PrivilegesRequiredOverrideTitle=インストールモードの選択
-PrivilegesRequiredOverrideInstruction=インストールモードを選択してください
-PrivilegesRequiredOverrideText1=%1 はすべてのユーザー (管理者権限が必要です) または現在のユーザー用にインストールできます。
-PrivilegesRequiredOverrideText2=%1 は現在のユーザーまたはすべてのユーザー用 (管理者権限が必要です) にインストールできます。
-PrivilegesRequiredOverrideAllUsers=すべてのユーザー用にインストール(&A)
-PrivilegesRequiredOverrideAllUsersRecommended=すべてのユーザー用にインストール(&A) (推奨)
-PrivilegesRequiredOverrideCurrentUser=現在のユーザー用にインストール(&M)
-PrivilegesRequiredOverrideCurrentUserRecommended=現在のユーザー用にインストール(&M) (推奨)
+PrivilegesRequiredOverrideTitle=インスト�Eルモード�E選抁E
+PrivilegesRequiredOverrideInstruction=インスト�Eルモードを選択してください
+PrivilegesRequiredOverrideText1=%1 はすべてのユーザー (管琁E��E��限が忁E��でぁE また�E現在のユーザー用にインスト�Eルできます、E
+PrivilegesRequiredOverrideText2=%1 は現在のユーザーまた�Eすべてのユーザー用 (管琁E��E��限が忁E��でぁE にインスト�Eルできます、E
+PrivilegesRequiredOverrideAllUsers=すべてのユーザー用にインスト�Eル(&A)
+PrivilegesRequiredOverrideAllUsersRecommended=すべてのユーザー用にインスト�Eル(&A) (推奨)
+PrivilegesRequiredOverrideCurrentUser=現在のユーザー用にインスト�Eル(&M)
+PrivilegesRequiredOverrideCurrentUserRecommended=現在のユーザー用にインスト�Eル(&M) (推奨)
 
 ; *** Misc. errors
-ErrorCreatingDir=ディレクトリ %1 を作成中にエラーが発生しました。
-ErrorTooManyFilesInDir=ディレクトリ %1 にファイルを作成中にエラーが発生しました。ファイルの数が多すぎます。
+ErrorCreatingDir=チE��レクトリ %1 を作�E中にエラーが発生しました、E
+ErrorTooManyFilesInDir=チE��レクトリ %1 にファイルを作�E中にエラーが発生しました。ファイルの数が多すぎます、E
 
 ; *** Setup common messages
-ExitSetupTitle=セットアップ終了
-ExitSetupMessage=セットアップ作業は完了していません。ここでセットアップを中止するとプログラムはインストールされません。%n%n改めてインストールする場合は、もう一度セットアップを実行してください。%n%nセットアップを終了しますか？
-AboutSetupMenuItem=セットアップについて(&A)...
-AboutSetupTitle=セットアップについて
-AboutSetupMessage=%1 %2%n%3%n%n%1 ホームページ:%n%4
+ExitSetupTitle=セチE��アチE�E終亁E
+ExitSetupMessage=セチE��アチE�E作業は完亁E��てぁE��せん。ここでセチE��アチE�Eを中止するとプログラムはインスト�Eルされません、En%n改めてインスト�Eルする場合�E、もぁE��度セチE��アチE�Eを実行してください、En%nセチE��アチE�Eを終亁E��ますか�E�E
+AboutSetupMenuItem=セチE��アチE�EにつぁE��(&A)...
+AboutSetupTitle=セチE��アチE�EにつぁE��
+AboutSetupMessage=%1 %2%n%3%n%n%1 ホ�Eムペ�Eジ:%n%4
 AboutSetupNote=
 TranslatorNote=
 
 ; *** Buttons
-ButtonBack=< 戻る(&B)
+ButtonBack=< 戻めE&B)
 ButtonNext=次へ(&N) >
-ButtonInstall=インストール(&I)
+ButtonInstall=インスト�Eル(&I)
 ButtonOK=OK
 ButtonCancel=キャンセル
-ButtonYes=はい(&Y)
-ButtonYesToAll=すべてはい(&A)
-ButtonNo=いいえ(&N)
-ButtonNoToAll=すべていいえ(&O)
-ButtonFinish=完了(&F)
-ButtonBrowse=参照(&B)...
-ButtonWizardBrowse=参照(&R)
+ButtonYes=はぁE&Y)
+ButtonYesToAll=すべてはぁE&A)
+ButtonNo=ぁE��ぁE&N)
+ButtonNoToAll=すべてぁE��ぁE&O)
+ButtonFinish=完亁E&F)
+ButtonBrowse=参�E(&B)...
+ButtonWizardBrowse=参�E(&R)
 ButtonNewFolder=新しいフォルダー(&M)
 
 ; *** "Select Language" dialog messages
-SelectLanguageTitle=セットアップに使用する言語の選択
-SelectLanguageLabel=インストール中に利用する言語を選んでください。
+SelectLanguageTitle=セチE��アチE�Eに使用する言語�E選抁E
+SelectLanguageLabel=インスト�Eル中に利用する言語を選んでください、E
 
 ; *** Common wizard text
-ClickNext=続行するには「次へ」、セットアップを終了するには「キャンセル」をクリックしてください。
+ClickNext=続行するには「次へ」、セチE��アチE�Eを終亁E��るには「キャンセル」をクリチE��してください、E
 BeveledLabel=
-BrowseDialogTitle=フォルダー参照
-BrowseDialogLabel=リストからフォルダーを選び OK を押してください。
+BrowseDialogTitle=フォルダー参�E
+BrowseDialogLabel=リストからフォルダーを選び OK を押してください、E
 NewFolderName=新しいフォルダー
 
 ; *** "Welcome" wizard page
-WelcomeLabel1=[name] セットアップウィザードの開始
-WelcomeLabel2=このプログラムはご使用のコンピューターへ [name/ver] をインストールします。%n%n続行する前に他のアプリケーションをすべて終了してください。
+WelcomeLabel1=[name] セチE��アチE�Eウィザード�E開姁E
+WelcomeLabel2=こ�Eプログラムはご使用のコンピューターへ [name/ver] をインスト�Eルします、En%n続行する前に他�Eアプリケーションをすべて終亁E��てください、E
 
 ; *** "Password" wizard page
-WizardPassword=パスワード
-PasswordLabel1=このインストールプログラムはパスワードによって保護されています。
-PasswordLabel3=パスワードを入力して「次へ」をクリックしてください。パスワードは大文字と小文字が区別されます。
-PasswordEditLabel=パスワード(&P):
-IncorrectPassword=入力されたパスワードが正しくありません。もう一度入力しなおしてください。
+WizardPassword=パスワーチE
+PasswordLabel1=こ�Eインスト�Eルプログラムはパスワードによって保護されてぁE��す、E
+PasswordLabel3=パスワードを入力して「次へ」をクリチE��してください。パスワード�E大斁E��と小文字が区別されます、E
+PasswordEditLabel=パスワーチE&P):
+IncorrectPassword=入力されたパスワードが正しくありません。もぁE��度入力しなおしてください、E
 
 ; *** "License Agreement" wizard page
-WizardLicense=使用許諾契約書の同意
-LicenseLabel=続行する前に以下の重要な情報をお読みください。
-LicenseLabel3=以下の使用許諾契約書をお読みください。インストールを続行するにはこの契約書に同意する必要があります。
+WizardLicense=使用許諾契紁E��の同意
+LicenseLabel=続行する前に以下�E重要な惁E��をお読みください、E
+LicenseLabel3=以下�E使用許諾契紁E��をお読みください。インスト�Eルを続行するにはこ�E契紁E��に同意する忁E��があります、E
 LicenseAccepted=同意する(&A)
-LicenseNotAccepted=同意しない(&D)
+LicenseNotAccepted=同意しなぁE&D)
 
 ; *** "Information" wizard pages
-WizardInfoBefore=情報
-InfoBeforeLabel=続行する前に以下の重要な情報をお読みください。
-InfoBeforeClickLabel=セットアップを続行するには「次へ」をクリックしてください。
-WizardInfoAfter=情報
-InfoAfterLabel=続行する前に以下の重要な情報をお読みください。
-InfoAfterClickLabel=セットアップを続行するには「次へ」をクリックしてください。
+WizardInfoBefore=惁E��
+InfoBeforeLabel=続行する前に以下�E重要な惁E��をお読みください、E
+InfoBeforeClickLabel=セチE��アチE�Eを続行するには「次へ」をクリチE��してください、E
+WizardInfoAfter=惁E��
+InfoAfterLabel=続行する前に以下�E重要な惁E��をお読みください、E
+InfoAfterClickLabel=セチE��アチE�Eを続行するには「次へ」をクリチE��してください、E
 
 ; *** "User Information" wizard page
-WizardUserInfo=ユーザー情報
-UserInfoDesc=ユーザー情報を入力してください。
-UserInfoName=ユーザー名(&U):
-UserInfoOrg=組織(&O):
+WizardUserInfo=ユーザー惁E��
+UserInfoDesc=ユーザー惁E��を�E力してください、E
+UserInfoName=ユーザー吁E&U):
+UserInfoOrg=絁E��E&O):
 UserInfoSerial=シリアル番号(&S):
-UserInfoNameRequired=ユーザー名を入力してください。
+UserInfoNameRequired=ユーザー名を入力してください、E
 
 ; *** "Select Destination Location" wizard page
-WizardSelectDir=インストール先の指定
-SelectDirDesc=[name] のインストール先を指定してください。
-SelectDirLabel3=[name] をインストールするフォルダを指定して、「次へ」をクリックしてください。
-SelectDirBrowseLabel=続けるには「次へ」をクリックしてください。別のフォルダーを選択するには「参照」をクリックしてください。
-DiskSpaceGBLabel=このプログラムは最低 [gb] GB のディスク空き領域を必要とします。
-DiskSpaceMBLabel=このプログラムは最低 [mb] MB のディスク空き領域を必要とします。
-CannotInstallToNetworkDrive=ネットワークドライブにインストールすることはできません。
-CannotInstallToUNCPath=UNC パスにインストールすることはできません。
-InvalidPath=ドライブ文字を含む完全なパスを入力してください。%n%n例：C:\APP%n%nまたは UNC 形式のパスを入力してください。%n%n例：\\server\share
-InvalidDrive=指定したドライブまたは UNC パスが見つからないかアクセスできません。別のパスを指定してください。
-DiskSpaceWarningTitle=ディスク空き領域の不足
-DiskSpaceWarning=インストールには最低 %1 KB のディスク空き領域が必要ですが、指定されたドライブには %2 KB の空き領域しかありません。%n%nこのまま続行しますか？
-DirNameTooLong=ドライブ名またはパスが長過ぎます。
-InvalidDirName=フォルダー名が無効です。
-BadDirName32=以下の文字を含むフォルダー名は指定できません。:%n%n%1
-DirExistsTitle=既存のフォルダー
-DirExists=フォルダー %n%n%1%n%nが既に存在します。このままこのフォルダーへインストールしますか？
-DirDoesntExistTitle=フォルダーが見つかりません。
-DirDoesntExist=フォルダー %n%n%1%n%nが見つかりません。新しいフォルダーを作成しますか？
+WizardSelectDir=インスト�Eル先�E持E��E
+SelectDirDesc=[name] のインスト�Eル先を持E��してください、E
+SelectDirLabel3=[name] をインスト�Eルするフォルダを指定して、「次へ」をクリチE��してください、E
+SelectDirBrowseLabel=続けるには「次へ」をクリチE��してください。別のフォルダーを選択するには「参照」をクリチE��してください、E
+DiskSpaceGBLabel=こ�Eプログラムは最佁E[gb] GB のチE��スク空き領域を忁E��とします、E
+DiskSpaceMBLabel=こ�Eプログラムは最佁E[mb] MB のチE��スク空き領域を忁E��とします、E
+CannotInstallToNetworkDrive=ネットワークドライブにインスト�Eルすることはできません、E
+CannotInstallToUNCPath=UNC パスにインスト�Eルすることはできません、E
+InvalidPath=ドライブ文字を含む完�Eなパスを�E力してください、En%n例：C:\APP%n%nまた�E UNC 形式�Eパスを�E力してください、En%n例：\\server\share
+InvalidDrive=持E��したドライブまた�E UNC パスが見つからなぁE��アクセスできません。別のパスを指定してください、E
+DiskSpaceWarningTitle=チE��スク空き領域の不足
+DiskSpaceWarning=インスト�Eルには最佁E%1 KB のチE��スク空き領域が忁E��ですが、指定されたドライブには %2 KB の空き領域しかありません、En%nこ�Eまま続行しますか�E�E
+DirNameTooLong=ドライブ名また�Eパスが長過ぎます、E
+InvalidDirName=フォルダー名が無効です、E
+BadDirName32=以下�E斁E��を含むフォルダー名�E持E��できません、E%n%n%1
+DirExistsTitle=既存�Eフォルダー
+DirExists=フォルダー %n%n%1%n%nが既に存在します。このままこ�Eフォルダーへインスト�Eルしますか�E�E
+DirDoesntExistTitle=フォルダーが見つかりません、E
+DirDoesntExist=フォルダー %n%n%1%n%nが見つかりません。新しいフォルダーを作�Eしますか�E�E
 
 ; *** "Select Components" wizard page
-WizardSelectComponents=コンポーネントの選択
-SelectComponentsDesc=インストールコンポーネントを選択してください。
-SelectComponentsLabel2=インストールするコンポーネントを選択してください。インストールする必要のないコンポーネントはチェックを外してください。続行するには「次へ」をクリックしてください。
-FullInstallation=フルインストール
+WizardSelectComponents=コンポ�Eネント�E選抁E
+SelectComponentsDesc=インスト�Eルコンポ�Eネントを選択してください、E
+SelectComponentsLabel2=インスト�Eルするコンポ�Eネントを選択してください。インスト�Eルする忁E���EなぁE��ンポ�Eネント�EチェチE��を外してください。続行するには「次へ」をクリチE��してください、E
+FullInstallation=フルインスト�Eル
 ; if possible don't translate 'Compact' as 'Minimal' (I mean 'Minimal' in your language)
-CompactInstallation=コンパクトインストール
-CustomInstallation=カスタムインストール
-NoUninstallWarningTitle=既存のコンポーネント
-NoUninstallWarning=セットアップは以下のコンポーネントが既にインストールされていることを検出しました。%n%n%1%n%nこれらのコンポーネントの選択を解除してもアンインストールはされません。%n%nこのまま続行しますか？
+CompactInstallation=コンパクトインスト�Eル
+CustomInstallation=カスタムインスト�Eル
+NoUninstallWarningTitle=既存�Eコンポ�EネンチE
+NoUninstallWarning=セチE��アチE�Eは以下�Eコンポ�Eネントが既にインスト�EルされてぁE��ことを検�Eしました、En%n%1%n%nこれら�Eコンポ�Eネント�E選択を解除してもアンインスト�Eルはされません、En%nこ�Eまま続行しますか�E�E
 ComponentSize1=%1 KB
 ComponentSize2=%1 MB
-ComponentsDiskSpaceGBLabel=現在の選択は最低 [gb] GB のディスク空き領域を必要とします。
-ComponentsDiskSpaceMBLabel=現在の選択は最低 [mb] MB のディスク空き領域を必要とします。
+ComponentsDiskSpaceGBLabel=現在の選択�E最佁E[gb] GB のチE��スク空き領域を忁E��とします、E
+ComponentsDiskSpaceMBLabel=現在の選択�E最佁E[mb] MB のチE��スク空き領域を忁E��とします、E
 
 ; *** "Select Additional Tasks" wizard page
-WizardSelectTasks=追加タスクの選択
-SelectTasksDesc=実行する追加タスクを選択してください。
-SelectTasksLabel2=[name] インストール時に実行する追加タスクを選択して、「次へ」をクリックしてください。
+WizardSelectTasks=追加タスクの選抁E
+SelectTasksDesc=実行する追加タスクを選択してください、E
+SelectTasksLabel2=[name] インスト�Eル時に実行する追加タスクを選択して、「次へ」をクリチE��してください、E
 
 ; *** "Select Start Menu Folder" wizard page
-WizardSelectProgramGroup=スタートメニューフォルダーの指定
-SelectStartMenuFolderDesc=プログラムのショートカットを作成する場所を指定してください。
-SelectStartMenuFolderLabel3=セットアップは次のスタートメニューフォルダーにプログラムのショートカットを作成します。
-SelectStartMenuFolderBrowseLabel=続けるには「次へ」をクリックしてください。違うフォルダーを選択するには「参照」をクリックしてください。
-MustEnterGroupName=フォルダー名を指定してください。
-GroupNameTooLong=フォルダー名またはパスが長過ぎます。
-InvalidGroupName=フォルダー名が無効です。
-BadGroupName=次の文字を含むフォルダー名は指定できません:%n%n%1
-NoProgramGroupCheck2=スタートメニューフォルダーを作成しない(&D)
+WizardSelectProgramGroup=スタートメニューフォルダーの持E��E
+SelectStartMenuFolderDesc=プログラムのショートカチE��を作�Eする場所を指定してください、E
+SelectStartMenuFolderLabel3=セチE��アチE�Eは次のスタートメニューフォルダーにプログラムのショートカチE��を作�Eします、E
+SelectStartMenuFolderBrowseLabel=続けるには「次へ」をクリチE��してください。違ぁE��ォルダーを選択するには「参照」をクリチE��してください、E
+MustEnterGroupName=フォルダー名を持E��してください、E
+GroupNameTooLong=フォルダー名また�Eパスが長過ぎます、E
+InvalidGroupName=フォルダー名が無効です、E
+BadGroupName=次の斁E��を含むフォルダー名�E持E��できません:%n%n%1
+NoProgramGroupCheck2=スタートメニューフォルダーを作�EしなぁE&D)
 
 ; *** "Ready to Install" wizard page
-WizardReady=インストール準備完了
-ReadyLabel1=ご使用のコンピュータへ [name] をインストールする準備ができました。
-ReadyLabel2a=インストールを続行するには「インストール」を、設定の確認や変更を行うには「戻る」をクリックしてください。
-ReadyLabel2b=インストールを続行するには「インストール」をクリックしてください。
-ReadyMemoUserInfo=ユーザー情報:
-ReadyMemoDir=インストール先:
-ReadyMemoType=セットアップの種類:
-ReadyMemoComponents=選択コンポーネント:
+WizardReady=インスト�Eル準備完亁E
+ReadyLabel1=ご使用のコンピュータへ [name] をインスト�Eルする準備ができました、E
+ReadyLabel2a=インスト�Eルを続行するには「インスト�Eル」を、設定�E確認や変更を行うには「戻る」をクリチE��してください、E
+ReadyLabel2b=インスト�Eルを続行するには「インスト�Eル」をクリチE��してください、E
+ReadyMemoUserInfo=ユーザー惁E��:
+ReadyMemoDir=インスト�Eル允E
+ReadyMemoType=セチE��アチE�Eの種顁E
+ReadyMemoComponents=選択コンポ�EネンチE
 ReadyMemoGroup=スタートメニューフォルダー:
 ReadyMemoTasks=追加タスク一覧:
 
 ; *** TDownloadWizardPage wizard page and DownloadTemporaryFile
-DownloadingLabel2=ファイルをダウンロードしています...
+DownloadingLabel2=ファイルをダウンロードしてぁE��ぁE..
 ButtonStopDownload=ダウンロードを中止(&S)
-StopDownload=ダウンロードを中止してもよろしいですか？
+StopDownload=ダウンロードを中止してもよろしぁE��すか�E�E
 ErrorDownloadAborted=ダウンロードを中止しました
 ErrorDownloadFailed=ダウンロードに失敗しました: %1 %2
 ErrorDownloadSizeFailed=サイズの取得に失敗しました: %1 %2
-ErrorProgress=無効な進行状況: %1 / %2
+ErrorProgress=無効な進行状況E %1 / %2
 ErrorFileSize=無効なファイルサイズ: 予期された値 %1, 実際の値 %2
 
 ; *** TExtractionWizardPage wizard page and ExtractArchive
-ExtractingLabel=ファイルを展開しています...
+ExtractingLabel=ファイルを展開してぁE��ぁE..
 ButtonStopExtraction=展開を中止(&S)
-StopExtraction=展開を中止してもよろしいですか？
+StopExtraction=展開を中止してもよろしぁE��すか�E�E
 ErrorExtractionAborted=展開を中止しました
 ErrorExtractionFailed=展開に失敗しました: %1
 
 ; *** Archive extraction failure details
-ArchiveIncorrectPassword=パスワードが間違っています
-ArchiveIsCorrupted=アーカイブが破損しています
-ArchiveUnsupportedFormat=アーカイブフォーマットがサポートされていません
+ArchiveIncorrectPassword=パスワードが間違ってぁE��ぁE
+ArchiveIsCorrupted=アーカイブが破損してぁE��ぁE
+ArchiveUnsupportedFormat=アーカイブフォーマットがサポ�EトされてぁE��せん
 
 ; *** "Preparing to Install" wizard page
-WizardPreparing=インストール準備中
-PreparingDesc=ご使用のコンピューターへ [name] をインストールする準備をしています。
-PreviousInstallNotCompleted=前回行ったアプリケーションのインストールまたは削除が完了していません。完了するにはコンピューターを再起動する必要があります。%n%n[name] のインストールを完了するためには、再起動後にもう一度セットアップを実行してください。
-CannotContinue=セットアップを続行できません。「キャンセル」をクリックしてセットアップを終了してください。
-ApplicationsFound=以下のアプリケーションがセットアップに必要なファイルを使用しています。セットアップに自動的にアプリケーションを終了させることを推奨します。
-ApplicationsFound2=以下のアプリケーションがセットアップに必要なファイルを使用しています。セットアップに自動的にアプリケーションを終了させることを推奨します。インストールの完了後、セットアップはアプリケーションの再起動を試みます。
-CloseApplications=自動的にアプリケーションを終了する(&A)
-DontCloseApplications=アプリケーションを終了しない(&D)
-ErrorCloseApplications=セットアップはすべてのアプリケーションを自動的に終了することができませんでした。セットアップを続行する前に、更新の必要なファイルを使用しているすべてのアプリケーションを終了することを推奨します。
-PrepareToInstallNeedsRestart=セットアップはコンピューターを再起動する必要があります。コンピューターを再起動した後、セットアップを再度実行して [name] のインストールを完了してください。%n%nすぐに再起動しますか？?
+WizardPreparing=インスト�Eル準備中
+PreparingDesc=ご使用のコンピューターへ [name] をインスト�Eルする準備をしてぁE��す、E
+PreviousInstallNotCompleted=前回行ったアプリケーションのインスト�Eルまた�E削除が完亁E��てぁE��せん。完亁E��るにはコンピューターを�E起動する忁E��があります、En%n[name] のインスト�Eルを完亁E��るためには、�E起動後にもう一度セチE��アチE�Eを実行してください、E
+CannotContinue=セチE��アチE�Eを続行できません。「キャンセル」をクリチE��してセチE��アチE�Eを終亁E��てください、E
+ApplicationsFound=以下�EアプリケーションがセチE��アチE�Eに忁E��なファイルを使用してぁE��す。セチE��アチE�Eに自動的にアプリケーションを終亁E��せることを推奨します、E
+ApplicationsFound2=以下�EアプリケーションがセチE��アチE�Eに忁E��なファイルを使用してぁE��す。セチE��アチE�Eに自動的にアプリケーションを終亁E��せることを推奨します。インスト�Eルの完亁E��、セチE��アチE�Eはアプリケーションの再起動を試みます、E
+CloseApplications=自動的にアプリケーションを終亁E��めE&A)
+DontCloseApplications=アプリケーションを終亁E��なぁE&D)
+ErrorCloseApplications=セチE��アチE�Eはすべてのアプリケーションを�E動的に終亁E��ることができませんでした。セチE��アチE�Eを続行する前に、更新の忁E��なファイルを使用してぁE��すべてのアプリケーションを終亁E��ることを推奨します、E
+PrepareToInstallNeedsRestart=セチE��アチE�Eはコンピューターを�E起動する忁E��があります。コンピューターを�E起動した後、セチE��アチE�Eを�E度実行して [name] のインスト�Eルを完亁E��てください、En%nすぐに再起動しますか�E�E
 
 ; *** "Installing" wizard page
-WizardInstalling=インストール状況
-InstallingLabel=ご使用のコンピューターに [name] をインストールしています。しばらくお待ちください。
+WizardInstalling=インスト�Eル状況E
+InstallingLabel=ご使用のコンピューターに [name] をインスト�EルしてぁE��す。しばらくお征E��ください、E
 
 ; *** "Setup Completed" wizard page
-FinishedHeadingLabel=[name] セットアップウィザードの完了
-FinishedLabelNoIcons=ご使用のコンピューターに [name] がセットアップされました。
-FinishedLabel=ご使用のコンピューターに [name] がセットアップされました。アプリケーションを実行するにはインストールされたショートカットを選択してください。
-ClickFinish=セットアップを終了するには「完了」をクリックしてください。
-FinishedRestartLabel=[name] のインストールを完了するためには、コンピューターを再起動する必要があります。すぐに再起動しますか？
-FinishedRestartMessage=[name] のインストールを完了するためには、コンピューターを再起動する必要があります。%n%nすぐに再起動しますか？
-ShowReadmeCheck=README ファイルを表示する。
-YesRadio=すぐに再起動(&Y)
-NoRadio=後で手動で再起動(&N)
+FinishedHeadingLabel=[name] セチE��アチE�Eウィザード�E完亁E
+FinishedLabelNoIcons=ご使用のコンピューターに [name] がセチE��アチE�Eされました、E
+FinishedLabel=ご使用のコンピューターに [name] がセチE��アチE�Eされました。アプリケーションを実行するにはインスト�EルされたショートカチE��を選択してください、E
+ClickFinish=セチE��アチE�Eを終亁E��るには「完亁E��をクリチE��してください、E
+FinishedRestartLabel=[name] のインスト�Eルを完亁E��るためには、コンピューターを�E起動する忁E��があります。すぐに再起動しますか�E�E
+FinishedRestartMessage=[name] のインスト�Eルを完亁E��るためには、コンピューターを�E起動する忁E��があります、En%nすぐに再起動しますか�E�E
+ShowReadmeCheck=README ファイルを表示する、E
+YesRadio=すぐに再起勁E&Y)
+NoRadio=後で手動で再起勁E&N)
 ; used for example as 'Run MyProg.exe'
-RunEntryExec=%1 の実行
+RunEntryExec=%1 の実衁E
 ; used for example as 'View Readme.txt'
 RunEntryShellExec=%1 の表示
 
 ; *** "Setup Needs the Next Disk" stuff
-ChangeDiskTitle=ディスクの挿入
-SelectDiskLabel2=ディスク %1 を挿入し、「OK」をクリックしてください。%n%nこのディスクのファイルが下に表示されているフォルダー以外の場所にある場合は、正しいパスを入力するか「参照」ボタンをクリックしてください。
+ChangeDiskTitle=チE��スクの挿入
+SelectDiskLabel2=チE��スク %1 を挿入し、「OK」をクリチE��してください、En%nこ�EチE��スクのファイルが下に表示されてぁE��フォルダー以外�E場所にある場合�E、正しいパスを�E力するか「参照」�EタンをクリチE��してください、E
 PathLabel=パス(&P):
-FileNotInDir2=ファイル %1 が %2 に見つかりません。正しいディスクを挿入するか、別のフォルダーを指定してください。
-SelectDirectoryLabel=次のディスクのある場所を指定してください。
+FileNotInDir2=ファイル %1 ぁE%2 に見つかりません。正しいチE��スクを挿入するか、別のフォルダーを指定してください、E
+SelectDirectoryLabel=次のチE��スクのある場所を指定してください、E
 
 ; *** Installation phase messages
-SetupAborted=セットアップは完了していません。%n%n問題を解決してから、もう一度セットアップを実行してください。
+SetupAborted=セチE��アチE�Eは完亁E��てぁE��せん、En%n問題を解決してから、もぁE��度セチE��アチE�Eを実行してください、E
 AbortRetryIgnoreSelectAction=アクションを選択してください
-AbortRetryIgnoreRetry=再試行(&T)
-AbortRetryIgnoreIgnore=エラーを無視して続行(&I)
-AbortRetryIgnoreCancel=インストールをキャンセル
+AbortRetryIgnoreRetry=再試衁E&T)
+AbortRetryIgnoreIgnore=エラーを無視して続衁E&I)
+AbortRetryIgnoreCancel=インスト�Eルをキャンセル
 RetryCancelSelectAction=アクションを選択してください
-RetryCancelRetry=再試行(&T)
+RetryCancelRetry=再試衁E&T)
 RetryCancelCancel=キャンセル
 
 ; *** Installation status messages
-StatusClosingApplications=アプリケーションを終了しています...
-StatusCreateDirs=フォルダーを作成しています...
-StatusExtractFiles=ファイルを展開しています...
-StatusDownloadFiles=ファイルをダウンロードしています...
-StatusCreateIcons=ショ－トカットを作成しています...
-StatusCreateIniEntries=INIファイルを設定しています...
-StatusCreateRegistryEntries=レジストリを設定しています...
-StatusRegisterFiles=ファイルを登録しています...
-StatusSavingUninstall=アンインストール情報を保存しています...
-StatusRunProgram=インストールを完了しています...
-StatusRestartingApplications=アプリケーションを再起動しています...
-StatusRollback=変更を元に戻しています...
+StatusClosingApplications=アプリケーションを終亁E��てぁE��ぁE..
+StatusCreateDirs=フォルダーを作�EしてぁE��ぁE..
+StatusExtractFiles=ファイルを展開してぁE��ぁE..
+StatusDownloadFiles=ファイルをダウンロードしてぁE��ぁE..
+StatusCreateIcons=ショ�E�トカチE��を作�EしてぁE��ぁE..
+StatusCreateIniEntries=INIファイルを設定してぁE��ぁE..
+StatusCreateRegistryEntries=レジストリを設定してぁE��ぁE..
+StatusRegisterFiles=ファイルを登録してぁE��ぁE..
+StatusSavingUninstall=アンインスト�Eル惁E��を保存してぁE��ぁE..
+StatusRunProgram=インスト�Eルを完亁E��てぁE��ぁE..
+StatusRestartingApplications=アプリケーションを�E起動してぁE��ぁE..
+StatusRollback=変更を�Eに戻してぁE��ぁE..
 
 ; *** Misc. errors
-ErrorInternal2=内部エラー: %1
+ErrorInternal2=冁E��エラー: %1
 ErrorFunctionFailedNoCode=%1 エラー
-ErrorFunctionFailed=%1 エラー: コード %2
-ErrorFunctionFailedWithMessage=%1 エラー: コード %2.%n%3
+ErrorFunctionFailed=%1 エラー: コーチE%2
+ErrorFunctionFailedWithMessage=%1 エラー: コーチE%2.%n%3
 ErrorExecutingProgram=ファイル実行エラー:%n%1
 
 ; *** Registry errors
 ErrorRegOpenKey=レジストリキーオープンエラー:%n%1\%2
-ErrorRegCreateKey=レジストリキー作成エラー:%n%1\%2
+ErrorRegCreateKey=レジストリキー作�Eエラー:%n%1\%2
 ErrorRegWriteKey=レジストリキー書き込みエラー:%n%1\%2
 
 ; *** INI errors
-ErrorIniEntry=INIファイルエントリ作成エラー: ファイル %1
+ErrorIniEntry=INIファイルエントリ作�Eエラー: ファイル %1
 
 ; *** File copying errors
-FileAbortRetryIgnoreSkipNotRecommended=このファイルをスキップ(&S) (推奨されません)
-FileAbortRetryIgnoreIgnoreNotRecommended=エラーを無視して続行(&I) (推奨されません)
-SourceIsCorrupted=コピー元のファイルが壊れています。
-SourceDoesntExist=コピー元のファイル %1 が見つかりません。
-SourceVerificationFailed=コピー元のファイルの検証に失敗しました: %1
+FileAbortRetryIgnoreSkipNotRecommended=こ�EファイルをスキチE�E(&S) (推奨されません)
+FileAbortRetryIgnoreIgnoreNotRecommended=エラーを無視して続衁E&I) (推奨されません)
+SourceIsCorrupted=コピ�E允E�Eファイルが壊れてぁE��す、E
+SourceDoesntExist=コピ�E允E�Eファイル %1 が見つかりません、E
+SourceVerificationFailed=コピ�E允E�Eファイルの検証に失敗しました: %1
 VerificationSignatureDoesntExist=署名ファイル "%1" が存在しません
-VerificationSignatureInvalid=署名ファイル "%1" が無効です
-VerificationKeyNotFound=署名ファイル "%1" で未知のキーが使用されています
+VerificationSignatureInvalid=署名ファイル "%1" が無効でぁE
+VerificationKeyNotFound=署名ファイル "%1" で未知のキーが使用されてぁE��ぁE
 VerificationFileNameIncorrect=ファイル名が正しくありません
 VerificationFileTagIncorrect=ファイルのタグが正しくありません
 VerificationFileSizeIncorrect=ファイルのサイズが正しくありません
 VerificationFileHashIncorrect=ファイルのハッシュが正しくありません
-ExistingFileReadOnly2=既存のファイルは読み取り専用のため置き換えできません。
-ExistingFileReadOnlyRetry=読み取り専用属性を解除してもう一度やりなおす(&R)
-ExistingFileReadOnlyKeepExisting=既存のファイルを残す(&K)
-ErrorReadingExistingDest=既存のファイルを読み込み中にエラーが発生しました:
+ExistingFileReadOnly2=既存�Eファイルは読み取り専用のため置き換えできません、E
+ExistingFileReadOnlyRetry=読み取り専用属性を解除してもう一度めE��なおす(&R)
+ExistingFileReadOnlyKeepExisting=既存�Eファイルを残す(&K)
+ErrorReadingExistingDest=既存�Eファイルを読み込み中にエラーが発生しました:
 FileExistsSelectAction=アクションを選択してください
-FileExists2=ファイルは既に存在します。
-FileExistsOverwriteExisting=既存のファイルを上書きする(&O)
-FileExistsKeepExisting=既存のファイルを維持する(&K)
-FileExistsOverwriteOrKeepAll=以降の競合に同じ処理を行う(&D)
+FileExists2=ファイルは既に存在します、E
+FileExistsOverwriteExisting=既存�Eファイルを上書きすめE&O)
+FileExistsKeepExisting=既存�Eファイルを維持すめE&K)
+FileExistsOverwriteOrKeepAll=以降�E競合に同じ処琁E��行う(&D)
 ExistingFileNewerSelectAction=アクションを選択してください
-ExistingFileNewer2=セットアップがインストールしようとしているものよりも新しいファイルがあります。
-ExistingFileNewerOverwriteExisting=既存のファイルを上書きする(&O)
-ExistingFileNewerKeepExisting=既存のファイルを維持する(&K) (推奨)
-ExistingFileNewerOverwriteOrKeepAll=以降の競合に同じ処理を行う(&D)
+ExistingFileNewer2=セチE��アチE�Eがインスト�EルしよぁE��してぁE��も�Eよりも新しいファイルがあります、E
+ExistingFileNewerOverwriteExisting=既存�Eファイルを上書きすめE&O)
+ExistingFileNewerKeepExisting=既存�Eファイルを維持すめE&K) (推奨)
+ExistingFileNewerOverwriteOrKeepAll=以降�E競合に同じ処琁E��行う(&D)
 ErrorChangingAttr=既存ファイルの属性を変更中にエラーが発生しました:
-ErrorCreatingTemp=コピー先のフォルダーにファイルを作成中にエラーが発生しました:
-ErrorReadingSource=コピー元のファイルを読み込み中にエラーが発生しました:
-ErrorCopying=ファイルをコピー中にエラーが発生しました:
+ErrorCreatingTemp=コピ�E先�Eフォルダーにファイルを作�E中にエラーが発生しました:
+ErrorReadingSource=コピ�E允E�Eファイルを読み込み中にエラーが発生しました:
+ErrorCopying=ファイルをコピ�E中にエラーが発生しました:
 ErrorDownloading=ファイルをダウンロード中にエラーが発生しました:
 ErrorExtracting=アーカイブを展開中にエラーが発生しました:
-ErrorReplacingExistingFile=既存のファイルを置き換え中にエラーが発生しました:
-ErrorRestartReplace=再起動による置き換えの実行に失敗しました:
-ErrorRenamingTemp=コピー先フォルダーのファイル名を変更中にエラーが発生しました:
+ErrorReplacingExistingFile=既存�Eファイルを置き換え中にエラーが発生しました:
+ErrorRestartReplace=再起動による置き換え�E実行に失敗しました:
+ErrorRenamingTemp=コピ�E先フォルダーのファイル名を変更中にエラーが発生しました:
 ErrorRegisterServer=DLL/OCXの登録に失敗しました: %1
-ErrorRegSvr32Failed=RegSvr32は終了コード %1 により失敗しました
+ErrorRegSvr32Failed=RegSvr32は終亁E��ーチE%1 により失敗しました
 ErrorRegisterTypeLib=タイプライブラリへの登録に失敗しました: %1
 
 ; *** Uninstall display name markings
 UninstallDisplayNameMark=%1 (%2)
 UninstallDisplayNameMarks=%1 (%2, %3)
-UninstallDisplayNameMark32Bit=32 ビット
-UninstallDisplayNameMark64Bit=64 ビット
+UninstallDisplayNameMark32Bit=32 ビッチE
+UninstallDisplayNameMark64Bit=64 ビッチE
 UninstallDisplayNameMarkAllUsers=すべてのユーザー
 UninstallDisplayNameMarkCurrentUser=現在のユーザー
 
 ; *** Post-installation errors
-ErrorOpeningReadme=README ファイルのオープンに失敗しました。
-ErrorRestartingComputer=コンピューターの再起動に失敗しました。手動で再起動してください。
+ErrorOpeningReadme=README ファイルのオープンに失敗しました、E
+ErrorRestartingComputer=コンピューターの再起動に失敗しました。手動で再起動してください、E
 
 ; *** Uninstaller messages
-UninstallNotFound=ファイル "%1" が見つかりません。アンインストールを実行できません。
-UninstallOpenError=ファイル "%1" を開くことができません。アンインストールを実行できません。
-UninstallUnsupportedVer=アンインストールログファイル "%1" は、このバージョンのアンインストールプログラムが認識できない形式です。アンインストールを実行できません。
-UninstallUnknownEntry=アンインストールログに不明のエントリ (%1) が見つかりました。
-ConfirmUninstall=%1 とその関連コンポーネントをすべて削除します。よろしいですか？
-UninstallOnlyOnWin64=このプログラムは64 ビット版Windows上でのみアンインストールすることができます。
-OnlyAdminCanUninstall=アンインストールするためには管理者権限が必要です。
-UninstallStatusLabel=ご使用のコンピューターから %1 を削除しています。しばらくお待ちください。
-UninstalledAll=%1 はご使用のコンピューターから正常に削除されました。
-UninstalledMost=%1 のアンインストールが完了しました。%n%nいくつかの項目が削除できませんでした。手動で削除してください。
-UninstalledAndNeedsRestart=%1 の削除を完了するためには、コンピューターを再起動する必要があります。すぐに再起動しますか？
-UninstallDataCorrupted=ファイル "%1" が壊れています。アンインストールを実行できません。
+UninstallNotFound=ファイル "%1" が見つかりません。アンインスト�Eルを実行できません、E
+UninstallOpenError=ファイル "%1" を開くことができません。アンインスト�Eルを実行できません、E
+UninstallUnsupportedVer=アンインスト�Eルログファイル "%1" は、このバ�Eジョンのアンインスト�Eルプログラムが認識できなぁE��式です。アンインスト�Eルを実行できません、E
+UninstallUnknownEntry=アンインスト�Eルログに不�Eのエントリ (%1) が見つかりました、E
+ConfirmUninstall=%1 とそ�E関連コンポ�Eネントをすべて削除します。よろしぁE��すか�E�E
+UninstallOnlyOnWin64=こ�Eプログラムは64 ビット版Windows上でのみアンインスト�Eルすることができます、E
+OnlyAdminCanUninstall=アンインスト�Eルするためには管琁E��E��限が忁E��です、E
+UninstallStatusLabel=ご使用のコンピューターから %1 を削除してぁE��す。しばらくお征E��ください、E
+UninstalledAll=%1 はご使用のコンピューターから正常に削除されました、E
+UninstalledMost=%1 のアンインスト�Eルが完亁E��ました、En%nぁE��つか�E頁E��が削除できませんでした。手動で削除してください、E
+UninstalledAndNeedsRestart=%1 の削除を完亁E��るためには、コンピューターを�E起動する忁E��があります。すぐに再起動しますか�E�E
+UninstallDataCorrupted=ファイル "%1" が壊れてぁE��す。アンインスト�Eルを実行できません、E
 
 ; *** Uninstallation phase messages
 ConfirmDeleteSharedFileTitle=共有ファイルの削除
-ConfirmDeleteSharedFile2=システム上で、次の共有ファイルはどのプログラムでも使用されていません。この共有ファイルを削除しますか？%n%n他のプログラムがまだこのファイルを使用する場合、削除するとプログラムが動作しなくなる恐れがあります。あまり確実でない場合は「いいえ」を選択してください。システムにファイルを残しても問題を引き起こすことはありません。
-SharedFileNameLabel=ファイル名:
+ConfirmDeleteSharedFile2=シスチE��上で、次の共有ファイルはどのプログラムでも使用されてぁE��せん。この共有ファイルを削除しますか�E�En%n他�Eプログラムがまだこ�Eファイルを使用する場合、削除するとプログラムが動作しなくなる恐れがあります。あまり確実でなぁE��合�E「いぁE��」を選択してください。シスチE��にファイルを残しても問題を引き起こすことはありません、E
+SharedFileNameLabel=ファイル吁E
 SharedFileLocationLabel=場所:
-WizardUninstalling=アンインストール状況
-StatusUninstalling=%1 をアンインストールしています...
+WizardUninstalling=アンインスト�Eル状況E
+StatusUninstalling=%1 をアンインスト�EルしてぁE��ぁE..
 
 ; *** Shutdown block reasons
-ShutdownBlockReasonInstallingApp=%1 をインストール中です。
-ShutdownBlockReasonUninstallingApp=%1 をアンインストール中です。
+ShutdownBlockReasonInstallingApp=%1 をインスト�Eル中です、E
+ShutdownBlockReasonUninstallingApp=%1 をアンインスト�Eル中です、E
 
 ; The custom messages below aren't used by Setup itself, but if you make
 ; use of them in your scripts, you'll want to translate them.
 
 [CustomMessages]
 
-NameAndVersion=%1 バージョン %2
+NameAndVersion=%1 バ�Eジョン %2
 AdditionalIcons=アイコンを追加する:
-CreateDesktopIcon=デスクトップ上にアイコンを作成する(&D)
-CreateQuickLaunchIcon=クイック起動アイコンを作成する(&Q)
+CreateDesktopIcon=チE��クトップ上にアイコンを作�Eする(&D)
+CreateQuickLaunchIcon=クイチE��起動アイコンを作�Eする(&Q)
 ProgramOnTheWeb=%1 on the Web
-UninstallProgram=%1 をアンインストールする
-LaunchProgram=%1 を実行する
-AssocFileExtension=ファイル拡張子 %2 に %1 を関連付けます。
-AssocingFileExtension=ファイル拡張子 %2 に %1 を関連付けています...
-AutoStartProgramGroupDescription=スタートアップ:
-AutoStartProgram=%1 を自動的に開始する
-AddonHostProgramNotFound=選択されたフォルダーに %1 が見つかりませんでした。%n%nこのまま続行しますか？
+UninstallProgram=%1 をアンインスト�Eルする
+LaunchProgram=%1 を実行すめE
+AssocFileExtension=ファイル拡張孁E%2 に %1 を関連付けます、E
+AssocingFileExtension=ファイル拡張孁E%2 に %1 を関連付けてぁE��ぁE..
+AutoStartProgramGroupDescription=スタートアチE�E:
+AutoStartProgram=%1 を�E動的に開始すめE
+AddonHostProgramNotFound=選択されたフォルダーに %1 が見つかりませんでした、En%nこ�Eまま続行しますか�E�E

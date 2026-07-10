@@ -20,6 +20,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Input;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace BASpark
 {
@@ -74,17 +75,22 @@ namespace BASpark
             public int Y;
         }
 
+        private const int MaxRemoteJsonBytes = 256 * 1024;
+        private static readonly HttpClient RemoteContentClient = CreateRemoteContentClient();
+        private static readonly SolidColorBrush FilteredStatusBrush = CreateFrozenBrush(0xD9, 0x77, 0x06);
+
         private DispatcherTimer _refreshTimer;
         private DispatcherTimer _noticeTimer;
         private DispatcherTimer? _scrollbarHideTimer;
+        private readonly CancellationTokenSource _lifetimeCts = new();
         private bool _isCheckingUpdate = false;
         private bool _suspendLinkedAnimationUiHandlers;
         private string _languageAtLoad = Localization.CultureZhCn;
         private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
         private bool _autoNetworkFailurePromptShown;
         private bool _logViewInitialized;
-        private bool _preloadingDarkTheme;
-        private bool _darkSettingsThemePreloaded;
+        private int _lastRenderedStatus = -1;
+        private int _lastRenderedClickCount = -1;
         private readonly object _networkPromptLock = new();
 
         public ObservableCollection<FilterProfile> Profiles { get; set; } = new ObservableCollection<FilterProfile>();
@@ -98,7 +104,6 @@ namespace BASpark
             InitializeComponent();
             SourceInitialized += (_, _) => ThemeManager.ApplyTitleBar(this);
             Activated += (_, _) => ThemeManager.ApplyTitleBar(this);
-            Deactivated += (_, _) => ThemeManager.ApplyTitleBar(this);
 
             _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
                 ? Localization.CurrentCultureName
@@ -110,34 +115,17 @@ namespace BASpark
             ListRunningProcesses.ItemsSource = RunningProcessList;
             ListVisualResetItems.ItemsSource = VisualResetItems;
             ListScreenOptions.ItemsSource = ScreenOptions;
-            SubTabBasic.Checked += SettingsSubTab_Checked;
-            SubTabVisual.Checked += SettingsSubTab_Checked;
-            SubTabFilter.Checked += SettingsSubTab_Checked;
-            SubTabMultiScreen.Checked += SettingsSubTab_Checked;
-            SubTabMore.Checked += SettingsSubTab_Checked;
-
             LoadVersion();
             LoadSettings();
             ApplyScrollbarSettings();
             UiLocalizer.ApplyControlPanel(this);
             LoadScreenOptions();
             ApplyDarkMode();
-            Loaded += (_, _) =>
-            {
-                PreloadDarkSettingsTheme();
-                RefreshThemeSoon();
-            };
-            ContentRendered += (_, _) => RefreshThemeSoon();
-            RefreshThemeSoon();
             CheckAdminStatus();
             InitLogView();
             AppLogger.EntryAdded += OnAppLogEntryAdded;
             SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
-            Closed += (_, _) =>
-            {
-                AppLogger.EntryAdded -= OnAppLogEntryAdded;
-                SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
-            };
+            Closed += ControlPanelWindow_Closed;
             _ = ApplySidebarBackgroundAsync(ConfigManager.SidebarBackgroundImagePath);
             _ = LoadRemoteNoticeAsync(isManual: false);
 
@@ -152,6 +140,35 @@ namespace BASpark
             _noticeTimer.Interval = TimeSpan.FromHours(3);
             _noticeTimer.Tick += (_, _) => _ = LoadRemoteNoticeAsync(isManual: false);
             _noticeTimer.Start();
+        }
+
+        private static HttpClient CreateRemoteContentClient()
+        {
+            var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(5),
+                MaxResponseContentBufferSize = MaxRemoteJsonBytes
+            };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(AppVersionInfo.UserAgent);
+            return client;
+        }
+
+        private static SolidColorBrush CreateFrozenBrush(byte red, byte green, byte blue)
+        {
+            var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(red, green, blue));
+            brush.Freeze();
+            return brush;
+        }
+
+        private void ControlPanelWindow_Closed(object? sender, EventArgs e)
+        {
+            _lifetimeCts.Cancel();
+            _refreshTimer.Stop();
+            _noticeTimer.Stop();
+            _scrollbarHideTimer?.Stop();
+            AppLogger.EntryAdded -= OnAppLogEntryAdded;
+            SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
+            _lifetimeCts.Dispose();
         }
 
         private void NumberValidationTextBox(object sender, TextCompositionEventArgs e)
@@ -199,17 +216,13 @@ namespace BASpark
             string updateUrl = Localization.GetRemoteUpdateUrl();
             try
             {
-                using HttpClient client = new HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(5);
-                client.DefaultRequestHeaders.Add("User-Agent", AppVersionInfo.UserAgent);
-
-                string json = await client.GetStringAsync(updateUrl);
+                string json = await RemoteContentClient.GetStringAsync(updateUrl, _lifetimeCts.Token);
                 using JsonDocument doc = JsonDocument.Parse(json);
                 JsonElement root = doc.RootElement;
 
-                string latestVersionStr = ReadJsonString(root, "version");
-                string downloadUrl = ReadJsonString(root, "url");
-                string updateNotes = ReadJsonString(root, "notes");
+                string latestVersionStr = ReadJsonString(root, "version", 64);
+                string downloadUrl = ReadJsonString(root, "url", 2048);
+                string updateNotes = ReadJsonString(root, "notes", 8000);
                 if (string.IsNullOrWhiteSpace(updateNotes))
                 {
                     updateNotes = Localization.Get("Msg_NoUpdateNotes");
@@ -247,6 +260,9 @@ namespace BASpark
                     });
                 }
             }
+            catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+            {
+            }
             catch (Exception ex)
             {
                 AppLogger.Warn($"Update check failed: {ex.Message}");
@@ -254,11 +270,15 @@ namespace BASpark
             }
         }
 
-        private static string ReadJsonString(JsonElement root, string propertyName)
+        private static string ReadJsonString(JsonElement root, string propertyName, int maxLength)
         {
-            return root.TryGetProperty(propertyName, out JsonElement value) && value.ValueKind == JsonValueKind.String
-                ? value.GetString() ?? string.Empty
-                : string.Empty;
+            if (!root.TryGetProperty(propertyName, out JsonElement value) || value.ValueKind != JsonValueKind.String)
+            {
+                return string.Empty;
+            }
+
+            string text = value.GetString() ?? string.Empty;
+            return text.Length <= maxLength ? text : text[..maxLength];
         }
 
         private static bool TryCreateHttpUri(string value, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Uri? uri)
@@ -308,20 +328,17 @@ namespace BASpark
             string noticeUrl = Localization.GetRemoteNoticeUrl();
             try
             {
-                using HttpClient client = new HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(5);
-                client.DefaultRequestHeaders.Add("User-Agent", AppVersionInfo.UserAgent);
-                string json = await client.GetStringAsync(noticeUrl);
+                string json = await RemoteContentClient.GetStringAsync(noticeUrl, _lifetimeCts.Token);
                 using JsonDocument doc = JsonDocument.Parse(json);
                 JsonElement root = doc.RootElement;
 
-                string title = ReadJsonString(root, "title");
+                string title = ReadJsonString(root, "title", 200);
                 if (string.IsNullOrWhiteSpace(title))
                 {
                     title = Localization.Get("Msg_DefaultNoticeTitle");
                 }
-                string content = ReadJsonString(root, "content");
-                string date = ReadJsonString(root, "date");
+                string content = ReadJsonString(root, "content", 8000);
+                string date = ReadJsonString(root, "date", 64);
                 string lastContent = ConfigManager.LastNoticeContent;
 
                 Dispatcher.Invoke(() =>
@@ -332,7 +349,6 @@ namespace BASpark
                         NoticeContent.Text = content;
                         NoticeDate.Text = date;
                         NoticeBar.Visibility = Visibility.Visible;
-                        RefreshThemeSoon();
                         if (content != lastContent)
                         {
                             ShowWindowsNotification(title, content);
@@ -340,6 +356,9 @@ namespace BASpark
                         }
                     }
                 });
+            }
+            catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+            {
             }
             catch (Exception ex)
             {
@@ -349,7 +368,6 @@ namespace BASpark
                     if (string.IsNullOrEmpty(NoticeContent.Text) || NoticeContent.Text == "...")
                     {
                         NoticeBar.Visibility = Visibility.Collapsed;
-                        RefreshThemeSoon();
                     }
                 });
                 HandleNetworkFetchFailure(isManual, ex.Message);
@@ -358,6 +376,11 @@ namespace BASpark
 
         private void HandleNetworkFetchFailure(bool isManual, string errorMessage)
         {
+            if (_lifetimeCts.IsCancellationRequested || !IsLoaded)
+            {
+                return;
+            }
+
             lock (_networkPromptLock)
             {
                 if (!isManual && _autoNetworkFailurePromptShown)
@@ -464,23 +487,33 @@ namespace BASpark
 
         private void RefreshTimer_Tick(object? sender, EventArgs e)
         {
-            if (ClickCountText != null)
-                ClickCountText.Text = Localization.Format("Welcome_ClicksUnit", ConfigManager.TotalClicks);
+            int clickCount = ConfigManager.TotalClicks;
+            if (ClickCountText != null && clickCount != _lastRenderedClickCount)
+            {
+                _lastRenderedClickCount = clickCount;
+                ClickCountText.Text = Localization.Format("Welcome_ClicksUnit", clickCount);
+            }
 
             if (StatusText != null)
             {
                 bool suppressedByEnvironment = ConfigManager.IsEffectEnabled &&
                     App.Overlay?.IsEffectSuppressedByEnvironment() == true;
+                int status = !ConfigManager.IsEffectEnabled ? 0 : suppressedByEnvironment ? 1 : 2;
+                if (status == _lastRenderedStatus)
+                {
+                    return;
+                }
 
-                if (!ConfigManager.IsEffectEnabled)
+                _lastRenderedStatus = status;
+                if (status == 0)
                 {
                     StatusText.Text = Localization.Get("Status_Paused");
                     StatusText.Foreground = System.Windows.Media.Brushes.Gray;
                 }
-                else if (suppressedByEnvironment)
+                else if (status == 1)
                 {
                     StatusText.Text = Localization.Get("Status_Filtered");
-                    StatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD9, 0x77, 0x06));
+                    StatusText.Foreground = FilteredStatusBrush;
                 }
                 else
                 {
@@ -703,109 +736,6 @@ namespace BASpark
             ThemeManager.ApplyControlPanel(this);
         }
 
-        private void RefreshThemeAfterLayout()
-        {
-            if (!Dispatcher.CheckAccess())
-            {
-                Dispatcher.BeginInvoke(new Action(RefreshThemeAfterLayout), DispatcherPriority.Loaded);
-                return;
-            }
-
-            ApplyDarkMode();
-            UpdateLayout();
-            ApplyDarkMode();
-            RefreshThemeSoon();
-        }
-
-        private void PreloadDarkSettingsTheme()
-        {
-            if (_darkSettingsThemePreloaded || !ThemeManager.IsDarkModeEnabled() || PageSettings == null)
-            {
-                return;
-            }
-
-            var subTabs = new[] { SubTabBasic, SubTabVisual, SubTabFilter, SubTabMultiScreen, SubTabMore };
-            var selectedSubTab = subTabs.FirstOrDefault(tab => tab.IsChecked == true) ?? SubTabBasic;
-            var originalVisibility = PageSettings.Visibility;
-            var originalOpacity = PageSettings.Opacity;
-            bool originalHitTest = PageSettings.IsHitTestVisible;
-
-            _preloadingDarkTheme = true;
-            try
-            {
-                PageSettings.Visibility = Visibility.Visible;
-                PageSettings.Opacity = 0;
-                PageSettings.IsHitTestVisible = false;
-
-                ApplyDarkMode();
-                foreach (var subTab in subTabs)
-                {
-                    subTab.IsChecked = true;
-                    UpdateLayout();
-                    ApplyTemplates(PageSettings, new HashSet<DependencyObject>());
-                }
-
-                ApplyDarkMode();
-                _darkSettingsThemePreloaded = true;
-            }
-            finally
-            {
-                selectedSubTab.IsChecked = true;
-                PageSettings.Visibility = originalVisibility;
-                PageSettings.Opacity = originalOpacity;
-                PageSettings.IsHitTestVisible = originalHitTest;
-                _preloadingDarkTheme = false;
-            }
-        }
-
-        private void ApplyTemplates(DependencyObject root, HashSet<DependencyObject> visited)
-        {
-            if (!visited.Add(root))
-            {
-                return;
-            }
-
-            if (root is System.Windows.Controls.Control control)
-            {
-                control.ApplyTemplate();
-            }
-
-            int visualChildren = 0;
-            try
-            {
-                visualChildren = VisualTreeHelper.GetChildrenCount(root);
-            }
-            catch
-            {
-                visualChildren = 0;
-            }
-
-            for (int i = 0; i < visualChildren; i++)
-            {
-                ApplyTemplates(VisualTreeHelper.GetChild(root, i), visited);
-            }
-
-            foreach (object child in LogicalTreeHelper.GetChildren(root))
-            {
-                if (child is DependencyObject dependencyObject)
-                {
-                    ApplyTemplates(dependencyObject, visited);
-                }
-            }
-        }
-
-        private void RefreshThemeSoon()
-        {
-            if (!Dispatcher.CheckAccess())
-            {
-                Dispatcher.BeginInvoke(new Action(RefreshThemeSoon), DispatcherPriority.Loaded);
-                return;
-            }
-
-            Dispatcher.BeginInvoke(new Action(ApplyDarkMode), DispatcherPriority.Loaded);
-            Dispatcher.BeginInvoke(new Action(ApplyDarkMode), DispatcherPriority.ContextIdle);
-        }
-
         private void SystemEvents_UserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
         {
             if (ConfigManager.DarkMode != DarkModeOption.System)
@@ -817,7 +747,7 @@ namespace BASpark
                 e.Category == UserPreferenceCategory.VisualStyle ||
                 e.Category == UserPreferenceCategory.Color)
             {
-                Dispatcher.Invoke(RefreshThemeSoon);
+                Dispatcher.BeginInvoke(new Action(ApplyDarkMode), DispatcherPriority.Normal);
             }
         }
 
@@ -1050,7 +980,6 @@ namespace BASpark
                 ListConfiguredProcesses.Opacity = processFilterEnabled || ThemeManager.IsDarkModeEnabled() ? 1.0 : 0.65;
             }
             ManualProcessInput.IsEnabled = processFilterEnabled;
-            RefreshThemeSoon();
         }
 
         private void SelectProcessFilterMode(ProcessFilterModeOption mode)
@@ -1084,18 +1013,6 @@ namespace BASpark
             else if (TabSettings.IsChecked == true) PageSettings.Visibility = Visibility.Visible;
             else if (TabLog.IsChecked == true) PageLog.Visibility = Visibility.Visible;
             else if (TabAbout.IsChecked == true) PageAbout.Visibility = Visibility.Visible;
-
-            RefreshThemeAfterLayout();
-        }
-
-        private void SettingsSubTab_Checked(object sender, RoutedEventArgs e)
-        {
-            if (_preloadingDarkTheme)
-            {
-                return;
-            }
-
-            RefreshThemeAfterLayout();
         }
 
         private void InitLogView()
@@ -1108,7 +1025,6 @@ namespace BASpark
             _logViewInitialized = true;
             TxtAppLog.Text = string.Join(Environment.NewLine, AppLogger.GetEntries());
             TxtAppLog.ScrollToEnd();
-            RefreshThemeSoon();
         }
 
         private void OnAppLogEntryAdded(string line)
@@ -1165,8 +1081,16 @@ namespace BASpark
                         return;
                     }
 
-                    SidebarBackgroundHost.Background = (System.Windows.Media.Brush?)brush ?? System.Windows.Media.Brushes.White;
-                    RefreshThemeSoon();
+                    if (brush == null)
+                    {
+                        SidebarBackgroundHost.SetResourceReference(
+                            System.Windows.Controls.Panel.BackgroundProperty,
+                            "ThemeSurfaceBackgroundBrush");
+                    }
+                    else
+                    {
+                        SidebarBackgroundHost.Background = brush;
+                    }
                 });
             }
             catch (Exception ex)
@@ -1255,14 +1179,14 @@ namespace BASpark
                 url = Localization.GetDiscordUrl();
             }
 
-            if (string.IsNullOrWhiteSpace(url))
+            if (string.IsNullOrWhiteSpace(url) || !TryCreateHttpUri(url, out Uri? uri))
             {
                 return;
             }
 
             try
             {
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
             }
             catch (Exception ex)
             {
@@ -1695,7 +1619,6 @@ namespace BASpark
             ConfigManager.Save("NetworkRegion", selectedNetworkRegion);
             ConfigManager.Save("DarkMode", selectedDarkMode);
             ApplyDarkMode();
-            RefreshThemeSoon();
             ConfigManager.Save("StartSilent", startSilentEnabled);
             ConfigManager.Save("EnableEnvironmentFilter", CheckEnvironmentFilter.IsChecked ?? false);
             ConfigManager.Save("HideInFullscreen", CheckHideInFullscreen.IsChecked ?? true);
@@ -1882,7 +1805,9 @@ namespace BASpark
 
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.System),
+                        "schtasks.exe"),
                     Arguments = arguments,
                     UseShellExecute = true,
                     CreateNoWindow = true,
@@ -1893,6 +1818,10 @@ namespace BASpark
                 using (Process? process = Process.Start(startInfo))
                 {
                     process?.WaitForExit();
+                    if (process is { ExitCode: not 0 })
+                    {
+                        AppLogger.Warn($"Task Scheduler command failed with exit code {process.ExitCode}.");
+                    }
                 }
             }
             catch (Exception ex)

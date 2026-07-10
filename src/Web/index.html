@@ -520,74 +520,83 @@
             }
 
             bindEvents() {
-                const getPos = e => ({ x: e.clientX, y: e.clientY });
-                const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-
                 window.addEventListener("mousedown", e => {
-                    if (this.clickEffects.length === 0 && this.distanceEffects.length === 0 && this.trail.length === 0) {
-                        this.lastFrameTime = performance.now();
-                    }
-                    this.isDown = true;
-                    this.lastPos = getPos(e);
-                    this.trailDistanceAccumulator = 0;
-                    this.distanceAccumulator = 0;
-                    this.trailEmitX = this.lastPos.x;
-                    this.trailEmitY = this.lastPos.y;
-                    this.resetTrailSmoothing(this.lastPos);
-                    this.beginTrailStroke(this.lastPos.x, this.lastPos.y);
-                    this.createEffects(this.lastPos.x, this.lastPos.y);
+                    this.pointerDown(e.clientX, e.clientY);
                 });
 
                 window.addEventListener("mousemove", e => {
-                    if (!this.isDown && !window.effectiveAlwaysTrail) return;
-
-                    const p = getPos(e);
-                    const prev = this.lastPos;
-                    if (!prev) {
-                        this.lastPos = p;
-                        const trailP = this.resetTrailSmoothing(p);
-                        if (window.effectiveAlwaysTrail) {
-                            this.beginTrailStroke(trailP.x, trailP.y);
-                        }
-                        return;
-                    }
-
-                    const d = dist(p, prev);
-                    if (d > 0) {
-                        const prevTrail = this.trailLastPos ?? this.resetTrailSmoothing(prev);
-                        const trailP = this.smoothTrailPoint(p);
-                        const trailD = dist(trailP, prevTrail);
-                        if (trailD > 0.01) {
-                            this.handleTrailMove(prevTrail, trailP, trailD);
-                        }
-                        this.trailLastPos = trailP;
-                        if (this.isDown) {
-                            this.handleDistanceEmitter(p, d);
-                        }
-                    }
-
-                    this.lastPos = p;
+                    this.pointerMove(e.clientX, e.clientY);
                 });
 
                 window.addEventListener("mouseup", () => {
-                    this.isDown = false;
-                    this.trailDistanceAccumulator = 0;
-                    this.trailEmitX = Number.NaN;
-                    this.trailEmitY = Number.NaN;
-                    if (!window.effectiveAlwaysTrail) {
-                        this.trailLastPos = null;
-                        this.trailSmoothX = Number.NaN;
-                        this.trailSmoothY = Number.NaN;
-                    }
-                    this.distanceAccumulator = 0;
+                    this.pointerUp();
                 });
+            }
+
+            pointerDown(x, y) {
+                if (this.clickEffects.length === 0 && this.distanceEffects.length === 0 && this.trail.length === 0) {
+                    this.lastFrameTime = performance.now();
+                }
+
+                this.isDown = true;
+                this.lastPos = { x, y };
+                this.trailDistanceAccumulator = 0;
+                this.distanceAccumulator = 0;
+                this.trailEmitX = x;
+                this.trailEmitY = y;
+                this.resetTrailSmoothing(this.lastPos);
+                this.beginTrailStroke(x, y);
+                this.createEffects(x, y);
+            }
+
+            pointerMove(x, y) {
+                if (!this.isDown && !window.effectiveAlwaysTrail) return;
+
+                const point = { x, y };
+                const previous = this.lastPos;
+                if (!previous) {
+                    this.lastPos = point;
+                    const trailPoint = this.resetTrailSmoothing(point);
+                    if (window.effectiveAlwaysTrail) {
+                        this.beginTrailStroke(trailPoint.x, trailPoint.y);
+                    }
+                    return;
+                }
+
+                const distance = Math.hypot(x - previous.x, y - previous.y);
+                if (distance > 0) {
+                    const previousTrail = this.trailLastPos ?? this.resetTrailSmoothing(previous);
+                    const trailPoint = this.smoothTrailPoint(point);
+                    const trailDistance = Math.hypot(trailPoint.x - previousTrail.x, trailPoint.y - previousTrail.y);
+                    if (trailDistance > 0.01) {
+                        this.handleTrailMove(previousTrail, trailPoint, trailDistance);
+                    }
+                    this.trailLastPos = trailPoint;
+                    if (this.isDown) {
+                        this.handleDistanceEmitter(point, distance);
+                    }
+                }
+
+                this.lastPos = point;
+            }
+
+            pointerUp() {
+                this.isDown = false;
+                this.trailDistanceAccumulator = 0;
+                this.trailEmitX = Number.NaN;
+                this.trailEmitY = Number.NaN;
+                if (!window.effectiveAlwaysTrail) {
+                    this.trailLastPos = null;
+                    this.trailSmoothX = Number.NaN;
+                    this.trailSmoothY = Number.NaN;
+                }
+                this.distanceAccumulator = 0;
             }
 
             initCanvas() {
                 this.mainCanvas = document.getElementById("sparkCanvas");
                 this.mainCtx = this.mainCanvas.getContext("2d");
-                this.bufferCanvas = document.createElement("canvas");
-                this.bufferCtx = this.bufferCanvas.getContext("2d");
+                this.bufferCtx = this.mainCtx;
                 this.resize();
                 window.addEventListener("resize", () => this.resize());
             }
@@ -606,8 +615,7 @@
                 this.previousDirtyRects = [];
                 this.forceFullRedraw = true;
                 this.lastFrameTime = performance.now();
-                this.mainCtx?.clearRect(0, 0, this.mainCanvas.width, this.mainCanvas.height);
-                this.bufferCtx?.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+                this.mainCtx?.clearRect(0, 0, this.cssWidth, this.cssHeight);
             }
 
             alpha(value) {
@@ -626,11 +634,9 @@
                 this.cssHeight = cssHeight;
                 this.mainCanvas.width = w;
                 this.mainCanvas.height = h;
-                this.bufferCanvas.width = w;
-                this.bufferCanvas.height = h;
                 this.previousDirtyRects = [];
                 this.forceFullRedraw = true;
-                this.bufferCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                this.mainCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
             }
 
             resetTrailSmoothing(point) {
@@ -1327,27 +1333,6 @@
                 ctx.clip();
             }
 
-            _renderToMain(rects) {
-                const { mainCtx, mainCanvas, bufferCanvas } = this;
-                if (!rects || rects.length === 0) {
-                    mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-                    mainCtx.drawImage(bufferCanvas, 0, 0);
-                    return;
-                }
-
-                const dpr = this.dpr || 1;
-                for (const rect of rects) {
-                    const sx = Math.max(0, Math.floor(rect.x * dpr));
-                    const sy = Math.max(0, Math.floor(rect.y * dpr));
-                    const sw = Math.min(mainCanvas.width - sx, Math.ceil(rect.w * dpr));
-                    const sh = Math.min(mainCanvas.height - sy, Math.ceil(rect.h * dpr));
-                    if (sw <= 0 || sh <= 0) continue;
-
-                    mainCtx.clearRect(sx, sy, sw, sh);
-                    mainCtx.drawImage(bufferCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
-                }
-            }
-
             animationLoops(now) {
                 if (window.renderingPaused) {
                     this.lastFrameTime = now;
@@ -1359,7 +1344,6 @@
                     this.lastFrameTime = now;
                     if (this.previousDirtyRects.length > 0) {
                         this._clearBufferRects(this.previousDirtyRects);
-                        this._renderToMain(this.previousDirtyRects);
                         this.previousDirtyRects = [];
                     }
                     return;
@@ -1410,7 +1394,6 @@
                 bctx.globalCompositeOperation = "source-over";
                 bctx.restore();
 
-                this._renderToMain(renderRects);
                 this.previousDirtyRects = this._getEffectRects();
                 this.forceFullRedraw = false;
 
@@ -1475,7 +1458,7 @@
 
             const cx = percentX * window.innerWidth;
             const cy = percentY * window.innerHeight;
-            window.dispatchEvent(new MouseEvent("mousedown", { clientX: cx, clientY: cy, bubbles: true }));
+            window.spark.pointerDown(cx, cy);
             window.scheduleNextAnimationFrame();
         };
 
@@ -1487,13 +1470,13 @@
 
             const cx = percentX * window.innerWidth;
             const cy = percentY * window.innerHeight;
-            window.dispatchEvent(new MouseEvent("mousemove", { clientX: cx, clientY: cy, bubbles: true }));
+            window.spark.pointerMove(cx, cy);
             window.scheduleNextAnimationFrame();
         };
 
         window.externalUp = () => {
             if (window.renderingPaused) return;
-            window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+            window.spark.pointerUp();
             window.scheduleNextAnimationFrame();
         };
 

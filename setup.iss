@@ -10,6 +10,8 @@ AppPublisher="BASpark Project"
 DefaultDirName={autopf}\BASpark
 DefaultGroupName=BASpark
 AllowNoIcons=yes
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 AppMutex=Global\BASpark_SingleInstance_Mutex
 CloseApplications=yes
 SetupIconFile=src\app.ico
@@ -40,9 +42,11 @@ Name: "{autodesktop}\BASpark"; Filename: "{app}\BASpark.exe"; Tasks: desktopicon
 
 [Registry]
 Root: HKCU; Subkey: "Software\BASpark"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "BASpark"; Flags: uninsdeletevalue dontcreatekey
 
 [UninstallRun]
-Filename: "taskkill"; Parameters: "/F /IM BASpark.exe /T"; Flags: runhidden; RunOnceId: "StopBASpark"
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM BASpark.exe /T"; Flags: runhidden; RunOnceId: "StopBASpark"
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN BASparkAutoStart /F"; Flags: runhidden; RunOnceId: "RemoveBASparkAutoStartTask"
 
 [Run]
 Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent

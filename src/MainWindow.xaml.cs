@@ -422,6 +422,12 @@ namespace BASpark
                 coreWebView.Settings.IsZoomControlEnabled = false;
                 coreWebView.Settings.AreDefaultContextMenusEnabled = false;
                 coreWebView.Settings.IsStatusBarEnabled = false;
+                coreWebView.Settings.AreDevToolsEnabled = false;
+                coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = false;
+                coreWebView.Settings.IsWebMessageEnabled = false;
+                coreWebView.Settings.AreHostObjectsAllowed = false;
+                coreWebView.Settings.IsPasswordAutosaveEnabled = false;
+                coreWebView.Settings.IsGeneralAutofillEnabled = false;
 
                 if (_processFailedHandler == null)
                 {

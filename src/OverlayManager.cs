@@ -556,7 +556,7 @@ namespace BASpark
             _isTouchLikeInput = !CursorIsVisible();
             _activePointerOverlay = target;
 
-            long currentTicks = DateTime.Now.Ticks;
+            long currentTicks = DateTime.UtcNow.Ticks;
             if (currentTicks - _lastClickTicks < ClickIntervalTicks) return;
             _lastClickTicks = currentTicks;
 
@@ -568,14 +568,14 @@ namespace BASpark
         {
             // 拖尾仅在点击特效开启或常驻拖尾开启时渲染
             if (!ConfigManager.IsTrailEffectActive) return;
-            if (!CanRenderEffects()) return;
 
-            bool cursorVisible = CursorIsVisible();
-            if (!cursorVisible && !_isPrimaryPointerDown) return;
-
-            long currentTicks = DateTime.Now.Ticks;
+            long currentTicks = DateTime.UtcNow.Ticks;
             if (currentTicks - _lastMoveTicks < _moveIntervalTicks) return;
             _lastMoveTicks = currentTicks;
+
+            bool cursorVisible = CursorIsVisible();
+            if (!CanRenderEffects(cursorVisible: cursorVisible)) return;
+            if (!cursorVisible && !_isPrimaryPointerDown) return;
 
             if (!TryGetPhysicalCursorPosition(out int cursorX, out int cursorY))
             {
@@ -612,7 +612,7 @@ namespace BASpark
         /// 检查渲染环境条件（覆盖窗口存在性、环境过滤、光标可见性）。
         /// 业务开关（点击特效、常驻拖尾）由各调用点自行判断。
         /// </summary>
-        private bool CanRenderEffects(bool skipSuppressionCheck = false)
+        private bool CanRenderEffects(bool skipSuppressionCheck = false, bool? cursorVisible = null)
         {
             if (_overlays.Count == 0)
             {
@@ -626,7 +626,7 @@ namespace BASpark
                 return false;
             }
 
-            if (!ConfigManager.IsTouchscreenMode && !CursorIsVisible())
+            if (!ConfigManager.IsTouchscreenMode && !(cursorVisible ?? CursorIsVisible()))
             {
                 ReleasePointerStateSilent();
                 return false;
@@ -731,6 +731,11 @@ namespace BASpark
                 return false;
             }
 
+            if (!forceRefresh && nowTicks < _suppressionCacheValidUntilTicks)
+            {
+                return _isSuppressedByEnvironment;
+            }
+
             GetCursorPos(out POINT pt);
             IntPtr cursorHwnd = WindowFromPoint(pt);
             IntPtr targetWindow = GetAncestor(cursorHwnd, GA_ROOT);
@@ -745,11 +750,6 @@ namespace BASpark
                 forceRefresh = true;
                 _lastForegroundWindow = targetWindow;
             }
-            if (!forceRefresh && nowTicks < _suppressionCacheValidUntilTicks)
-            {
-                return _isSuppressedByEnvironment;
-            }
-
             string className = GetWindowClassName(targetWindow);
             if (string.IsNullOrEmpty(className))
             {
@@ -886,21 +886,26 @@ namespace BASpark
             IntPtr hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
             if (hProc == IntPtr.Zero) return string.Empty;
 
-            var sb = new StringBuilder(1024);
-            int size = sb.Capacity;
-            if (!QueryFullProcessImageName(hProc, 0, sb, ref size))
+            try
+            {
+                var sb = new StringBuilder(1024);
+                int size = sb.Capacity;
+                if (!QueryFullProcessImageName(hProc, 0, sb, ref size))
+                {
+                    return string.Empty;
+                }
+
+                string fileName = System.IO.Path.GetFileName(sb.ToString());
+                if (!fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    fileName += ".exe";
+                }
+                return fileName.ToLowerInvariant();
+            }
+            finally
             {
                 CloseHandle(hProc);
-                return string.Empty;
             }
-
-            CloseHandle(hProc);
-            string fileName = System.IO.Path.GetFileName(sb.ToString());
-            if (!fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            {
-                fileName += ".exe";
-            }
-            return fileName.ToLowerInvariant();
         }
 
         private static bool IsEffectiveFullscreenWindow(IntPtr hwnd)
