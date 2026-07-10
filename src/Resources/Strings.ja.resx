@@ -565,6 +565,12 @@
     <data name="VisualReset_TrailThickness_Sub" xml:space="preserve">
       <value>既定 1.00 ×</value>
     </data>
+    <data name="VisualReset_GlowIntensity" xml:space="preserve">
+      <value>グロー強度</value>
+    </data>
+    <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
+      <value>既定 1.00 ×</value>
+    </data>
     <data name="VisualReset_TrailDelay" xml:space="preserve">
       <value>トレイル遅延</value>
     </data>
@@ -621,6 +627,9 @@
     </data>
     <data name="Visual_TrailThickness" xml:space="preserve">
       <value>トレイルの太さ</value>
+    </data>
+    <data name="Visual_GlowIntensity" xml:space="preserve">
+      <value>グロー強度</value>
     </data>
     <data name="Visual_TrailDelay" xml:space="preserve">
       <value>トレイル遅延</value>

@@ -80,30 +80,48 @@ namespace BASpark
             ("ThemeHintTextBrush", "#9BA3AF", "#8793A0"),
             ("ThemeSidebarVersionBrush", "#B0B8C3", "#8793A0"),
             ("ThemeSidebarCopyrightBrush", "#A0A8B3", "#8793A0"),
+            ("ThemeSettingsDividerBrush", "#E3E8EF", "#3A4654"),
+            ("ThemeStartupBorderBrush", "#EDF2F7", "#3A4654"),
+            ("ThemePrivacyIntroTextBrush", "#2D3748", "#E7EDF4"),
+            ("ThemePrivacyBodyTextBrush", "#718096", "#B7C2CE"),
+            ("ThemePrivacySectionTitleBrush", "#4A5568", "#E7EDF4"),
+            ("ThemePrivacyTelemetryTextBrush", "#A0AEC0", "#8793A0"),
+            ("ThemePrivacyWarningTitleBrush", "#E53E3E", "#FF7A7A"),
+            ("ThemePrivacyWarningTextBrush", "#C53030", "#FF8B8B"),
+            ("ThemePrivacyRefuseBackgroundBrush", "#F7FAFC", "#27313C"),
+            ("ThemePrivacyRefuseForegroundBrush", "#A0AEC0", "#B7C2CE"),
             ("NavForegroundBrush", "#666666", "#C5CED8"),
             ("NavHoverBrush", "#E0F2FF", "#263847"),
             ("SegmentSelectedBackgroundBrush", "#FFFFFF", "#202731"),
             ("SegmentSelectedForegroundBrush", "#45AFFF", "#45AFFF"),
-            (WpfSystemColors.WindowBrushKey, "#FFFFFF", "#1B222B"),
-            (WpfSystemColors.ControlBrushKey, "#FFFFFF", "#1B222B"),
-            (WpfSystemColors.ControlLightBrushKey, "#F8FAFF", "#27313C"),
-            (WpfSystemColors.ControlDarkBrushKey, "#D6DEE8", "#3A4654"),
-            (WpfSystemColors.ControlTextBrushKey, "#333333", "#E7EDF4"),
-            (WpfSystemColors.GrayTextBrushKey, "#999999", "#8793A0"),
-            (WpfSystemColors.HighlightBrushKey, "#E0F2FF", "#263847"),
-            (WpfSystemColors.HighlightTextBrushKey, "#333333", "#E7EDF4"),
+        ];
+
+        private static readonly (object Key, string Color)[] DarkSystemPaletteEntries =
+        [
+            (WpfSystemColors.WindowBrushKey, "#1B222B"),
+            (WpfSystemColors.ControlBrushKey, "#1B222B"),
+            (WpfSystemColors.ControlLightBrushKey, "#27313C"),
+            (WpfSystemColors.ControlDarkBrushKey, "#3A4654"),
+            (WpfSystemColors.ControlTextBrushKey, "#E7EDF4"),
+            (WpfSystemColors.GrayTextBrushKey, "#8793A0"),
+            (WpfSystemColors.HighlightBrushKey, "#263847"),
+            (WpfSystemColors.HighlightTextBrushKey, "#E7EDF4"),
         ];
 
         private static readonly IReadOnlyDictionary<object, SolidColorBrush> LightPalette = BuildPalette(dark: false);
         private static readonly IReadOnlyDictionary<object, SolidColorBrush> DarkPalette = BuildPalette(dark: true);
-        private static readonly (object ActiveKey, string LightKey, string DarkKey)[] ThemeStyleEntries =
+        private static readonly IReadOnlyDictionary<object, SolidColorBrush> DarkSystemPalette = BuildDarkSystemPalette();
+        private static readonly (object ActiveKey, string DarkKey)[] DarkControlStyleEntries =
         [
-            (typeof(WpfControls.ComboBoxItem), "LightComboBoxItemStyle", "DarkComboBoxItemStyle"),
-            (typeof(WpfControls.ComboBox), "LightComboBoxStyle", "DarkComboBoxStyle"),
-            (typeof(WpfControls.TextBox), "LightTextBoxStyle", "DarkTextBoxStyle"),
-            (typeof(WpfControls.ListBox), "LightListBoxStyle", "DarkListBoxStyle"),
-            (typeof(WpfControls.CheckBox), "LightCheckBoxStyle", "DarkCheckBoxStyle"),
-            (typeof(WpfControls.ListBoxItem), "LightListBoxItemStyle", "DarkListBoxItemStyle"),
+            (typeof(WpfControls.ComboBoxItem), "DarkComboBoxItemStyle"),
+            (typeof(WpfControls.ComboBox), "DarkComboBoxStyle"),
+            (typeof(WpfControls.TextBox), "DarkTextBoxStyle"),
+            (typeof(WpfControls.ListBox), "DarkListBoxStyle"),
+            (typeof(WpfControls.CheckBox), "DarkCheckBoxStyle"),
+            (typeof(WpfControls.ListBoxItem), "DarkListBoxItemStyle"),
+        ];
+        private static readonly (object ActiveKey, string LightKey, string DarkKey)[] NamedThemeStyleEntries =
+        [
             ("SecondaryActionButton", "LightSecondaryActionButton", "DarkSecondaryActionButton"),
             ("DangerActionButton", "LightDangerActionButton", "DarkDangerActionButton"),
         ];
@@ -125,6 +143,13 @@ namespace BASpark
         public static void ApplyTitleBar(Window window) =>
             SetTitleBarDarkMode(window, IsDarkModeEnabled());
 
+        public static void ApplyWindow(Window window)
+        {
+            bool dark = IsDarkModeEnabled();
+            SetTitleBarDarkMode(window, dark);
+            ApplyPalette(window, dark);
+        }
+
         public static void ApplyControlPanel(ControlPanelWindow window)
         {
             bool dark = IsDarkModeEnabled();
@@ -136,13 +161,21 @@ namespace BASpark
                 return;
             }
 
-            IReadOnlyDictionary<object, SolidColorBrush> palette = dark ? DarkPalette : LightPalette;
-            foreach (var pair in palette)
+            ApplyPalette(window, dark);
+
+            foreach (var entry in DarkControlStyleEntries)
             {
-                window.Resources[pair.Key] = pair.Value;
+                if (dark)
+                {
+                    window.Resources[entry.ActiveKey] = window.Resources[entry.DarkKey];
+                }
+                else
+                {
+                    window.Resources.Remove(entry.ActiveKey);
+                }
             }
 
-            foreach (var entry in ThemeStyleEntries)
+            foreach (var entry in NamedThemeStyleEntries)
             {
                 window.Resources[entry.ActiveKey] = window.Resources[dark ? entry.DarkKey : entry.LightKey];
             }
@@ -161,6 +194,40 @@ namespace BASpark
             }
 
             return palette;
+        }
+
+        private static IReadOnlyDictionary<object, SolidColorBrush> BuildDarkSystemPalette()
+        {
+            var palette = new Dictionary<object, SolidColorBrush>(DarkSystemPaletteEntries.Length);
+            foreach (var entry in DarkSystemPaletteEntries)
+            {
+                var brush = new SolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString(entry.Color));
+                brush.Freeze();
+                palette[entry.Key] = brush;
+            }
+
+            return palette;
+        }
+
+        private static void ApplyPalette(Window window, bool dark)
+        {
+            IReadOnlyDictionary<object, SolidColorBrush> palette = dark ? DarkPalette : LightPalette;
+            foreach (var pair in palette)
+            {
+                window.Resources[pair.Key] = pair.Value;
+            }
+
+            foreach (var pair in DarkSystemPalette)
+            {
+                if (dark)
+                {
+                    window.Resources[pair.Key] = pair.Value;
+                }
+                else
+                {
+                    window.Resources.Remove(pair.Key);
+                }
+            }
         }
 
         private static bool IsSystemAppDarkMode()

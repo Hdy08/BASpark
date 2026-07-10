@@ -10,6 +10,9 @@ namespace BASpark
         {
             _displayCulture = Localization.DetectCultureFromSystem();
             InitializeComponent();
+            ThemeManager.ApplyWindow(this);
+            SourceInitialized += (_, _) => ThemeManager.ApplyTitleBar(this);
+            Activated += (_, _) => ThemeManager.ApplyTitleBar(this);
             ApplyDisplayLanguage();
             SelectDefaultRadio();
         }

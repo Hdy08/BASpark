@@ -132,8 +132,8 @@ namespace BASpark
         }
 
         public void UpdateColor(string color) => ForEachOverlay(w => w.UpdateColor(color));
-        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness, double trailDelay) =>
-            ForEachOverlay(w => w.UpdateEffectSettings(scale, opacity, trailSpeed, clickSpeed, trailThickness, trailDelay));
+        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness, double trailDelay, double glowIntensity) =>
+            ForEachOverlay(w => w.UpdateEffectSettings(scale, opacity, trailSpeed, clickSpeed, trailThickness, trailDelay, glowIntensity));
         public void UpdateTrailRefreshRate(int hz)
         {
             hz = Math.Clamp(hz, 10, 240);
@@ -731,25 +731,29 @@ namespace BASpark
                 return false;
             }
 
-            if (!forceRefresh && nowTicks < _suppressionCacheValidUntilTicks)
+            IntPtr targetWindow = IntPtr.Zero;
+            if (GetCursorPos(out POINT pt))
             {
-                return _isSuppressedByEnvironment;
+                IntPtr cursorHwnd = WindowFromPoint(pt);
+                targetWindow = GetAncestor(cursorHwnd, GA_ROOT);
             }
-
-            GetCursorPos(out POINT pt);
-            IntPtr cursorHwnd = WindowFromPoint(pt);
-            IntPtr targetWindow = GetAncestor(cursorHwnd, GA_ROOT);
 
             if (targetWindow == IntPtr.Zero || IsOverlayWindow(targetWindow))
             {
                 targetWindow = GetForegroundWindow();
             }
 
-            if (targetWindow != _lastForegroundWindow)
+            bool targetWindowChanged = targetWindow != _lastForegroundWindow;
+            if (targetWindowChanged)
             {
-                forceRefresh = true;
                 _lastForegroundWindow = targetWindow;
             }
+
+            if (!forceRefresh && !targetWindowChanged && nowTicks < _suppressionCacheValidUntilTicks)
+            {
+                return _isSuppressedByEnvironment;
+            }
+
             string className = GetWindowClassName(targetWindow);
             if (string.IsNullOrEmpty(className))
             {

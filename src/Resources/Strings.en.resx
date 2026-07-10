@@ -565,6 +565,12 @@ Download now?</value>
     <data name="VisualReset_TrailThickness_Sub" xml:space="preserve">
       <value>Default 1.00 ×</value>
     </data>
+    <data name="VisualReset_GlowIntensity" xml:space="preserve">
+      <value>Glow intensity</value>
+    </data>
+    <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
+      <value>Default 1.00 ×</value>
+    </data>
     <data name="VisualReset_TrailDelay" xml:space="preserve">
       <value>Trail delay</value>
     </data>
@@ -621,6 +627,9 @@ Download now?</value>
     </data>
     <data name="Visual_TrailThickness" xml:space="preserve">
       <value>Trail thickness</value>
+    </data>
+    <data name="Visual_GlowIntensity" xml:space="preserve">
+      <value>Glow intensity</value>
     </data>
     <data name="Visual_TrailDelay" xml:space="preserve">
       <value>Trail delay</value>

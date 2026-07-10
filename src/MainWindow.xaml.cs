@@ -200,7 +200,7 @@ namespace BASpark
             ExecuteScript($"if(window.updateColor) window.updateColor({colorJson});");
         }
 
-        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness, double trailDelay)
+        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness, double trailDelay, double glowIntensity)
         {
             string scaleStr = FormatScriptNumber(scale, 0.5, 3.0, 1.0);
             string opacityStr = FormatScriptNumber(opacity, 0.1, 1.0, 1.0);
@@ -208,8 +208,9 @@ namespace BASpark
             string clickStr = FormatScriptNumber(clickSpeed, 0.2, 3.0, 1.0);
             string trailThicknessStr = FormatScriptNumber(trailThickness, 0.5, 3.0, 1.0);
             string trailDelayStr = FormatScriptNumber(trailDelay, 0.0, 0.5, 0.10);
+            string glowIntensityStr = FormatScriptNumber(glowIntensity, 0.0, 3.0, 1.0);
 
-            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr}, {trailThicknessStr}, {trailDelayStr});");
+            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr}, {trailThicknessStr}, {trailDelayStr}, {glowIntensityStr});");
         }
 
         private static string FormatScriptNumber(double value, double min, double max, double fallback)
@@ -330,7 +331,11 @@ namespace BASpark
 
             try
             {
-                await coreWebView.TrySuspendAsync().ConfigureAwait(true);
+                bool suspended = await coreWebView.TrySuspendAsync().ConfigureAwait(true);
+                if (suspended && !_overlayRuntimePaused)
+                {
+                    coreWebView.Resume();
+                }
             }
             catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
             {
@@ -455,7 +460,7 @@ namespace BASpark
                         _lastReportedAlwaysTrail = null;
                         UpdateColor(ConfigManager.ParticleColor);
                         ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
-                        UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness, ConfigManager.TrailDelay);
+                        UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness, ConfigManager.TrailDelay, ConfigManager.GlowIntensity);
                         UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
                         SyncInputContext(InputModeMouse);
                         if (_overlayRuntimePaused)

@@ -675,6 +675,7 @@ namespace BASpark
 
             SliderScale.Value = ConfigManager.EffectScale;
             SliderTrailThickness.Value = ConfigManager.TrailThickness;
+            SliderGlowIntensity.Value = ConfigManager.GlowIntensity;
             SliderOpacity.Value = ConfigManager.EffectOpacity * 100;
             CheckLinkedAnimationSpeed.IsChecked = ConfigManager.UseLinkedAnimationSpeed;
             SliderSpeed.Value = ConfigManager.EffectSpeed;
@@ -735,6 +736,7 @@ namespace BASpark
         private void ApplyDarkMode()
         {
             ThemeManager.ApplyControlPanel(this);
+            UpdateEnvironmentFilterInterlock();
         }
 
         private void SystemEvents_UserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
@@ -1393,13 +1395,14 @@ namespace BASpark
             VisualResetItems.Clear();
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectScale, Localization.Get("VisualReset_Scale"), Localization.Get("VisualReset_Scale_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailThickness, Localization.Get("VisualReset_TrailThickness"), Localization.Get("VisualReset_TrailThickness_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), Localization.Get("VisualReset_GlowIntensity_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectOpacity, Localization.Get("VisualReset_Opacity"), Localization.Get("VisualReset_Opacity_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), Localization.Get("VisualReset_UnifiedSpeed_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), Localization.Get("VisualReset_TrailSpeed_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ClickAnimationSpeed, Localization.Get("VisualReset_ClickSpeed"), Localization.Get("VisualReset_ClickSpeed_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, Localization.Get("VisualReset_TrailRefresh"), Localization.Get("VisualReset_TrailRefresh_Sub")));
-            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ParticleColor, Localization.Get("VisualReset_Color"), Localization.Get("VisualReset_Color_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailDelay, Localization.Get("VisualReset_TrailDelay"), Localization.Get("VisualReset_TrailDelay_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ParticleColor, Localization.Get("VisualReset_Color"), Localization.Get("VisualReset_Color_Sub")));
         }
 
         private void OpenVisualResetOverlay_Click(object sender, RoutedEventArgs e)
@@ -1482,10 +1485,11 @@ namespace BASpark
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
             double effectScale = Math.Round(SliderScale.Value, 2);
             double trailThickness = Math.Round(SliderTrailThickness.Value, 2);
+            double glowIntensity = Math.Round(SliderGlowIntensity.Value, 2);
             double trailDelay = Math.Round(SliderTrailDelay.Value, 2);
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
-            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, trailSp, clickSp, trailThickness, trailDelay);
+            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, trailSp, clickSp, trailThickness, trailDelay, glowIntensity);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
 
             VisualResetOverlay.Visibility = Visibility.Collapsed;
@@ -1524,6 +1528,7 @@ namespace BASpark
 
             double effectScale = Math.Round(SliderScale.Value, 2);
             double trailThickness = Math.Round(SliderTrailThickness.Value, 2);
+            double glowIntensity = Math.Round(SliderGlowIntensity.Value, 2);
             double trailDelay = Math.Round(SliderTrailDelay.Value, 2);
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsChecked == true;
@@ -1607,6 +1612,7 @@ namespace BASpark
             ConfigManager.Save("ParticleColor", ConfigManager.ParticleColor);
             ConfigManager.Save("EffectScale", effectScale);
             ConfigManager.Save("TrailThickness", trailThickness);
+            ConfigManager.Save("GlowIntensity", glowIntensity);
             ConfigManager.Save("TrailDelay", trailDelay);
             ConfigManager.Save("EffectOpacity", effectOpacity);
             ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
@@ -1657,7 +1663,7 @@ namespace BASpark
 
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             GetUiAnimationSpeeds(out double overlayTrail, out double overlayClick);
-            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, overlayTrail, overlayClick, trailThickness, trailDelay);
+            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, overlayTrail, overlayClick, trailThickness, trailDelay, glowIntensity);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
             App.Overlay?.RefreshEnvironmentFilterState();
             App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);

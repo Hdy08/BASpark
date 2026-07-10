@@ -62,17 +62,7 @@
         <SolidColorBrush x:Key="ThemeSidebarVersionBrush" Color="#B0B8C3"/>
         <SolidColorBrush x:Key="ThemeSidebarCopyrightBrush" Color="#A0A8B3"/>
 
-        <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#F8FAFF"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.ControlDarkBrushKey}" Color="#D6DEE8"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#333333"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#999999"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#E0F2FF"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#333333"/>
-
         <Style x:Key="LightComboBoxItemStyle" TargetType="{x:Type ComboBoxItem}"/>
-        <Style TargetType="{x:Type ComboBoxItem}" BasedOn="{StaticResource LightComboBoxItemStyle}"/>
         <Style x:Key="DarkComboBoxItemStyle" TargetType="{x:Type ComboBoxItem}">
             <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
             <Setter Property="Background" Value="{DynamicResource ThemeInputBackgroundBrush}"/>
@@ -91,7 +81,6 @@
         </Style>
 
         <Style x:Key="LightComboBoxStyle" TargetType="{x:Type ComboBox}"/>
-        <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource LightComboBoxStyle}"/>
         <Style x:Key="DarkComboBoxStyle" TargetType="{x:Type ComboBox}">
             <Setter Property="Background" Value="{DynamicResource ThemeInputBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
@@ -162,7 +151,6 @@
         </Style>
 
         <Style x:Key="LightTextBoxStyle" TargetType="{x:Type TextBox}"/>
-        <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource LightTextBoxStyle}"/>
         <Style x:Key="DarkTextBoxStyle" TargetType="{x:Type TextBox}">
             <Setter Property="Background" Value="{DynamicResource ThemeInputBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
@@ -170,7 +158,6 @@
         </Style>
 
         <Style x:Key="LightListBoxStyle" TargetType="{x:Type ListBox}"/>
-        <Style TargetType="{x:Type ListBox}" BasedOn="{StaticResource LightListBoxStyle}"/>
         <Style x:Key="DarkListBoxStyle" TargetType="{x:Type ListBox}">
             <Setter Property="Background" Value="{DynamicResource ThemeListBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
@@ -178,7 +165,6 @@
         </Style>
 
         <Style x:Key="LightCheckBoxStyle" TargetType="{x:Type CheckBox}"/>
-        <Style TargetType="{x:Type CheckBox}" BasedOn="{StaticResource LightCheckBoxStyle}"/>
         <Style x:Key="DarkCheckBoxStyle" TargetType="{x:Type CheckBox}">
             <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
         </Style>
@@ -231,7 +217,6 @@
         <Style x:Key="DangerActionButton" TargetType="Button" BasedOn="{StaticResource LightDangerActionButton}"/>
 
         <Style x:Key="LightListBoxItemStyle" TargetType="{x:Type ListBoxItem}"/>
-        <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource LightListBoxItemStyle}"/>
         <Style x:Key="DarkListBoxItemStyle" TargetType="{x:Type ListBoxItem}">
             <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -544,10 +529,10 @@
                 </StackPanel>
 
                 <StackPanel Name="PageAbout" Visibility="Collapsed">
-                    <TextBlock x:Name="TxtAboutTitle" Text="关于" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource ThemePrimaryTextBrush}" Margin="0,0,0,20"/>
+                    <TextBlock x:Name="TxtAboutTitle" Text="关于" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" Margin="0,0,0,20"/>
                     
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,14">
-                        <TextBlock FontSize="28" FontWeight="Bold" Foreground="{DynamicResource ThemePrimaryTextBrush}" VerticalAlignment="Center">
+                        <TextBlock FontSize="28" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" VerticalAlignment="Center">
                             <Run Text="BASpark "/>
                             <Run x:Name="VersionText" Text="V1.6.2-beta" Foreground="#45AFFF" FontSize="24"/>
                         </TextBlock>
@@ -606,7 +591,7 @@
                 </Grid.RowDefinitions>
 
                 <Border x:Name="SettingsHeaderBackground" Grid.Row="0" Background="{DynamicResource ThemePageBackgroundBrush}" Padding="0,0,0,16">
-                    <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,16">
+                    <Border BorderBrush="{DynamicResource ThemeSettingsDividerBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,16">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -742,7 +727,7 @@
                                                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                 <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                          TextAlignment="Right" VerticalAlignment="Center" 
-                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Background="Transparent"
+                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
                                                                          Text="{Binding ElementName=SliderScale, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
@@ -759,7 +744,7 @@
                                                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                 <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                          TextAlignment="Right" VerticalAlignment="Center"
-                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Background="Transparent"
+                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
                                                                          Text="{Binding ElementName=SliderTrailThickness, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
@@ -772,11 +757,28 @@
 
                                                     <StackPanel Margin="0,0,0,15">
                                                         <DockPanel LastChildFill="False">
+                                                            <TextBlock x:Name="TxtGlowIntensity" Text="发光强度" Foreground="{DynamicResource ThemeTertiaryTextBrush}" FontSize="13" VerticalAlignment="Center"/>
+                                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                                                <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
+                                                                         TextAlignment="Right" VerticalAlignment="Center"
+                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
+                                                                         Text="{Binding ElementName=SliderGlowIntensity, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
+                                                                         PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
+                                                                         InputMethod.IsInputMethodEnabled="False"/>
+                                                                <TextBlock Text=" X" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                        <Slider Name="SliderGlowIntensity" Minimum="0.00" Maximum="3.00" TickFrequency="0.01" SmallChange="0.01" LargeChange="0.10" IsSnapToTickEnabled="True"
+                                                                ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Margin="0,0,0,15">
+                                                        <DockPanel LastChildFill="False">
                                                             <TextBlock x:Name="TxtVisualOpacity" Text="全局不透明度" Foreground="{DynamicResource ThemeTertiaryTextBrush}" FontSize="13" VerticalAlignment="Center"/>
                                                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                 <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                         TextAlignment="Right" VerticalAlignment="Center" 
-                                                                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Background="Transparent"
+                                                                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
                                                                         Text="{Binding ElementName=SliderOpacity, Path=Value, StringFormat={}{0:F0}, UpdateSourceTrigger=LostFocus}"
                                                                         PreviewTextInput="NumberValidationTextBox" 
                                                                         KeyDown="TextBox_KeyDown"
@@ -798,7 +800,7 @@
                                                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                 <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                          TextAlignment="Right" VerticalAlignment="Center"
-                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Background="Transparent"
+                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
                                                                          Text="{Binding ElementName=SliderSpeed, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
@@ -816,7 +818,7 @@
                                                                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                     <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                              TextAlignment="Right" VerticalAlignment="Center"
-                                                                             BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Background="Transparent"
+                                                                             BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
                                                                              Text="{Binding ElementName=SliderTrailAnimSpeed, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                              PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                              InputMethod.IsInputMethodEnabled="False"/>
@@ -832,7 +834,7 @@
                                                                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                     <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                              TextAlignment="Right" VerticalAlignment="Center"
-                                                                             BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Background="Transparent"
+                                                                             BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
                                                                              Text="{Binding ElementName=SliderClickAnimSpeed, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                              PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                              InputMethod.IsInputMethodEnabled="False"/>
@@ -850,7 +852,7 @@
                                                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                 <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                          TextAlignment="Right" VerticalAlignment="Center" 
-                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Background="Transparent"
+                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
                                                                          Text="{Binding ElementName=SliderTrailRefresh, Path=Value, StringFormat={}{0:F0}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
@@ -861,22 +863,13 @@
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                     </StackPanel>
 
-                                                    <Separator Background="{DynamicResource ThemeSeparatorBrush}" Margin="0,2,0,12"/>
-                                                    <TextBlock x:Name="TxtEffectColor" Text="特效主题颜色" Foreground="{DynamicResource ThemeSecondaryTextBrush}" Margin="0,0,0,8" FontSize="12"/>
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <Border Name="ColorPreview" Width="40" Height="28" CornerRadius="6" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" BorderThickness="1" Margin="0,0,10,0"/>
-                                                        <Button x:Name="BtnPickColor" Content="更改颜色" Click="PickColor_Click" Width="90" Height="28" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="#45AFFF" Foreground="#45AFFF" Cursor="Hand" FontSize="12" Style="{DynamicResource SecondaryActionButton}">
-                                                            <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
-                                                        </Button>
-                                                    </StackPanel>
-
-                                                    <StackPanel Margin="0,15,0,0">
+                                                    <StackPanel Margin="0,0,0,15">
                                                         <DockPanel LastChildFill="False">
                                                             <TextBlock x:Name="TxtTrailDelay" Text="拖尾延迟" Foreground="{DynamicResource ThemeTertiaryTextBrush}" FontSize="13" VerticalAlignment="Center"/>
                                                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                 <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                          TextAlignment="Right" VerticalAlignment="Center"
-                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Background="Transparent"
+                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
                                                                          Text="{Binding ElementName=SliderTrailDelay, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
@@ -885,6 +878,15 @@
                                                         </DockPanel>
                                                         <Slider Name="SliderTrailDelay" Minimum="0.00" Maximum="0.50" TickFrequency="0.01" SmallChange="0.01" LargeChange="0.05" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
+                                                    </StackPanel>
+
+                                                    <Separator Background="{DynamicResource ThemeSeparatorBrush}" Margin="0,2,0,12"/>
+                                                    <TextBlock x:Name="TxtEffectColor" Text="特效主题颜色" Foreground="{DynamicResource ThemeSecondaryTextBrush}" Margin="0,0,0,8" FontSize="12"/>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Name="ColorPreview" Width="40" Height="28" CornerRadius="6" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" BorderThickness="1" Margin="0,0,10,0"/>
+                                                        <Button x:Name="BtnPickColor" Content="更改颜色" Click="PickColor_Click" Width="90" Height="28" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="#45AFFF" Foreground="#45AFFF" Cursor="Hand" FontSize="12" Style="{DynamicResource SecondaryActionButton}">
+                                                            <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
+                                                        </Button>
                                                     </StackPanel>
                                                 </StackPanel>
                                             </Border>
@@ -1091,7 +1093,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     
-                    <TextBlock x:Name="TxtOverlayRunning" Text="从运行中进程添加" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource ThemePrimaryTextBrush}" Margin="0,0,0,15"/>
+                    <TextBlock x:Name="TxtOverlayRunning" Text="从运行中进程添加" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" Margin="0,0,0,15"/>
                     
                     <Grid Grid.Row="1" Margin="0,0,0,10">
                         <TextBox x:Name="SearchRunningProcess" Height="30" VerticalContentAlignment="Center" TextChanged="SearchRunningProcess_TextChanged" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Padding="26,0,5,0">
@@ -1136,7 +1138,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock x:Name="TxtOverlayVisualReset" Text="选择要恢复默认的视觉表现项" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource ThemePrimaryTextBrush}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TxtOverlayVisualReset" Text="选择要恢复默认的视觉表现项" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" Margin="0,0,0,8" TextWrapping="Wrap"/>
 
                     <Grid Grid.Row="1" Margin="0,0,0,10">
                         <TextBox x:Name="SearchVisualReset" Height="30" VerticalContentAlignment="Center" TextChanged="SearchVisualReset_TextChanged" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Padding="26,0,5,0">
@@ -1173,7 +1175,7 @@
         <Grid Name="RenameProfileOverlay" Grid.ColumnSpan="2" Background="#80000000" Visibility="Collapsed">
             <Border Background="{DynamicResource ThemeSurfaceBackgroundBrush}" CornerRadius="12" Width="350" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="20">
                 <StackPanel>
-                    <TextBlock x:Name="TxtOverlayRename" Text="重命名配置组" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource ThemePrimaryTextBrush}" Margin="0,0,0,15"/>
+                    <TextBlock x:Name="TxtOverlayRename" Text="重命名配置组" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" Margin="0,0,0,15"/>
                     <TextBlock x:Name="TxtOverlayRenamePrompt" Text="请输入新的配置组名称：" FontSize="13" Foreground="{DynamicResource ThemeSecondaryTextBrush}" Margin="0,0,0,10"/>
                     <TextBox x:Name="NewProfileNameInput" Height="32" VerticalContentAlignment="Center" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Padding="8,0">
                         <TextBox.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></TextBox.Resources>

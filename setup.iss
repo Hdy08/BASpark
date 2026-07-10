@@ -2,6 +2,20 @@
   #define AppVersion "1.6.2-beta"
 #endif
 
+#if Copy(AppVersion, 1, 1) == "v"
+  #define NormalizedAppVersion Copy(AppVersion, 2)
+#else
+  #define NormalizedAppVersion AppVersion
+#endif
+
+#define PublishedExecutable SourcePath + "\src\publish_full\BASpark.exe"
+#if FileExists(PublishedExecutable)
+  #define PublishedAppVersion GetStringFileInfo(PublishedExecutable, "ProductVersion")
+  #if PublishedAppVersion != NormalizedAppVersion
+    #pragma error "Published BASpark.exe ProductVersion (" + PublishedAppVersion + ") does not match installer AppVersion (" + NormalizedAppVersion + ")"
+  #endif
+#endif
+
 [Setup]
 AppId={{B0A2C1D4-E3F5-4A6B-9C8D-7E1F2A3B4C5D}}
 AppName=BASpark
@@ -40,13 +54,39 @@ Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{group}\BASpark"; Filename: "{app}\BASpark.exe"
 Name: "{autodesktop}\BASpark"; Filename: "{app}\BASpark.exe"; Tasks: desktopicon
 
-[Registry]
-Root: HKCU; Subkey: "Software\BASpark"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "BASpark"; Flags: uninsdeletevalue dontcreatekey
-
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM BASpark.exe /T"; Flags: runhidden; RunOnceId: "StopBASpark"
 Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN BASparkAutoStart /F"; Flags: runhidden; RunOnceId: "RemoveBASparkAutoStartTask"
 
 [Run]
 Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+procedure CleanupInstalledAutoStartEntry;
+var
+  UserHives: TArrayOfString;
+  I: Integer;
+  RunKey: String;
+  RunCommand: String;
+  ExpectedCommand: String;
+begin
+  RunKey := 'Software\Microsoft\Windows\CurrentVersion\Run';
+  ExpectedCommand := '"' + ExpandConstant('{app}\BASpark.exe') + '" --autostart';
+
+  if not RegGetSubkeyNames(HKEY_USERS, '', UserHives) then
+    Exit;
+
+  for I := 0 to GetArrayLength(UserHives) - 1 do
+    if RegQueryStringValue(HKEY_USERS, UserHives[I] + '\' + RunKey, 'BASpark', RunCommand) and
+       (CompareText(RunCommand, ExpectedCommand) = 0) then
+    begin
+      RegDeleteValue(HKEY_USERS, UserHives[I] + '\' + RunKey, 'BASpark');
+      Log('Removed BASpark auto-start entry for user hive ' + UserHives[I]);
+    end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+    CleanupInstalledAutoStartEntry;
+end;

@@ -36,11 +36,21 @@
         const DEFAULT_COLOR = "45,175,255";
         const DEFAULT_COLOR_RGB = [45 / 255, 175 / 255, 1.0];
         const UI_DEFAULT_SCALE = 1.0;
+        const TRAIL_BASE_WIDTH_SCALE = 2.0;
         const TRAIL_SMOOTHING_RADIUS_PX = 9.0;
         const TRAIL_TARGET_SEGMENT_PX = 10.0;
+        const TRAIL_GLOW_BUFFER_SCALE = 0.5;
+        const TRAIL_NEAR_GLOW_BLUR_PX = 2.2;
+        const TRAIL_HEAD_GLOW_BLUR_PX = 4.5;
+        const TRAIL_TAIL_WIDTH_RATIO = 0.18;
+        const TRAIL_RIBBON_SEGMENT_PX = 6.0;
+        const TRAIL_RIBBON_MAX_SEGMENTS = 12;
         const TRAIL_MAX_POINTS = 320;
+        const TRAIL_COMPACT_TARGET = 256;
         const MAX_TRAIL_SEGMENTS_PER_MOVE = 8;
         const MAX_CLICK_EFFECTS = 16;
+        const MAX_CLICK_GLOW_EFFECTS = 6;
+        const MAX_CLICK_SHADOW_BLUR_PX = 48;
         const MAX_DISTANCE_EFFECTS = 24;
         const MAX_DISTANCE_EMIT_EVENTS_PER_MOVE = 8;
         const TRAIL_MASK_LUT_SIZE = 128;
@@ -441,7 +451,7 @@
                     uvCycles: value.uvCycles ?? 1.0,
                     localScalePx: localScale * UNITY_SIZE_TO_PX * globalScale,
                     sizePx: size * localScale * UNITY_SIZE_TO_PX * globalScale,
-                    widthPx: (value.widthMultiplier ?? 0.0) * UNITY_SIZE_TO_PX * globalScale,
+                    widthPx: (value.widthMultiplier ?? 0.0) * UNITY_SIZE_TO_PX * TRAIL_BASE_WIDTH_SCALE,
                     minVertexDistancePx: (value.minVertexDistance ?? 0.0) * UNITY_SIZE_TO_PX * globalScale,
                     hdrGain: ((value.hdrColor?.[0] ?? 1) + (value.hdrColor?.[1] ?? 1) + (value.hdrColor?.[2] ?? 1)) / 3,
                 };
@@ -458,6 +468,7 @@
                 this.trailSpeed = opts.trailSpeed != null ? opts.trailSpeed : (opts.speed || 1.0);
                 this.clickSpeed = opts.clickSpeed != null ? opts.clickSpeed : (opts.speed || 1.0);
                 this.trailThickness = opts.trailThickness != null ? opts.trailThickness : 1.0;
+                this.glowIntensity = opts.glowIntensity != null ? opts.glowIntensity : 1.0;
                 this.trailDelayMs = opts.trailDelayMs != null ? opts.trailDelayMs : 100;
                 this.trailFrameIntervalMs = 1000 / 40;
                 this.trailRenderAccumulator = 1.0;
@@ -483,8 +494,11 @@
                 this.trailSmoothX = Number.NaN;
                 this.trailSmoothY = Number.NaN;
                 this.trailLastSmoothTime = Number.NaN;
-                this.trailMaskBuffer = new Float32Array(TRAIL_MAX_POINTS);
                 this.trailAlphaBuffer = new Float32Array(TRAIL_MAX_POINTS);
+                this.trailHeadProgressBuffer = new Float32Array(TRAIL_MAX_POINTS);
+                this.trailRibbonSamples = new Float32Array((TRAIL_RIBBON_MAX_SEGMENTS + 1) * 5);
+                this.previousTrailGlowRect = null;
+                this.activeTrailGlowRect = null;
                 this.distanceAccumulator = 0;
 
                 this.rebuildConfig();
@@ -497,6 +511,9 @@
                 const defaultHsl = rgbToHsl(DEFAULT_COLOR_RGB);
                 const themeHsl = rgbToHsl(base);
                 const globalScale = clamp(this.scale / UI_DEFAULT_SCALE, 0.5, 3.0);
+                const rawGlowIntensity = Number(this.glowIntensity);
+                const glowIntensity = clamp(Number.isFinite(rawGlowIntensity) ? rawGlowIntensity : 1.0, 0, 3);
+                const glowOverdrive = Math.max(0, glowIntensity - 1.0);
                 const colorMapActive = !colorsNearlyEqual(base, DEFAULT_COLOR_RGB);
                 const themeHueShift = themeHsl[0] - defaultHsl[0];
                 const themeSatScale = defaultHsl[1] > 1e-6 ? themeHsl[1] / defaultHsl[1] : 1.0;
@@ -507,6 +524,14 @@
                     colorDeep: colorMapActive ? mapThemeRgb(makeDeepRgb(DEFAULT_COLOR_RGB), themeHueShift, themeSatScale, themeLightnessOffset) : makeDeepRgb(base),
                     colorWhite: [1, 1, 1],
                     trailThickness: clamp(this.trailThickness, 0.5, 3.0),
+                    glowIntensity,
+                    glowGain: glowIntensity <= 1.0
+                        ? 1.55 * glowIntensity
+                        : 1.55 + 0.65 * glowOverdrive,
+                    glowSpreadScale: glowIntensity > 0
+                        ? 0.68 + 0.42 * Math.sqrt(Math.min(glowIntensity, 1.0)) + 0.06 * glowOverdrive
+                        : 0,
+                    glowOverdrive,
                     colorMapActive,
                     themeHueShift,
                     themeSatScale,
@@ -514,6 +539,9 @@
                     distanceEmitStepPx: 100,
                 };
                 this.subsystems = buildSubsystemMap(globalScale);
+                if (glowIntensity <= 0) {
+                    this._releaseTrailGlowBuffers();
+                }
             }
 
             themeRgb(rgb) {
@@ -602,6 +630,12 @@
                 this.mainCanvas = document.getElementById("sparkCanvas");
                 this.mainCtx = this.mainCanvas.getContext("2d");
                 this.bufferCtx = this.mainCtx;
+                this.trailGlowCanvas = null;
+                this.trailGlowCtx = null;
+                this.trailHeadGlowCanvas = null;
+                this.trailHeadGlowCtx = null;
+                this.trailBloomCanvas = null;
+                this.trailBloomCtx = null;
                 this.resize();
                 window.addEventListener("resize", () => this.resize());
             }
@@ -625,10 +659,25 @@
                 this.forceFullRedraw = true;
                 this.lastFrameTime = performance.now();
                 this.mainCtx?.clearRect(0, 0, this.cssWidth, this.cssHeight);
+                this._clearTrailGlowBuffers();
+                this.previousTrailGlowRect = null;
+                this.activeTrailGlowRect = null;
             }
 
             alpha(value) {
                 return clamp(value * this.opacity, 0, 1);
+            }
+
+            glowSpreadPx(basePx) {
+                return basePx * this.cfg.globalScale * this.cfg.glowSpreadScale;
+            }
+
+            clickGlowBlurPx(basePx) {
+                return Math.min(this.glowSpreadPx(basePx) * this.dpr, MAX_CLICK_SHADOW_BLUR_PX);
+            }
+
+            trailGlowSpreadPx(basePx) {
+                return basePx * this.cfg.glowSpreadScale;
             }
 
             resize() {
@@ -644,8 +693,15 @@
                 this.mainCanvas.width = w;
                 this.mainCanvas.height = h;
                 this.previousDirtyRects = [];
+                this.previousTrailGlowRect = null;
+                this.activeTrailGlowRect = null;
                 this.forceFullRedraw = true;
                 this.mainCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                if (this.trailGlowCanvas && this.cfg.glowGain > 0) {
+                    this._resizeTrailGlowBuffers();
+                } else if (this.cfg.glowGain <= 0) {
+                    this._releaseTrailGlowBuffers();
+                }
             }
 
             resetTrailSmoothing(point) {
@@ -828,10 +884,41 @@
                 this.trail.push({ x, y, tMs, penUp });
             }
 
-            trimTrailPoints() {
-                if (this.trail.length > TRAIL_MAX_POINTS) {
-                    this.trail.splice(0, this.trail.length - TRAIL_MAX_POINTS);
+            trimTrailPoints(nowMs = performance.now()) {
+                this.pruneTrail(nowMs);
+                if (this.trail.length <= TRAIL_MAX_POINTS) return;
+
+                const source = this.trail;
+                const mandatory = new Uint8Array(source.length);
+                let mandatoryCount = 0;
+                for (let i = 0; i < source.length; i++) {
+                    if (i === source.length - 1 || source[i].penUp || (i + 1 < source.length && source[i + 1].penUp)) {
+                        mandatory[i] = 1;
+                        mandatoryCount++;
+                    }
                 }
+
+                const target = Math.max(mandatoryCount, TRAIL_COMPACT_TARGET);
+                const candidates = [];
+                for (let i = 0; i < source.length; i++) {
+                    if (!mandatory[i]) candidates.push(i);
+                }
+
+                const slots = Math.max(0, target - mandatoryCount);
+                const selected = new Uint8Array(source.length);
+                for (let i = 0; i < source.length; i++) {
+                    if (mandatory[i]) selected[i] = 1;
+                }
+                for (let i = 0; i < slots && i < candidates.length; i++) {
+                    const candidateIndex = Math.floor(((i + 0.5) * candidates.length) / slots);
+                    selected[candidates[Math.min(candidateIndex, candidates.length - 1)]] = 1;
+                }
+
+                const compacted = [];
+                for (let i = 0; i < source.length; i++) {
+                    if (selected[i]) compacted.push(source[i]);
+                }
+                this.trail = compacted;
             }
 
             handleTrailMove(current) {
@@ -944,13 +1031,13 @@
                 return lerp(uvLut[frame0 % uvLut.length] ?? 1.0, uvLut[frame1 % uvLut.length] ?? 1.0, blend);
             }
 
-            drawClickEffect(effect) {
-                this.renderRing(effect);
-                this.renderTriangleLayer(effect.x, effect.y, effect.parts.ring3, effect.tMs);
-                this.renderMeshTri(effect);
+            drawClickEffect(effect, glowEnabled) {
+                this.renderRing(effect, glowEnabled);
+                this.renderTriangleLayer(effect.x, effect.y, effect.parts.ring3, effect.tMs, glowEnabled);
+                this.renderMeshTri(effect, glowEnabled);
             }
 
-            renderRing(effect) {
+            renderRing(effect, glowEnabled) {
                 const ctx = this.bufferCtx;
                 const sub = effect.parts.ring;
                 const p = this.subProgress(sub, effect.tMs);
@@ -969,12 +1056,25 @@
                 ctx.scale(1.0, 0.94);
                 ctx.beginPath();
                 ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                if (glowEnabled && this.cfg.glowGain > 0) {
+                    ctx.shadowBlur = this.clickGlowBlurPx(10);
+                    ctx.shadowColor = rgba(
+                        [col[0], col[1], col[2]],
+                        clamp(0.62 * this.cfg.glowGain, 0, 0.95)
+                    );
+                }
                 ctx.fillStyle = rgba([col[0], col[1], col[2]], this.alpha(0.58 * col[3] * entryFade));
                 ctx.fill();
+                if (glowEnabled && this.cfg.glowOverdrive > 0) {
+                    ctx.shadowBlur = this.clickGlowBlurPx(6);
+                    ctx.shadowColor = rgba([col[0], col[1], col[2]], 0.65);
+                    ctx.globalAlpha = clamp(0.18 * this.cfg.glowOverdrive, 0, 0.36);
+                    ctx.fill();
+                }
                 ctx.restore();
             }
 
-            renderTriangleLayer(cx, cy, sub, tMs) {
+            renderTriangleLayer(cx, cy, sub, tMs, glowEnabled = false) {
                 if (!sub.particles || sub.particles.length === 0) return;
 
                 for (const item of sub.particles) {
@@ -990,11 +1090,11 @@
                     const y = cy + Math.sin(item.angle) * radius;
                     const alpha = clamp(col[3] * this.uvFrameFactor(sub, p, item), 0, 1);
                     const size = sub.params.sizePx * item.sizeMul * Math.max(0, curve);
-                    this.drawTriangle(x, y, size, item.orientBase ?? 0, [col[0], col[1], col[2]], this.cfg.colorWhite, alpha);
+                    this.drawTriangle(x, y, size, item.orientBase ?? 0, [col[0], col[1], col[2]], this.cfg.colorWhite, alpha, glowEnabled);
                 }
             }
 
-            drawTriangle(x, y, size, orient, baseCol, highlightCol, alpha) {
+            drawTriangle(x, y, size, orient, baseCol, highlightCol, alpha, glowEnabled = false) {
                 const ctx = this.bufferCtx;
                 const side = size * 1.35;
                 const h = side * 0.8660254;
@@ -1008,8 +1108,19 @@
                 ctx.lineTo(-side / 2, h / 3);
                 ctx.lineTo(side / 2, h / 3);
                 ctx.closePath();
+                if (glowEnabled && this.cfg.glowGain > 0 && alpha > 0.08 && size > 0.6) {
+                    ctx.shadowBlur = this.clickGlowBlurPx(2.2);
+                    ctx.shadowColor = rgba(baseCol, clamp(0.36 * this.cfg.glowGain, 0, 0.82));
+                }
                 ctx.fillStyle = rgba(baseCol, this.alpha(alpha));
                 ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "rgba(0,0,0,0)";
+                if (glowEnabled && this.cfg.glowOverdrive > 0) {
+                    ctx.globalAlpha = clamp(0.14 * this.cfg.glowOverdrive, 0, 0.28);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
 
                 ctx.beginPath();
                 ctx.moveTo(0, -2 * h / 3);
@@ -1051,12 +1162,13 @@
                 return evalScalarStops(sub.params.customData0Curve, p, 1.0);
             }
 
-            renderMeshTri(effect) {
+            renderMeshTri(effect, glowEnabled) {
                 const ctx = this.bufferCtx;
                 const sub = effect.parts.meshTri;
                 const p = this.subProgress(sub, effect.tMs);
                 if (p >= 1) return;
 
+                ctx.save();
                 const profile = { innerRadiusNorm: 1.0, outerRadiusNorm: 1.0636685 };
                 for (const item of sub.rings) {
                     const localP = clamp(p + item.phase * 0.08, 0, 1);
@@ -1092,14 +1204,40 @@
                     grad.addColorStop(0.55, rgba(this.cfg.colorWhite, this.alpha(0.95 * col[3] * brightness)));
                     grad.addColorStop(1.00, rgba(this.cfg.colorDeep, this.alpha(0.14 * col[3] * brightness)));
                     ctx.fillStyle = grad;
+                    if (glowEnabled && this.cfg.glowGain > 0) {
+                        ctx.shadowBlur = this.clickGlowBlurPx(10);
+                        ctx.shadowColor = rgba(this.cfg.colorBase, clamp(0.52 * this.cfg.glowGain, 0, 0.94));
+                    }
                     ctx.fill();
+                    if (glowEnabled && this.cfg.glowOverdrive > 0) {
+                        ctx.shadowBlur = this.clickGlowBlurPx(6);
+                        ctx.shadowColor = rgba(this.cfg.colorBase, 0.55);
+                        ctx.globalAlpha = clamp(0.14 * this.cfg.glowOverdrive, 0, 0.28);
+                        ctx.fill();
+                        ctx.globalAlpha = 1;
+                    }
 
                     ctx.beginPath();
                     ctx.arc(effect.x, effect.y, (innerR + outerR) * 0.5, start, end);
-                    ctx.lineWidth = Math.max(0.7, width * 0.20);
+                    const coreWidth = Math.max(0.7, width * 0.20);
+                    if (glowEnabled && this.cfg.glowGain > 0) {
+                        ctx.shadowBlur = this.clickGlowBlurPx(6);
+                        ctx.shadowColor = rgba(mid, clamp(0.64 * this.cfg.glowGain, 0, 0.98));
+                    }
+                    ctx.lineWidth = coreWidth;
                     ctx.strokeStyle = rgba(this.cfg.colorWhite, this.alpha(0.60 * col[3] * brightness));
                     ctx.stroke();
+                    if (glowEnabled && this.cfg.glowOverdrive > 0) {
+                        ctx.shadowBlur = this.clickGlowBlurPx(3.5);
+                        ctx.shadowColor = rgba(mid, 0.72);
+                        ctx.globalAlpha = clamp(0.16 * this.cfg.glowOverdrive, 0, 0.32);
+                        ctx.stroke();
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = "rgba(0,0,0,0)";
                 }
+                ctx.restore();
             }
 
             trailPointAgeMs(point, nowMs) {
@@ -1165,32 +1303,131 @@
                 return false;
             }
 
-            _drawTrailPiece(x0, y0, controlX, controlY, x1, y1, curved, mask, alpha, baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul) {
-                const maskValue = Math.max(0.02, mask);
+            _buildTrailRibbonSamples(x0, y0, controlX, controlY, x1, y1, curved, progress0, progress1) {
+                const directLength = Math.hypot(x1 - x0, y1 - y0);
+                const estimatedLength = curved
+                    ? Math.hypot(controlX - x0, controlY - y0) + Math.hypot(x1 - controlX, y1 - controlY)
+                    : directLength;
+                const segmentCount = curved
+                    ? clamp(Math.ceil(estimatedLength / TRAIL_RIBBON_SEGMENT_PX), 2, TRAIL_RIBBON_MAX_SEGMENTS)
+                    : 1;
+                const samples = this.trailRibbonSamples;
+                let fallbackDx = x1 - x0;
+                let fallbackDy = y1 - y0;
+                if (Math.hypot(fallbackDx, fallbackDy) < 1e-4) {
+                    fallbackDx = 1;
+                    fallbackDy = 0;
+                }
+
+                for (let i = 0; i <= segmentCount; i++) {
+                    const t = i / segmentCount;
+                    let x;
+                    let y;
+                    let tangentX;
+                    let tangentY;
+                    if (curved) {
+                        const invT = 1 - t;
+                        x = invT * invT * x0 + 2 * invT * t * controlX + t * t * x1;
+                        y = invT * invT * y0 + 2 * invT * t * controlY + t * t * y1;
+                        tangentX = 2 * invT * (controlX - x0) + 2 * t * (x1 - controlX);
+                        tangentY = 2 * invT * (controlY - y0) + 2 * t * (y1 - controlY);
+                    } else {
+                        x = lerp(x0, x1, t);
+                        y = lerp(y0, y1, t);
+                        tangentX = fallbackDx;
+                        tangentY = fallbackDy;
+                    }
+
+                    let tangentLength = Math.hypot(tangentX, tangentY);
+                    if (tangentLength < 1e-4) {
+                        tangentX = fallbackDx;
+                        tangentY = fallbackDy;
+                        tangentLength = Math.hypot(tangentX, tangentY);
+                    } else {
+                        fallbackDx = tangentX;
+                        fallbackDy = tangentY;
+                    }
+
+                    const offset = i * 5;
+                    samples[offset] = x;
+                    samples[offset + 1] = y;
+                    samples[offset + 2] = -tangentY / tangentLength;
+                    samples[offset + 3] = tangentX / tangentLength;
+                    samples[offset + 4] = lerp(progress0, progress1, t);
+                }
+                return segmentCount + 1;
+            }
+
+            _trailRibbonWidth(baseWidth, progress, layer) {
+                const p = clamp(progress, 0, 1);
+                const coreWidth = baseWidth * lerp(TRAIL_TAIL_WIDTH_RATIO, 1, p);
+                if (layer === 0) return coreWidth;
+                if (layer === 1) return Math.max(coreWidth * 1.15, 2.0);
+
+                const rampT = clamp((p - 0.18) / 0.70, 0, 1);
+                const rangeRamp = rampT * rampT * (3 - 2 * rampT);
+                const fadeT = clamp((p - 0.90) / 0.10, 0, 1);
+                const endpointFade = 1 - fadeT * fadeT * (3 - 2 * fadeT);
+                return Math.max(coreWidth * 1.15, 2.0) * (0.45 + 0.75 * rangeRamp) * endpointFade;
+            }
+
+            _fillTrailRibbon(ctx, sampleCount, baseWidth, layer, alpha) {
+                if (!ctx || alpha <= 0.005 || sampleCount < 2) return;
+
+                const samples = this.trailRibbonSamples;
+                ctx.beginPath();
+                for (let i = 0; i < sampleCount; i++) {
+                    const offset = i * 5;
+                    const halfWidth = this._trailRibbonWidth(baseWidth, samples[offset + 4], layer) * 0.5;
+                    const x = samples[offset] + samples[offset + 2] * halfWidth;
+                    const y = samples[offset + 1] + samples[offset + 3] * halfWidth;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                for (let i = sampleCount - 1; i >= 0; i--) {
+                    const offset = i * 5;
+                    const halfWidth = this._trailRibbonWidth(baseWidth, samples[offset + 4], layer) * 0.5;
+                    ctx.lineTo(
+                        samples[offset] - samples[offset + 2] * halfWidth,
+                        samples[offset + 1] - samples[offset + 3] * halfWidth
+                    );
+                }
+                ctx.closePath();
+                ctx.globalAlpha = this.alpha(alpha);
+                ctx.fill();
+            }
+
+            _drawTrailPiece(x0, y0, controlX, controlY, x1, y1, curved, alpha0, alpha1, progress0, progress1, baseWidth, coreAlphaMul) {
+                const alpha = (alpha0 + alpha1) * 0.5;
                 if (alpha <= 0.005) return;
 
-                const ctx = this.bufferCtx;
-                ctx.lineWidth = baseWidth * maskValue * (1.6 + 0.24 * hdrScale);
-                ctx.globalAlpha = this.alpha(alpha * bloomAlphaMul);
-                ctx.beginPath();
-                ctx.moveTo(x0, y0);
-                if (curved) {
-                    ctx.quadraticCurveTo(controlX, controlY, x1, y1);
-                } else {
-                    ctx.lineTo(x1, y1);
-                }
-                ctx.stroke();
+                const startProgress = clamp(progress0, 0, 1);
+                const endProgress = Math.max(startProgress, clamp(progress1, 0, 1));
+                const sampleCount = this._buildTrailRibbonSamples(
+                    x0, y0, controlX, controlY, x1, y1, curved, startProgress, endProgress
+                );
+                const progress = (startProgress + endProgress) * 0.5;
+                const intensityWeight = progress * progress * (3 - 2 * progress);
 
-                ctx.lineWidth = baseWidth * maskValue;
-                ctx.globalAlpha = this.alpha(alpha * coreAlphaMul);
-                ctx.beginPath();
-                ctx.moveTo(x0, y0);
-                if (curved) {
-                    ctx.quadraticCurveTo(controlX, controlY, x1, y1);
-                } else {
-                    ctx.lineTo(x1, y1);
+                if (this.cfg.glowGain > 0) {
+                    const naturalGlowWidth = baseWidth * lerp(TRAIL_TAIL_WIDTH_RATIO, 1, progress) * 1.15;
+                    const glowEnergyCompensation = Math.min(1, naturalGlowWidth / Math.max(naturalGlowWidth, 2.0));
+                    this._fillTrailRibbon(
+                        this.trailGlowCtx, sampleCount, baseWidth, 1,
+                        alpha * (0.28 + 0.62 * intensityWeight) * glowEnergyCompensation
+                    );
+
+                    const rampT = clamp((progress - 0.18) / 0.70, 0, 1);
+                    const rangeRamp = rampT * rampT * (3 - 2 * rampT);
+                    const fadeT = clamp((progress - 0.90) / 0.10, 0, 1);
+                    const endpointFade = 1 - fadeT * fadeT * (3 - 2 * fadeT);
+                    this._fillTrailRibbon(
+                        this.trailHeadGlowCtx, sampleCount, baseWidth, 2,
+                        alpha * rangeRamp * endpointFade * glowEnergyCompensation
+                    );
                 }
-                ctx.stroke();
+
+                this._fillTrailRibbon(this.bufferCtx, sampleCount, baseWidth, 0, alpha * coreAlphaMul);
             }
 
             drawTrail(nowMs) {
@@ -1203,22 +1440,32 @@
                 const lifeMs = Math.max(1, Math.round((trail.lifetimeSec ?? 0.3) * 1000));
                 const bright = this.evalTrailGradientColor(trail, 0);
                 const brightCss = rgbCss(bright);
-                const bloomAlphaMul = 0.16 + 0.12 * hdrScale;
                 const coreAlphaMul = 0.50 + 0.26 * hdrScale;
                 const count = this.trail.length;
+                if (count > this.trailAlphaBuffer.length) {
+                    this.trailAlphaBuffer = new Float32Array(count);
+                    this.trailHeadProgressBuffer = new Float32Array(count);
+                }
 
                 for (let i = 0; i < count; i++) {
                     const age = clamp(this.trailPointAgeMs(this.trail[i], nowMs) / lifeMs, 0, 1);
                     const mask = this.sampleTrailTextureMask(age);
-                    this.trailMaskBuffer[i] = mask;
                     this.trailAlphaBuffer[i] = this.evalTrailGradientAlpha(trail, age) * mask;
                 }
 
                 ctx.save();
                 ctx.globalCompositeOperation = "lighter";
-                ctx.lineCap = "butt";
-                ctx.lineJoin = "round";
-                ctx.strokeStyle = brightCss;
+                ctx.fillStyle = brightCss;
+                if (this.cfg.glowGain > 0 && this.trailGlowCtx) {
+                    this.trailGlowCtx.save();
+                    this.trailGlowCtx.globalCompositeOperation = "source-over";
+                    this.trailGlowCtx.fillStyle = rgbCss(this.cfg.colorBase);
+                }
+                if (this.cfg.glowGain > 0 && this.trailHeadGlowCtx) {
+                    this.trailHeadGlowCtx.save();
+                    this.trailHeadGlowCtx.globalCompositeOperation = "source-over";
+                    this.trailHeadGlowCtx.fillStyle = rgbCss(this.cfg.colorBase);
+                }
 
                 let strokeStart = 0;
                 while (strokeStart < count) {
@@ -1228,24 +1475,55 @@
                     }
 
                     const last = strokeEnd - 1;
+                    for (let i = strokeStart; i <= last; i++) {
+                        this.trailHeadProgressBuffer[i] = 0;
+                    }
+                    if (last > strokeStart) {
+                        let visibleStart = strokeStart;
+                        while (visibleStart <= last && this.trailAlphaBuffer[visibleStart] <= 0.005) {
+                            visibleStart++;
+                        }
+
+                        if (visibleStart <= last) {
+                            let visibleLength = 0;
+                            this.trailHeadProgressBuffer[visibleStart] = 0;
+                            for (let i = visibleStart + 1; i <= last; i++) {
+                                const previous = this.trail[i - 1];
+                                const point = this.trail[i];
+                                visibleLength += Math.hypot(point.x - previous.x, point.y - previous.y);
+                                this.trailHeadProgressBuffer[i] = visibleLength;
+                            }
+
+                            if (visibleLength > 0.001) {
+                                for (let i = visibleStart; i <= last; i++) {
+                                    this.trailHeadProgressBuffer[i] = clamp(this.trailHeadProgressBuffer[i] / visibleLength, 0, 1);
+                                }
+                            } else {
+                                this.trailHeadProgressBuffer[last] = 1;
+                            }
+                        }
+                    }
+
                     if (last > strokeStart) {
                         const firstPoint = this.trail[strokeStart];
                         const secondPoint = this.trail[strokeStart + 1];
                         if (last === strokeStart + 1) {
                             this._drawTrailPiece(
                                 firstPoint.x, firstPoint.y, 0, 0, secondPoint.x, secondPoint.y, false,
-                                (this.trailMaskBuffer[strokeStart] + this.trailMaskBuffer[last]) * 0.5,
-                                (this.trailAlphaBuffer[strokeStart] + this.trailAlphaBuffer[last]) * 0.5,
-                                baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul
+                                this.trailAlphaBuffer[strokeStart], this.trailAlphaBuffer[last],
+                                this.trailHeadProgressBuffer[strokeStart], this.trailHeadProgressBuffer[last],
+                                baseWidth, coreAlphaMul
                             );
                         } else {
                             let midpointX = (firstPoint.x + secondPoint.x) * 0.5;
                             let midpointY = (firstPoint.y + secondPoint.y) * 0.5;
                             this._drawTrailPiece(
                                 firstPoint.x, firstPoint.y, 0, 0, midpointX, midpointY, false,
-                                (this.trailMaskBuffer[strokeStart] * 3 + this.trailMaskBuffer[strokeStart + 1]) * 0.25,
-                                (this.trailAlphaBuffer[strokeStart] * 3 + this.trailAlphaBuffer[strokeStart + 1]) * 0.25,
-                                baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul
+                                this.trailAlphaBuffer[strokeStart],
+                                (this.trailAlphaBuffer[strokeStart] + this.trailAlphaBuffer[strokeStart + 1]) * 0.5,
+                                this.trailHeadProgressBuffer[strokeStart],
+                                (this.trailHeadProgressBuffer[strokeStart] + this.trailHeadProgressBuffer[strokeStart + 1]) * 0.5,
+                                baseWidth, coreAlphaMul
                             );
 
                             for (let i = strokeStart + 1; i < last; i++) {
@@ -1255,9 +1533,11 @@
                                 const nextMidpointY = (point.y + next.y) * 0.5;
                                 this._drawTrailPiece(
                                     midpointX, midpointY, point.x, point.y, nextMidpointX, nextMidpointY, true,
-                                    (this.trailMaskBuffer[i - 1] + this.trailMaskBuffer[i] * 2 + this.trailMaskBuffer[i + 1]) * 0.25,
-                                    (this.trailAlphaBuffer[i - 1] + this.trailAlphaBuffer[i] * 2 + this.trailAlphaBuffer[i + 1]) * 0.25,
-                                    baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul
+                                    (this.trailAlphaBuffer[i - 1] + this.trailAlphaBuffer[i]) * 0.5,
+                                    (this.trailAlphaBuffer[i] + this.trailAlphaBuffer[i + 1]) * 0.5,
+                                    (this.trailHeadProgressBuffer[i - 1] + this.trailHeadProgressBuffer[i]) * 0.5,
+                                    (this.trailHeadProgressBuffer[i] + this.trailHeadProgressBuffer[i + 1]) * 0.5,
+                                    baseWidth, coreAlphaMul
                                 );
                                 midpointX = nextMidpointX;
                                 midpointY = nextMidpointY;
@@ -1266,9 +1546,11 @@
                             const lastPoint = this.trail[last];
                             this._drawTrailPiece(
                                 midpointX, midpointY, 0, 0, lastPoint.x, lastPoint.y, false,
-                                (this.trailMaskBuffer[last - 1] + this.trailMaskBuffer[last] * 3) * 0.25,
-                                (this.trailAlphaBuffer[last - 1] + this.trailAlphaBuffer[last] * 3) * 0.25,
-                                baseWidth, hdrScale, bloomAlphaMul, coreAlphaMul
+                                (this.trailAlphaBuffer[last - 1] + this.trailAlphaBuffer[last]) * 0.5,
+                                this.trailAlphaBuffer[last],
+                                (this.trailHeadProgressBuffer[last - 1] + this.trailHeadProgressBuffer[last]) * 0.5,
+                                this.trailHeadProgressBuffer[last],
+                                baseWidth, coreAlphaMul
                             );
                         }
                     }
@@ -1276,6 +1558,161 @@
                     strokeStart = strokeEnd;
                 }
 
+                if (this.cfg.glowGain > 0 && this.trailGlowCtx) {
+                    this.trailGlowCtx.restore();
+                }
+                if (this.cfg.glowGain > 0 && this.trailHeadGlowCtx) {
+                    this.trailHeadGlowCtx.restore();
+                }
+                ctx.restore();
+            }
+
+            _resizeTrailGlowBuffers() {
+                if (!this.trailGlowCanvas || !this.trailHeadGlowCanvas || !this.trailBloomCanvas) return;
+
+                const glowWidth = Math.max(1, Math.ceil(this.cssWidth * TRAIL_GLOW_BUFFER_SCALE));
+                const glowHeight = Math.max(1, Math.ceil(this.cssHeight * TRAIL_GLOW_BUFFER_SCALE));
+                for (const canvas of [this.trailGlowCanvas, this.trailHeadGlowCanvas, this.trailBloomCanvas]) {
+                    if (canvas.width !== glowWidth) canvas.width = glowWidth;
+                    if (canvas.height !== glowHeight) canvas.height = glowHeight;
+                }
+                this.trailGlowScaleX = glowWidth / this.cssWidth;
+                this.trailGlowScaleY = glowHeight / this.cssHeight;
+                this.trailGlowCtx.setTransform(this.trailGlowScaleX, 0, 0, this.trailGlowScaleY, 0, 0);
+                this.trailHeadGlowCtx.setTransform(this.trailGlowScaleX, 0, 0, this.trailGlowScaleY, 0, 0);
+                this.trailBloomCtx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+
+            _ensureTrailGlowBuffers() {
+                if (this.cfg.glowGain <= 0) return false;
+                if (!this.trailGlowCanvas) {
+                    this.trailGlowCanvas = document.createElement("canvas");
+                    this.trailGlowCtx = this.trailGlowCanvas.getContext("2d");
+                    this.trailHeadGlowCanvas = document.createElement("canvas");
+                    this.trailHeadGlowCtx = this.trailHeadGlowCanvas.getContext("2d");
+                    this.trailBloomCanvas = document.createElement("canvas");
+                    this.trailBloomCtx = this.trailBloomCanvas.getContext("2d");
+                    if (!this.trailGlowCtx || !this.trailHeadGlowCtx || !this.trailBloomCtx) {
+                        this._releaseTrailGlowBuffers();
+                        return false;
+                    }
+                    this._resizeTrailGlowBuffers();
+                }
+                return Boolean(this.trailGlowCtx && this.trailHeadGlowCtx && this.trailBloomCtx);
+            }
+
+            _releaseTrailGlowBuffers() {
+                for (const canvas of [this.trailGlowCanvas, this.trailHeadGlowCanvas, this.trailBloomCanvas]) {
+                    if (!canvas) continue;
+                    canvas.width = 0;
+                    canvas.height = 0;
+                }
+                this.trailGlowCanvas = null;
+                this.trailGlowCtx = null;
+                this.trailHeadGlowCanvas = null;
+                this.trailHeadGlowCtx = null;
+                this.trailBloomCanvas = null;
+                this.trailBloomCtx = null;
+                this.previousTrailGlowRect = null;
+                this.activeTrailGlowRect = null;
+            }
+
+            _clearTrailGlowBuffers(rect = null) {
+                const buffers = [
+                    [this.trailGlowCtx, this.trailGlowCanvas],
+                    [this.trailHeadGlowCtx, this.trailHeadGlowCanvas],
+                    [this.trailBloomCtx, this.trailBloomCanvas],
+                ];
+                for (const [ctx, canvas] of buffers) {
+                    if (!ctx || !canvas) continue;
+                    ctx.save();
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    if (rect) {
+                        const x0 = Math.max(0, Math.floor(rect.x * this.trailGlowScaleX) - 2);
+                        const y0 = Math.max(0, Math.floor(rect.y * this.trailGlowScaleY) - 2);
+                        const x1 = Math.min(canvas.width, Math.ceil((rect.x + rect.w) * this.trailGlowScaleX) + 2);
+                        const y1 = Math.min(canvas.height, Math.ceil((rect.y + rect.h) * this.trailGlowScaleY) + 2);
+                        ctx.clearRect(x0, y0, x1 - x0, y1 - y0);
+                    } else {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    }
+                    ctx.restore();
+                }
+            }
+
+            _prepareTrailGlowBuffers() {
+                if (!this._ensureTrailGlowBuffers()) return false;
+
+                const currentRect = this._clipRect(this._trailRect(this.trailPaddingPx()));
+                if (!currentRect) return false;
+                const clearRect = this.previousTrailGlowRect
+                    ? this._unionRect(this.previousTrailGlowRect, currentRect)
+                    : currentRect;
+                this._clearTrailGlowBuffers(clearRect);
+                this.activeTrailGlowRect = currentRect;
+                this.previousTrailGlowRect = currentRect;
+                return true;
+            }
+
+            trailPaddingPx() {
+                const basePadding = 22 * this.cfg.trailThickness + 12;
+                if (this.cfg.glowGain <= 0) return basePadding;
+
+                const trail = this.subsystems.trail;
+                const coreWidth = Math.max(0.2, (trail?.widthPx ?? 1.0) * this.cfg.trailThickness);
+                const glowSourceHalfWidth = Math.max(coreWidth * 1.15, 2) * 0.5;
+                return Math.max(basePadding, glowSourceHalfWidth + this.trailGlowSpreadPx(TRAIL_HEAD_GLOW_BLUR_PX) * 3 + 4);
+            }
+
+            _compositeTrailGlow() {
+                if (this.cfg.glowGain <= 0 || this.trail.length < 2 || !this.trailGlowCtx || !this.trailHeadGlowCtx || !this.trailBloomCtx) {
+                    return;
+                }
+
+                const rect = this.activeTrailGlowRect;
+                if (!rect) return;
+
+                const scaleX = this.trailGlowScaleX;
+                const scaleY = this.trailGlowScaleY;
+                const sx = Math.max(0, Math.floor(rect.x * scaleX));
+                const sy = Math.max(0, Math.floor(rect.y * scaleY));
+                const x1 = Math.min(this.trailGlowCanvas.width, Math.ceil((rect.x + rect.w) * scaleX));
+                const y1 = Math.min(this.trailGlowCanvas.height, Math.ceil((rect.y + rect.h) * scaleY));
+                const sw = x1 - sx;
+                const sh = y1 - sy;
+                if (sw <= 0 || sh <= 0) return;
+
+                const bloomCtx = this.trailBloomCtx;
+                const filterScale = (scaleX + scaleY) * 0.5;
+                bloomCtx.save();
+                bloomCtx.setTransform(1, 0, 0, 1, 0, 0);
+                bloomCtx.globalCompositeOperation = "lighter";
+                bloomCtx.imageSmoothingEnabled = true;
+
+                bloomCtx.filter = `blur(${Math.max(0.5, this.trailGlowSpreadPx(TRAIL_HEAD_GLOW_BLUR_PX) * filterScale).toFixed(2)}px)`;
+                bloomCtx.globalAlpha = clamp(0.22 * this.cfg.glowGain, 0, 0.65);
+                bloomCtx.drawImage(this.trailHeadGlowCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
+
+                bloomCtx.filter = `blur(${Math.max(0.35, this.trailGlowSpreadPx(TRAIL_NEAR_GLOW_BLUR_PX) * filterScale).toFixed(2)}px)`;
+                bloomCtx.globalAlpha = clamp(0.64 * this.cfg.glowGain, 0, 0.98);
+                bloomCtx.drawImage(this.trailGlowCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
+                bloomCtx.restore();
+
+                const dx = sx / scaleX;
+                const dy = sy / scaleY;
+                const dw = sw / scaleX;
+                const dh = sh / scaleY;
+                const ctx = this.bufferCtx;
+                ctx.save();
+                ctx.globalCompositeOperation = "lighter";
+                ctx.globalAlpha = 1;
+                ctx.filter = "none";
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(this.trailBloomCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+                if (this.cfg.glowOverdrive > 0) {
+                    ctx.globalAlpha = clamp(0.24 * this.cfg.glowOverdrive, 0, 0.48);
+                    ctx.drawImage(this.trailBloomCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+                }
                 ctx.restore();
             }
 
@@ -1368,7 +1805,7 @@
                 const rects = [];
                 const effectPad = 210 * this.cfg.globalScale + 20;
                 const distancePad = 90 * this.cfg.globalScale + 20;
-                const trailPad = 22 * this.cfg.globalScale * this.cfg.trailThickness + 12;
+                const trailPad = this.trailPaddingPx();
 
                 for (const effect of this.clickEffects) {
                     rects.push(this._pointRect(effect.x, effect.y, effectPad));
@@ -1414,6 +1851,11 @@
                         this._clearBufferRects(this.previousDirtyRects);
                         this.previousDirtyRects = [];
                     }
+                    if (this.previousTrailGlowRect) {
+                        this._clearTrailGlowBuffers(this.previousTrailGlowRect);
+                        this.previousTrailGlowRect = null;
+                        this.activeTrailGlowRect = null;
+                    }
                     return;
                 }
 
@@ -1451,10 +1893,17 @@
                 bctx.globalCompositeOperation = "lighter";
 
                 this._clearBufferRects(renderRects);
-                for (const effect of this.clickEffects) {
-                    this.drawClickEffect(effect);
+                if (this.cfg.glowGain > 0 && this.trail.length >= 2) {
+                    this._prepareTrailGlowBuffers();
+                } else {
+                    this.activeTrailGlowRect = null;
+                }
+                const firstGlowEffect = Math.max(0, this.clickEffects.length - MAX_CLICK_GLOW_EFFECTS);
+                for (let i = 0; i < this.clickEffects.length; i++) {
+                    this.drawClickEffect(this.clickEffects[i], this.cfg.glowGain > 0 && i >= firstGlowEffect);
                 }
                 this.drawTrail(now);
+                this._compositeTrailGlow();
                 for (const effect of this.distanceEffects) {
                     this.renderTriangleLayer(effect.x, effect.y, effect.part, effect.tMs);
                 }
@@ -1554,13 +2003,15 @@
             window.spark.rebuildConfig();
         };
 
-        window.updateEffectSettings = (scale, opacity, trailSpeed, clickSpeed, trailThickness, trailDelay) => {
+        window.updateEffectSettings = (scale, opacity, trailSpeed, clickSpeed, trailThickness, trailDelay, glowIntensity) => {
             if (!window.spark) return;
             window.spark.scale = Math.max(0.5, Math.min(3, Number(scale) || UI_DEFAULT_SCALE));
             window.spark.opacity = Math.max(0.1, Math.min(1, Number(opacity) || 1.0));
             window.spark.trailThickness = Math.max(0.5, Math.min(3, Number(trailThickness) || 1.0));
             const delay = Number(trailDelay);
             window.spark.trailDelayMs = Math.max(0, Math.min(500, Number.isFinite(delay) ? delay * 1000 : 100));
+            const glow = Number(glowIntensity);
+            window.spark.glowIntensity = Math.max(0, Math.min(3, Number.isFinite(glow) ? glow : 1.0));
             let t = Number(trailSpeed);
             if (!Number.isFinite(t)) t = 1.0;
             let c = Number(clickSpeed);

@@ -17,7 +17,8 @@ namespace BASpark
         TrailAnimationSpeed = 1 << 5,
         ClickAnimationSpeed = 1 << 6,
         TrailThickness = 1 << 7,
-        TrailDelay = 1 << 8
+        TrailDelay = 1 << 8,
+        GlowIntensity = 1 << 9
     }
 
     public enum ProcessFilterModeOption
@@ -80,6 +81,7 @@ namespace BASpark
         public static bool RunAsAdmin { get; set; } = false;
         public static double EffectScale { get; set; } = 1.0;
         public static double TrailThickness { get; set; } = 1.0;
+        public static double GlowIntensity { get; set; } = 1.0;
         public static double TrailDelay { get; set; } = 0.10;
         public static double EffectOpacity { get; set; } = 1.0;
         public static double EffectSpeed { get; set; } = 1.0;
@@ -141,6 +143,7 @@ namespace BASpark
                         RunAsAdmin = ReadBool(key, "RunAsAdmin", false);
                         EffectScale = ReadClampedDouble(key, "EffectScale", 1.0, 0.5, 3.0);
                         TrailThickness = ReadClampedDouble(key, "TrailThickness", 1.0, 0.5, 3.0);
+                        GlowIntensity = ReadClampedDouble(key, "GlowIntensity", 1.0, 0.0, 3.0);
                         TrailDelay = ReadClampedDouble(key, "TrailDelay", 0.10, 0.00, 0.50);
                         EffectOpacity = ReadClampedDouble(key, "EffectOpacity", 1.0, 0.1, 1.0);
                         EffectSpeed = ReadClampedDouble(key, "EffectSpeed", 1.0, 0.2, 3.0);
@@ -402,6 +405,11 @@ namespace BASpark
                 Save("TrailThickness", 1.0);
             }
 
+            if (flags.HasFlag(VisualAppearanceResetFlags.GlowIntensity))
+            {
+                Save("GlowIntensity", 1.0);
+            }
+
             if (flags.HasFlag(VisualAppearanceResetFlags.TrailDelay))
             {
                 Save("TrailDelay", 0.10);
@@ -658,6 +666,7 @@ namespace BASpark
                     RunAsAdmin = false;
                     EffectScale = 1.0;
                     TrailThickness = 1.0;
+                    GlowIntensity = 1.0;
                     TrailDelay = 0.10;
                     EffectOpacity = 1.0;
                     EffectSpeed = 1.0;

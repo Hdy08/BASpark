@@ -565,6 +565,12 @@
     <data name="VisualReset_TrailThickness_Sub" xml:space="preserve">
       <value>默认 1.00 ×</value>
     </data>
+    <data name="VisualReset_GlowIntensity" xml:space="preserve">
+      <value>发光强度</value>
+    </data>
+    <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
+      <value>默认 1.00 ×</value>
+    </data>
     <data name="VisualReset_TrailDelay" xml:space="preserve">
       <value>拖尾延迟</value>
     </data>
@@ -621,6 +627,9 @@
     </data>
     <data name="Visual_TrailThickness" xml:space="preserve">
       <value>拖尾粗细</value>
+    </data>
+    <data name="Visual_GlowIntensity" xml:space="preserve">
+      <value>发光强度</value>
     </data>
     <data name="Visual_TrailDelay" xml:space="preserve">
       <value>拖尾延迟</value>
