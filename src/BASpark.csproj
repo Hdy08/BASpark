@@ -20,7 +20,9 @@
     
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     
-    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationManifest Condition="'$(EnableUIAccess)' != 'true'">app.manifest</ApplicationManifest>
+    <ApplicationManifest Condition="'$(EnableUIAccess)' == 'true'">app.uiaccess.manifest</ApplicationManifest>
+    <DefaultItemExcludes Condition="'$(EnableUIAccess)' == 'true'">$(DefaultItemExcludes);$(MSBuildProjectDirectory)\obj\**;$(MSBuildProjectDirectory)\bin\**</DefaultItemExcludes>
 
     <WebView2LoaderPreference>Static</WebView2LoaderPreference>
   </PropertyGroup>

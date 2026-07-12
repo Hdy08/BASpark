@@ -442,3 +442,5 @@ config.json
 # Local release outputs
 dist/
 src/publish_full/
+src/publish_uiaccess/
+.uiaccess-build/

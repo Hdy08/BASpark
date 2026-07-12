@@ -71,6 +71,7 @@ namespace BASpark
         private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private const uint SWP_NOZORDER = 0x0004;
         private const uint SWP_NOACTIVATE = 0x0010;
         private const uint SWP_NOSENDCHANGING = 0x0400;
 
@@ -90,6 +91,10 @@ namespace BASpark
         private IntPtr _winEventHook = IntPtr.Zero;
         private long _lastEnsureTopmostTicks;
         private bool _isClosing;
+        // WebView2's WPF HwndHost cannot be parented reliably while a UIAccess
+        // window is already topmost. Raise the overlay only after navigation
+        // has completed successfully.
+        private bool _webViewReadyForTopmost;
         private bool _screenshotCompatibilityMode = ConfigManager.ScreenshotCompatibilityMode;
         private static readonly long EnsureTopmostDebounceTicks = TimeSpan.FromMilliseconds(80).Ticks;
         private bool _hiddenForExternalScreenshotCapture;
@@ -183,7 +188,7 @@ namespace BASpark
 
         private void SafeEnsureTopmost()
         {
-            if (_hwnd == IntPtr.Zero || !IsVisible || _overlayRuntimePaused) return;
+            if (_hwnd == IntPtr.Zero || !IsVisible || _overlayRuntimePaused || !_webViewReadyForTopmost) return;
 
             Rectangle bounds = GetScreenBounds();
             SetWindowPos(_hwnd, HWND_TOPMOST,
@@ -451,10 +456,18 @@ namespace BASpark
                 {
                     using var reader = new System.IO.StreamReader(streamInfo.Stream);
                     string htmlContent = reader.ReadToEnd();
-                    coreWebView.NavigateToString(htmlContent);
                     _navigationCompletedHandler = (s, e) =>
                     {
                         if (_isClosing) return;
+
+                        if (!e.IsSuccess)
+                        {
+                            _webViewReadyForTopmost = false;
+                            return;
+                        }
+
+                        _webViewReadyForTopmost = true;
+                        SafeEnsureTopmost();
 
                         _lastReportedInputMode = null;
                         _lastReportedAlwaysTrail = null;
@@ -470,6 +483,7 @@ namespace BASpark
                         }
                     };
                     coreWebView.NavigationCompleted += _navigationCompletedHandler;
+                    coreWebView.NavigateToString(htmlContent);
                 }
             }
             catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
@@ -494,6 +508,8 @@ namespace BASpark
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (_isClosing) return;
+                _webViewReadyForTopmost = false;
+                Topmost = false;
                 if (_coreWebView != null && _processFailedHandler != null)
                 {
                     try { _coreWebView.ProcessFailed -= _processFailedHandler; } catch { /* ignore: event unsubscribe is best-effort */ }
@@ -646,7 +662,14 @@ namespace BASpark
                 return;
             }
 
-            SetWindowPos(_hwnd, HWND_TOPMOST, bounds.Left, bounds.Top - 1, bounds.Width, bounds.Height, SWP_NOACTIVATE);
+            SetWindowPos(
+                _hwnd,
+                IntPtr.Zero,
+                bounds.Left,
+                bounds.Top - 1,
+                bounds.Width,
+                bounds.Height,
+                SWP_NOACTIVATE | SWP_NOZORDER);
         }
 
         public string ScreenDeviceName => _screenDeviceName;
