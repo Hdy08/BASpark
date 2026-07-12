@@ -12,6 +12,7 @@ namespace BASpark
     {
         private const string SingleInstanceMutexName = @"Local\BASpark_SingleInstance_Mutex";
         private const string RestartHandoffArgument = "--baspark-restart-handoff";
+        private const string ShowControlPanelArgument = "--show-control-panel";
         private static readonly TimeSpan RestartHandoffTimeout = TimeSpan.FromSeconds(10);
 
         public static OverlayManager? Overlay { get; private set; }
@@ -24,7 +25,7 @@ namespace BASpark
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            bool waitForRestartHandoff = HasRestartHandoffArgument(e.Args);
+            bool waitForRestartHandoff = HasArgument(e.Args, RestartHandoffArgument);
             _mutex = new Mutex(false, SingleInstanceMutexName);
             try
             {
@@ -124,7 +125,7 @@ namespace BASpark
             Overlay = new OverlayManager();
             Overlay.Start();
 
-            if (!ConfigManager.StartSilent)
+            if (!ConfigManager.StartSilent || HasArgument(e.Args, ShowControlPanelArgument))
             {
                 ShowControlPanel();
             }
@@ -294,11 +295,11 @@ namespace BASpark
             System.Windows.Application.Current.Shutdown();
         }
 
-        private static bool HasRestartHandoffArgument(string[] args)
+        private static bool HasArgument(string[] args, string expectedArgument)
         {
             foreach (string argument in args)
             {
-                if (string.Equals(argument, RestartHandoffArgument, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(argument, expectedArgument, StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }

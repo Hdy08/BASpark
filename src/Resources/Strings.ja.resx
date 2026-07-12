@@ -196,7 +196,7 @@
       <value>🚫 オフ</value>
     </data>
     <data name="Filter_Mode_Whitelist" xml:space="preserve">
-      <value>✅ ホワイトリスト</value>
+      <value>✓ ホワイトリスト</value>
     </data>
     <data name="Filter_New" xml:space="preserve">
       <value>新規</value>
@@ -587,7 +587,7 @@
       <value>トレイル更新率</value>
     </data>
     <data name="VisualReset_TrailRefresh_Sub" xml:space="preserve">
-      <value>既定 40 Hz</value>
+      <value>既定: ディスプレイに追従</value>
     </data>
     <data name="VisualReset_TrailSpeed" xml:space="preserve">
       <value>トレイルのアニメ速度</value>
@@ -636,6 +636,9 @@
     </data>
     <data name="Visual_GlowIntensity" xml:space="preserve">
       <value>グロー強度</value>
+    </data>
+    <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
+      <value>トレイル更新率をディスプレイに合わせる</value>
     </data>
     <data name="Visual_TrailDelay" xml:space="preserve">
       <value>トレイル遅延</value>

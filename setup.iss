@@ -64,19 +64,19 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 #ifdef UiAccessCertificateThumbprint
 [CustomMessages]
-UiAccessCertificatePrompt=To draw effects above Windows Start, notification center, and calendar, Setup must trust a local BASpark code-signing certificate on this computer. The private key is not included. Continue?
+UiAccessCertificateConsent=Trust the BASpark signing certificate on this computer to allow effects over system interfaces such as the Start menu
 UiAccessCertificateRequired=Certificate trust is required for the UIAccess build. Setup made no changes.
 UiAccessCertificateSilentRequired=Silent installation requires /ACCEPTUIACCESSCERT=1.
 UiAccessCertificateInstallFailed=Failed to trust the BASpark UIAccess signing certificate. Setup made no application changes.
 UiAccessSecureLocationRequired=The UIAccess build must be installed in Program Files\BASpark.
 UiAccessPreviousLocationRequired=An existing BASpark installation was found outside Program Files\BASpark. Uninstall it before installing the UIAccess build.
-chinesesimplified.UiAccessCertificatePrompt=为了让特效覆盖 Windows 开始菜单、通知中心和日历，安装程序需要在此计算机信任仅用于 BASpark 的本地代码签名证书。安装包不包含私钥。是否继续？
+chinesesimplified.UiAccessCertificateConsent=在此计算机信任仅用于 BASpark 的签名证书，以允许特效覆盖开始菜单等系统界面
 chinesesimplified.UiAccessCertificateRequired=UIAccess 版本必须信任代码签名证书，安装程序尚未修改应用文件。
 chinesesimplified.UiAccessCertificateSilentRequired=静默安装必须添加 /ACCEPTUIACCESSCERT=1。
 chinesesimplified.UiAccessCertificateInstallFailed=无法信任 BASpark UIAccess 签名证书，安装程序尚未修改应用文件。
 chinesesimplified.UiAccessSecureLocationRequired=UIAccess 版本必须安装在 Program Files\BASpark 目录中。
 chinesesimplified.UiAccessPreviousLocationRequired=检测到 BASpark 旧版本安装在 Program Files\BASpark 之外。请先卸载旧版本，再安装 UIAccess 版本。
-japanese.UiAccessCertificatePrompt=Windows のスタート、通知センター、カレンダーより上にエフェクトを表示するため、このコンピューターで BASpark 専用のローカルコード署名証明書を信頼する必要があります。秘密鍵は含まれていません。続行しますか？
+japanese.UiAccessCertificateConsent=スタートメニューなどのシステム画面上にエフェクトを表示するため、BASpark の署名証明書を信頼する
 japanese.UiAccessCertificateRequired=UIAccess 版ではコード署名証明書の信頼が必要です。アプリケーションファイルは変更されていません。
 japanese.UiAccessCertificateSilentRequired=サイレントインストールには /ACCEPTUIACCESSCERT=1 が必要です。
 japanese.UiAccessCertificateInstallFailed=BASpark UIAccess 署名証明書を信頼できませんでした。アプリケーションファイルは変更されていません。
@@ -104,9 +104,9 @@ Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN BASparkAutoStart /F"; F
 
 [Run]
 #ifdef UiAccessCertificateThumbprint
-Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent shellexec
+Filename: "{app}\BASpark.exe"; Parameters: "--show-control-panel"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent shellexec
 #else
-Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\BASpark.exe"; Parameters: "--show-control-panel"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent
 #endif
 
 [Code]
@@ -117,12 +117,29 @@ const
   PreviousInstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B0A2C1D4-E3F5-4A6B-9C8D-7E1F2A3B4C5D}}_is1';
 
 var
+  UiAccessCertificateConsentCheckBox: TNewCheckBox;
   UiAccessCertificateInstalled: Boolean;
   UiAccessPeopleOwnershipAdded: Boolean;
   UiAccessPeopleWasPresent: Boolean;
   UiAccessPublisherOwnershipAdded: Boolean;
   UiAccessPublisherWasPresent: Boolean;
   SetupInstallationCompleted: Boolean;
+
+procedure InitializeWizard;
+begin
+  UiAccessCertificateConsentCheckBox := TNewCheckBox.Create(WizardForm);
+  UiAccessCertificateConsentCheckBox.Parent := WizardForm.ReadyPage;
+  UiAccessCertificateConsentCheckBox.Caption :=
+    ExpandConstant('{cm:UiAccessCertificateConsent}');
+  UiAccessCertificateConsentCheckBox.Checked := True;
+  UiAccessCertificateConsentCheckBox.Left := WizardForm.ReadyMemo.Left;
+  UiAccessCertificateConsentCheckBox.Width := WizardForm.ReadyMemo.Width;
+  UiAccessCertificateConsentCheckBox.Height := ScaleY(17);
+  WizardForm.ReadyMemo.Height := WizardForm.ReadyMemo.Height -
+    UiAccessCertificateConsentCheckBox.Height - ScaleY(8);
+  UiAccessCertificateConsentCheckBox.Top := WizardForm.ReadyMemo.Top +
+    WizardForm.ReadyMemo.Height + ScaleY(8);
+end;
 
 function CertificateStoreKey(StoreName, Thumbprint: String): String;
 begin
@@ -430,9 +447,7 @@ begin
     end;
   end
   else
-    ConsentGranted := MsgBox(
-      ExpandConstant('{cm:UiAccessCertificatePrompt}'), mbConfirmation,
-      MB_YESNO) = IDYES;
+    ConsentGranted := UiAccessCertificateConsentCheckBox.Checked;
 
   if not ConsentGranted then
   begin

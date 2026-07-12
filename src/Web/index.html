@@ -470,7 +470,7 @@
                 this.trailThickness = opts.trailThickness != null ? opts.trailThickness : 1.0;
                 this.glowIntensity = opts.glowIntensity != null ? opts.glowIntensity : 1.0;
                 this.trailDelayMs = opts.trailDelayMs != null ? opts.trailDelayMs : 100;
-                this.trailFrameIntervalMs = 1000 / 40;
+                this.trailFrameIntervalMs = 1000 / 60;
                 this.trailRenderAccumulator = 1.0;
                 this.lastTrailRenderGateMs = performance.now();
 
@@ -583,6 +583,20 @@
                 this.resetTrailSmoothing(this.lastPos);
                 this.beginTrailStroke(x, y);
                 this.createEffects(x, y);
+            }
+
+            beginTrailStrokeOnly(x, y, pointerDown) {
+                if (this.clickEffects.length === 0 && this.distanceEffects.length === 0 && this.trail.length === 0) {
+                    this.lastFrameTime = performance.now();
+                }
+
+                this.isDown = Boolean(pointerDown);
+                this.lastPos = { x, y };
+                this.distanceAccumulator = 0;
+                this.trailEmitX = x;
+                this.trailEmitY = y;
+                this.resetTrailSmoothing(this.lastPos);
+                this.beginTrailStroke(x, y);
             }
 
             pointerMove(x, y) {
@@ -2032,6 +2046,16 @@
             window.scheduleNextAnimationFrame();
         };
 
+        window.externalTrailStart = (percentX, percentY, pointerDown) => {
+            if (window.renderingPaused) return;
+            lastMoveX = percentX;
+            lastMoveY = percentY;
+            const cx = percentX * window.innerWidth;
+            const cy = percentY * window.innerHeight;
+            window.spark.beginTrailStrokeOnly(cx, cy, pointerDown);
+            window.scheduleNextAnimationFrame();
+        };
+
         window.externalUp = () => {
             if (window.renderingPaused) return;
             window.spark.pointerUp();
@@ -2065,7 +2089,7 @@
         window.updateTrailRefreshRate = hz => {
             if (!window.spark) return;
             const value = Number(hz);
-            const refreshHz = Math.max(10, Math.min(240, Number.isFinite(value) ? value : 40));
+            const refreshHz = Math.max(30, Math.min(360, Number.isFinite(value) ? value : 60));
             window.spark.trailFrameIntervalMs = 1000 / refreshHz;
             window.spark.trailRenderAccumulator = 1.0;
         };

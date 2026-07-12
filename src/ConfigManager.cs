@@ -88,7 +88,8 @@ namespace BASpark
         public static bool UseLinkedAnimationSpeed { get; set; } = true;
         public static double TrailAnimationSpeed { get; set; } = 1.0;
         public static double ClickAnimationSpeed { get; set; } = 1.0;
-        public static int TrailRefreshRate { get; set; } = 40;
+        public static int TrailRefreshRate { get; set; } = 60;
+        public static bool FollowDisplayRefreshRate { get; set; } = true;
         public static bool EnableEnvironmentFilter { get; set; } = false;
         public static bool HideInFullscreen { get; set; } = true;
         public static bool ShowEffectOnDesktop { get; set; } = true;
@@ -150,7 +151,8 @@ namespace BASpark
                         UseLinkedAnimationSpeed = ReadBool(key, "UseLinkedAnimationSpeed", true);
                         TrailAnimationSpeed = ReadClampedDouble(key, "TrailAnimationSpeed", EffectSpeed, 0.2, 3.0);
                         ClickAnimationSpeed = ReadClampedDouble(key, "ClickAnimationSpeed", EffectSpeed, 0.2, 3.0);
-                        TrailRefreshRate = ReadClampedInt(key, "TrailRefreshRate", 40, 10, 240);
+                        TrailRefreshRate = ReadClampedInt(key, "TrailRefreshRate", 60, 30, 360);
+                        FollowDisplayRefreshRate = ReadBool(key, "FollowDisplayRefreshRate", true);
                         EnableEnvironmentFilter = ReadBool(key, "EnableEnvironmentFilter", false);
                         HideInFullscreen = ReadBool(key, "HideInFullscreen", true);
                         ShowEffectOnDesktop = ReadBool(key, "ShowEffectOnDesktop", true);
@@ -524,7 +526,8 @@ namespace BASpark
 
             if (flags.HasFlag(VisualAppearanceResetFlags.TrailRefreshRate))
             {
-                Save("TrailRefreshRate", 40);
+                Save("TrailRefreshRate", 60);
+                Save("FollowDisplayRefreshRate", true);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.ParticleColor))
@@ -859,7 +862,8 @@ namespace BASpark
                     UseLinkedAnimationSpeed = true;
                     TrailAnimationSpeed = 1.0;
                     ClickAnimationSpeed = 1.0;
-                    TrailRefreshRate = 40;
+                    TrailRefreshRate = 60;
+                    FollowDisplayRefreshRate = true;
                     EnableEnvironmentFilter = false;
                     HideInFullscreen = true;
                     ShowEffectOnDesktop = true;

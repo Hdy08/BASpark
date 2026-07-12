@@ -101,6 +101,10 @@ namespace BASpark
         private bool _hiddenByEnvironmentSuppression;
         private bool _overlayRuntimePaused;
         private bool _webViewRecoveryPending;
+        private int _trailRefreshRate = 60;
+        private long _trailMoveIntervalTimestamp = Math.Max(
+            1,
+            System.Diagnostics.Stopwatch.Frequency / 60);
 
         private delegate void WinEventDelegate(
             IntPtr hWinEventHook,
@@ -111,7 +115,7 @@ namespace BASpark
             uint dwEventThread,
             uint dwmsEventTime);
 
-        public MainWindow(Screen screen)
+        public MainWindow(Screen screen, int trailRefreshRate)
         {
             _screenDeviceName = screen.DeviceName;
             _screenBounds = screen.Bounds;
@@ -119,7 +123,7 @@ namespace BASpark
 
             InitializeComponent();
             webView.DefaultBackgroundColor = System.Drawing.Color.Transparent;
-            UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
+            UpdateTrailRefreshRate(trailRefreshRate);
             _ = InitWebView();
         }
 
@@ -228,8 +232,11 @@ namespace BASpark
 
         public void UpdateTrailRefreshRate(int hz)
         {
-            int clampedHz = Math.Clamp(hz, 10, 240);
-            ExecuteScript($"if(window.updateTrailRefreshRate) window.updateTrailRefreshRate({clampedHz});");
+            _trailRefreshRate = Math.Clamp(hz, 30, 360);
+            _trailMoveIntervalTimestamp = Math.Max(
+                1,
+                System.Diagnostics.Stopwatch.Frequency / _trailRefreshRate);
+            ExecuteScript($"if(window.updateTrailRefreshRate) window.updateTrailRefreshRate({_trailRefreshRate});");
         }
 
         public void UpdateTouchMode(bool enabled)
@@ -485,7 +492,7 @@ namespace BASpark
                     UpdateColor(ConfigManager.ParticleColor);
                     ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
                     UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness, ConfigManager.TrailDelay, ConfigManager.GlowIntensity);
-                    UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
+                    UpdateTrailRefreshRate(_trailRefreshRate);
                     SyncInputContext(InputModeMouse);
                     if (_overlayRuntimePaused)
                     {
@@ -770,6 +777,16 @@ namespace BASpark
             ExecuteWithInputContext(inputMode, $"if(window.externalMove) window.externalMove({px}, {py});");
         }
 
+        public void EmitTrailStart(int x, int y, bool touchLike, bool pointerDown)
+        {
+            if (!TryConvertScreenToOverlayPoint(x, y, out System.Windows.Point clientPoint)) return;
+            string inputMode = touchLike ? InputModeTouch : InputModeMouse;
+            string px = FormatCoordinate(clientPoint.X);
+            string py = FormatCoordinate(clientPoint.Y);
+            string pointerDownLiteral = pointerDown ? "true" : "false";
+            ExecuteWithInputContext(inputMode, $"if(window.externalTrailStart) window.externalTrailStart({px}, {py}, {pointerDownLiteral});");
+        }
+
         public void EmitUp(bool touchLike)
         {
             string inputMode = touchLike ? InputModeTouch : InputModeMouse;
@@ -801,6 +818,7 @@ namespace BASpark
         }
 
         public string ScreenDeviceName => _screenDeviceName;
+        public long TrailMoveIntervalTimestamp => _trailMoveIntervalTimestamp;
 
         private Rectangle GetScreenBounds()
         {

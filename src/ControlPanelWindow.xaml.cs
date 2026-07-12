@@ -683,6 +683,7 @@ namespace BASpark
             SliderSpeed.Value = ConfigManager.EffectSpeed;
             SliderTrailAnimSpeed.Value = ConfigManager.TrailAnimationSpeed;
             SliderClickAnimSpeed.Value = ConfigManager.ClickAnimationSpeed;
+            CheckFollowDisplayRefreshRate.IsChecked = ConfigManager.FollowDisplayRefreshRate;
             SliderTrailRefresh.Value = ConfigManager.TrailRefreshRate;
             SliderTrailDelay.Value = ConfigManager.TrailDelay;
             UpdateAnimationSpeedPanelVisibility();
@@ -982,8 +983,21 @@ namespace BASpark
 
             if (ListConfiguredProcesses != null)
             {
+                bool useDarkDisabledTemplate = !processFilterEnabled && ThemeManager.IsDarkModeEnabled();
+                if (useDarkDisabledTemplate &&
+                    TryFindResource("DarkDisabledListBoxTemplate") is ControlTemplate disabledTemplate)
+                {
+                    ListConfiguredProcesses.Template = disabledTemplate;
+                }
+                else
+                {
+                    ListConfiguredProcesses.ClearValue(System.Windows.Controls.Control.TemplateProperty);
+                }
+
                 ListConfiguredProcesses.IsEnabled = processFilterEnabled;
-                ListConfiguredProcesses.Opacity = processFilterEnabled || ThemeManager.IsDarkModeEnabled() ? 1.0 : 0.65;
+                ListConfiguredProcesses.Opacity = processFilterEnabled
+                    ? 1.0
+                    : useDarkDisabledTemplate ? 0.6 : 0.65;
             }
             ManualProcessInput.IsEnabled = processFilterEnabled;
         }
@@ -1485,6 +1499,7 @@ namespace BASpark
             LoadSettings();
 
             int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
+            bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsChecked == true;
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
             double effectScale = Math.Round(SliderScale.Value, 2);
             double trailThickness = Math.Round(SliderTrailThickness.Value, 2);
@@ -1493,7 +1508,7 @@ namespace BASpark
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, trailSp, clickSp, trailThickness, trailDelay, glowIntensity);
-            App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
+            App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
 
             VisualResetOverlay.Visibility = Visibility.Collapsed;
             System.Windows.MessageBox.Show(
@@ -1554,6 +1569,7 @@ namespace BASpark
             }
 
             int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
+            bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsChecked == true;
             bool autoStartEnabled = CheckAutoStart.IsChecked ?? false;
             bool startSilentEnabled = CheckStartSilent.IsChecked ?? false;
             bool runAsAdminEnabled = CheckRunAsAdmin.IsChecked ?? false;
@@ -1645,6 +1661,7 @@ namespace BASpark
             settingsSaved &= ConfigManager.Save("TrailAnimationSpeed", trailAnimSpeed);
             settingsSaved &= ConfigManager.Save("ClickAnimationSpeed", clickAnimSpeed);
             settingsSaved &= ConfigManager.Save("TrailRefreshRate", trailRefreshRate);
+            settingsSaved &= ConfigManager.Save("FollowDisplayRefreshRate", followDisplayRefreshRate);
             settingsSaved &= ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
             settingsSaved &= ConfigManager.Save("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch.IsChecked ?? false);
             var scrollbarVisibility = RadioScrollbarAlways.IsChecked == true
@@ -1703,7 +1720,7 @@ namespace BASpark
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             GetUiAnimationSpeeds(out double overlayTrail, out double overlayClick);
             App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, overlayTrail, overlayClick, trailThickness, trailDelay, glowIntensity);
-            App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
+            App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
             App.Overlay?.RefreshEnvironmentFilterState();
             App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);
             App.Overlay?.UpdateScreenshotCompatibilityMode(screenshotCompatibilityEnabled);

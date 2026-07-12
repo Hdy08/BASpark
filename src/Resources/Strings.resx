@@ -196,7 +196,7 @@
       <value>🚫 关闭过滤</value>
     </data>
     <data name="Filter_Mode_Whitelist" xml:space="preserve">
-      <value>✅ 白名单模式</value>
+      <value>✓ 白名单模式</value>
     </data>
     <data name="Filter_New" xml:space="preserve">
       <value>新建</value>
@@ -587,7 +587,7 @@
       <value>拖尾刷新率</value>
     </data>
     <data name="VisualReset_TrailRefresh_Sub" xml:space="preserve">
-      <value>默认 40 Hz</value>
+      <value>默认跟随显示器</value>
     </data>
     <data name="VisualReset_TrailSpeed" xml:space="preserve">
       <value>拖尾动画速度</value>
@@ -636,6 +636,9 @@
     </data>
     <data name="Visual_GlowIntensity" xml:space="preserve">
       <value>发光强度</value>
+    </data>
+    <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
+      <value>拖尾刷新率跟随显示器</value>
     </data>
     <data name="Visual_TrailDelay" xml:space="preserve">
       <value>拖尾延迟</value>
