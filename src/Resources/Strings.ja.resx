@@ -326,6 +326,12 @@
     <data name="Msg_SettingsApplied" xml:space="preserve">
       <value>設定を適用しました！</value>
     </data>
+    <data name="Msg_SettingsSaveFailed" xml:space="preserve">
+      <value>一部の設定を保存できませんでした。レジストリのアクセス権を確認して再試行してください。</value>
+    </data>
+    <data name="Msg_AutoStartUpdateFailed" xml:space="preserve">
+      <value>自動起動設定の更新に失敗しました: {0}</value>
+    </data>
     <data name="Msg_UpToDate" xml:space="preserve">
       <value>最新バージョンです。</value>
     </data>

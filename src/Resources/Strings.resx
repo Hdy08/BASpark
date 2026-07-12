@@ -326,6 +326,12 @@
     <data name="Msg_SettingsApplied" xml:space="preserve">
       <value>配置已成功应用！</value>
     </data>
+    <data name="Msg_SettingsSaveFailed" xml:space="preserve">
+      <value>部分设置无法保存，请检查注册表权限后重试。</value>
+    </data>
+    <data name="Msg_AutoStartUpdateFailed" xml:space="preserve">
+      <value>更新开机自启设置失败：{0}</value>
+    </data>
     <data name="Msg_UpToDate" xml:space="preserve">
       <value>当前已是最新版本，无需更新！</value>
     </data>

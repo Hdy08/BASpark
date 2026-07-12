@@ -11,7 +11,7 @@
         ResizeMode="NoResize"
         Left="0" Top="0" 
         IsHitTestVisible="False">
-    <Grid>
+    <Grid x:Name="OverlayRoot">
         <wv2:WebView2 Name="webView" DefaultBackgroundColor="Transparent"/>
     </Grid>
 </Window>

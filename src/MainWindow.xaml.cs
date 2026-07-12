@@ -100,6 +100,7 @@ namespace BASpark
         private bool _hiddenForExternalScreenshotCapture;
         private bool _hiddenByEnvironmentSuppression;
         private bool _overlayRuntimePaused;
+        private bool _webViewRecoveryPending;
 
         private delegate void WinEventDelegate(
             IntPtr hWinEventHook,
@@ -404,12 +405,12 @@ namespace BASpark
 
         public IntPtr Handle => _hwnd;
 
-        private async System.Threading.Tasks.Task InitWebView()
+        private async System.Threading.Tasks.Task<bool> InitWebView(bool reportFailure = true)
         {
             try
             {
                 var env = await WebView2EnvironmentHolder.GetOrCreateAsync().ConfigureAwait(true);
-                if (_isClosing) return;
+                if (_isClosing) return false;
 
                 if (webView.CoreWebView2 == null)
                 {
@@ -427,7 +428,7 @@ namespace BASpark
                     }
                 }
 
-                if (_isClosing || !TryGetCoreWebView2(out CoreWebView2? coreWebView)) return;
+                if (_isClosing || !TryGetCoreWebView2(out CoreWebView2? coreWebView)) return false;
 
                 _coreWebView = coreWebView;
                 coreWebView.Settings.IsZoomControlEnabled = false;
@@ -452,46 +453,79 @@ namespace BASpark
                 }
 
                 var streamInfo = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/Web/index.html"));
-                if (streamInfo != null)
+                if (streamInfo == null)
                 {
-                    using var reader = new System.IO.StreamReader(streamInfo.Stream);
-                    string htmlContent = reader.ReadToEnd();
-                    _navigationCompletedHandler = (s, e) =>
-                    {
-                        if (_isClosing) return;
-
-                        if (!e.IsSuccess)
-                        {
-                            _webViewReadyForTopmost = false;
-                            return;
-                        }
-
-                        _webViewReadyForTopmost = true;
-                        SafeEnsureTopmost();
-
-                        _lastReportedInputMode = null;
-                        _lastReportedAlwaysTrail = null;
-                        UpdateColor(ConfigManager.ParticleColor);
-                        ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
-                        UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness, ConfigManager.TrailDelay, ConfigManager.GlowIntensity);
-                        UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
-                        SyncInputContext(InputModeMouse);
-                        if (_overlayRuntimePaused)
-                        {
-                            ExecuteScript("if(window.setRenderingPaused) window.setRenderingPaused(true);");
-                            _ = TrySuspendWebViewAsync();
-                        }
-                    };
-                    coreWebView.NavigationCompleted += _navigationCompletedHandler;
-                    coreWebView.NavigateToString(htmlContent);
+                    throw new InvalidOperationException("The embedded WebView2 content could not be loaded.");
                 }
+
+                using var reader = new System.IO.StreamReader(streamInfo.Stream);
+                string htmlContent = reader.ReadToEnd();
+                var navigationCompletion = new System.Threading.Tasks.TaskCompletionSource<CoreWebView2NavigationCompletedEventArgs>(
+                    System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+                _navigationCompletedHandler = (s, e) =>
+                {
+                    navigationCompletion.TrySetResult(e);
+                    if (_isClosing) return;
+
+                    if (!e.IsSuccess)
+                    {
+                        _webViewReadyForTopmost = false;
+                        if (!_webViewRecoveryPending)
+                        {
+                            Dispatcher.BeginInvoke(new Action(() => _ = RecreateWebViewAsync()));
+                        }
+                        return;
+                    }
+
+                    _webViewReadyForTopmost = true;
+                    SafeEnsureTopmost();
+
+                    _lastReportedInputMode = null;
+                    _lastReportedAlwaysTrail = null;
+                    UpdateColor(ConfigManager.ParticleColor);
+                    ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
+                    UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness, ConfigManager.TrailDelay, ConfigManager.GlowIntensity);
+                    UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
+                    SyncInputContext(InputModeMouse);
+                    if (_overlayRuntimePaused)
+                    {
+                        ExecuteScript("if(window.setRenderingPaused) window.setRenderingPaused(true);");
+                        _ = TrySuspendWebViewAsync();
+                    }
+                };
+                coreWebView.NavigationCompleted += _navigationCompletedHandler;
+                coreWebView.NavigateToString(htmlContent);
+
+                CoreWebView2NavigationCompletedEventArgs navigationResult = await navigationCompletion.Task
+                    .WaitAsync(TimeSpan.FromSeconds(10))
+                    .ConfigureAwait(true);
+                if (!navigationResult.IsSuccess)
+                {
+                    throw new InvalidOperationException($"WebView2 navigation failed: {navigationResult.WebErrorStatus}.");
+                }
+
+                return true;
             }
             catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
             {
+                return false;
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show(Localization.Format("WebView2_InitFailed", ex.Message));
+                if (_isClosing)
+                {
+                    return false;
+                }
+
+                if (reportFailure)
+                {
+                    System.Windows.MessageBox.Show(Localization.Format("WebView2_InitFailed", ex.Message));
+                }
+                else
+                {
+                    AppLogger.Warn($"WebView2 recovery initialization failed: {ex.Message}");
+                }
+                return false;
             }
         }
 
@@ -505,19 +539,113 @@ namespace BASpark
         {
             if (_isClosing) return;
 
-            Dispatcher.BeginInvoke(new Action(() =>
+            AppLogger.Warn($"WebView2 process failure: {e.ProcessFailedKind} ({e.Reason}).");
+            if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited)
             {
-                if (_isClosing) return;
-                _webViewReadyForTopmost = false;
-                Topmost = false;
-                if (_coreWebView != null && _processFailedHandler != null)
+                Dispatcher.BeginInvoke(new Action(() => _ = RecreateWebViewAsync()));
+                return;
+            }
+
+            if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessExited)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    try { _coreWebView.ProcessFailed -= _processFailedHandler; } catch { /* ignore: event unsubscribe is best-effort */ }
+                    if (_isClosing || _webViewRecoveryPending) return;
+                    _webViewReadyForTopmost = false;
+                    Topmost = false;
+                    try
+                    {
+                        _coreWebView?.Reload();
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn($"WebView2 reload failed; recreating the control: {ex.Message}");
+                        _ = RecreateWebViewAsync();
+                    }
+                }));
+            }
+        }
+
+        private async System.Threading.Tasks.Task RecreateWebViewAsync()
+        {
+            if (_isClosing || _webViewRecoveryPending)
+            {
+                return;
+            }
+
+            _webViewRecoveryPending = true;
+            try
+            {
+                for (int attempt = 1; attempt <= 3 && !_isClosing; attempt++)
+                {
+                    if (attempt > 1)
+                    {
+                        await System.Threading.Tasks.Task.Delay(250 * attempt).ConfigureAwait(true);
+                    }
+
+                    if (_isClosing)
+                    {
+                        return;
+                    }
+
+                    ReplaceWebViewControl();
+                    if (await InitWebView(reportFailure: false).ConfigureAwait(true))
+                    {
+                        return;
+                    }
+
+                    AppLogger.Warn($"WebView2 recovery attempt {attempt} failed.");
                 }
-                _processFailedHandler = null;
-                _coreWebView = null;
-                _ = InitWebView();
-            }));
+            }
+            catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+            {
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Failed to recreate WebView2 after browser process exit.", ex);
+            }
+            finally
+            {
+                _webViewRecoveryPending = false;
+            }
+        }
+
+        private void ReplaceWebViewControl()
+        {
+            _webViewReadyForTopmost = false;
+            Topmost = false;
+            DetachWebViewHandlers();
+
+            var oldWebView = webView;
+            int childIndex = OverlayRoot.Children.IndexOf(oldWebView);
+            OverlayRoot.Children.Remove(oldWebView);
+            oldWebView.Dispose();
+
+            webView = new Microsoft.Web.WebView2.Wpf.WebView2
+            {
+                DefaultBackgroundColor = System.Drawing.Color.Transparent
+            };
+            OverlayRoot.Children.Insert(Math.Max(0, childIndex), webView);
+        }
+
+        private void DetachWebViewHandlers()
+        {
+            CoreWebView2? coreWebView = _coreWebView;
+            if (coreWebView != null && _navigationCompletedHandler != null)
+            {
+                try { coreWebView.NavigationCompleted -= _navigationCompletedHandler; }
+                catch (Exception ex) { AppLogger.Debug($"Failed to detach WebView2 navigation handler: {ex.Message}"); }
+            }
+
+            if (coreWebView != null && _processFailedHandler != null)
+            {
+                try { coreWebView.ProcessFailed -= _processFailedHandler; }
+                catch (Exception ex) { AppLogger.Debug($"Failed to detach WebView2 process handler: {ex.Message}"); }
+            }
+
+            _navigationCompletedHandler = null;
+            _processFailedHandler = null;
+            _coreWebView = null;
         }
 
         private static bool IsCursorVisible()
@@ -620,7 +748,7 @@ namespace BASpark
 
         public bool ContainsScreenPoint(int x, int y)
         {
-            return GetScreenBounds().Contains(x, y);
+            return _screenBounds.Contains(x, y);
         }
 
         public void EmitDown(int x, int y)
@@ -728,33 +856,7 @@ namespace BASpark
                 _topmostTimer = null;
             }
 
-            if (_coreWebView != null)
-            {
-                if (_navigationCompletedHandler != null)
-                {
-                    try
-                    {
-                        _coreWebView.NavigationCompleted -= _navigationCompletedHandler;
-                    }
-                    catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
-                    {
-                    }
-                    _navigationCompletedHandler = null;
-                }
-
-                if (_processFailedHandler != null)
-                {
-                    try
-                    {
-                        _coreWebView.ProcessFailed -= _processFailedHandler;
-                    }
-                    catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
-                    {
-                    }
-                    _processFailedHandler = null;
-                }
-            }
-            _coreWebView = null;
+            DetachWebViewHandlers();
 
             if (_winEventHook != IntPtr.Zero)
             {

@@ -573,6 +573,15 @@ namespace BASpark
             if (currentTicks - _lastMoveTicks < _moveIntervalTicks) return;
             _lastMoveTicks = currentTicks;
 
+            if (!_isPrimaryPointerDown && !ConfigManager.EnableAlwaysTrailEffect)
+            {
+                if (ConfigManager.EnableEnvironmentFilter)
+                {
+                    ShouldSuppressEffects();
+                }
+                return;
+            }
+
             bool cursorVisible = CursorIsVisible();
             if (!CanRenderEffects(cursorVisible: cursorVisible)) return;
             if (!cursorVisible && !_isPrimaryPointerDown) return;
@@ -656,8 +665,13 @@ namespace BASpark
 
         private MainWindow? ResolveTargetOverlay(int x, int y)
         {
-            MainWindow? direct = _overlays.Values.FirstOrDefault(w => w.ContainsScreenPoint(x, y));
-            if (direct != null) return direct;
+            foreach (MainWindow overlay in _overlays.Values)
+            {
+                if (overlay.ContainsScreenPoint(x, y))
+                {
+                    return overlay;
+                }
+            }
 
             Screen nearest = Screen.FromPoint(new Point(x, y));
             if (_overlays.TryGetValue(nearest.DeviceName, out MainWindow? byDevice))
@@ -665,7 +679,15 @@ namespace BASpark
                 return byDevice;
             }
 
-            return _overlays.Values.FirstOrDefault(w => w.ContainsScreenPoint(nearest.Bounds.Left, nearest.Bounds.Top));
+            foreach (MainWindow overlay in _overlays.Values)
+            {
+                if (overlay.ContainsScreenPoint(nearest.Bounds.Left, nearest.Bounds.Top))
+                {
+                    return overlay;
+                }
+            }
+
+            return null;
         }
 
         private void RebuildWindows(bool forceRebuild)
@@ -700,6 +722,8 @@ namespace BASpark
                 var win = new MainWindow(pair.Value);
                 _overlays[pair.Key] = win;
                 win.Show();
+                win.SetEnvironmentSuppressed(_isSuppressedByEnvironment);
+                win.SetHiddenForExternalScreenshotCapture(_screenshotCaptureSessionActive);
             }
         }
 
@@ -792,24 +816,20 @@ namespace BASpark
 
         private bool IsOverlayWindow(IntPtr hwnd)
         {
-            return _overlays.Values.Any(o => o.Handle == hwnd);
+            foreach (MainWindow overlay in _overlays.Values)
+            {
+                if (overlay.Handle == hwnd)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsSuppressedByProcessFilter(string processName)
         {
-            var profile = ConfigManager.GetActiveProfile();
-            if (profile == null || profile.Mode == ProcessFilterModeOption.Disabled)
-            {
-                return false;
-            }
-
-            bool isListed = profile.Processes.Contains(processName, StringComparer.OrdinalIgnoreCase);
-            return profile.Mode switch
-            {
-                ProcessFilterModeOption.Blacklist => isListed,
-                ProcessFilterModeOption.Whitelist => !isListed,
-                _ => false
-            };
+            return ConfigManager.IsProcessSuppressedByActiveProfile(processName);
         }
 
         private static void UpdateSuppressionState(long nowTicks, bool isSuppressed, ref bool suppressed, ref long cacheUntil)

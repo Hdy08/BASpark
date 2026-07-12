@@ -175,48 +175,51 @@ namespace BASpark
                         FilterProfiles = key.GetValue("FilterProfiles", "")?.ToString() ?? "";
                         ActiveProfileId = key.GetValue("ActiveProfileId", "")?.ToString() ?? "";
 
-                        if (!string.IsNullOrEmpty(FilterProfiles))
+                        lock (_syncLock)
                         {
-                            try
+                            _profiles = new List<FilterProfile>();
+                            if (!string.IsNullOrEmpty(FilterProfiles))
                             {
-                                _profiles = System.Text.Json.JsonSerializer.Deserialize<List<FilterProfile>>(FilterProfiles) ?? new List<FilterProfile>();
+                                try
+                                {
+                                    _profiles = DeserializeProfiles(FilterProfiles);
+                                }
+                                catch (Exception ex)
+                                {
+                                    AppLogger.Warn($"Failed to deserialize FilterProfiles; fallback to empty list: {ex.Message}");
+                                }
                             }
-                            catch (Exception ex)
+
+                            // 向后兼容处理
+                            if (_profiles.Count == 0)
                             {
-                                AppLogger.Warn($"Failed to deserialize FilterProfiles; fallback to empty list: {ex.Message}");
-                                _profiles = new List<FilterProfile>();
+                                string processFilterModeRaw = key.GetValue("ProcessFilterMode", "Disabled")?.ToString() ?? "Disabled";
+                                ProcessFilterModeOption oldMode;
+                                if (!Enum.TryParse(processFilterModeRaw, true, out oldMode))
+                                {
+                                    oldMode = ProcessFilterModeOption.Disabled;
+                                }
+                                string oldListRaw = key.GetValue("ProcessFilterList", "")?.ToString() ?? "";
+                                var oldList = oldListRaw
+                                    .Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                    .Select(s => s.ToLowerInvariant())
+                                    .Distinct()
+                                    .ToList();
+
+                                var defaultProfile = new FilterProfile
+                                {
+                                    Name = Localization.Get("Profile_Default"),
+                                    Mode = oldMode == ProcessFilterModeOption.Disabled ? ProcessFilterModeOption.Blacklist : oldMode,
+                                    Processes = oldList
+                                };
+                                _profiles.Add(defaultProfile);
+                                ActiveProfileId = defaultProfile.Id;
                             }
-                        }
 
-                        // 向后兼容处理
-                        if (_profiles.Count == 0)
-                        {
-                            string processFilterModeRaw = key.GetValue("ProcessFilterMode", "Disabled")?.ToString() ?? "Disabled";
-                            ProcessFilterModeOption oldMode;
-                            if (!Enum.TryParse(processFilterModeRaw, true, out oldMode))
+                            if (string.IsNullOrEmpty(ActiveProfileId) && _profiles.Count > 0)
                             {
-                                oldMode = ProcessFilterModeOption.Disabled;
+                                ActiveProfileId = _profiles[0].Id;
                             }
-                            string oldListRaw = key.GetValue("ProcessFilterList", "")?.ToString() ?? "";
-                            var oldList = oldListRaw
-                                .Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                                .Select(s => s.ToLowerInvariant())
-                                .Distinct()
-                                .ToList();
-
-                            var defaultProfile = new FilterProfile
-                            {
-                                Name = Localization.Get("Profile_Default"),
-                                Mode = oldMode == ProcessFilterModeOption.Disabled ? ProcessFilterModeOption.Blacklist : oldMode,
-                                Processes = oldList
-                            };
-                            _profiles.Add(defaultProfile);
-                            ActiveProfileId = defaultProfile.Id;
-                        }
-
-                        if (string.IsNullOrEmpty(ActiveProfileId) && _profiles.Count > 0)
-                        {
-                            ActiveProfileId = _profiles[0].Id;
                         }
                     }
                 }
@@ -359,27 +362,113 @@ namespace BASpark
 
         public static List<FilterProfile> GetProfiles()
         {
-            lock (_syncLock) { return [.. _profiles]; }
+            lock (_syncLock)
+            {
+                return _profiles.Select(CloneProfile).ToList();
+            }
         }
 
         public static FilterProfile? GetActiveProfile()
         {
             lock (_syncLock)
             {
-                return _profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? _profiles.FirstOrDefault();
+                FilterProfile? profile = _profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? _profiles.FirstOrDefault();
+                return profile == null ? null : CloneProfile(profile);
             }
         }
 
-        public static void SaveProfiles(List<FilterProfile> profiles, string activeId)
+        public static bool IsProcessSuppressedByActiveProfile(string processName)
         {
+            if (string.IsNullOrWhiteSpace(processName))
+            {
+                return false;
+            }
+
             lock (_syncLock)
             {
-                _profiles = profiles;
-                ActiveProfileId = activeId;
-                string json = System.Text.Json.JsonSerializer.Serialize(_profiles);
-                Save("FilterProfiles", json);
-                Save("ActiveProfileId", activeId);
+                FilterProfile? profile = _profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? _profiles.FirstOrDefault();
+                if (profile == null || profile.Mode == ProcessFilterModeOption.Disabled)
+                {
+                    return false;
+                }
+
+                bool isListed = false;
+                foreach (string configuredProcess in profile.Processes)
+                {
+                    if (string.Equals(configuredProcess, processName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        isListed = true;
+                        break;
+                    }
+                }
+
+                return profile.Mode switch
+                {
+                    ProcessFilterModeOption.Blacklist => isListed,
+                    ProcessFilterModeOption.Whitelist => !isListed,
+                    _ => false
+                };
             }
+        }
+
+        public static bool SaveProfiles(List<FilterProfile> profiles, string activeId)
+        {
+            List<FilterProfile> normalizedProfiles = NormalizeProfiles(profiles);
+            string normalizedActiveId = normalizedProfiles.Any(p => p.Id == activeId)
+                ? activeId
+                : normalizedProfiles.FirstOrDefault()?.Id ?? "";
+            string json = System.Text.Json.JsonSerializer.Serialize(normalizedProfiles);
+
+            lock (_syncLock)
+            {
+                string previousProfilesJson = FilterProfiles;
+                string previousActiveId = ActiveProfileId;
+                if (!Save("FilterProfiles", json))
+                {
+                    return false;
+                }
+
+                if (!Save("ActiveProfileId", normalizedActiveId))
+                {
+                    if (!Save("FilterProfiles", previousProfilesJson))
+                    {
+                        AppLogger.Warn("Failed to roll back FilterProfiles after ActiveProfileId could not be saved.");
+                    }
+                    FilterProfiles = previousProfilesJson;
+                    ActiveProfileId = previousActiveId;
+                    return false;
+                }
+
+                _profiles = normalizedProfiles;
+                return true;
+            }
+        }
+
+        private static List<FilterProfile> DeserializeProfiles(string json)
+        {
+            var profiles = System.Text.Json.JsonSerializer.Deserialize<List<FilterProfile?>>(json);
+            return NormalizeProfiles(profiles);
+        }
+
+        private static List<FilterProfile> NormalizeProfiles(IEnumerable<FilterProfile?>? profiles)
+        {
+            return profiles?
+                .Where(profile => profile != null)
+                .Select(profile => CloneProfile(profile!))
+                .ToList() ?? new List<FilterProfile>();
+        }
+
+        private static FilterProfile CloneProfile(FilterProfile profile)
+        {
+            return new FilterProfile
+            {
+                Id = string.IsNullOrWhiteSpace(profile.Id) ? Guid.NewGuid().ToString() : profile.Id,
+                Name = profile.Name ?? "",
+                Mode = Enum.IsDefined(profile.Mode) ? profile.Mode : ProcessFilterModeOption.Blacklist,
+                Processes = profile.Processes?
+                    .Where(process => !string.IsNullOrWhiteSpace(process))
+                    .ToList() ?? new List<string>()
+            };
         }
 
         /// 将选中的视觉表现项恢复默认值并写入注册表
@@ -444,7 +533,7 @@ namespace BASpark
             }
         }
 
-        public static void Save(string name, object value)
+        public static bool Save(string name, object value)
         {
             try
             {
@@ -454,7 +543,7 @@ namespace BASpark
                     if (key == null)
                     {
                         AppLogger.Warn($"Failed to open config registry key while saving '{name}'.");
-                        return;
+                        return false;
                     }
 
                     key.SetValue(name, ToRegistryValue(value));
@@ -477,11 +566,69 @@ namespace BASpark
 
                         prop.SetValue(null, propertyValue);
                     }
+
+                    return true;
                 }
             }
             catch (Exception ex)
             {
                 AppLogger.Warn($"Failed to save config entry '{name}': {ex.Message}");
+                return false;
+            }
+        }
+
+        public static bool SaveAutoStartSettings(bool autoStart, bool runAsAdmin)
+        {
+            lock (_syncLock)
+            {
+                bool previousAutoStart = AutoStart;
+                bool previousRunAsAdmin = RunAsAdmin;
+                try
+                {
+                    using RegistryKey? key = Registry.CurrentUser.CreateSubKey(RegPath);
+                    if (key == null)
+                    {
+                        AppLogger.Warn("Failed to open the config registry key while saving auto-start settings.");
+                        return false;
+                    }
+
+                    object? previousAutoStartValue = key.GetValue("AutoStart", null);
+                    object? previousRunAsAdminValue = key.GetValue("RunAsAdmin", null);
+                    try
+                    {
+                        key.SetValue("AutoStart", ToRegistryValue(autoStart));
+                        key.SetValue("RunAsAdmin", ToRegistryValue(runAsAdmin));
+                    }
+                    catch
+                    {
+                        RestoreRegistryValue(key, "AutoStart", previousAutoStartValue);
+                        RestoreRegistryValue(key, "RunAsAdmin", previousRunAsAdminValue);
+                        throw;
+                    }
+
+                    AutoStart = autoStart;
+                    RunAsAdmin = runAsAdmin;
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    AutoStart = previousAutoStart;
+                    RunAsAdmin = previousRunAsAdmin;
+                    AppLogger.Warn($"Failed to save auto-start config: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
+        private static void RestoreRegistryValue(RegistryKey key, string name, object? value)
+        {
+            if (value == null)
+            {
+                key.DeleteValue(name, false);
+            }
+            else
+            {
+                key.SetValue(name, value);
             }
         }
 
@@ -548,7 +695,18 @@ namespace BASpark
 
             try
             {
-                return System.Text.Json.JsonSerializer.Deserialize<List<ScreenSelectionState>>(ScreenSelections) ?? new List<ScreenSelectionState>();
+                var selections = System.Text.Json.JsonSerializer.Deserialize<List<ScreenSelectionState?>>(ScreenSelections);
+                return selections?
+                    .Where(selection => selection != null &&
+                        (!string.IsNullOrWhiteSpace(selection.IdentityKey) || !string.IsNullOrWhiteSpace(selection.DeviceName)))
+                    .Select(selection => new ScreenSelectionState
+                    {
+                        IdentityKey = NormalizeScreenValue(selection!.IdentityKey),
+                        DeviceName = NormalizeScreenValue(selection.DeviceName),
+                        DisplayName = NormalizeScreenValue(selection.DisplayName),
+                        IsEnabled = selection.IsEnabled
+                    })
+                    .ToList() ?? new List<ScreenSelectionState>();
             }
             catch (Exception ex)
             {
@@ -578,10 +736,10 @@ namespace BASpark
             return enabled;
         }
 
-        public static void SaveScreenSelections(IEnumerable<ScreenSelectionState> screenSelections)
+        public static bool SaveScreenSelections(IEnumerable<ScreenSelectionState> screenSelections)
         {
             var incoming = screenSelections
-                .Where(s => !string.IsNullOrWhiteSpace(s.IdentityKey) || !string.IsNullOrWhiteSpace(s.DeviceName))
+                .Where(s => s != null && (!string.IsNullOrWhiteSpace(s.IdentityKey) || !string.IsNullOrWhiteSpace(s.DeviceName)))
                 .Select(s => new ScreenSelectionState
                 {
                     IdentityKey = NormalizeScreenValue(s.IdentityKey),
@@ -591,16 +749,44 @@ namespace BASpark
                 })
                 .ToList();
 
-            var merged = GetScreenSelections();
-            foreach (var item in incoming)
+            lock (_syncLock)
             {
-                merged.RemoveAll(existing => IsSameSavedScreen(existing, item));
-                merged.Add(item);
-            }
+                var merged = GetScreenSelections();
+                foreach (var item in incoming)
+                {
+                    merged.RemoveAll(existing => IsSameSavedScreen(existing, item));
+                    merged.Add(item);
+                }
 
-            string json = System.Text.Json.JsonSerializer.Serialize(merged);
-            Save("ScreenSelections", json);
-            SaveEnabledScreenIds(incoming.Where(s => s.IsEnabled).Select(s => s.DeviceName));
+                string selectionsJson = System.Text.Json.JsonSerializer.Serialize(merged);
+                string enabledIdsJson = System.Text.Json.JsonSerializer.Serialize(incoming
+                    .Where(s => s.IsEnabled)
+                    .Select(s => s.DeviceName)
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Select(s => s.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList());
+                string previousSelections = ScreenSelections;
+                string previousEnabledIds = EnabledScreenIds;
+
+                if (!Save("ScreenSelections", selectionsJson))
+                {
+                    return false;
+                }
+
+                if (!Save("EnabledScreenIds", enabledIdsJson))
+                {
+                    if (!Save("ScreenSelections", previousSelections))
+                    {
+                        AppLogger.Warn("Failed to roll back ScreenSelections after EnabledScreenIds could not be saved.");
+                    }
+                    ScreenSelections = previousSelections;
+                    EnabledScreenIds = previousEnabledIds;
+                    return false;
+                }
+
+                return true;
+            }
         }
 
         private static bool IsScreenEnabledByPreference(
@@ -638,7 +824,7 @@ namespace BASpark
                     string.Equals(left.DeviceName, right.DeviceName, StringComparison.OrdinalIgnoreCase));
         }
 
-        private static string NormalizeScreenValue(string value) => value.Trim();
+        private static string NormalizeScreenValue(string? value) => value?.Trim() ?? "";
 
         public static void ResetAndClear()
         {

@@ -5,26 +5,41 @@ using Microsoft.Win32;
 using System.Windows.Interop;
 using System.Diagnostics;
 using System.Security.Principal;
-using System.Linq;
 
 namespace BASpark
 {
     public partial class App : System.Windows.Application
     {
+        private const string SingleInstanceMutexName = @"Local\BASpark_SingleInstance_Mutex";
+        private const string RestartHandoffArgument = "--baspark-restart-handoff";
+        private static readonly TimeSpan RestartHandoffTimeout = TimeSpan.FromSeconds(10);
+
         public static OverlayManager? Overlay { get; private set; }
         private System.Windows.Forms.NotifyIcon? _notifyIcon;
         private ControlPanelWindow? _controlPanel;
 
         private static Mutex? _mutex;
+        private static bool _ownsMutex;
         private int _isExiting = 0;
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            const string appName = @"Global\BASpark_SingleInstance_Mutex";
-            _mutex = new Mutex(true, appName, out bool createdNew);
-
-            if (!createdNew)
+            bool waitForRestartHandoff = HasRestartHandoffArgument(e.Args);
+            _mutex = new Mutex(false, SingleInstanceMutexName);
+            try
             {
+                _ownsMutex = _mutex.WaitOne(
+                    waitForRestartHandoff ? RestartHandoffTimeout : TimeSpan.Zero);
+            }
+            catch (AbandonedMutexException)
+            {
+                _ownsMutex = true;
+            }
+
+            if (!_ownsMutex)
+            {
+                _mutex.Dispose();
+                _mutex = null;
                 ConfigManager.Load();
                 if (!string.IsNullOrWhiteSpace(ConfigManager.UiLanguage))
                 {
@@ -86,8 +101,6 @@ namespace BASpark
 
             base.OnStartup(e);
 
-            bool launchedFromAutoStart = IsAutoStartLaunch(e.Args);
-
             if (!ConfigManager.AgreedToPrivacy)
             {
                 var privacyWin = new PrivacyWindow();
@@ -111,7 +124,7 @@ namespace BASpark
             Overlay = new OverlayManager();
             Overlay.Start();
 
-            if (!(launchedFromAutoStart && ConfigManager.StartSilent))
+            if (!ConfigManager.StartSilent)
             {
                 ShowControlPanel();
             }
@@ -139,32 +152,26 @@ namespace BASpark
             };
             foreach (string argument in args)
             {
-                startInfo.ArgumentList.Add(argument);
+                if (!string.Equals(argument, RestartHandoffArgument, StringComparison.OrdinalIgnoreCase))
+                {
+                    startInfo.ArgumentList.Add(argument);
+                }
             }
+            startInfo.ArgumentList.Add(RestartHandoffArgument);
 
             try
             {
-                Process.Start(startInfo);
-                if (_mutex != null)
+                if (Process.Start(startInfo) == null)
                 {
-                    _mutex.ReleaseMutex();
-                    _mutex.Dispose();
-                    _mutex = null;
+                    throw new InvalidOperationException("Failed to start the elevated process.");
                 }
+                ReleaseSingleInstanceMutex();
                 System.Windows.Application.Current.Shutdown();
             }
             catch (System.ComponentModel.Win32Exception)
             {
                 throw new Exception("用户拒绝了管理员授权。");
             }
-        }
-
-        private static bool IsAutoStartLaunch(string[] args)
-        {
-            return args.Any(arg =>
-                string.Equals(arg, "--autostart", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(arg, "--silent", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(arg, "/silent", StringComparison.OrdinalIgnoreCase));
         }
 
         private void OnSessionEnding(object sender, SessionEndingEventArgs e)
@@ -246,8 +253,12 @@ namespace BASpark
                 {
                     startInfo.Verb = "runas";
                 }
+                startInfo.ArgumentList.Add(RestartHandoffArgument);
 
-                System.Diagnostics.Process.Start(startInfo);
+                if (System.Diagnostics.Process.Start(startInfo) == null)
+                {
+                    throw new InvalidOperationException("Failed to start the replacement process.");
+                }
                 ExitApplication();
             }
             catch (Exception ex)
@@ -279,13 +290,45 @@ namespace BASpark
                 try { Overlay?.Dispose(); } catch { /* ignore: best-effort cleanup during shutdown */ }
             });
 
-            if (_mutex != null)
-            {
-                try { _mutex.ReleaseMutex(); } catch { /* ignore: mutex disposal during shutdown */ }
-                _mutex.Dispose();
-                _mutex = null;
-            }
+            ReleaseSingleInstanceMutex();
             System.Windows.Application.Current.Shutdown();
+        }
+
+        private static bool HasRestartHandoffArgument(string[] args)
+        {
+            foreach (string argument in args)
+            {
+                if (string.Equals(argument, RestartHandoffArgument, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void ReleaseSingleInstanceMutex()
+        {
+            if (_mutex == null)
+            {
+                return;
+            }
+
+            if (_ownsMutex)
+            {
+                try
+                {
+                    _mutex.ReleaseMutex();
+                }
+                catch (ApplicationException ex)
+                {
+                    AppLogger.Warn($"Failed to release the single-instance mutex: {ex.Message}");
+                }
+                _ownsMutex = false;
+            }
+
+            _mutex.Dispose();
+            _mutex = null;
         }
 
     }

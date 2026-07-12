@@ -81,7 +81,7 @@ namespace BASpark
 
         private DispatcherTimer _refreshTimer;
         private DispatcherTimer _noticeTimer;
-        private DispatcherTimer? _scrollbarHideTimer;
+        private readonly DispatcherTimer _scrollbarHideTimer;
         private readonly CancellationTokenSource _lifetimeCts = new();
         private bool _isCheckingUpdate = false;
         private bool _suspendLinkedAnimationUiHandlers;
@@ -91,6 +91,7 @@ namespace BASpark
         private bool _logViewInitialized;
         private int _lastRenderedStatus = -1;
         private int _lastRenderedClickCount = -1;
+        private int _themeRefreshPending;
         private readonly object _networkPromptLock = new();
 
         public ObservableCollection<FilterProfile> Profiles { get; set; } = new ObservableCollection<FilterProfile>();
@@ -102,6 +103,8 @@ namespace BASpark
         public ControlPanelWindow()
         {
             InitializeComponent();
+            _scrollbarHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+            _scrollbarHideTimer.Tick += ScrollbarHideTimer_Tick;
             SourceInitialized += (_, _) => ThemeManager.ApplyTitleBar(this);
             Activated += (_, _) => ThemeManager.ApplyTitleBar(this);
 
@@ -165,7 +168,7 @@ namespace BASpark
             _lifetimeCts.Cancel();
             _refreshTimer.Stop();
             _noticeTimer.Stop();
-            _scrollbarHideTimer?.Stop();
+            _scrollbarHideTimer.Stop();
             AppLogger.EntryAdded -= OnAppLogEntryAdded;
             SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
             _lifetimeCts.Dispose();
@@ -665,11 +668,10 @@ namespace BASpark
             Profiles.Clear();
             foreach (var p in ConfigManager.GetProfiles()) Profiles.Add(p);
 
-            var active = ConfigManager.GetActiveProfile();
-            ComboProfiles.SelectedItem = active;
+            string? activeId = ConfigManager.GetActiveProfile()?.Id;
+            ComboProfiles.SelectedItem = Profiles.FirstOrDefault(p => p.Id == activeId) ?? Profiles.FirstOrDefault();
 
             UpdateColorPreview(ConfigManager.ParticleColor);
-            UpdateStartSilentInterlock();
             UpdateClickEffectPanelVisibility();
             UpdateEnvironmentFilterInterlock();
 
@@ -750,7 +752,19 @@ namespace BASpark
                 e.Category == UserPreferenceCategory.VisualStyle ||
                 e.Category == UserPreferenceCategory.Color)
             {
-                Dispatcher.BeginInvoke(new Action(ApplyDarkMode), DispatcherPriority.Normal);
+                if (Interlocked.Exchange(ref _themeRefreshPending, 1) != 0)
+                {
+                    return;
+                }
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    Interlocked.Exchange(ref _themeRefreshPending, 0);
+                    if (ConfigManager.DarkMode == DarkModeOption.System)
+                    {
+                        ApplyDarkMode();
+                    }
+                }), DispatcherPriority.Normal);
             }
         }
 
@@ -787,7 +801,7 @@ namespace BASpark
 
         private void ApplyScrollbarSettings()
         {
-            _scrollbarHideTimer?.Stop();
+            _scrollbarHideTimer.Stop();
             ApplyScrollbarVisibility(MainContentScrollViewer);
             ApplyScrollbarVisibility(SettingsContentScrollViewer);
         }
@@ -807,18 +821,18 @@ namespace BASpark
             }
 
             scrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Visible;
-            _scrollbarHideTimer?.Stop();
-            _scrollbarHideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
-            _scrollbarHideTimer.Tick += (_, _) =>
-            {
-                _scrollbarHideTimer?.Stop();
-                if (ConfigManager.ScrollbarVisibility == PanelScrollbarVisibility.OnScroll)
-                {
-                    ApplyScrollbarVisibility(MainContentScrollViewer);
-                    ApplyScrollbarVisibility(SettingsContentScrollViewer);
-                }
-            };
+            _scrollbarHideTimer.Stop();
             _scrollbarHideTimer.Start();
+        }
+
+        private void ScrollbarHideTimer_Tick(object? sender, EventArgs e)
+        {
+            _scrollbarHideTimer.Stop();
+            if (ConfigManager.ScrollbarVisibility == PanelScrollbarVisibility.OnScroll)
+            {
+                ApplyScrollbarVisibility(MainContentScrollViewer);
+                ApplyScrollbarVisibility(SettingsContentScrollViewer);
+            }
         }
 
         private void MainContentScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -916,11 +930,6 @@ namespace BASpark
             }
         }
 
-        private void CheckAutoStart_Changed(object sender, RoutedEventArgs e)
-        {
-            UpdateStartSilentInterlock();
-        }
-
         private void CheckMasterSwitch_Changed(object sender, RoutedEventArgs e)
         {
             if (!IsLoaded) return;
@@ -942,12 +951,6 @@ namespace BASpark
                 StatusText.Text = Localization.Get("Status_AdminPending");
                 StatusText.Foreground = System.Windows.Media.Brushes.Orange;
             }
-        }
-
-        private void UpdateStartSilentInterlock()
-        {
-            bool autoStartEnabled = CheckAutoStart.IsChecked == true;
-            CheckStartSilent.IsEnabled = autoStartEnabled;
         }
 
         private void EnvironmentFilterSetting_Changed(object sender, RoutedEventArgs e)
@@ -1519,6 +1522,8 @@ namespace BASpark
 
         private void SaveSettings_Click(object sender, RoutedEventArgs e)
         {
+            bool autoStartWasEnabled = ConfigManager.AutoStart;
+            bool runAsAdminWasEnabled = ConfigManager.RunAsAdmin;
             string? selectedLanguage = GetSelectedLanguage();
             bool languageChanged = !string.IsNullOrWhiteSpace(selectedLanguage) &&
                 !string.Equals(selectedLanguage, _languageAtLoad, StringComparison.OrdinalIgnoreCase);
@@ -1594,64 +1599,78 @@ namespace BASpark
                 return;
             }
 
+            AutoStartPlan previousAutoStartPlan = AutoStartManager.CreatePlan(autoStartWasEnabled, runAsAdminWasEnabled);
+            AutoStartPlan requestedAutoStartPlan = AutoStartManager.CreatePlan(autoStartEnabled, runAsAdminEnabled);
+            bool autoStartPlanChanged = previousAutoStartPlan != requestedAutoStartPlan;
+            if (autoStartPlanChanged &&
+                !ApplyAutoStartSettings(previousAutoStartPlan, requestedAutoStartPlan, showError: true))
+            {
+                return;
+            }
+
+            if (!ConfigManager.SaveAutoStartSettings(autoStartEnabled, runAsAdminEnabled))
+            {
+                bool restored = !autoStartPlanChanged ||
+                    ApplyAutoStartSettings(requestedAutoStartPlan, previousAutoStartPlan, showError: false);
+                ConfigManager.AutoStart = autoStartWasEnabled;
+                ConfigManager.RunAsAdmin = runAsAdminWasEnabled;
+                string details = restored
+                    ? "The application configuration could not be saved."
+                    : "The application configuration could not be saved, and the previous operating-system auto-start state could not be fully restored.";
+                ShowAutoStartError(details);
+                return;
+            }
+
+            bool settingsSaved = true;
             if (!string.IsNullOrWhiteSpace(selectedLanguage))
             {
-                ConfigManager.Save("UiLanguage", selectedLanguage);
-                Localization.ApplyCulture(selectedLanguage);
+                settingsSaved &= ConfigManager.Save("UiLanguage", selectedLanguage);
             }
 
             // 保存配置组
             string activeId = (ComboProfiles.SelectedItem as FilterProfile)?.Id ?? "";
-            ConfigManager.SaveProfiles(Profiles.ToList(), activeId);
+            settingsSaved &= ConfigManager.SaveProfiles(Profiles.ToList(), activeId);
 
-            ConfigManager.Save("RunAsAdmin", runAsAdminEnabled);
-            ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
-            ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsChecked ?? true);
-            ConfigManager.Save("AutoStart", autoStartEnabled);
-            ConfigManager.Save("EnableTelemetry", telemetryEnabled);
-            ConfigManager.Save("ParticleColor", ConfigManager.ParticleColor);
-            ConfigManager.Save("EffectScale", effectScale);
-            ConfigManager.Save("TrailThickness", trailThickness);
-            ConfigManager.Save("GlowIntensity", glowIntensity);
-            ConfigManager.Save("TrailDelay", trailDelay);
-            ConfigManager.Save("EffectOpacity", effectOpacity);
-            ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
-            ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
-            ConfigManager.Save("TrailAnimationSpeed", trailAnimSpeed);
-            ConfigManager.Save("ClickAnimationSpeed", clickAnimSpeed);
-            ConfigManager.Save("TrailRefreshRate", trailRefreshRate);
-            ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
-            ConfigManager.Save("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch.IsChecked ?? false);
+            settingsSaved &= ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
+            settingsSaved &= ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsChecked ?? true);
+            settingsSaved &= ConfigManager.Save("EnableTelemetry", telemetryEnabled);
+            settingsSaved &= ConfigManager.Save("ParticleColor", ConfigManager.ParticleColor);
+            settingsSaved &= ConfigManager.Save("EffectScale", effectScale);
+            settingsSaved &= ConfigManager.Save("TrailThickness", trailThickness);
+            settingsSaved &= ConfigManager.Save("GlowIntensity", glowIntensity);
+            settingsSaved &= ConfigManager.Save("TrailDelay", trailDelay);
+            settingsSaved &= ConfigManager.Save("EffectOpacity", effectOpacity);
+            settingsSaved &= ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
+            settingsSaved &= ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
+            settingsSaved &= ConfigManager.Save("TrailAnimationSpeed", trailAnimSpeed);
+            settingsSaved &= ConfigManager.Save("ClickAnimationSpeed", clickAnimSpeed);
+            settingsSaved &= ConfigManager.Save("TrailRefreshRate", trailRefreshRate);
+            settingsSaved &= ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
+            settingsSaved &= ConfigManager.Save("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch.IsChecked ?? false);
             var scrollbarVisibility = RadioScrollbarAlways.IsChecked == true
                 ? PanelScrollbarVisibility.Always
                 : PanelScrollbarVisibility.OnScroll;
-            ConfigManager.Save("ScrollbarVisibility", scrollbarVisibility);
-            ApplyScrollbarSettings();
-            ConfigManager.Save("NetworkRegion", selectedNetworkRegion);
-            ConfigManager.Save("DarkMode", selectedDarkMode);
-            ApplyDarkMode();
-            ConfigManager.Save("StartSilent", startSilentEnabled);
-            ConfigManager.Save("EnableEnvironmentFilter", CheckEnvironmentFilter.IsChecked ?? false);
-            ConfigManager.Save("HideInFullscreen", CheckHideInFullscreen.IsChecked ?? true);
-            ConfigManager.Save("ShowEffectOnDesktop", CheckShowEffectOnDesktop.IsChecked ?? true);
-            ConfigManager.Save("ClickTriggerType", clickType);
-            ConfigManager.Save("EnableMiddleClickTrigger", middleClickEnabled);
-            ConfigManager.Save("ScreenshotCompatibilityMode", screenshotCompatibilityEnabled);
+            settingsSaved &= ConfigManager.Save("ScrollbarVisibility", scrollbarVisibility);
+            settingsSaved &= ConfigManager.Save("NetworkRegion", selectedNetworkRegion);
+            settingsSaved &= ConfigManager.Save("DarkMode", selectedDarkMode);
+            settingsSaved &= ConfigManager.Save("StartSilent", startSilentEnabled);
+            settingsSaved &= ConfigManager.Save("EnableEnvironmentFilter", CheckEnvironmentFilter.IsChecked ?? false);
+            settingsSaved &= ConfigManager.Save("HideInFullscreen", CheckHideInFullscreen.IsChecked ?? true);
+            settingsSaved &= ConfigManager.Save("ShowEffectOnDesktop", CheckShowEffectOnDesktop.IsChecked ?? true);
+            settingsSaved &= ConfigManager.Save("ClickTriggerType", clickType);
+            settingsSaved &= ConfigManager.Save("EnableMiddleClickTrigger", middleClickEnabled);
+            settingsSaved &= ConfigManager.Save("ScreenshotCompatibilityMode", screenshotCompatibilityEnabled);
 
             bool sidebarBackgroundChanged = !string.Equals(
                 sidebarBackgroundPath,
                 ConfigManager.SidebarBackgroundImagePath,
                 StringComparison.OrdinalIgnoreCase);
-            ConfigManager.Save("SidebarBackgroundImagePath", sidebarBackgroundPath);
-            if (sidebarBackgroundChanged)
-            {
-                _ = ApplySidebarBackgroundAsync(sidebarBackgroundPath);
-            }
+            settingsSaved &= ConfigManager.Save("SidebarBackgroundImagePath", sidebarBackgroundPath);
 
             var previousEnabledScreenIds = ConfigManager.ResolveEnabledScreenDeviceNames(ScreenOptions.Select(CreateScreenIdentityInfo));
 
             // 保存当前可见屏幕的启用状态，离线屏幕的旧设置会在 ConfigManager 中保留
-            ConfigManager.SaveScreenSelections(ScreenOptions.Select(item => new ScreenSelectionState
+            settingsSaved &= ConfigManager.SaveScreenSelections(ScreenOptions.Select(item => new ScreenSelectionState
             {
                 IdentityKey = item.IdentityKey,
                 DeviceName = item.DeviceName,
@@ -1659,7 +1678,27 @@ namespace BASpark
                 IsEnabled = item.IsEnabled
             }));
 
-            ApplyAutoStartSettings();
+            if (!settingsSaved)
+            {
+                System.Windows.MessageBox.Show(
+                    this,
+                    Localization.Get("Msg_SettingsSaveFailed"),
+                    Localization.Get("Msg_Error"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedLanguage))
+            {
+                Localization.ApplyCulture(selectedLanguage);
+            }
+            ApplyScrollbarSettings();
+            ApplyDarkMode();
+            if (sidebarBackgroundChanged)
+            {
+                _ = ApplySidebarBackgroundAsync(sidebarBackgroundPath);
+            }
 
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             GetUiAnimationSpeeds(out double overlayTrail, out double overlayClick);
@@ -1762,52 +1801,103 @@ namespace BASpark
             };
         }
 
-        private void ApplyAutoStartSettings()
+        private bool ApplyAutoStartSettings(
+            AutoStartPlan previousPlan,
+            AutoStartPlan requestedPlan,
+            bool showError)
         {
-            bool autoStart = CheckAutoStart.IsChecked == true;
-            bool runAsAdmin = CheckRunAsAdmin.IsChecked == true;
-
             string? exePath = AutoStartManager.ResolveExecutablePath(
                 Environment.ProcessPath,
                 Process.GetCurrentProcess().MainModule?.FileName,
                 Assembly.GetExecutingAssembly().Location,
                 AppDomain.CurrentDomain.BaseDirectory);
 
-            if (string.IsNullOrEmpty(exePath)) return;
+            if (string.IsNullOrEmpty(exePath))
+            {
+                if (showError)
+                {
+                    ShowAutoStartError("The application executable path could not be resolved.");
+                }
+                return false;
+            }
 
             string regKeyPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-            AutoStartPlan plan = AutoStartManager.CreatePlan(autoStart, runAsAdmin);
+            bool scheduledTaskChanged = requestedPlan.ScheduledTaskEnabled != previousPlan.ScheduledTaskEnabled;
 
             try
             {
-                // 注册表 Run 条目（普通自启）与计划任务（管理员自启）是两条独立路径，
-                // 注册表打开失败不应阻止计划任务的创建/清理
-                using (RegistryKey? key = Registry.CurrentUser.CreateSubKey(regKeyPath, true))
+                using RegistryKey? key = Registry.CurrentUser.CreateSubKey(regKeyPath, true);
+                if (key == null)
                 {
-                    if (key == null)
-                    {
-                        AppLogger.Warn($"Failed to open registry key for auto-start: {regKeyPath}");
-                    }
-                    else if (plan.RegistryRunEnabled)
-                    {
-                        key.SetValue(AutoStartManager.RunValueName, AutoStartManager.BuildRunCommand(exePath));
-                    }
-                    else
-                    {
-                        key.DeleteValue(AutoStartManager.RunValueName, false);
-                    }
+                    throw new InvalidOperationException($"Failed to open registry key for auto-start: {regKeyPath}");
                 }
 
-                ManageTaskScheduler(AutoStartManager.TaskName, exePath, plan.ScheduledTaskEnabled);
+                if (scheduledTaskChanged &&
+                    !ManageTaskScheduler(AutoStartManager.TaskName, exePath, requestedPlan.ScheduledTaskEnabled, out string taskError))
+                {
+                    if (showError)
+                    {
+                        ShowAutoStartError(taskError);
+                    }
+                    return false;
+                }
+
+                if (requestedPlan.RegistryRunEnabled)
+                {
+                    key.SetValue(AutoStartManager.RunValueName, AutoStartManager.BuildRunCommand(exePath));
+                }
+                else
+                {
+                    key.DeleteValue(AutoStartManager.RunValueName, false);
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
                 AppLogger.Warn($"Failed to apply auto-start settings: {ex.Message}");
+                string details = ex.Message;
+                if (scheduledTaskChanged)
+                {
+                    if (!ManageTaskScheduler(AutoStartManager.TaskName, exePath, previousPlan.ScheduledTaskEnabled, out string taskRollbackError))
+                    {
+                        details += $" Task rollback failed: {taskRollbackError}";
+                    }
+                }
+
+                try
+                {
+                    using RegistryKey? rollbackKey = Registry.CurrentUser.CreateSubKey(regKeyPath, true);
+                    if (rollbackKey == null)
+                    {
+                        throw new InvalidOperationException("The auto-start registry key could not be reopened for rollback.");
+                    }
+
+                    if (previousPlan.RegistryRunEnabled)
+                    {
+                        rollbackKey.SetValue(AutoStartManager.RunValueName, AutoStartManager.BuildRunCommand(exePath));
+                    }
+                    else
+                    {
+                        rollbackKey.DeleteValue(AutoStartManager.RunValueName, false);
+                    }
+                }
+                catch (Exception rollbackEx)
+                {
+                    details += $" Registry rollback failed: {rollbackEx.Message}";
+                }
+
+                if (showError)
+                {
+                    ShowAutoStartError(details);
+                }
+                return false;
             }
         }
 
-        private void ManageTaskScheduler(string taskName, string exePath, bool create)
+        private bool ManageTaskScheduler(string taskName, string exePath, bool create, out string error)
         {
+            error = string.Empty;
             try
             {
                 string arguments = create
@@ -1826,50 +1916,52 @@ namespace BASpark
                     Verb = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator) ? "" : "runas"
                 };
 
-                using (Process? process = Process.Start(startInfo))
+                using Process? process = Process.Start(startInfo);
+                if (process == null)
                 {
-                    process?.WaitForExit();
-                    if (process is { ExitCode: not 0 })
-                    {
-                        AppLogger.Warn($"Task Scheduler command failed with exit code {process.ExitCode}.");
-                    }
+                    error = "Task Scheduler could not be started.";
+                    return false;
                 }
+
+                if (!process.WaitForExit(30000))
+                {
+                    try { process.Kill(entireProcessTree: true); } catch { /* best-effort timeout cleanup */ }
+                    error = "Task Scheduler did not finish within 30 seconds.";
+                    return false;
+                }
+
+                if (process.ExitCode != 0)
+                {
+                    error = $"Task Scheduler exited with code {process.ExitCode}.";
+                    AppLogger.Warn(error);
+                    return false;
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("任务计划程序配置失败: " + ex.Message);
+                error = ex.Message;
+                AppLogger.Warn($"Task Scheduler configuration failed: {ex.Message}");
+                return false;
             }
+        }
+
+        private void ShowAutoStartError(string details)
+        {
+            System.Windows.MessageBox.Show(
+                this,
+                Localization.Format("Msg_AutoStartUpdateFailed", details),
+                Localization.Get("Msg_Error"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
 
         private void RestartAsAdmin()
         {
-            try
+            if (System.Windows.Application.Current is App app)
             {
-                string? exePath = Process.GetCurrentProcess().MainModule?.FileName;
-
-                if (string.IsNullOrEmpty(exePath) || !exePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                {
-                    exePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BASpark.exe");
-                }
-
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = exePath,
-                    UseShellExecute = true,
-                    Verb = "runas",
-                    Arguments = ConfigManager.StartSilent ? "/silent" : ""
-                };
-
-                Process.Start(startInfo);
-                System.Windows.Application.Current.Shutdown();
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show(
-                    Localization.Format("Msg_RestartAdminFailed", ex.Message),
-                    Localization.Get("Msg_Error"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                app.RestartApplicationFromPanel();
             }
         }
 
