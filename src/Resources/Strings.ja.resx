@@ -196,7 +196,7 @@
       <value>🚫 オフ</value>
     </data>
     <data name="Filter_Mode_Whitelist" xml:space="preserve">
-      <value>✓ ホワイトリスト</value>
+      <value>✔ ホワイトリスト</value>
     </data>
     <data name="Filter_New" xml:space="preserve">
       <value>新規</value>

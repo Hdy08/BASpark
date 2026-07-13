@@ -196,7 +196,7 @@
       <value>🚫 关闭过滤</value>
     </data>
     <data name="Filter_Mode_Whitelist" xml:space="preserve">
-      <value>✓ 白名单模式</value>
+      <value>✔ 白名单模式</value>
     </data>
     <data name="Filter_New" xml:space="preserve">
       <value>新建</value>

@@ -1782,13 +1782,6 @@ namespace BASpark
             {
                 TelemetryHelper.SendStartupData();
             }
-
-            System.Windows.MessageBox.Show(
-                this,
-                Localization.Get("Msg_SettingsApplied"),
-                Localization.Get("App_Title_ControlPanel"),
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
         }
 
         private void RefreshScreenOptions_Click(object sender, RoutedEventArgs e)

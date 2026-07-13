@@ -966,7 +966,7 @@
                                                     <ComboBox Name="ComboProcessFilterMode" Width="180" Margin="0,0,0,12" SelectionChanged="ProcessFilterMode_Changed" Height="28" VerticalContentAlignment="Center" HorizontalAlignment="Left">
                                                         <ComboBoxItem Content="🚫 关闭过滤" Tag="Disabled"/>
                                                         <ComboBoxItem Content="❌ 黑名单模式" Tag="Blacklist"/>
-                                                        <ComboBoxItem Content="✓ 白名单模式" Tag="Whitelist"/>
+                                                        <ComboBoxItem Content="✔ 白名单模式" Tag="Whitelist"/>
                                                     </ComboBox>
 
                                                     <TextBlock x:Name="TxtProcessList" Text="已配置进程列表" FontWeight="SemiBold" Foreground="{DynamicResource ThemePrimaryTextBrush}" Margin="0,0,0,10"/>
