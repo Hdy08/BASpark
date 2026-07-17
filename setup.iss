@@ -104,8 +104,10 @@ Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN BASparkAutoStart /F"; F
 
 [Run]
 #ifdef UiAccessCertificateThumbprint
+Filename: "{app}\BASpark.exe"; Parameters: "--repair-autostart"; Flags: runhidden waituntilterminated shellexec
 Filename: "{app}\BASpark.exe"; Parameters: "--show-control-panel"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent shellexec
 #else
+Filename: "{app}\BASpark.exe"; Parameters: "--repair-autostart"; Flags: runhidden waituntilterminated
 Filename: "{app}\BASpark.exe"; Parameters: "--show-control-panel"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent
 #endif
 

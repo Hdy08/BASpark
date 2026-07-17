@@ -1843,7 +1843,7 @@ namespace BASpark
                 }
 
                 if (scheduledTaskChanged &&
-                    !ManageTaskScheduler(AutoStartManager.TaskName, exePath, requestedPlan.ScheduledTaskEnabled, out string taskError))
+                    !AutoStartManager.TrySetScheduledTask(exePath, requestedPlan.ScheduledTaskEnabled, out string taskError))
                 {
                     if (showError)
                     {
@@ -1869,7 +1869,7 @@ namespace BASpark
                 string details = ex.Message;
                 if (scheduledTaskChanged)
                 {
-                    if (!ManageTaskScheduler(AutoStartManager.TaskName, exePath, previousPlan.ScheduledTaskEnabled, out string taskRollbackError))
+                    if (!AutoStartManager.TrySetScheduledTask(exePath, previousPlan.ScheduledTaskEnabled, out string taskRollbackError))
                     {
                         details += $" Task rollback failed: {taskRollbackError}";
                     }
@@ -1901,58 +1901,6 @@ namespace BASpark
                 {
                     ShowAutoStartError(details);
                 }
-                return false;
-            }
-        }
-
-        private bool ManageTaskScheduler(string taskName, string exePath, bool create, out string error)
-        {
-            error = string.Empty;
-            try
-            {
-                string arguments = create
-                    ? $"/create /tn \"{taskName}\" /tr \"\\\"{exePath}\\\" --autostart\" /sc onlogon /rl highest /f"
-                    : $"/delete /tn \"{taskName}\" /f";
-
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    FileName = System.IO.Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.System),
-                        "schtasks.exe"),
-                    Arguments = arguments,
-                    UseShellExecute = true,
-                    CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    Verb = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator) ? "" : "runas"
-                };
-
-                using Process? process = Process.Start(startInfo);
-                if (process == null)
-                {
-                    error = "Task Scheduler could not be started.";
-                    return false;
-                }
-
-                if (!process.WaitForExit(30000))
-                {
-                    try { process.Kill(entireProcessTree: true); } catch { /* best-effort timeout cleanup */ }
-                    error = "Task Scheduler did not finish within 30 seconds.";
-                    return false;
-                }
-
-                if (process.ExitCode != 0)
-                {
-                    error = $"Task Scheduler exited with code {process.ExitCode}.";
-                    AppLogger.Warn(error);
-                    return false;
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                error = ex.Message;
-                AppLogger.Warn($"Task Scheduler configuration failed: {ex.Message}");
                 return false;
             }
         }

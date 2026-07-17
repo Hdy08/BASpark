@@ -13,6 +13,7 @@ namespace BASpark
         private const string SingleInstanceMutexName = @"Local\BASpark_SingleInstance_Mutex";
         private const string RestartHandoffArgument = "--baspark-restart-handoff";
         private const string ShowControlPanelArgument = "--show-control-panel";
+        private const string RepairAutoStartArgument = "--repair-autostart";
         private static readonly TimeSpan RestartHandoffTimeout = TimeSpan.FromSeconds(10);
 
         public static OverlayManager? Overlay { get; private set; }
@@ -60,6 +61,13 @@ namespace BASpark
             ConfigManager.Load();
             AppLogger.Initialize();
 
+            if (HasArgument(e.Args, RepairAutoStartArgument))
+            {
+                SynchronizeScheduledAutoStart(removeWhenDisabled: true);
+                ExitApplication();
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(ConfigManager.UiLanguage))
             {
                 if (!ConfigManager.AgreedToPrivacy)
@@ -97,6 +105,8 @@ namespace BASpark
                     Debug.WriteLine("自动请求管理员权限被拒绝或失败: " + ex.Message);
                 }
             }
+
+            SynchronizeScheduledAutoStart(removeWhenDisabled: false);
 
             SystemEvents.SessionEnding += OnSessionEnding;
 
@@ -137,6 +147,31 @@ namespace BASpark
             {
                 WindowsPrincipal principal = new WindowsPrincipal(identity);
                 return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+        }
+
+        private void SynchronizeScheduledAutoStart(bool removeWhenDisabled)
+        {
+            bool scheduledTaskEnabled = ConfigManager.AutoStart && ConfigManager.RunAsAdmin;
+            if ((!scheduledTaskEnabled || !IsRunningAsAdmin()) && !removeWhenDisabled)
+            {
+                return;
+            }
+
+            string? exePath = AutoStartManager.ResolveExecutablePath(
+                Environment.ProcessPath,
+                Process.GetCurrentProcess().MainModule?.FileName,
+                typeof(App).Assembly.Location,
+                AppContext.BaseDirectory);
+            if (string.IsNullOrEmpty(exePath) ||
+                (scheduledTaskEnabled && AutoStartManager.IsScheduledTaskCurrent(exePath)))
+            {
+                return;
+            }
+
+            if (!AutoStartManager.TrySetScheduledTask(exePath, scheduledTaskEnabled, out string error))
+            {
+                AppLogger.Warn($"Failed to synchronize the auto-start task: {error}");
             }
         }
 
