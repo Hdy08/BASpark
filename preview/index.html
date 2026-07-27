@@ -273,6 +273,7 @@
             const TRAIL_RENDER_WIDTH_SCALE = 0.5;
             const DISTANCE_RATE_PER_WORLD = 5;
             const DISC_HDR = 2;
+            const MASK_COLOR = Object.freeze([1, 1, 1]);
             const PARTICLE_HDR = 5.992156982421875;
             const TRAIL_HDR = 23.9686279296875;
             const BLOOM_RESOURCE_INTENSITY = 1.7000000476837158;
@@ -287,7 +288,7 @@
 
             const PROFILE = Object.freeze({
                 disc: {
-                    lifetimeMs: 200,
+                    lifetimeMs: 200.00000298023224,
                     size: 0.12,
                     sizeMultiplier: 2,
                     sizeCurve: [
@@ -964,6 +965,8 @@
                 uniform sampler2D uSource;
                 uniform sampler2D uBloom;
                 uniform sampler2D uDiscMask;
+                uniform sampler2D uDiscFootprint;
+                uniform sampler2D uNonDiscAlpha;
                 uniform float uBloomStrength;
                 uniform vec2 uBloomTexel;
                 uniform float uSampleScale;
@@ -991,9 +994,45 @@
                     float sourceCoverage = clamp(source.a, 0.0, 1.0);
                     float effectAlpha = 1.0 - (1.0 - sourceCoverage) * (1.0 - effectCoverage);
                     float discCoverage = texture(uDiscMask, vUv).r;
-                    float discMask = step(0.0001, discCoverage);
-                    float alpha = mix(effectAlpha, discCoverage, discMask);
+                    float discFootprint = texture(uDiscFootprint, vUv).r;
+                    float nonDiscAlpha = texture(uNonDiscAlpha, vUv).r;
+                    float discCompositeAlpha = 1.0 - (1.0 - discCoverage) * (1.0 - nonDiscAlpha);
+                    float discMask = step(0.0001, discFootprint);
+                    float alpha = mix(effectAlpha, discCompositeAlpha, discMask);
                     outColor = vec4(min(srgb, vec3(alpha)), alpha);
+                }`;
+
+            const NON_DISC_ALPHA_FRAGMENT = `#version 300 es
+                precision highp float;
+                uniform sampler2D uSource;
+                uniform sampler2D uBloom;
+                uniform float uBloomStrength;
+                uniform vec2 uBloomTexel;
+                uniform float uSampleScale;
+                in vec2 vUv;
+                out vec4 outColor;
+                vec3 linearToSrgb(vec3 value) {
+                    vec3 lo = value * 12.92;
+                    vec3 hi = 1.055 * pow(max(value, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055;
+                    return mix(hi, lo, lessThanEqual(value, vec3(0.0031308)));
+                }
+                vec3 sampleBloom(vec2 uv) {
+                    vec2 offset = uBloomTexel * (uSampleScale * 0.5);
+                    vec3 color = texture(uBloom, uv + offset * vec2(-1.0, -1.0)).rgb;
+                    color += texture(uBloom, uv + offset * vec2( 1.0, -1.0)).rgb;
+                    color += texture(uBloom, uv + offset * vec2(-1.0,  1.0)).rgb;
+                    color += texture(uBloom, uv + offset * vec2( 1.0,  1.0)).rgb;
+                    return color * 0.25;
+                }
+                void main() {
+                    vec4 source = texture(uSource, vUv);
+                    vec3 bloom = sampleBloom(vUv) * uBloomStrength;
+                    vec3 hdr = max(source.rgb + bloom, vec3(0.0));
+                    vec3 srgb = linearToSrgb(hdr);
+                    float effectCoverage = clamp(max(max(srgb.r, srgb.g), srgb.b), 0.0, 1.0);
+                    float sourceCoverage = clamp(source.a, 0.0, 1.0);
+                    float alpha = 1.0 - (1.0 - sourceCoverage) * (1.0 - effectCoverage);
+                    outColor = vec4(alpha, 0.0, 0.0, 1.0);
                 }`;
 
             class WebGlRenderer {
@@ -1038,6 +1077,7 @@
                     this.prefilterProgram = createProgram(gl, FULLSCREEN_VERTEX, PREFILTER_FRAGMENT);
                     this.downsampleProgram = createProgram(gl, FULLSCREEN_VERTEX, DOWNSAMPLE_FRAGMENT);
                     this.upsampleProgram = createProgram(gl, FULLSCREEN_VERTEX, UPSAMPLE_FRAGMENT);
+                    this.nonDiscAlphaProgram = createProgram(gl, FULLSCREEN_VERTEX, NON_DISC_ALPHA_FRAGMENT);
                     this.finalProgram = createProgram(gl, FULLSCREEN_VERTEX, FINAL_FRAGMENT);
                 }
 
@@ -1105,24 +1145,44 @@
                     return target;
                 }
 
-                createMaskTarget(width, height) {
+                createCoverageTarget(width, height) {
                     const gl = this.gl;
-                    const texture = gl.createTexture();
-                    gl.bindTexture(gl.TEXTURE_2D, texture);
-                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, width, height, 0, gl.RED, gl.UNSIGNED_BYTE, null);
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                    const framebuffer = gl.createFramebuffer();
-                    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-                    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-                        throw new Error("Touch effect mask framebuffer is incomplete");
+                    const formats = this.floatTargets
+                        ? [
+                            { internalFormat: gl.R16F, type: gl.HALF_FLOAT },
+                            { internalFormat: gl.R8, type: gl.UNSIGNED_BYTE }
+                        ]
+                        : [{ internalFormat: gl.R8, type: gl.UNSIGNED_BYTE }];
+                    for (const format of formats) {
+                        const texture = gl.createTexture();
+                        gl.bindTexture(gl.TEXTURE_2D, texture);
+                        gl.texImage2D(
+                            gl.TEXTURE_2D,
+                            0,
+                            format.internalFormat,
+                            width,
+                            height,
+                            0,
+                            gl.RED,
+                            format.type,
+                            null
+                        );
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                        const framebuffer = gl.createFramebuffer();
+                        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+                        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) {
+                            const target = { texture, framebuffer, width, height };
+                            this.targets.push(target);
+                            return target;
+                        }
+                        gl.deleteTexture(texture);
+                        gl.deleteFramebuffer(framebuffer);
                     }
-                    const target = { texture, framebuffer, width, height };
-                    this.targets.push(target);
-                    return target;
+                    throw new Error("Touch effect coverage framebuffer is incomplete");
                 }
 
                 createMultisampleTarget(width, height) {
@@ -1200,7 +1260,10 @@
                     this.canvas.height = pixelHeight;
                     this.deleteTargets();
                     this.sourceTarget = this.createTarget(pixelWidth, pixelHeight);
-                    this.discMaskTarget = this.createMaskTarget(pixelWidth, pixelHeight);
+                    this.nonDiscTarget = this.createTarget(pixelWidth, pixelHeight);
+                    this.discMaskTarget = this.createCoverageTarget(pixelWidth, pixelHeight);
+                    this.discFootprintTarget = this.createCoverageTarget(pixelWidth, pixelHeight);
+                    this.nonDiscAlphaTarget = this.createCoverageTarget(pixelWidth, pixelHeight);
                     this.sourceMsaaTarget = this.createMultisampleTarget(pixelWidth, pixelHeight);
                     this.msaaSamples = this.sourceMsaaTarget?.samples || 1;
                     this.downTargets = [];
@@ -1261,8 +1324,21 @@
                     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
                 }
 
-                drawSprite(texture, x, y, width, height, rotation, color, alpha, gain, uvRect = [0, 0, 1, 1]) {
-                    if (width <= 0.02 || height <= 0.02 || alpha <= 0.0001) return;
+                drawSprite(
+                    texture,
+                    x,
+                    y,
+                    width,
+                    height,
+                    rotation,
+                    color,
+                    alpha,
+                    gain,
+                    uvRect = [0, 0, 1, 1],
+                    alphaCutoff = 0.0001,
+                    applyEngineOpacity = true
+                ) {
+                    if (width <= 0.02 || height <= 0.02 || alpha <= alphaCutoff) return;
                     const gl = this.gl;
                     const program = this.spriteProgram;
                     gl.useProgram(program);
@@ -1277,7 +1353,8 @@
                     gl.uniform1f(gl.getUniformLocation(program, "uRotation"), rotation);
                     const linear = linearColor(color);
                     gl.uniform3f(gl.getUniformLocation(program, "uColor"), linear[0], linear[1], linear[2]);
-                    gl.uniform1f(gl.getUniformLocation(program, "uAlpha"), clamp(alpha * this.engine.opacity, 0, 1));
+                    const opacity = applyEngineOpacity ? this.engine.opacity : 1;
+                    gl.uniform1f(gl.getUniformLocation(program, "uAlpha"), clamp(alpha * opacity, 0, 1));
                     gl.uniform1f(gl.getUniformLocation(program, "uGain"), gain);
                     gl.drawArrays(gl.TRIANGLES, 0, 6);
                 }
@@ -1343,7 +1420,9 @@
                         0,
                         disc.color,
                         disc.alpha,
-                        DISC_HDR
+                        DISC_HDR,
+                        [0, 0, 1, 1],
+                        0
                     );
                 }
 
@@ -1358,9 +1437,31 @@
                         disc.size,
                         disc.size,
                         0,
-                        [1, 1, 1],
+                        MASK_COLOR,
                         disc.alpha,
-                        1
+                        1,
+                        [0, 0, 1, 1],
+                        0
+                    );
+                }
+
+                renderDiscFootprint(click, now) {
+                    const disc = this.getDiscState(click, now);
+                    if (!disc) return;
+                    this.setPremultipliedBlend();
+                    this.drawSprite(
+                        this.textures.circle,
+                        click.x,
+                        click.y,
+                        disc.size,
+                        disc.size,
+                        0,
+                        MASK_COLOR,
+                        1,
+                        1,
+                        [0, 0, 1, 1],
+                        0,
+                        false
                     );
                 }
 
@@ -1491,14 +1592,16 @@
                     }
                 }
 
-                renderSource(now) {
+                renderSource(now, target, includeDisc = true) {
                     const gl = this.gl;
-                    const renderTarget = this.sourceMsaaTarget || this.sourceTarget;
+                    const renderTarget = this.sourceMsaaTarget || target;
                     this.clearTarget(renderTarget);
                     gl.disable(gl.DEPTH_TEST);
                     gl.disable(gl.CULL_FACE);
                     this.renderTrail(now);
-                    for (const click of this.engine.clicks) this.renderDisc(click, now);
+                    if (includeDisc) {
+                        for (const click of this.engine.clicks) this.renderDisc(click, now);
+                    }
                     for (const click of this.engine.clicks) {
                         for (const arc of click.arcs) this.renderArc(click, arc, now);
                     }
@@ -1510,7 +1613,11 @@
                             this.renderTriangle(particle, now, this.engine.clickSpeed);
                         }
                     }
-                    this.resolveSourceMultisample();
+                    this.resolveSourceMultisample(target);
+                }
+
+                renderNonDiscSource(now) {
+                    this.renderSource(now, this.nonDiscTarget, false);
                 }
 
                 renderDiscMasks(now) {
@@ -1519,13 +1626,21 @@
                     gl.disable(gl.DEPTH_TEST);
                     gl.disable(gl.CULL_FACE);
                     for (const click of this.engine.clicks) this.renderDiscMask(click, now);
+                    this.clearTarget(this.discFootprintTarget);
+                    gl.disable(gl.DEPTH_TEST);
+                    gl.disable(gl.CULL_FACE);
+                    for (const click of this.engine.clicks) this.renderDiscFootprint(click, now);
                 }
 
-                resolveSourceMultisample() {
+                hasActiveDisc(now) {
+                    return this.engine.clicks.some(click => this.getDiscState(click, now) !== null);
+                }
+
+                resolveSourceMultisample(target) {
                     if (!this.sourceMsaaTarget) return;
                     const gl = this.gl;
                     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sourceMsaaTarget.framebuffer);
-                    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.sourceTarget.framebuffer);
+                    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, target.framebuffer);
                     gl.blitFramebuffer(
                         0,
                         0,
@@ -1533,8 +1648,8 @@
                         this.sourceMsaaTarget.height,
                         0,
                         0,
-                        this.sourceTarget.width,
-                        this.sourceTarget.height,
+                        target.width,
+                        target.height,
                         gl.COLOR_BUFFER_BIT,
                         gl.NEAREST
                     );
@@ -1557,10 +1672,33 @@
                     gl.drawArrays(gl.TRIANGLES, 0, 3);
                 }
 
-                renderBloom(levelCount, sampleScale) {
+                renderNonDiscAlpha(bloom, sampleScale, glowControl) {
                     const gl = this.gl;
                     gl.disable(gl.BLEND);
-                    let source = this.sourceTarget;
+                    gl.useProgram(this.nonDiscAlphaProgram);
+                    this.bindFullscreenTexture(this.nonDiscAlphaProgram, "uSource", 0, this.nonDiscTarget.texture);
+                    this.bindFullscreenTexture(this.nonDiscAlphaProgram, "uBloom", 1, bloom.texture);
+                    gl.uniform1f(
+                        gl.getUniformLocation(this.nonDiscAlphaProgram, "uBloomStrength"),
+                        BLOOM_BASE_STRENGTH * glowControl
+                    );
+                    gl.uniform2f(
+                        gl.getUniformLocation(this.nonDiscAlphaProgram, "uBloomTexel"),
+                        1 / bloom.width,
+                        1 / bloom.height
+                    );
+                    gl.uniform1f(
+                        gl.getUniformLocation(this.nonDiscAlphaProgram, "uSampleScale"),
+                        sampleScale
+                    );
+                    this.clearTarget(this.nonDiscAlphaTarget);
+                    this.drawFullscreen(this.nonDiscAlphaProgram, this.nonDiscAlphaTarget);
+                }
+
+                renderBloom(sourceTarget, levelCount, sampleScale) {
+                    const gl = this.gl;
+                    gl.disable(gl.BLEND);
+                    let source = sourceTarget;
                     for (let level = 0; level < levelCount; level++) {
                         const target = this.downTargets[level];
                         const program = level === 0 ? this.prefilterProgram : this.downsampleProgram;
@@ -1599,14 +1737,22 @@
                 render(now) {
                     this.resize();
                     this.engine.prune(now);
-                    this.renderSource(now);
+                    this.renderSource(now, this.sourceTarget);
                     this.renderDiscMasks(now);
+                    const hasActiveDisc = this.hasActiveDisc(now);
                     const glowControl = clamp(this.engine.glowIntensity, 0, 3);
                     const bloomParameters = this.bloomParameters(glowControl);
                     this.activeBloomLevels = bloomParameters.levels;
                     this.bloomSampleScale = bloomParameters.sampleScale;
+                    if (hasActiveDisc) {
+                        this.renderNonDiscSource(now);
+                        const nonDiscBloom = glowControl > 0
+                            ? this.renderBloom(this.nonDiscTarget, bloomParameters.levels, bloomParameters.sampleScale)
+                            : this.nonDiscTarget;
+                        this.renderNonDiscAlpha(nonDiscBloom, bloomParameters.sampleScale, glowControl);
+                    }
                     const bloom = glowControl > 0
-                        ? this.renderBloom(bloomParameters.levels, bloomParameters.sampleScale)
+                        ? this.renderBloom(this.sourceTarget, bloomParameters.levels, bloomParameters.sampleScale)
                         : this.sourceTarget;
                     const gl = this.gl;
                     gl.disable(gl.BLEND);
@@ -1614,6 +1760,8 @@
                     this.bindFullscreenTexture(this.finalProgram, "uSource", 0, this.sourceTarget.texture);
                     this.bindFullscreenTexture(this.finalProgram, "uBloom", 1, bloom.texture);
                     this.bindFullscreenTexture(this.finalProgram, "uDiscMask", 2, this.discMaskTarget.texture);
+                    this.bindFullscreenTexture(this.finalProgram, "uDiscFootprint", 3, this.discFootprintTarget.texture);
+                    this.bindFullscreenTexture(this.finalProgram, "uNonDiscAlpha", 4, this.nonDiscAlphaTarget.texture);
                     gl.uniform1f(
                         gl.getUniformLocation(this.finalProgram, "uBloomStrength"),
                         BLOOM_BASE_STRENGTH * glowControl

@@ -58,7 +58,7 @@ public class TouchEffectResourceTests
             html,
             StringComparison.Ordinal);
         Assert.Contains("this.bloomLogs + Math.log2(radiusScale)", html, StringComparison.Ordinal);
-        Assert.Contains("renderBloom(levelCount, sampleScale)", html, StringComparison.Ordinal);
+        Assert.Contains("renderBloom(sourceTarget, levelCount, sampleScale)", html, StringComparison.Ordinal);
         Assert.Contains(
             "BLOOM_BASE_STRENGTH * glowControl",
             html,
@@ -83,8 +83,14 @@ public class TouchEffectResourceTests
             "float discCoverage = texture(uDiscMask, vUv).r",
             html,
             StringComparison.Ordinal);
-        Assert.Contains("float discMask = step(0.0001, discCoverage)", html, StringComparison.Ordinal);
-        Assert.Contains("float alpha = mix(effectAlpha, discCoverage, discMask)", html, StringComparison.Ordinal);
+        Assert.Contains("float discFootprint = texture(uDiscFootprint, vUv).r", html, StringComparison.Ordinal);
+        Assert.Contains("float nonDiscAlpha = texture(uNonDiscAlpha, vUv).r", html, StringComparison.Ordinal);
+        Assert.Contains(
+            "float discCompositeAlpha = 1.0 - (1.0 - discCoverage) * (1.0 - nonDiscAlpha)",
+            html,
+            StringComparison.Ordinal);
+        Assert.Contains("float discMask = step(0.0001, discFootprint)", html, StringComparison.Ordinal);
+        Assert.Contains("float alpha = mix(effectAlpha, discCompositeAlpha, discMask)", html, StringComparison.Ordinal);
         Assert.Contains(
             "outColor = vec4(min(srgb, vec3(alpha)), alpha)",
             html,
@@ -114,8 +120,17 @@ public class TouchEffectResourceTests
         Assert.Contains("TRAIL_RENDER_SEGMENT_PX / Math.max(1, this.dpr)", html, StringComparison.Ordinal);
         Assert.Contains("createMultisampleTarget(width, height)", html, StringComparison.Ordinal);
         Assert.Contains("gl.renderbufferStorageMultisample", html, StringComparison.Ordinal);
-        Assert.Contains("this.resolveSourceMultisample();", html, StringComparison.Ordinal);
+        Assert.Contains("this.resolveSourceMultisample(target);", html, StringComparison.Ordinal);
         Assert.Contains("gl.blitFramebuffer", html, StringComparison.Ordinal);
+        Assert.Contains("this.nonDiscTarget = this.createTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
+        Assert.Contains("this.discMaskTarget = this.createCoverageTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
+        Assert.Contains("this.discFootprintTarget = this.createCoverageTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
+        Assert.Contains("this.nonDiscAlphaTarget = this.createCoverageTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
+        Assert.Contains("this.renderSource(now, this.nonDiscTarget, false)", html, StringComparison.Ordinal);
+        Assert.Contains("this.renderBloom(this.nonDiscTarget, bloomParameters.levels, bloomParameters.sampleScale)", html, StringComparison.Ordinal);
+        Assert.Contains("this.renderNonDiscAlpha(nonDiscBloom, bloomParameters.sampleScale, glowControl)", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("uNonDiscMask", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("renderNonDiscMasks", html, StringComparison.Ordinal);
         Assert.Contains("window.truncateTrail", html, StringComparison.Ordinal);
         Assert.Contains("engine.truncateTrail();", html, StringComparison.Ordinal);
 
@@ -140,15 +155,24 @@ public class TouchEffectResourceTests
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
 
         Assert.Contains("{ t: 7903 / 65535, c: [0.24056601524353027, 0.39061814546585083, 1] }", html, StringComparison.Ordinal);
+        Assert.Contains("lifetimeMs: 200.00000298023224", html, StringComparison.Ordinal);
         Assert.Contains("{ t: 7132 / 65535, v: 1 }", html, StringComparison.Ordinal);
         Assert.Contains("function evalGradientAlpha(stops, t)", html, StringComparison.Ordinal);
         Assert.Contains("const alpha = evalGradientAlpha(PROFILE.disc.alpha, p);", html, StringComparison.Ordinal);
-        Assert.Contains("this.discMaskTarget = this.createMaskTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
+        Assert.Contains("if (p < 0 || p >= 1) return null", html, StringComparison.Ordinal);
+        Assert.Contains("this.discMaskTarget = this.createCoverageTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
+        Assert.Contains("this.discFootprintTarget = this.createCoverageTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
+        Assert.Contains("this.nonDiscAlphaTarget = this.createCoverageTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
         Assert.Contains("for (const click of this.engine.clicks) this.renderDiscMask(click, now)", html, StringComparison.Ordinal);
+        Assert.Contains("for (const click of this.engine.clicks) this.renderDiscFootprint(click, now)", html, StringComparison.Ordinal);
         Assert.Contains("this.bindFullscreenTexture(this.finalProgram, \"uDiscMask\", 2, this.discMaskTarget.texture)", html, StringComparison.Ordinal);
+        Assert.Contains("this.bindFullscreenTexture(this.finalProgram, \"uDiscFootprint\", 3, this.discFootprintTarget.texture)", html, StringComparison.Ordinal);
+        Assert.Contains("this.bindFullscreenTexture(this.finalProgram, \"uNonDiscAlpha\", 4, this.nonDiscAlphaTarget.texture)", html, StringComparison.Ordinal);
+        Assert.Contains("const formats = this.floatTargets", html, StringComparison.Ordinal);
+        Assert.Contains("{ internalFormat: gl.R16F, type: gl.HALF_FLOAT }", html, StringComparison.Ordinal);
 
         int maskRenderStart = html.IndexOf("renderDiscMask(click, now)", StringComparison.Ordinal);
-        int maskRenderEnd = html.IndexOf("renderTriangle(", maskRenderStart, StringComparison.Ordinal);
+        int maskRenderEnd = html.IndexOf("renderDiscFootprint(click, now)", maskRenderStart, StringComparison.Ordinal);
         Assert.True(maskRenderStart >= 0 && maskRenderEnd > maskRenderStart, "Disc mask renderer is missing.");
         Assert.Contains("disc.alpha,", html[maskRenderStart..maskRenderEnd], StringComparison.Ordinal);
     }
@@ -163,15 +187,22 @@ public class TouchEffectResourceTests
         double alpha = 1.0 - (normalizedAge - fadeStart) / (1.0 - fadeStart);
         double midpointAge = (fadeStart + 1.0) * 0.5;
         double midpointAlpha = 1.0 - (midpointAge - fadeStart) / (1.0 - fadeStart);
+        double twentyThirdSampleAge = (22.0 / 120.0) / lifetimeSeconds;
+        double twentyThirdSampleAlpha = 1.0 - (twentyThirdSampleAge - fadeStart) / (1.0 - fadeStart);
 
         Assert.InRange(alpha, 0.93, 0.94);
         Assert.Equal(1.0, 1.0 - (fadeStart - fadeStart) / (1.0 - fadeStart), 12);
         Assert.Equal(0.5, midpointAlpha, 12);
         Assert.Equal(0.0, 1.0 - (1.0 - fadeStart) / (1.0 - fadeStart), 12);
+        Assert.InRange(twentyThirdSampleAlpha, 0.09, 0.10);
 
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
-        Assert.Contains("float alpha = mix(effectAlpha, discCoverage, discMask)", html, StringComparison.Ordinal);
-        Assert.Contains("float discMask = step(0.0001, discCoverage)", html, StringComparison.Ordinal);
+        Assert.Contains("if (p < 0 || p >= 1) return null", html, StringComparison.Ordinal);
+        Assert.Contains("float alpha = mix(effectAlpha, discCompositeAlpha, discMask)", html, StringComparison.Ordinal);
+        Assert.Contains(
+            "float discMask = step(0.0001, discFootprint)",
+            html,
+            StringComparison.Ordinal);
     }
 
     [Fact]
