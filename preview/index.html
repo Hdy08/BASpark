@@ -986,9 +986,11 @@
                     vec3 bloom = sampleBloom(vUv) * uBloomStrength;
                     vec3 hdr = max(source.rgb + bloom, vec3(0.0));
                     vec3 srgb = linearToSrgb(hdr);
-                    float effectCoverage = clamp(max(max(srgb.r, srgb.g), srgb.b), 0.0, 1.0);
+                    // HDR direct color must not turn the particle's alpha back into full coverage.
+                    vec3 bloomSrgb = linearToSrgb(bloom);
+                    float bloomCoverage = clamp(max(max(bloomSrgb.r, bloomSrgb.g), bloomSrgb.b), 0.0, 1.0);
                     float sourceCoverage = clamp(source.a, 0.0, 1.0);
-                    float alpha = 1.0 - (1.0 - sourceCoverage) * (1.0 - effectCoverage);
+                    float alpha = max(sourceCoverage, bloomCoverage);
                     outColor = vec4(min(srgb, vec3(alpha)), alpha);
                 }`;
 

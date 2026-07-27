@@ -71,12 +71,16 @@ public class TouchEffectResourceTests
         Assert.Contains("sampleTent4(uLow, vUv, uLowTexel), 0.0)", html, StringComparison.Ordinal);
         Assert.Contains("vec3 bloom = sampleBloom(vUv) * uBloomStrength", html, StringComparison.Ordinal);
         Assert.Contains(
-            "float effectCoverage = clamp(max(max(srgb.r, srgb.g), srgb.b), 0.0, 1.0)",
+            "vec3 bloomSrgb = linearToSrgb(bloom)",
+            html,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "float bloomCoverage = clamp(max(max(bloomSrgb.r, bloomSrgb.g), bloomSrgb.b), 0.0, 1.0)",
             html,
             StringComparison.Ordinal);
         Assert.Contains("float sourceCoverage = clamp(source.a, 0.0, 1.0)", html, StringComparison.Ordinal);
         Assert.Contains(
-            "float alpha = 1.0 - (1.0 - sourceCoverage) * (1.0 - effectCoverage)",
+            "float alpha = max(sourceCoverage, bloomCoverage)",
             html,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -137,6 +141,22 @@ public class TouchEffectResourceTests
         Assert.Contains("{ t: 7132 / 65535, v: 1 }", html, StringComparison.Ordinal);
         Assert.Contains("function evalGradientAlpha(stops, t)", html, StringComparison.Ordinal);
         Assert.Contains("const alpha = evalGradientAlpha(PROFILE.disc.alpha, p);", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ClickDisc_FadesByTheFourth120FpsSample()
+    {
+        const double frameTimeSeconds = 4.0 / 120.0;
+        const double lifetimeSeconds = 0.20000000298023224;
+        const double fadeStart = 7132.0 / 65535.0;
+        double normalizedAge = frameTimeSeconds / lifetimeSeconds;
+        double alpha = 1.0 - (normalizedAge - fadeStart) / (1.0 - fadeStart);
+
+        Assert.InRange(alpha, 0.93, 0.94);
+
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        Assert.Contains("float alpha = max(sourceCoverage, bloomCoverage)", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("effectCoverage = clamp(max(max(srgb.r, srgb.g), srgb.b)", html, StringComparison.Ordinal);
     }
 
     [Fact]
