@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MediaColor = System.Windows.Media.Color;
 using MediaColorConverter = System.Windows.Media.ColorConverter;
 using WpfControls = System.Windows.Controls;
@@ -25,9 +26,7 @@ namespace BASpark
         private const uint SwpNoZOrder = 0x0004;
         private const uint SwpNoActivate = 0x0010;
         private const uint SwpFrameChanged = 0x0020;
-        private const uint RdwInvalidate = 0x0001;
-        private const uint RdwUpdateNow = 0x0100;
-        private const uint RdwFrame = 0x0400;
+        private const uint WmNcActivate = 0x0086;
 
         private static readonly (object Key, string Light, string Dark)[] PaletteEntries =
         [
@@ -146,6 +145,25 @@ namespace BASpark
         public static void ApplyTitleBar(Window window) =>
             SetTitleBarDarkMode(window, IsDarkModeEnabled());
 
+        public static void RefreshTitleBarAfterInput(Window window)
+        {
+            if (window.Dispatcher.HasShutdownStarted || window.Dispatcher.HasShutdownFinished)
+            {
+                return;
+            }
+
+            _ = window.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() =>
+            {
+                if (!window.IsVisible)
+                {
+                    return;
+                }
+
+                SetTitleBarDarkMode(window, IsDarkModeEnabled());
+                ForceNonClientRepaint(window);
+            }));
+        }
+
         public static void ApplyWindow(Window window)
         {
             bool dark = IsDarkModeEnabled();
@@ -262,10 +280,16 @@ namespace BASpark
                 _ = DwmSetWindowAttribute(handle, DwmwaUseImmersiveDarkModeLegacy, ref value, sizeof(int));
             }
 
-            int captionColor = dark ? DarkCaptionColor : DwmColorDefault;
-            int textColor = dark ? DarkCaptionTextColor : DwmColorDefault;
-            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
-            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
+            // Caption and text colors are available starting with Windows 11. Windows 10
+            // rejects these attributes, so its title bar follows the immersive-mode flag.
+            if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            {
+                int captionColor = dark ? DarkCaptionColor : DwmColorDefault;
+                int textColor = dark ? DarkCaptionTextColor : DwmColorDefault;
+                _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
+                _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
+            }
+
             _ = SetWindowPos(
                 handle,
                 IntPtr.Zero,
@@ -274,9 +298,20 @@ namespace BASpark
                 0,
                 0,
                 SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
+        }
 
-            // DWM can defer an active window's caption repaint until activation changes.
-            _ = RedrawWindow(handle, IntPtr.Zero, IntPtr.Zero, RdwInvalidate | RdwUpdateNow | RdwFrame);
+        private static void ForceNonClientRepaint(Window window)
+        {
+            IntPtr handle = new WindowInteropHelper(window).Handle;
+            if (handle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            IntPtr activeState = GetForegroundWindow() == handle ? new IntPtr(1) : IntPtr.Zero;
+            IntPtr inverseState = activeState == IntPtr.Zero ? new IntPtr(1) : IntPtr.Zero;
+            _ = SendMessage(handle, WmNcActivate, inverseState, IntPtr.Zero);
+            _ = SendMessage(handle, WmNcActivate, activeState, IntPtr.Zero);
         }
 
         [DllImport("dwmapi.dll")]
@@ -292,12 +327,14 @@ namespace BASpark
             int cy,
             uint uFlags);
 
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool RedrawWindow(
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(
             IntPtr hWnd,
-            IntPtr lprcUpdate,
-            IntPtr hrgnUpdate,
-            uint flags);
+            uint msg,
+            IntPtr wParam,
+            IntPtr lParam);
     }
 }

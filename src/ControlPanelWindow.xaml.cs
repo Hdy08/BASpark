@@ -1539,6 +1539,7 @@ namespace BASpark
         {
             bool autoStartWasEnabled = ConfigManager.AutoStart;
             bool runAsAdminWasEnabled = ConfigManager.RunAsAdmin;
+            DarkModeOption previousDarkMode = ConfigManager.DarkMode;
             string? selectedLanguage = GetSelectedLanguage();
             bool languageChanged = !string.IsNullOrWhiteSpace(selectedLanguage) &&
                 !string.Equals(selectedLanguage, _languageAtLoad, StringComparison.OrdinalIgnoreCase);
@@ -1712,6 +1713,11 @@ namespace BASpark
             }
             ApplyScrollbarSettings();
             ApplyDarkMode();
+            if (selectedDarkMode != previousDarkMode)
+            {
+                ThemeManager.RefreshTitleBarAfterInput(this);
+            }
+
             (System.Windows.Application.Current as App)?.RefreshTrayTheme();
             if (sidebarBackgroundChanged)
             {
