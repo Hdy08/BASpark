@@ -25,6 +25,9 @@ namespace BASpark
         private const uint SwpNoZOrder = 0x0004;
         private const uint SwpNoActivate = 0x0010;
         private const uint SwpFrameChanged = 0x0020;
+        private const uint RdwInvalidate = 0x0001;
+        private const uint RdwUpdateNow = 0x0100;
+        private const uint RdwFrame = 0x0400;
 
         private static readonly (object Key, string Light, string Dark)[] PaletteEntries =
         [
@@ -271,6 +274,9 @@ namespace BASpark
                 0,
                 0,
                 SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
+
+            // DWM can defer an active window's caption repaint until activation changes.
+            _ = RedrawWindow(handle, IntPtr.Zero, IntPtr.Zero, RdwInvalidate | RdwUpdateNow | RdwFrame);
         }
 
         [DllImport("dwmapi.dll")]
@@ -285,5 +291,13 @@ namespace BASpark
             int cx,
             int cy,
             uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool RedrawWindow(
+            IntPtr hWnd,
+            IntPtr lprcUpdate,
+            IntPtr hrgnUpdate,
+            uint flags);
     }
 }
