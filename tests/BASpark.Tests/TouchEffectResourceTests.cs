@@ -71,18 +71,20 @@ public class TouchEffectResourceTests
         Assert.Contains("sampleTent4(uLow, vUv, uLowTexel), 0.0)", html, StringComparison.Ordinal);
         Assert.Contains("vec3 bloom = sampleBloom(vUv) * uBloomStrength", html, StringComparison.Ordinal);
         Assert.Contains(
-            "vec3 bloomSrgb = linearToSrgb(bloom)",
+            "float effectCoverage = clamp(max(max(srgb.r, srgb.g), srgb.b), 0.0, 1.0)",
             html,
             StringComparison.Ordinal);
         Assert.Contains(
-            "float bloomCoverage = clamp(max(max(bloomSrgb.r, bloomSrgb.g), bloomSrgb.b), 0.0, 1.0)",
+            "float effectAlpha = 1.0 - (1.0 - sourceCoverage) * (1.0 - effectCoverage)",
             html,
             StringComparison.Ordinal);
         Assert.Contains("float sourceCoverage = clamp(source.a, 0.0, 1.0)", html, StringComparison.Ordinal);
         Assert.Contains(
-            "float alpha = max(sourceCoverage, bloomCoverage)",
+            "float discCoverage = texture(uDiscMask, vUv).r",
             html,
             StringComparison.Ordinal);
+        Assert.Contains("float discMask = step(0.0001, discCoverage)", html, StringComparison.Ordinal);
+        Assert.Contains("float alpha = mix(effectAlpha, discCoverage, discMask)", html, StringComparison.Ordinal);
         Assert.Contains(
             "outColor = vec4(min(srgb, vec3(alpha)), alpha)",
             html,
@@ -141,6 +143,14 @@ public class TouchEffectResourceTests
         Assert.Contains("{ t: 7132 / 65535, v: 1 }", html, StringComparison.Ordinal);
         Assert.Contains("function evalGradientAlpha(stops, t)", html, StringComparison.Ordinal);
         Assert.Contains("const alpha = evalGradientAlpha(PROFILE.disc.alpha, p);", html, StringComparison.Ordinal);
+        Assert.Contains("this.discMaskTarget = this.createMaskTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
+        Assert.Contains("for (const click of this.engine.clicks) this.renderDiscMask(click, now)", html, StringComparison.Ordinal);
+        Assert.Contains("this.bindFullscreenTexture(this.finalProgram, \"uDiscMask\", 2, this.discMaskTarget.texture)", html, StringComparison.Ordinal);
+
+        int maskRenderStart = html.IndexOf("renderDiscMask(click, now)", StringComparison.Ordinal);
+        int maskRenderEnd = html.IndexOf("renderTriangle(", maskRenderStart, StringComparison.Ordinal);
+        Assert.True(maskRenderStart >= 0 && maskRenderEnd > maskRenderStart, "Disc mask renderer is missing.");
+        Assert.Contains("disc.alpha,", html[maskRenderStart..maskRenderEnd], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -151,12 +161,17 @@ public class TouchEffectResourceTests
         const double fadeStart = 7132.0 / 65535.0;
         double normalizedAge = frameTimeSeconds / lifetimeSeconds;
         double alpha = 1.0 - (normalizedAge - fadeStart) / (1.0 - fadeStart);
+        double midpointAge = (fadeStart + 1.0) * 0.5;
+        double midpointAlpha = 1.0 - (midpointAge - fadeStart) / (1.0 - fadeStart);
 
         Assert.InRange(alpha, 0.93, 0.94);
+        Assert.Equal(1.0, 1.0 - (fadeStart - fadeStart) / (1.0 - fadeStart), 12);
+        Assert.Equal(0.5, midpointAlpha, 12);
+        Assert.Equal(0.0, 1.0 - (1.0 - fadeStart) / (1.0 - fadeStart), 12);
 
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
-        Assert.Contains("float alpha = max(sourceCoverage, bloomCoverage)", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("effectCoverage = clamp(max(max(srgb.r, srgb.g), srgb.b)", html, StringComparison.Ordinal);
+        Assert.Contains("float alpha = mix(effectAlpha, discCoverage, discMask)", html, StringComparison.Ordinal);
+        Assert.Contains("float discMask = step(0.0001, discCoverage)", html, StringComparison.Ordinal);
     }
 
     [Fact]

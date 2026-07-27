@@ -963,6 +963,7 @@
                 precision highp float;
                 uniform sampler2D uSource;
                 uniform sampler2D uBloom;
+                uniform sampler2D uDiscMask;
                 uniform float uBloomStrength;
                 uniform vec2 uBloomTexel;
                 uniform float uSampleScale;
@@ -986,11 +987,12 @@
                     vec3 bloom = sampleBloom(vUv) * uBloomStrength;
                     vec3 hdr = max(source.rgb + bloom, vec3(0.0));
                     vec3 srgb = linearToSrgb(hdr);
-                    // HDR direct color must not turn the particle's alpha back into full coverage.
-                    vec3 bloomSrgb = linearToSrgb(bloom);
-                    float bloomCoverage = clamp(max(max(bloomSrgb.r, bloomSrgb.g), bloomSrgb.b), 0.0, 1.0);
+                    float effectCoverage = clamp(max(max(srgb.r, srgb.g), srgb.b), 0.0, 1.0);
                     float sourceCoverage = clamp(source.a, 0.0, 1.0);
-                    float alpha = max(sourceCoverage, bloomCoverage);
+                    float effectAlpha = 1.0 - (1.0 - sourceCoverage) * (1.0 - effectCoverage);
+                    float discCoverage = texture(uDiscMask, vUv).r;
+                    float discMask = step(0.0001, discCoverage);
+                    float alpha = mix(effectAlpha, discCoverage, discMask);
                     outColor = vec4(min(srgb, vec3(alpha)), alpha);
                 }`;
 
@@ -1103,6 +1105,26 @@
                     return target;
                 }
 
+                createMaskTarget(width, height) {
+                    const gl = this.gl;
+                    const texture = gl.createTexture();
+                    gl.bindTexture(gl.TEXTURE_2D, texture);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, width, height, 0, gl.RED, gl.UNSIGNED_BYTE, null);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                    const framebuffer = gl.createFramebuffer();
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+                    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+                        throw new Error("Touch effect mask framebuffer is incomplete");
+                    }
+                    const target = { texture, framebuffer, width, height };
+                    this.targets.push(target);
+                    return target;
+                }
+
                 createMultisampleTarget(width, height) {
                     const gl = this.gl;
                     const samples = Math.min(
@@ -1178,6 +1200,7 @@
                     this.canvas.height = pixelHeight;
                     this.deleteTargets();
                     this.sourceTarget = this.createTarget(pixelWidth, pixelHeight);
+                    this.discMaskTarget = this.createMaskTarget(pixelWidth, pixelHeight);
                     this.sourceMsaaTarget = this.createMultisampleTarget(pixelWidth, pixelHeight);
                     this.msaaSamples = this.sourceMsaaTarget?.samples || 1;
                     this.downTargets = [];
@@ -1296,16 +1319,49 @@
                     return -integral * h / 3 * PROFILE.mesh.lifetimeMs / 1000;
                 }
 
-                renderDisc(click, now) {
+                getDiscState(click, now) {
                     const p = (now - click.born) * this.engine.clickSpeed / PROFILE.disc.lifetimeMs;
-                    if (p < 0 || p >= 1) return;
+                    if (p < 0 || p >= 1) return null;
                     const curve = Math.max(0, evalCurve(PROFILE.disc.sizeCurve, p)) * PROFILE.disc.sizeMultiplier;
                     const effectiveScale = this.engine.scale * EFFECT_RENDER_SCALE;
                     const size = PROFILE.disc.size * this.engine.worldToPx * curve * effectiveScale;
                     const color = this.engine.displayColor(evalColor(PROFILE.disc.color, p));
                     const alpha = evalGradientAlpha(PROFILE.disc.alpha, p);
+                    return { size, color, alpha };
+                }
+
+                renderDisc(click, now) {
+                    const disc = this.getDiscState(click, now);
+                    if (!disc) return;
                     this.setPremultipliedBlend();
-                    this.drawSprite(this.textures.circle, click.x, click.y, size, size, 0, color, alpha, DISC_HDR);
+                    this.drawSprite(
+                        this.textures.circle,
+                        click.x,
+                        click.y,
+                        disc.size,
+                        disc.size,
+                        0,
+                        disc.color,
+                        disc.alpha,
+                        DISC_HDR
+                    );
+                }
+
+                renderDiscMask(click, now) {
+                    const disc = this.getDiscState(click, now);
+                    if (!disc) return;
+                    this.setPremultipliedBlend();
+                    this.drawSprite(
+                        this.textures.circle,
+                        click.x,
+                        click.y,
+                        disc.size,
+                        disc.size,
+                        0,
+                        [1, 1, 1],
+                        disc.alpha,
+                        1
+                    );
                 }
 
                 renderTriangle(particle, now, speed) {
@@ -1457,6 +1513,14 @@
                     this.resolveSourceMultisample();
                 }
 
+                renderDiscMasks(now) {
+                    const gl = this.gl;
+                    this.clearTarget(this.discMaskTarget);
+                    gl.disable(gl.DEPTH_TEST);
+                    gl.disable(gl.CULL_FACE);
+                    for (const click of this.engine.clicks) this.renderDiscMask(click, now);
+                }
+
                 resolveSourceMultisample() {
                     if (!this.sourceMsaaTarget) return;
                     const gl = this.gl;
@@ -1536,6 +1600,7 @@
                     this.resize();
                     this.engine.prune(now);
                     this.renderSource(now);
+                    this.renderDiscMasks(now);
                     const glowControl = clamp(this.engine.glowIntensity, 0, 3);
                     const bloomParameters = this.bloomParameters(glowControl);
                     this.activeBloomLevels = bloomParameters.levels;
@@ -1548,6 +1613,7 @@
                     gl.useProgram(this.finalProgram);
                     this.bindFullscreenTexture(this.finalProgram, "uSource", 0, this.sourceTarget.texture);
                     this.bindFullscreenTexture(this.finalProgram, "uBloom", 1, bloom.texture);
+                    this.bindFullscreenTexture(this.finalProgram, "uDiscMask", 2, this.discMaskTarget.texture);
                     gl.uniform1f(
                         gl.getUniformLocation(this.finalProgram, "uBloomStrength"),
                         BLOOM_BASE_STRENGTH * glowControl
