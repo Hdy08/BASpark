@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.6.2-beta"
+  #define AppVersion "1.6.2-beta2"
 #endif
 
 #if Copy(AppVersion, 1, 1) == "v"
