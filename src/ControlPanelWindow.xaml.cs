@@ -678,7 +678,7 @@ namespace BASpark
             SliderScale.Value = ConfigManager.EffectScale;
             SliderTrailThickness.Value = ConfigManager.TrailThickness;
             SliderGlowIntensity.Value = ConfigManager.GlowIntensity;
-            SliderOpacity.Value = ConfigManager.EffectOpacity * 100;
+            SliderOpacity.Value = ConfigManager.EffectOpacity;
             CheckLinkedAnimationSpeed.IsChecked = ConfigManager.UseLinkedAnimationSpeed;
             SliderSpeed.Value = ConfigManager.EffectSpeed;
             SliderTrailAnimSpeed.Value = ConfigManager.TrailAnimationSpeed;
@@ -1505,7 +1505,7 @@ namespace BASpark
             double trailThickness = Math.Round(SliderTrailThickness.Value, 2);
             double glowIntensity = Math.Round(SliderGlowIntensity.Value, 2);
             double trailDelay = Math.Round(SliderTrailDelay.Value, 2);
-            double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
+            double effectOpacity = Math.Round(SliderOpacity.Value, 2);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, trailSp, clickSp, trailThickness, trailDelay, glowIntensity);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
@@ -1550,7 +1550,7 @@ namespace BASpark
             double trailThickness = Math.Round(SliderTrailThickness.Value, 2);
             double glowIntensity = Math.Round(SliderGlowIntensity.Value, 2);
             double trailDelay = Math.Round(SliderTrailDelay.Value, 2);
-            double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
+            double effectOpacity = Math.Round(SliderOpacity.Value, 2);
             bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsChecked == true;
             double trailAnimSpeed;
             double clickAnimSpeed;
@@ -1712,6 +1712,7 @@ namespace BASpark
             }
             ApplyScrollbarSettings();
             ApplyDarkMode();
+            (System.Windows.Application.Current as App)?.RefreshTrayTheme();
             if (sidebarBackgroundChanged)
             {
                 _ = ApplySidebarBackgroundAsync(sidebarBackgroundPath);

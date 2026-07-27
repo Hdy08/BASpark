@@ -551,13 +551,13 @@ Download now?</value>
       <value>Effect color</value>
     </data>
     <data name="VisualReset_Color_Sub" xml:space="preserve">
-      <value>Default RGB(45,175,255)</value>
+      <value>Default RGB(95,197,255)</value>
     </data>
     <data name="VisualReset_Opacity" xml:space="preserve">
       <value>Global opacity</value>
     </data>
     <data name="VisualReset_Opacity_Sub" xml:space="preserve">
-      <value>Default 100 %</value>
+      <value>Default 1.00 ×</value>
     </data>
     <data name="VisualReset_Scale" xml:space="preserve">
       <value>Scale</value>
@@ -581,7 +581,7 @@ Download now?</value>
       <value>Trail delay</value>
     </data>
     <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
-      <value>Default 0.10 s</value>
+      <value>Default 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>Trail refresh rate</value>

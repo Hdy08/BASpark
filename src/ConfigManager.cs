@@ -68,8 +68,14 @@ namespace BASpark
     public static class ConfigManager
     {
         private const string RegPath = @"Software\BASpark";
+        private const int CurrentVisualSettingsSchemaVersion = 1;
+        private const string VisualSettingsSchemaVersionValueName = "VisualSettingsSchemaVersion";
+        private const string TrailDelayMultiplierValueName = "TrailDelayMultiplier";
 
-        public static string ParticleColor { get; set; } = "45,175,255";
+        public const string DefaultParticleColor = "95,197,255";
+        public const double DefaultTrailDelayMultiplier = 1.0;
+
+        public static string ParticleColor { get; set; } = DefaultParticleColor;
         public static bool IsEffectEnabled { get; set; } = true;
         public static bool AutoStart { get; set; } = false;
         public static bool AgreedToPrivacy { get; set; } = false;
@@ -82,7 +88,7 @@ namespace BASpark
         public static double EffectScale { get; set; } = 1.0;
         public static double TrailThickness { get; set; } = 1.0;
         public static double GlowIntensity { get; set; } = 1.0;
-        public static double TrailDelay { get; set; } = 0.10;
+        public static double TrailDelay { get; set; } = DefaultTrailDelayMultiplier;
         public static double EffectOpacity { get; set; } = 1.0;
         public static double EffectSpeed { get; set; } = 1.0;
         public static bool UseLinkedAnimationSpeed { get; set; } = true;
@@ -125,13 +131,16 @@ namespace BASpark
 
         public static void Load()
         {
+            bool shouldPersistTrailDelayMultiplier = false;
+            bool shouldPersistMigratedParticleColor = false;
+
             try
             {
                 using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(RegPath))
                 {
                     if (key != null)
                     {
-                        ParticleColor = key.GetValue("ParticleColor", "45,175,255")?.ToString() ?? "45,175,255";
+                        ParticleColor = key.GetValue("ParticleColor", DefaultParticleColor)?.ToString() ?? DefaultParticleColor;
 
                         IsEffectEnabled = ReadBool(key, "IsEffectEnabled", true);
                         AutoStart = ReadBool(key, "AutoStart", false);
@@ -145,7 +154,30 @@ namespace BASpark
                         EffectScale = ReadClampedDouble(key, "EffectScale", 1.0, 0.5, 3.0);
                         TrailThickness = ReadClampedDouble(key, "TrailThickness", 1.0, 0.5, 3.0);
                         GlowIntensity = ReadClampedDouble(key, "GlowIntensity", 1.0, 0.0, 3.0);
-                        TrailDelay = ReadClampedDouble(key, "TrailDelay", 0.10, 0.00, 0.50);
+                        int visualSettingsSchemaVersion = ReadClampedInt(
+                            key,
+                            VisualSettingsSchemaVersionValueName,
+                            0,
+                            0,
+                            int.MaxValue);
+                        if (visualSettingsSchemaVersion < CurrentVisualSettingsSchemaVersion &&
+                            string.Equals(ParticleColor, "45,175,255", StringComparison.Ordinal))
+                        {
+                            ParticleColor = DefaultParticleColor;
+                            shouldPersistMigratedParticleColor = true;
+                        }
+
+                        object? storedTrailDelayMultiplier = key.GetValue(TrailDelayMultiplierValueName, null);
+                        bool trailDelayIsMultiplier =
+                            visualSettingsSchemaVersion >= CurrentVisualSettingsSchemaVersion ||
+                            storedTrailDelayMultiplier != null;
+                        object? storedTrailDelay = storedTrailDelayMultiplier ?? key.GetValue(
+                            "TrailDelay",
+                            trailDelayIsMultiplier ? DefaultTrailDelayMultiplier : 0.10);
+                        TrailDelay = NormalizeTrailDelayMultiplier(storedTrailDelay, trailDelayIsMultiplier);
+                        shouldPersistTrailDelayMultiplier =
+                            visualSettingsSchemaVersion < CurrentVisualSettingsSchemaVersion ||
+                            storedTrailDelayMultiplier == null;
                         EffectOpacity = ReadClampedDouble(key, "EffectOpacity", 1.0, 0.1, 1.0);
                         EffectSpeed = ReadClampedDouble(key, "EffectSpeed", 1.0, 0.2, 3.0);
                         UseLinkedAnimationSpeed = ReadBool(key, "UseLinkedAnimationSpeed", true);
@@ -224,6 +256,13 @@ namespace BASpark
                             }
                         }
                     }
+                }
+
+                bool canFinalizeVisualSettingsMigration =
+                    !shouldPersistMigratedParticleColor || Save("ParticleColor", ParticleColor);
+                if (shouldPersistTrailDelayMultiplier && canFinalizeVisualSettingsMigration)
+                {
+                    Save("TrailDelay", TrailDelay);
                 }
             }
             catch (Exception ex)
@@ -306,6 +345,16 @@ namespace BASpark
                 result = 0;
                 return false;
             }
+        }
+
+        private static double NormalizeTrailDelayMultiplier(object? value, bool storedAsMultiplier)
+        {
+            double fallback = storedAsMultiplier ? DefaultTrailDelayMultiplier : 0.10;
+            double storedValue = TryReadDouble(value, out double parsed) && double.IsFinite(parsed)
+                ? parsed
+                : fallback;
+            double multiplier = storedAsMultiplier ? storedValue : storedValue / 0.10;
+            return Math.Round(Math.Clamp(multiplier, 0.0, 2.0), 2);
         }
 
         public static PanelScrollbarVisibility ParseScrollbarVisibility(string? raw)
@@ -503,7 +552,7 @@ namespace BASpark
 
             if (flags.HasFlag(VisualAppearanceResetFlags.TrailDelay))
             {
-                Save("TrailDelay", 0.10);
+                Save("TrailDelay", DefaultTrailDelayMultiplier);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.UnifiedAnimationSpeed))
@@ -532,7 +581,7 @@ namespace BASpark
 
             if (flags.HasFlag(VisualAppearanceResetFlags.ParticleColor))
             {
-                Save("ParticleColor", "45,175,255");
+                Save("ParticleColor", DefaultParticleColor);
             }
         }
 
@@ -549,12 +598,26 @@ namespace BASpark
                         return false;
                     }
 
-                    key.SetValue(name, ToRegistryValue(value));
+                    object valueToSave = value;
+                    if (string.Equals(name, "TrailDelay", StringComparison.Ordinal))
+                    {
+                        valueToSave = NormalizeTrailDelayMultiplier(value, storedAsMultiplier: true);
+
+                        // The dedicated value is self-identifying. Write it before the schema marker so
+                        // an interrupted migration can never apply the legacy seconds conversion twice.
+                        key.SetValue(TrailDelayMultiplierValueName, ToRegistryValue(valueToSave));
+                        key.SetValue(
+                            VisualSettingsSchemaVersionValueName,
+                            CurrentVisualSettingsSchemaVersion,
+                            RegistryValueKind.DWord);
+                    }
+
+                    key.SetValue(name, ToRegistryValue(valueToSave));
 
                     var prop = _propertyCache.GetOrAdd(name, n => typeof(ConfigManager).GetProperty(n));
                     if (prop != null)
                     {
-                        object propertyValue = value;
+                        object propertyValue = valueToSave;
                         if (prop.PropertyType.IsEnum)
                         {
                             if (value is string stringValue)
@@ -843,7 +906,7 @@ namespace BASpark
                         System.IO.File.Delete(oldJson);
                     }
 
-                    ParticleColor = "45,175,255";
+                    ParticleColor = DefaultParticleColor;
                     IsEffectEnabled = true;
                     AutoStart = false;
                     AgreedToPrivacy = false;
@@ -856,7 +919,7 @@ namespace BASpark
                     EffectScale = 1.0;
                     TrailThickness = 1.0;
                     GlowIntensity = 1.0;
-                    TrailDelay = 0.10;
+                    TrailDelay = DefaultTrailDelayMultiplier;
                     EffectOpacity = 1.0;
                     EffectSpeed = 1.0;
                     UseLinkedAnimationSpeed = true;

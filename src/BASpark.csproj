@@ -44,6 +44,10 @@
   <ItemGroup>
     <Resource Include="app.ico" />
     <Resource Include="Web\index.html" />
+    <Resource Include="Web\Assets\FX_TEX_Circle_01.png" />
+    <Resource Include="Web\Assets\FX_TEX_Grad_Ring3.png" />
+    <Resource Include="Web\Assets\FX_TEX_Trail_03.png" />
+    <Resource Include="Web\Assets\FX_TEX_Triangle_02_1.png" />
   </ItemGroup>
 
 

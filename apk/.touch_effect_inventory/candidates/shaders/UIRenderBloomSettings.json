@@ -1,0 +1,36 @@
+{
+  "resource_name": "UIRenderBloomSettings",
+  "shader_name": "Hidden/MXFinalBloom",
+  "shader_passes": [
+    "Copy",
+    "Prefilter",
+    "Downsample",
+    "Upsample",
+    "Final"
+  ],
+  "enabled": true,
+  "intensity": 1.7000000476837158,
+  "threshold_gamma": 1.0,
+  "soft_knee": 0.0,
+  "clamp": 65472.0,
+  "diffusion": 7,
+  "anamorphic_ratio": 0.0,
+  "tint_rgba": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "blend_factor_enum": {
+    "0": "Zero",
+    "1": "One",
+    "5": "SrcAlpha",
+    "10": "OneMinusSrcAlpha"
+  },
+  "material_summary": {
+    "trail": "One + One additive, HDR multiplier 23.96862793, queue 4499",
+    "triangle_billboards": "One + One additive, HDR multiplier 5.99215698, queue 4550",
+    "annular_ring": "SrcAlpha + One additive, HDR multiplier 5.99215698, queue 4499",
+    "disc": "One + OneMinusSrcAlpha premultiplied alpha, multiplier 2.0, queue 4499"
+  }
+}

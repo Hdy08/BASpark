@@ -440,6 +440,10 @@ desktop.ini
 config.json
 
 # Local release outputs
+
+# Local source game archive; its extracted touch-effect inventory is versioned.
+apk/*.apks
+
 dist/
 src/publish_full/
 src/publish_uiaccess/

@@ -5,6 +5,46 @@ namespace BASpark.Tests;
 public class ConfigManagerTests
 {
     [Fact]
+    public void VisualDefaults_MatchOriginalGameBaseline()
+    {
+        Assert.Equal("95,197,255", ConfigManager.DefaultParticleColor);
+        Assert.Equal(1.0, ConfigManager.DefaultTrailDelayMultiplier);
+    }
+
+    [Theory]
+    [InlineData(0.00, 0.00)]
+    [InlineData(0.10, 1.00)]
+    [InlineData(0.15, 1.50)]
+    [InlineData(0.50, 2.00)]
+    public void NormalizeTrailDelayMultiplier_MigratesLegacySecondsOnce(
+        double legacyDelay,
+        double expectedMultiplier)
+    {
+        Assert.Equal(expectedMultiplier, NormalizeTrailDelayMultiplier(legacyDelay, storedAsMultiplier: false));
+    }
+
+    [Theory]
+    [InlineData(0.00, 0.00)]
+    [InlineData(1.00, 1.00)]
+    [InlineData(1.50, 1.50)]
+    [InlineData(3.00, 2.00)]
+    public void NormalizeTrailDelayMultiplier_DoesNotRemigrateCurrentValues(
+        double savedMultiplier,
+        double expectedMultiplier)
+    {
+        Assert.Equal(expectedMultiplier, NormalizeTrailDelayMultiplier(savedMultiplier, storedAsMultiplier: true));
+    }
+
+    private static double NormalizeTrailDelayMultiplier(object value, bool storedAsMultiplier)
+    {
+        MethodInfo normalize = typeof(ConfigManager).GetMethod(
+            "NormalizeTrailDelayMultiplier",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        return Assert.IsType<double>(normalize.Invoke(null, [value, storedAsMultiplier]));
+    }
+
+    [Fact]
     public void DeserializeProfiles_DropsNullProfilesAndRepairsNullFields()
     {
         const string json = """

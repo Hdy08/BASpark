@@ -551,13 +551,13 @@
       <value>エフェクト色</value>
     </data>
     <data name="VisualReset_Color_Sub" xml:space="preserve">
-      <value>既定 RGB(45,175,255)</value>
+      <value>既定 RGB(95,197,255)</value>
     </data>
     <data name="VisualReset_Opacity" xml:space="preserve">
       <value>全体の不透明度</value>
     </data>
     <data name="VisualReset_Opacity_Sub" xml:space="preserve">
-      <value>既定 100 %</value>
+      <value>既定 1.00 ×</value>
     </data>
     <data name="VisualReset_Scale" xml:space="preserve">
       <value>拡大率</value>
@@ -581,7 +581,7 @@
       <value>トレイル遅延</value>
     </data>
     <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
-      <value>既定 0.10 s</value>
+      <value>既定 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>トレイル更新率</value>

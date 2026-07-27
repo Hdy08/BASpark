@@ -217,7 +217,7 @@ namespace BASpark
             string trailStr = FormatScriptNumber(trailSpeed, 0.2, 3.0, 1.0);
             string clickStr = FormatScriptNumber(clickSpeed, 0.2, 3.0, 1.0);
             string trailThicknessStr = FormatScriptNumber(trailThickness, 0.5, 3.0, 1.0);
-            string trailDelayStr = FormatScriptNumber(trailDelay, 0.0, 0.5, 0.10);
+            string trailDelayStr = FormatScriptNumber(trailDelay, 0.0, 2.0, 1.0);
             string glowIntensityStr = FormatScriptNumber(glowIntensity, 0.0, 3.0, 1.0);
 
             ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr}, {trailThicknessStr}, {trailDelayStr}, {glowIntensityStr});");
@@ -262,7 +262,7 @@ namespace BASpark
             SyncOverlayPresentationState();
         }
 
-        /// 环境过滤时隐藏叠加层并暂停 WebView 渲染
+        /// 环境过滤时隐藏叠加层并截断当前输入轨迹；已有动画继续按时间自然结束。
         public void SetEnvironmentSuppressed(bool suppressed)
         {
             if (_hiddenByEnvironmentSuppression == suppressed)
@@ -270,12 +270,23 @@ namespace BASpark
                 return;
             }
 
+            if (suppressed)
+            {
+                ExecuteScript("if(window.truncateTrail) window.truncateTrail();");
+            }
+
             _hiddenByEnvironmentSuppression = suppressed;
             SyncOverlayPresentationState();
+            if (!suppressed)
+            {
+                ExecuteScript("if(window.scheduleNextAnimationFrame) window.scheduleNextAnimationFrame();");
+            }
         }
 
         private bool ShouldOverlayBeVisible =>
             !_hiddenForExternalScreenshotCapture && !_hiddenByEnvironmentSuppression;
+
+        private bool ShouldPauseOverlayRuntime => _hiddenForExternalScreenshotCapture;
 
         private void SyncOverlayPresentationState()
         {
@@ -291,7 +302,15 @@ namespace BASpark
             }
             else
             {
-                PauseOverlayRuntime();
+                if (ShouldPauseOverlayRuntime)
+                {
+                    PauseOverlayRuntime();
+                }
+                else
+                {
+                    ResumeOverlayRuntime();
+                }
+
                 if (IsVisible)
                 {
                     Hide();
@@ -467,6 +486,7 @@ namespace BASpark
 
                 using var reader = new System.IO.StreamReader(streamInfo.Stream);
                 string htmlContent = reader.ReadToEnd();
+                htmlContent = InjectTouchEffectAssets(htmlContent);
                 var navigationCompletion = new System.Threading.Tasks.TaskCompletionSource<CoreWebView2NavigationCompletedEventArgs>(
                     System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
                 _navigationCompletedHandler = (s, e) =>
@@ -534,6 +554,41 @@ namespace BASpark
                 }
                 return false;
             }
+        }
+
+        private static string InjectTouchEffectAssets(string htmlContent)
+        {
+            const string assetBootstrapMarker = "<!-- BASPARK_ASSET_BOOTSTRAP -->";
+            if (!htmlContent.Contains(assetBootstrapMarker, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The touch effect asset bootstrap marker is missing.");
+            }
+
+            var assets = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["circle"] = ReadEmbeddedAssetDataUrl("Web/Assets/FX_TEX_Circle_01.png"),
+                ["ring"] = ReadEmbeddedAssetDataUrl("Web/Assets/FX_TEX_Grad_Ring3.png"),
+                ["trail"] = ReadEmbeddedAssetDataUrl("Web/Assets/FX_TEX_Trail_03.png"),
+                ["triangle"] = ReadEmbeddedAssetDataUrl("Web/Assets/FX_TEX_Triangle_02_1.png")
+            };
+
+            string bootstrap = $"<script>window.__BASPARK_ASSETS={JsonSerializer.Serialize(assets)};</script>";
+            return htmlContent.Replace(assetBootstrapMarker, bootstrap, StringComparison.Ordinal);
+        }
+
+        private static string ReadEmbeddedAssetDataUrl(string resourcePath)
+        {
+            var streamInfo = System.Windows.Application.GetResourceStream(
+                new Uri($"pack://application:,,,/BASpark;component/{resourcePath}", UriKind.Absolute));
+            if (streamInfo == null)
+            {
+                throw new InvalidOperationException($"The embedded touch effect asset '{resourcePath}' could not be loaded.");
+            }
+
+            using var source = streamInfo.Stream;
+            using var memory = new System.IO.MemoryStream();
+            source.CopyTo(memory);
+            return $"data:image/png;base64,{Convert.ToBase64String(memory.ToArray())}";
         }
 
         private static bool IsWebViewEnvironmentConflictException(Exception ex)

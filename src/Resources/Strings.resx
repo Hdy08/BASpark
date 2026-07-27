@@ -551,13 +551,13 @@
       <value>特效主题颜色</value>
     </data>
     <data name="VisualReset_Color_Sub" xml:space="preserve">
-      <value>默认 RGB(45,175,255)</value>
+      <value>默认 RGB(95,197,255)</value>
     </data>
     <data name="VisualReset_Opacity" xml:space="preserve">
       <value>全局不透明度</value>
     </data>
     <data name="VisualReset_Opacity_Sub" xml:space="preserve">
-      <value>默认 100 %</value>
+      <value>默认 1.00 ×</value>
     </data>
     <data name="VisualReset_Scale" xml:space="preserve">
       <value>缩放比例</value>
@@ -581,7 +581,7 @@
       <value>拖尾延迟</value>
     </data>
     <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
-      <value>默认 0.10 s</value>
+      <value>默认 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>拖尾刷新率</value>

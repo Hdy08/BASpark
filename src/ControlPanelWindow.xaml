@@ -747,10 +747,10 @@
                                                                          Text="{Binding ElementName=SliderScale, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
-                                                                <TextBlock Text=" X" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                <TextBlock Text="x" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                             </StackPanel>
                                                         </DockPanel>
-                                                        <Slider Name="SliderScale" Minimum="0.5" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True" 
+                                                        <Slider Name="SliderScale" Minimum="0.5" Maximum="3.0" TickFrequency="0.10" SmallChange="0.10" LargeChange="0.10" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                     </StackPanel>
 
@@ -764,10 +764,10 @@
                                                                          Text="{Binding ElementName=SliderTrailThickness, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
-                                                                <TextBlock Text=" X" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                <TextBlock Text="x" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                             </StackPanel>
                                                         </DockPanel>
-                                                        <Slider Name="SliderTrailThickness" Minimum="0.5" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                                        <Slider Name="SliderTrailThickness" Minimum="0.5" Maximum="3.0" TickFrequency="0.10" SmallChange="0.10" LargeChange="0.10" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                     </StackPanel>
 
@@ -781,10 +781,10 @@
                                                                          Text="{Binding ElementName=SliderGlowIntensity, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
-                                                                <TextBlock Text=" X" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                <TextBlock Text="x" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                             </StackPanel>
                                                         </DockPanel>
-                                                        <Slider Name="SliderGlowIntensity" Minimum="0.00" Maximum="3.00" TickFrequency="0.01" SmallChange="0.01" LargeChange="0.10" IsSnapToTickEnabled="True"
+                                                        <Slider Name="SliderGlowIntensity" Minimum="0.00" Maximum="3.00" TickFrequency="0.10" SmallChange="0.10" LargeChange="0.10" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                     </StackPanel>
 
@@ -795,14 +795,14 @@
                                                                 <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
                                                                         TextAlignment="Right" VerticalAlignment="Center" 
                                                                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Background="Transparent"
-                                                                        Text="{Binding ElementName=SliderOpacity, Path=Value, StringFormat={}{0:F0}, UpdateSourceTrigger=LostFocus}"
+                                                                        Text="{Binding ElementName=SliderOpacity, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                         PreviewTextInput="NumberValidationTextBox" 
                                                                         KeyDown="TextBox_KeyDown"
                                                                         InputMethod.IsInputMethodEnabled="False"/>
-                                                                <TextBlock Text=" %" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                <TextBlock Text="x" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                             </StackPanel>
                                                         </DockPanel>
-                                                        <Slider Name="SliderOpacity" Minimum="10" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" 
+                                                        <Slider Name="SliderOpacity" Minimum="0.10" Maximum="1.00" TickFrequency="0.10" SmallChange="0.10" LargeChange="0.10" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                     </StackPanel>
 
@@ -820,10 +820,10 @@
                                                                          Text="{Binding ElementName=SliderSpeed, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
-                                                                <TextBlock Text=" X" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                <TextBlock Text="x" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                             </StackPanel>
                                                         </DockPanel>
-                                                        <Slider Name="SliderSpeed" Minimum="0.2" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                                        <Slider Name="SliderSpeed" Minimum="0.2" Maximum="3.0" TickFrequency="0.10" SmallChange="0.10" LargeChange="0.10" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                     </StackPanel>
 
@@ -838,10 +838,10 @@
                                                                              Text="{Binding ElementName=SliderTrailAnimSpeed, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                              PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                              InputMethod.IsInputMethodEnabled="False"/>
-                                                                    <TextBlock Text=" X" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                    <TextBlock Text="x" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                                 </StackPanel>
                                                             </DockPanel>
-                                                            <Slider Name="SliderTrailAnimSpeed" Minimum="0.2" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                                            <Slider Name="SliderTrailAnimSpeed" Minimum="0.2" Maximum="3.0" TickFrequency="0.10" SmallChange="0.10" LargeChange="0.10" IsSnapToTickEnabled="True"
                                                                     ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                         </StackPanel>
                                                         <StackPanel>
@@ -854,10 +854,10 @@
                                                                              Text="{Binding ElementName=SliderClickAnimSpeed, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                              PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                              InputMethod.IsInputMethodEnabled="False"/>
-                                                                    <TextBlock Text=" X" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                    <TextBlock Text="x" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                                 </StackPanel>
                                                             </DockPanel>
-                                                            <Slider Name="SliderClickAnimSpeed" Minimum="0.2" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                                            <Slider Name="SliderClickAnimSpeed" Minimum="0.2" Maximum="3.0" TickFrequency="0.10" SmallChange="0.10" LargeChange="0.10" IsSnapToTickEnabled="True"
                                                                     ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                         </StackPanel>
                                                     </StackPanel>
@@ -901,10 +901,10 @@
                                                                          Text="{Binding ElementName=SliderTrailDelay, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
                                                                          InputMethod.IsInputMethodEnabled="False"/>
-                                                                <TextBlock Text=" s" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                <TextBlock Text="x" Foreground="{DynamicResource ThemeMutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                             </StackPanel>
                                                         </DockPanel>
-                                                        <Slider Name="SliderTrailDelay" Minimum="0.00" Maximum="0.50" TickFrequency="0.01" SmallChange="0.01" LargeChange="0.05" IsSnapToTickEnabled="True"
+                                                        <Slider Name="SliderTrailDelay" Minimum="0.00" Maximum="2.00" TickFrequency="0.10" SmallChange="0.10" LargeChange="0.10" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                     </StackPanel>
 
