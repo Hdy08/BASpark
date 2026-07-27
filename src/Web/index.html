@@ -449,6 +449,20 @@
                 return stops[stops.length - 1].v;
             }
 
+            // Unity Gradient alpha keys are linearly interpolated, unlike AnimationCurve keys.
+            function evalGradientAlpha(stops, t) {
+                if (t <= stops[0].t) return stops[0].v;
+                for (let index = 1; index < stops.length; index++) {
+                    const b = stops[index];
+                    if (t <= b.t) {
+                        const a = stops[index - 1];
+                        const p = clamp((t - a.t) / Math.max(0.000001, b.t - a.t), 0, 1);
+                        return lerp(a.v, b.v, p);
+                    }
+                }
+                return stops[stops.length - 1].v;
+            }
+
             function evalColor(stops, t) {
                 if (t <= stops[0].t) return stops[0].c;
                 for (let index = 1; index < stops.length; index++) {
@@ -1287,7 +1301,7 @@
                     const effectiveScale = this.engine.scale * EFFECT_RENDER_SCALE;
                     const size = PROFILE.disc.size * this.engine.worldToPx * curve * effectiveScale;
                     const color = this.engine.displayColor(evalColor(PROFILE.disc.color, p));
-                    const alpha = evalCurve(PROFILE.disc.alpha, p);
+                    const alpha = evalGradientAlpha(PROFILE.disc.alpha, p);
                     this.setPremultipliedBlend();
                     this.drawSprite(this.textures.circle, click.x, click.y, size, size, 0, color, alpha, DISC_HDR);
                 }

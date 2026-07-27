@@ -129,6 +129,17 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
+    public void ClickDisc_UsesExtractedLinearGradientFadeTiming()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+
+        Assert.Contains("{ t: 7903 / 65535, c: [0.24056601524353027, 0.39061814546585083, 1] }", html, StringComparison.Ordinal);
+        Assert.Contains("{ t: 7132 / 65535, v: 1 }", html, StringComparison.Ordinal);
+        Assert.Contains("function evalGradientAlpha(stops, t)", html, StringComparison.Ordinal);
+        Assert.Contains("const alpha = evalGradientAlpha(PROFILE.disc.alpha, p);", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EnvironmentFiltering_TruncatesInputWithoutPausingExistingEffects()
     {
         string sourcePath = Path.Combine(FindWorkspaceRoot(), "src", "MainWindow.xaml.cs");
