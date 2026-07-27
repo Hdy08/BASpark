@@ -578,7 +578,7 @@
       <value>默认 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailDelay" xml:space="preserve">
-      <value>拖尾延迟</value>
+      <value>拖尾收回延迟</value>
     </data>
     <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
       <value>默认 1.00 ×</value>
@@ -641,7 +641,7 @@
       <value>拖尾刷新率跟随显示器</value>
     </data>
     <data name="Visual_TrailDelay" xml:space="preserve">
-      <value>拖尾延迟</value>
+      <value>拖尾收回延迟</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>视觉表现</value>

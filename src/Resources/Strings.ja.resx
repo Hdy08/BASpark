@@ -578,7 +578,7 @@
       <value>既定 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailDelay" xml:space="preserve">
-      <value>トレイル遅延</value>
+      <value>トレイル収束遅延</value>
     </data>
     <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
       <value>既定 1.00 ×</value>
@@ -641,7 +641,7 @@
       <value>トレイル更新率をディスプレイに合わせる</value>
     </data>
     <data name="Visual_TrailDelay" xml:space="preserve">
-      <value>トレイル遅延</value>
+      <value>トレイル収束遅延</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>ビジュアル</value>

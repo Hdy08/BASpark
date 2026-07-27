@@ -150,6 +150,43 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
+    public void TrailRetractionDelayAndSpeed_UseIndependentGameMatchedDefaults()
+    {
+        string root = FindWorkspaceRoot();
+        string parametersPath = Path.Combine(
+            root,
+            "apk",
+            ".touch_effect_inventory",
+            "candidates",
+            "fx_touch_parameters.json");
+        using var parameters = System.Text.Json.JsonDocument.Parse(File.ReadAllText(parametersPath, Encoding.UTF8));
+
+        System.Text.Json.JsonElement trail = parameters.RootElement
+            .GetProperty("trail_renderers")
+            .EnumerateArray()
+            .Single(item => item.GetProperty("game_object").GetString() == "Trail");
+        System.Text.Json.JsonElement rootParticle = parameters.RootElement
+            .GetProperty("particles")
+            .EnumerateArray()
+            .First(item => item.GetProperty("game_object").GetString() == "FX_Touch");
+
+        Assert.Equal(0.30000001192092896, trail.GetProperty("time_s").GetDouble(), 12);
+        Assert.Equal(1.0, rootParticle.GetProperty("simulation_speed").GetDouble(), 12);
+        Assert.Equal(1.0, ConfigManager.DefaultTrailDelayMultiplier);
+
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        Assert.Contains("const TRAIL_LIFETIME_MS = 300.00001192092896", html, StringComparison.Ordinal);
+        Assert.Contains("this.trailRetractionDelayMultiplier = 1", html, StringComparison.Ordinal);
+        Assert.Contains("return now - this.trailRetentionMs();", html, StringComparison.Ordinal);
+        Assert.Contains("cutoffAtRelease: time - retentionMs", html, StringComparison.Ordinal);
+        Assert.Contains(
+            "Math.max(0, now - retraction.releasedAt) * this.trailSpeed",
+            html,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("lifetime / this.trailSpeed", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ClickDisc_UsesExtractedLinearGradientFadeTiming()
     {
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));

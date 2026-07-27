@@ -243,7 +243,7 @@
                 <label class="preview-control"><span>拖尾速度</span><input id="previewTrailSpeed" type="range" min="0.20" max="3.00" step="0.10" value="1.00"><output>1.00x</output></label>
                 <label class="preview-control"><span>点击速度</span><input id="previewClickSpeed" type="range" min="0.20" max="3.00" step="0.10" value="1.00"><output>1.00x</output></label>
             </div>
-            <label class="preview-control"><span>拖尾延迟倍数</span><input id="previewLifetime" type="range" min="0.00" max="2.00" step="0.10" value="1.00"><output>1.00x</output></label>
+            <label class="preview-control"><span>拖尾收回延迟</span><input id="previewLifetime" type="range" min="0.00" max="2.00" step="0.10" value="1.00"><output>1.00x</output></label>
             <label class="preview-toggle"><input id="previewFollowRefresh" type="checkbox" checked><span>拖尾刷新率跟随显示器</span></label>
             <label id="previewRefreshControl" class="preview-control" hidden><span>拖尾刷新率</span><input id="previewRefresh" type="range" min="30" max="360" step="10" value="60"><output>60 Hz</output></label>
         </section>
@@ -514,7 +514,7 @@
                     this.trailSpeed = 1;
                     this.clickSpeed = 1;
                     this.trailThickness = 1;
-                    this.trailLifetimeMultiplier = 1;
+                    this.trailRetractionDelayMultiplier = 1;
                     this.glowIntensity = 1;
                     this.trailRefreshRate = 60;
                     this.clicks = [];
@@ -524,6 +524,7 @@
                     this.lastRaw = null;
                     this.trailEmit = null;
                     this.trailTip = null;
+                    this.trailRetractions = new Map();
                     this.distanceAccumulator = 0;
                     this.strokeId = 0;
                     this.testClock = null;
@@ -561,11 +562,12 @@
                     this.lastRaw = null;
                     this.trailEmit = null;
                     this.trailTip = null;
+                    this.trailRetractions.clear();
                     this.distanceAccumulator = 0;
                 }
 
-                truncateTrail() {
-                    this.commitTrailTip();
+                truncateTrail(time = this.now()) {
+                    this.endTrailStroke(time);
                     this.down = false;
                     this.lastRaw = null;
                     this.trailEmit = null;
@@ -601,11 +603,12 @@
                     this.lastRaw = { x, y, time };
                 }
 
-                pointerUp() {
+                pointerUp(time = this.now()) {
+                    const continuesAsAlwaysTrail = window.effectiveAlwaysTrail;
+                    if (!continuesAsAlwaysTrail) this.endTrailStroke(time);
                     this.down = false;
                     this.distanceAccumulator = 0;
-                    if (!window.effectiveAlwaysTrail) {
-                        this.commitTrailTip();
+                    if (!continuesAsAlwaysTrail) {
                         this.lastRaw = null;
                         this.trailEmit = null;
                         this.trailTip = null;
@@ -613,6 +616,7 @@
                 }
 
                 beginStroke(x, y, time) {
+                    if (this.trailTip) this.endTrailStroke(time);
                     this.strokeId++;
                     this.appendTrail(x, y, time, this.strokeId);
                     this.trailEmit = { x, y, time };
@@ -627,6 +631,32 @@
                         Math.hypot(last.x - tip.x, last.y - tip.y) >= 0.05) {
                         this.appendTrail(tip.x, tip.y, tip.born, tip.strokeId);
                     }
+                }
+
+                trailRetentionMs() {
+                    return TRAIL_LIFETIME_MS * this.trailRetractionDelayMultiplier;
+                }
+
+                endTrailStroke(time) {
+                    this.commitTrailTip();
+                    const tip = this.trailTip;
+                    if (!tip || this.trailRetractions.has(tip.strokeId)) return;
+
+                    const retentionMs = this.trailRetentionMs();
+                    this.trailRetractions.set(tip.strokeId, {
+                        releasedAt: time,
+                        cutoffAtRelease: time - retentionMs,
+                        retentionMs
+                    });
+                }
+
+                trailCutoff(strokeId, now) {
+                    const retraction = this.trailRetractions.get(strokeId);
+                    if (!retraction) return now - this.trailRetentionMs();
+
+                    // Preserve the sampled history first, then advance its removal boundary independently.
+                    return retraction.cutoffAtRelease +
+                        Math.max(0, now - retraction.releasedAt) * this.trailSpeed;
                 }
 
                 appendTrail(x, y, born, strokeId) {
@@ -744,16 +774,27 @@
                         particle => (now - particle.born) * this.trailSpeed <= particle.lifetimeMs
                     );
 
-                    const lifetime = TRAIL_LIFETIME_MS * this.trailLifetimeMultiplier;
-                    if (lifetime <= 0) {
+                    if (this.trailRetentionMs() <= 0) {
                         this.trail.length = 0;
+                        this.trailRetractions.clear();
                     } else {
-                        const cutoff = now - lifetime / this.trailSpeed - 100;
-                        let firstUseful = 0;
-                        while (firstUseful + 1 < this.trail.length && this.trail[firstUseful + 1].born < cutoff) {
-                            firstUseful++;
+                        const strokes = new Map();
+                        for (const point of this.trail) {
+                            if (!strokes.has(point.strokeId)) strokes.set(point.strokeId, []);
+                            strokes.get(point.strokeId).push(point);
                         }
-                        if (firstUseful > 0) this.trail.splice(0, firstUseful);
+
+                        const retained = [];
+                        for (const [strokeId, points] of strokes) {
+                            const cutoff = this.trailCutoff(strokeId, now);
+                            const firstAlive = points.findIndex(point => point.born >= cutoff);
+                            if (firstAlive < 0) {
+                                this.trailRetractions.delete(strokeId);
+                                continue;
+                            }
+                            retained.push(...points.slice(Math.max(0, firstAlive - 1)));
+                        }
+                        this.trail = retained;
                     }
                 }
 
@@ -764,9 +805,7 @@
                 }
 
                 trailStrokes(now) {
-                    const lifetime = TRAIL_LIFETIME_MS * this.trailLifetimeMultiplier;
-                    if (lifetime <= 0 || this.trail.length === 0) return [];
-                    const cutoff = now - lifetime / this.trailSpeed;
+                    if (this.trailRetentionMs() <= 0 || this.trail.length === 0) return [];
                     const groups = new Map();
                     for (const point of this.trail) {
                         if (!groups.has(point.strokeId)) groups.set(point.strokeId, []);
@@ -775,6 +814,7 @@
 
                     const result = [];
                     for (const [strokeId, source] of groups) {
+                        const cutoff = this.trailCutoff(strokeId, now);
                         const emitted = source.filter(point => point.born <= now);
                         const tip = this.trailTip;
                         const last = emitted[emitted.length - 1];
@@ -1841,14 +1881,15 @@
                     trailWidthPx: TRAIL_WIDTH_WORLD * worldToPx * engine.trailThickness *
                         TRAIL_RENDER_WIDTH_SCALE,
                     trailMinVertexDistancePx: TRAIL_MIN_VERTEX_WORLD * worldToPx,
-                    trailLifetimeMs: TRAIL_LIFETIME_MS * engine.trailLifetimeMultiplier,
+                    trailLifetimeMs: engine.trailRetentionMs(),
+                    trailRetractionDelayMs: engine.trailRetentionMs(),
                     scale: engine.scale,
                     effectiveScale: engine.scale * EFFECT_RENDER_SCALE,
                     opacity: engine.opacity,
                     trailSpeed: engine.trailSpeed,
                     clickSpeed: engine.clickSpeed,
                     trailThickness: engine.trailThickness,
-                    trailLifetimeMultiplier: engine.trailLifetimeMultiplier,
+                    trailRetractionDelayMultiplier: engine.trailRetractionDelayMultiplier,
                     trailRefreshRate: engine.trailRefreshRate,
                     glowIntensity: engine.glowIntensity,
                     bloomResourceIntensity: BLOOM_RESOURCE_INTENSITY,
@@ -1938,7 +1979,7 @@
                 trailSpeed,
                 clickSpeed,
                 trailThickness,
-                trailLifetimeMultiplier,
+                trailRetractionDelayMultiplier,
                 glowIntensity
             ) => {
                 const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -1947,7 +1988,7 @@
                 engine.trailSpeed = clamp(finite(trailSpeed, 1), 0.2, 3);
                 engine.clickSpeed = clamp(finite(clickSpeed, 1), 0.2, 3);
                 engine.trailThickness = clamp(finite(trailThickness, 1), 0.5, 3);
-                engine.trailLifetimeMultiplier = clamp(finite(trailLifetimeMultiplier, 1), 0, 2);
+                engine.trailRetractionDelayMultiplier = clamp(finite(trailRetractionDelayMultiplier, 1), 0, 2);
                 engine.glowIntensity = clamp(finite(glowIntensity, 1), 0, 3);
                 window.scheduleNextAnimationFrame();
             };

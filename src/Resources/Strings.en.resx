@@ -578,7 +578,7 @@ Download now?</value>
       <value>Default 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailDelay" xml:space="preserve">
-      <value>Trail delay</value>
+      <value>Trail retraction delay</value>
     </data>
     <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
       <value>Default 1.00 ×</value>
@@ -641,7 +641,7 @@ Download now?</value>
       <value>Match trail refresh rate to display</value>
     </data>
     <data name="Visual_TrailDelay" xml:space="preserve">
-      <value>Trail delay</value>
+      <value>Trail retraction delay</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>Visual</value>
