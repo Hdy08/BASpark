@@ -52,7 +52,7 @@ public class TouchEffectResourceTests
         Assert.Contains("Math.log2(Math.max(levelWidth, levelHeight)) + BLOOM_DIFFUSION - 10", html, StringComparison.Ordinal);
         Assert.Contains("const BLOOM_RESOURCE_INTENSITY = 1.7000000476837158", html, StringComparison.Ordinal);
         Assert.Contains("const BLOOM_BASE_STRENGTH = 0.05", html, StringComparison.Ordinal);
-        Assert.Contains("const BLOOM_RADIUS_CALIBRATION = 0.5", html, StringComparison.Ordinal);
+        Assert.Contains("const BLOOM_RADIUS_CALIBRATION = 0.25", html, StringComparison.Ordinal);
         Assert.Contains(
             "const radiusScale = BLOOM_RADIUS_CALIBRATION * Math.sqrt(glowControl)",
             html,
