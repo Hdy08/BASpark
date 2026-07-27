@@ -268,6 +268,7 @@
             const TRAIL_MIN_VERTEX_WORLD = 0.009999999776482582;
             const TRAIL_SMOOTHING_PASSES = 3;
             const TRAIL_RENDER_SEGMENT_PX = 0.5;
+            const TRAIL_JITTER_TOLERANCE_RATIO = 0.25;
             const TRAIL_MSAA_SAMPLES = 4;
             const EFFECT_RENDER_SCALE = 0.5;
             const TRAIL_RENDER_WIDTH_SCALE = 0.5;
@@ -427,6 +428,37 @@
                     }
                 }
                 return resampled;
+            }
+
+            function simplifyTrailPath(source, tolerancePx) {
+                if (source.length < 3 || tolerancePx <= 0) return source;
+
+                const toleranceSquared = tolerancePx * tolerancePx;
+                const simplified = [source[0]];
+                for (let index = 1; index < source.length - 1; index++) {
+                    const first = simplified[simplified.length - 1];
+                    const point = source[index];
+                    const last = source[index + 1];
+                    const dx = last.x - first.x;
+                    const dy = last.y - first.y;
+                    const lengthSquared = dx * dx + dy * dy;
+                    if (lengthSquared <= 0.000001) {
+                        simplified.push(point);
+                        continue;
+                    }
+
+                    const offsetX = point.x - first.x;
+                    const offsetY = point.y - first.y;
+                    const projection = offsetX * dx + offsetY * dy;
+                    const distance = Math.abs(dx * (first.y - point.y) - offsetX * dy);
+                    const distanceSquared = distance * distance / lengthSquared;
+                    const liesBetweenNeighbors = projection >= 0 && projection <= lengthSquared;
+                    if (!liesBetweenNeighbors || distanceSquared > toleranceSquared) {
+                        simplified.push(point);
+                    }
+                }
+                simplified.push(source[source.length - 1]);
+                return simplified;
             }
 
             function evalCurve(stops, t, fallback = 1) {
@@ -1567,9 +1599,15 @@
                     if (halfWidth <= 0 || strokes.length === 0) return;
                     this.setAdditiveBlend();
                     for (const sourcePoints of strokes) {
+                        const renderSegmentPx = TRAIL_RENDER_SEGMENT_PX / Math.max(1, this.dpr);
+                        const jitterTolerancePx = Math.max(
+                            renderSegmentPx,
+                            TRAIL_MIN_VERTEX_WORLD * this.engine.worldToPx * TRAIL_JITTER_TOLERANCE_RATIO
+                        );
+                        const stabilizedPoints = simplifyTrailPath(sourcePoints, jitterTolerancePx);
                         const points = smoothTrailPath(
-                            sourcePoints,
-                            TRAIL_RENDER_SEGMENT_PX / Math.max(1, this.dpr)
+                            stabilizedPoints,
+                            renderSegmentPx
                         );
                         const lengths = new Float32Array(points.length);
                         let total = 0;

@@ -108,8 +108,10 @@ public class TouchEffectResourceTests
         Assert.Contains("gl.TEXTURE_MIN_FILTER, gl.LINEAR", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_SMOOTHING_PASSES = 3", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_RENDER_SEGMENT_PX = 0.5", html, StringComparison.Ordinal);
+        Assert.Contains("const TRAIL_JITTER_TOLERANCE_RATIO = 0.25", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_MSAA_SAMPLES = 4", html, StringComparison.Ordinal);
         Assert.Contains("function smoothTrailPath(source, renderSegmentPx)", html, StringComparison.Ordinal);
+        Assert.Contains("function simplifyTrailPath(source, tolerancePx)", html, StringComparison.Ordinal);
         Assert.Contains("pass < TRAIL_SMOOTHING_PASSES", html, StringComparison.Ordinal);
         Assert.Contains("x: lerp(a.x, b.x, 0.25)", html, StringComparison.Ordinal);
         Assert.Contains("x: lerp(a.x, b.x, 0.75)", html, StringComparison.Ordinal);
@@ -118,6 +120,7 @@ public class TouchEffectResourceTests
             html,
             StringComparison.Ordinal);
         Assert.Contains("TRAIL_RENDER_SEGMENT_PX / Math.max(1, this.dpr)", html, StringComparison.Ordinal);
+        Assert.Contains("const stabilizedPoints = simplifyTrailPath(sourcePoints, jitterTolerancePx)", html, StringComparison.Ordinal);
         Assert.Contains("createMultisampleTarget(width, height)", html, StringComparison.Ordinal);
         Assert.Contains("gl.renderbufferStorageMultisample", html, StringComparison.Ordinal);
         Assert.Contains("this.resolveSourceMultisample(target);", html, StringComparison.Ordinal);
@@ -184,6 +187,21 @@ public class TouchEffectResourceTests
             html,
             StringComparison.Ordinal);
         Assert.DoesNotContain("lifetime / this.trailSpeed", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OverlayCoordinates_KeepSubpixelTrailPrecision()
+    {
+        string sourcePath = Path.Combine(FindWorkspaceRoot(), "src", "MainWindow.xaml.cs");
+        string source = File.ReadAllText(sourcePath, Encoding.UTF8);
+        int methodStart = source.IndexOf("private static string FormatCoordinate(double value)", StringComparison.Ordinal);
+        int methodEnd = source.IndexOf("private bool TryConvertScreenToOverlayPoint", methodStart, StringComparison.Ordinal);
+
+        Assert.True(methodStart >= 0, "Coordinate formatter is missing.");
+        Assert.True(methodEnd > methodStart, "Coordinate formatter is incomplete.");
+        string method = source[methodStart..methodEnd];
+        Assert.Contains("value.ToString(\"F6\", CultureInfo.InvariantCulture)", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"F3\"", method, StringComparison.Ordinal);
     }
 
     [Fact]

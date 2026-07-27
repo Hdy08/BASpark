@@ -884,7 +884,7 @@ namespace BASpark
 
         private static string FormatCoordinate(double value)
         {
-            return value.ToString("F3", CultureInfo.InvariantCulture);
+            return value.ToString("F6", CultureInfo.InvariantCulture);
         }
 
         private bool TryConvertScreenToOverlayPoint(int screenX, int screenY, out System.Windows.Point percentPoint)
