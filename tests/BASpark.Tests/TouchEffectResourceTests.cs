@@ -261,23 +261,38 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
-    public void EnvironmentFiltering_TruncatesInputWithoutPausingExistingEffects()
+    public void EnvironmentFiltering_ReleasesInputWithoutHidingExistingEffects()
     {
-        string sourcePath = Path.Combine(FindWorkspaceRoot(), "src", "MainWindow.xaml.cs");
-        string source = File.ReadAllText(sourcePath, Encoding.UTF8);
-        int methodStart = source.IndexOf("public void SetEnvironmentSuppressed(bool suppressed)", StringComparison.Ordinal);
-        int methodEnd = source.IndexOf("private bool ShouldOverlayBeVisible", methodStart, StringComparison.Ordinal);
+        string root = FindWorkspaceRoot();
+        string mainWindowSource = File.ReadAllText(
+            Path.Combine(root, "src", "MainWindow.xaml.cs"),
+            Encoding.UTF8);
+        int methodStart = mainWindowSource.IndexOf("public void SetEnvironmentSuppressed(bool suppressed)", StringComparison.Ordinal);
+        int methodEnd = mainWindowSource.IndexOf("private bool ShouldOverlayBeVisible", methodStart, StringComparison.Ordinal);
 
         Assert.True(methodStart >= 0, "Environment suppression handler is missing.");
         Assert.True(methodEnd > methodStart, "Environment suppression handler is incomplete.");
-        string method = source[methodStart..methodEnd];
+        string method = mainWindowSource[methodStart..methodEnd];
         Assert.Contains("if(window.truncateTrail) window.truncateTrail();", method, StringComparison.Ordinal);
-        Assert.Contains("if(window.scheduleNextAnimationFrame) window.scheduleNextAnimationFrame();", method, StringComparison.Ordinal);
+        Assert.Contains("_environmentInputSuppressed = suppressed;", method, StringComparison.Ordinal);
         Assert.DoesNotContain("PauseOverlayRuntime", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("SyncOverlayPresentationState", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("Hide()", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("clearEffects", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("_hiddenByEnvironmentSuppression", mainWindowSource, StringComparison.Ordinal);
         Assert.Contains(
-            "private bool ShouldPauseOverlayRuntime => _hiddenForExternalScreenshotCapture;",
-            source,
+            "private bool ShouldOverlayBeVisible =>\n            !_hiddenForExternalScreenshotCapture;",
+            mainWindowSource,
             StringComparison.Ordinal);
+
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        int truncateStart = html.IndexOf("truncateTrail(time = this.now())", StringComparison.Ordinal);
+        int truncateEnd = html.IndexOf("pointerDown(x, y, time = this.now())", truncateStart, StringComparison.Ordinal);
+        Assert.True(truncateStart >= 0 && truncateEnd > truncateStart, "Trail truncation implementation is missing.");
+        string truncateTrail = html[truncateStart..truncateEnd];
+        Assert.Contains("this.endTrailStroke(time);", truncateTrail, StringComparison.Ordinal);
+        Assert.DoesNotContain("this.clicks", truncateTrail, StringComparison.Ordinal);
+        Assert.DoesNotContain("this.distanceParticles", truncateTrail, StringComparison.Ordinal);
     }
 
     [Theory]

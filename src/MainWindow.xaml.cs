@@ -98,7 +98,7 @@ namespace BASpark
         private bool _screenshotCompatibilityMode = ConfigManager.ScreenshotCompatibilityMode;
         private static readonly long EnsureTopmostDebounceTicks = TimeSpan.FromMilliseconds(80).Ticks;
         private bool _hiddenForExternalScreenshotCapture;
-        private bool _hiddenByEnvironmentSuppression;
+        private bool _environmentInputSuppressed;
         private bool _overlayRuntimePaused;
         private bool _webViewRecoveryPending;
         private int _trailRefreshRate = 60;
@@ -262,29 +262,23 @@ namespace BASpark
             SyncOverlayPresentationState();
         }
 
-        /// 环境过滤时隐藏叠加层并截断当前输入轨迹；已有动画继续按时间自然结束。
+        /// 环境过滤终止当前指针输入并阻止后续输入。已创建的动画保持可见并按原时序结束。
         public void SetEnvironmentSuppressed(bool suppressed)
         {
-            if (_hiddenByEnvironmentSuppression == suppressed)
+            if (_environmentInputSuppressed == suppressed)
             {
                 return;
             }
 
+            _environmentInputSuppressed = suppressed;
             if (suppressed)
             {
                 ExecuteScript("if(window.truncateTrail) window.truncateTrail();");
             }
-
-            _hiddenByEnvironmentSuppression = suppressed;
-            SyncOverlayPresentationState();
-            if (!suppressed)
-            {
-                ExecuteScript("if(window.scheduleNextAnimationFrame) window.scheduleNextAnimationFrame();");
-            }
         }
 
         private bool ShouldOverlayBeVisible =>
-            !_hiddenForExternalScreenshotCapture && !_hiddenByEnvironmentSuppression;
+            !_hiddenForExternalScreenshotCapture;
 
         private bool ShouldPauseOverlayRuntime => _hiddenForExternalScreenshotCapture;
 
