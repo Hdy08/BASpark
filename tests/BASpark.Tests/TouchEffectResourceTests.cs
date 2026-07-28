@@ -110,11 +110,12 @@ public class TouchEffectResourceTests
         Assert.Contains("const TRAIL_RENDER_SEGMENT_PX = 0.5", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_JITTER_TOLERANCE_RATIO = 0.25", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_MSAA_SAMPLES = 4", html, StringComparison.Ordinal);
-        Assert.Contains("function smoothTrailPath(source, renderSegmentPx)", html, StringComparison.Ordinal);
+        Assert.Contains("function smoothTrailPath(source, renderSegmentPx, createPoint = null)", html, StringComparison.Ordinal);
         Assert.Contains("function simplifyTrailPath(source, tolerancePx)", html, StringComparison.Ordinal);
         Assert.Contains("pass < TRAIL_SMOOTHING_PASSES", html, StringComparison.Ordinal);
-        Assert.Contains("x: lerp(a.x, b.x, 0.25)", html, StringComparison.Ordinal);
-        Assert.Contains("x: lerp(a.x, b.x, 0.75)", html, StringComparison.Ordinal);
+        Assert.Contains("refined.push(makePoint(", html, StringComparison.Ordinal);
+        Assert.Contains("lerp(a.x, b.x, 0.25)", html, StringComparison.Ordinal);
+        Assert.Contains("lerp(a.x, b.x, 0.75)", html, StringComparison.Ordinal);
         Assert.Contains(
             "Math.ceil(distance / renderSegmentPx)",
             html,
@@ -205,6 +206,61 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
+    public void InputBridgeAndTopmostMonitor_AvoidPerSampleScriptCompilation()
+    {
+        string root = FindWorkspaceRoot();
+        string mainWindowSource = File.ReadAllText(
+            Path.Combine(root, "src", "MainWindow.xaml.cs"),
+            Encoding.UTF8);
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+
+        Assert.Contains("coreWebView.Settings.IsWebMessageEnabled = true;", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("coreWebView.PostWebMessageAsJson(message);", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("PostInputMessage(\"move\", inputMode, clientPoint);", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("PostHostInputState(", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("AdvanceInputGeneration()", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("\\\"kind\\\":\\\"hostState\\\"", mainWindowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ExecuteWithInputContext", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("private sealed class InputBoundsSnapshot", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("System.Threading.Volatile.Read(ref _inputBounds)", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("CacheInputBounds(bounds);", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.Exchange(ref _topmostRefreshQueued, 1)", mainWindowSource, StringComparison.Ordinal);
+
+        Assert.Contains("function installHostInputBridge()", html, StringComparison.Ordinal);
+        Assert.Contains("webView.addEventListener(\"message\", event =>", html, StringComparison.Ordinal);
+        Assert.Contains("let hostInputGeneration = 0;", html, StringComparison.Ordinal);
+        Assert.Contains("if (kind === \"hostState\")", html, StringComparison.Ordinal);
+        Assert.Contains("if (!hostInputEnabled || generation !== hostInputGeneration) return;", html, StringComparison.Ordinal);
+        Assert.Contains("window.externalMove(x, y);", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Renderer_UsesNoDiscFastPathWithoutReducingActiveDiscCoverage()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        int renderStart = html.IndexOf("render(now)", StringComparison.Ordinal);
+        int renderEnd = html.IndexOf("clear()", renderStart, StringComparison.Ordinal);
+
+        Assert.True(renderStart >= 0 && renderEnd > renderStart, "Renderer entry point is missing.");
+        string render = html[renderStart..renderEnd];
+        Assert.Contains("this.engine.prune(now);", render, StringComparison.Ordinal);
+        Assert.Contains("if (this.viewportNeedsResize()) this.resize();", render, StringComparison.Ordinal);
+        Assert.Contains("const hasActiveDisc = this.hasActiveDisc(now);", render, StringComparison.Ordinal);
+        Assert.Contains("if (hasActiveDisc) {\n                        this.renderDiscMasks(now);", render, StringComparison.Ordinal);
+        Assert.Contains("this.renderFinal(bloom, bloomParameters.sampleScale, glowControl, hasActiveDisc);", render, StringComparison.Ordinal);
+        Assert.Contains("viewportNeedsResize()", html, StringComparison.Ordinal);
+        Assert.Contains("createUniformCache(program, names)", html, StringComparison.Ordinal);
+        Assert.Contains("this.geometryUploadScratch = new Float32Array(0);", html, StringComparison.Ordinal);
+
+        int livenessStart = html.IndexOf("hasActiveEffects()", StringComparison.Ordinal);
+        int livenessEnd = html.IndexOf("trailStrokes(now)", livenessStart, StringComparison.Ordinal);
+        Assert.True(livenessStart >= 0 && livenessEnd > livenessStart, "Effect liveness check is missing.");
+        string liveness = html[livenessStart..livenessEnd];
+        Assert.DoesNotContain("this.prune", liveness, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ClickDisc_UsesExtractedLinearGradientFadeTiming()
     {
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
@@ -220,9 +276,11 @@ public class TouchEffectResourceTests
         Assert.Contains("this.nonDiscAlphaTarget = this.createCoverageTarget(pixelWidth, pixelHeight)", html, StringComparison.Ordinal);
         Assert.Contains("for (const click of this.engine.clicks) this.renderDiscMask(click, now)", html, StringComparison.Ordinal);
         Assert.Contains("for (const click of this.engine.clicks) this.renderDiscFootprint(click, now)", html, StringComparison.Ordinal);
-        Assert.Contains("this.bindFullscreenTexture(this.finalProgram, \"uDiscMask\", 2, this.discMaskTarget.texture)", html, StringComparison.Ordinal);
-        Assert.Contains("this.bindFullscreenTexture(this.finalProgram, \"uDiscFootprint\", 3, this.discFootprintTarget.texture)", html, StringComparison.Ordinal);
-        Assert.Contains("this.bindFullscreenTexture(this.finalProgram, \"uNonDiscAlpha\", 4, this.nonDiscAlphaTarget.texture)", html, StringComparison.Ordinal);
+        Assert.Contains("const FINAL_NO_DISC_FRAGMENT", html, StringComparison.Ordinal);
+        Assert.Contains("this.finalNoDiscProgram = createProgram", html, StringComparison.Ordinal);
+        Assert.Contains("this.bindFullscreenTexture(uniforms, \"uDiscMask\", 2, this.discMaskTarget.texture)", html, StringComparison.Ordinal);
+        Assert.Contains("this.bindFullscreenTexture(uniforms, \"uDiscFootprint\", 3, this.discFootprintTarget.texture)", html, StringComparison.Ordinal);
+        Assert.Contains("this.bindFullscreenTexture(uniforms, \"uNonDiscAlpha\", 4, this.nonDiscAlphaTarget.texture)", html, StringComparison.Ordinal);
         Assert.Contains("const formats = this.floatTargets", html, StringComparison.Ordinal);
         Assert.Contains("{ internalFormat: gl.R16F, type: gl.HALF_FLOAT }", html, StringComparison.Ordinal);
 
@@ -273,8 +331,10 @@ public class TouchEffectResourceTests
         Assert.True(methodStart >= 0, "Environment suppression handler is missing.");
         Assert.True(methodEnd > methodStart, "Environment suppression handler is incomplete.");
         string method = mainWindowSource[methodStart..methodEnd];
-        Assert.Contains("if(window.truncateTrail) window.truncateTrail();", method, StringComparison.Ordinal);
-        Assert.Contains("_environmentInputSuppressed = suppressed;", method, StringComparison.Ordinal);
+        Assert.Contains("PostHostInputState(", method, StringComparison.Ordinal);
+        Assert.Contains("inputEnabled: false", method, StringComparison.Ordinal);
+        Assert.Contains("truncateTrail: true", method, StringComparison.Ordinal);
+        Assert.Contains("AdvanceInputGeneration()", method, StringComparison.Ordinal);
         Assert.DoesNotContain("PauseOverlayRuntime", method, StringComparison.Ordinal);
         Assert.DoesNotContain("SyncOverlayPresentationState", method, StringComparison.Ordinal);
         Assert.DoesNotContain("Hide()", method, StringComparison.Ordinal);
@@ -293,6 +353,8 @@ public class TouchEffectResourceTests
         Assert.Contains("this.endTrailStroke(time);", truncateTrail, StringComparison.Ordinal);
         Assert.DoesNotContain("this.clicks", truncateTrail, StringComparison.Ordinal);
         Assert.DoesNotContain("this.distanceParticles", truncateTrail, StringComparison.Ordinal);
+        Assert.Contains("if (Boolean(message.truncateTrail))", html, StringComparison.Ordinal);
+        Assert.Contains("window.truncateTrail();", html, StringComparison.Ordinal);
     }
 
     [Theory]

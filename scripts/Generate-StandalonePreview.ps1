@@ -16,7 +16,7 @@ $sourceFullPath = [System.IO.Path]::GetFullPath($SourcePath)
 $outputFullPath = [System.IO.Path]::GetFullPath($OutputPath)
 $marker = "<!-- BASPARK_ASSET_BOOTSTRAP -->"
 $html = [System.IO.File]::ReadAllText($sourceFullPath, [System.Text.Encoding]::UTF8)
-if (($html.Split($marker).Length - 1) -ne 1) {
+if (($html.Split([string[]]@($marker), [System.StringSplitOptions]::None).Length - 1) -ne 1) {
     throw "Expected exactly one touch-effect asset bootstrap marker."
 }
 

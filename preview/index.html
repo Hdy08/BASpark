@@ -389,24 +389,25 @@
             const lerp = (a, b, t) => a + (b - a) * t;
             const randomRange = (a, b) => a + (b - a) * Math.random();
 
-            function smoothTrailPath(source, renderSegmentPx) {
+            function smoothTrailPath(source, renderSegmentPx, createPoint = null) {
                 if (source.length < 3) return source;
+                const makePoint = createPoint || ((x, y, born) => ({ x, y, born }));
                 let points = source;
                 for (let pass = 0; pass < TRAIL_SMOOTHING_PASSES; pass++) {
                     const refined = [points[0]];
                     for (let index = 0; index < points.length - 1; index++) {
                         const a = points[index];
                         const b = points[index + 1];
-                        refined.push({
-                            x: lerp(a.x, b.x, 0.25),
-                            y: lerp(a.y, b.y, 0.25),
-                            born: lerp(a.born, b.born, 0.25)
-                        });
-                        refined.push({
-                            x: lerp(a.x, b.x, 0.75),
-                            y: lerp(a.y, b.y, 0.75),
-                            born: lerp(a.born, b.born, 0.75)
-                        });
+                        refined.push(makePoint(
+                            lerp(a.x, b.x, 0.25),
+                            lerp(a.y, b.y, 0.25),
+                            lerp(a.born, b.born, 0.25)
+                        ));
+                        refined.push(makePoint(
+                            lerp(a.x, b.x, 0.75),
+                            lerp(a.y, b.y, 0.75),
+                            lerp(a.born, b.born, 0.75)
+                        ));
                     }
                     refined.push(points[points.length - 1]);
                     points = refined;
@@ -420,11 +421,11 @@
                     const segmentCount = Math.max(1, Math.ceil(distance / renderSegmentPx));
                     for (let segment = 1; segment <= segmentCount; segment++) {
                         const t = segment / segmentCount;
-                        resampled.push({
-                            x: lerp(a.x, b.x, t),
-                            y: lerp(a.y, b.y, t),
-                            born: lerp(a.born, b.born, t)
-                        });
+                        resampled.push(makePoint(
+                            lerp(a.x, b.x, t),
+                            lerp(a.y, b.y, t),
+                            lerp(a.born, b.born, t)
+                        ));
                     }
                 }
                 return resampled;
@@ -496,18 +497,18 @@
                 return stops[stops.length - 1].v;
             }
 
-            function evalColor(stops, t) {
+            function evalColor(stops, t, output = null) {
                 if (t <= stops[0].t) return stops[0].c;
                 for (let index = 1; index < stops.length; index++) {
                     const b = stops[index];
                     if (t <= b.t) {
                         const a = stops[index - 1];
                         const p = clamp((t - a.t) / Math.max(0.000001, b.t - a.t), 0, 1);
-                        return [
-                            lerp(a.c[0], b.c[0], p),
-                            lerp(a.c[1], b.c[1], p),
-                            lerp(a.c[2], b.c[2], p)
-                        ];
+                        const color = output || [0, 0, 0];
+                        color[0] = lerp(a.c[0], b.c[0], p);
+                        color[1] = lerp(a.c[1], b.c[1], p);
+                        color[2] = lerp(a.c[2], b.c[2], p);
+                        return color;
                     }
                 }
                 return stops[stops.length - 1].c;
@@ -529,8 +530,12 @@
                 return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
             }
 
-            function linearColor(color) {
-                return color.map(srgbChannelToLinear);
+            function linearColor(color, output = null) {
+                const linear = output || [0, 0, 0];
+                linear[0] = srgbChannelToLinear(color[0]);
+                linear[1] = srgbChannelToLinear(color[1]);
+                linear[2] = srgbChannelToLinear(color[2]);
+                return linear;
             }
 
             class TouchEngine {
@@ -779,8 +784,11 @@
 
                 spawnClick(x, y, born) {
                     const triangles = [];
+                    let lifetimeMs = PROFILE.mesh.lifetimeMs;
                     for (let index = 0; index < PROFILE.clickTriangles.count; index++) {
-                        triangles.push(this.makeTriangle(PROFILE.clickTriangles, x, y, born));
+                        const triangle = this.makeTriangle(PROFILE.clickTriangles, x, y, born);
+                        triangles.push(triangle);
+                        lifetimeMs = Math.max(lifetimeMs, triangle.lifetimeMs);
                     }
                     const arcs = [];
                     for (let index = 0; index < PROFILE.mesh.count; index++) {
@@ -790,81 +798,114 @@
                             startSize: randomRange(PROFILE.mesh.size[0], PROFILE.mesh.size[1])
                         });
                     }
-                    this.clicks.push({ x, y, born, triangles, arcs });
+                    this.clicks.push({ x, y, born, triangles, arcs, lifetimeMs });
                     if (this.clicks.length > MAX_CLICK_EFFECTS) this.clicks.shift();
                 }
 
                 prune(now) {
-                    this.clicks = this.clicks.filter(click => {
-                        const triangleEnd = click.triangles.reduce(
-                            (longest, triangle) => Math.max(longest, triangle.lifetimeMs),
-                            PROFILE.mesh.lifetimeMs
-                        );
-                        return (now - click.born) * this.clickSpeed <= triangleEnd;
-                    });
-                    this.distanceParticles = this.distanceParticles.filter(
-                        particle => (now - particle.born) * this.trailSpeed <= particle.lifetimeMs
-                    );
+                    let clickWriteIndex = 0;
+                    for (let index = 0; index < this.clicks.length; index++) {
+                        const click = this.clicks[index];
+                        if ((now - click.born) * this.clickSpeed <= click.lifetimeMs) {
+                            this.clicks[clickWriteIndex++] = click;
+                        }
+                    }
+                    this.clicks.length = clickWriteIndex;
+
+                    let particleWriteIndex = 0;
+                    for (let index = 0; index < this.distanceParticles.length; index++) {
+                        const particle = this.distanceParticles[index];
+                        if ((now - particle.born) * this.trailSpeed <= particle.lifetimeMs) {
+                            this.distanceParticles[particleWriteIndex++] = particle;
+                        }
+                    }
+                    this.distanceParticles.length = particleWriteIndex;
 
                     if (this.trailRetentionMs() <= 0) {
                         this.trail.length = 0;
                         this.trailRetractions.clear();
                     } else {
-                        const strokes = new Map();
-                        for (const point of this.trail) {
-                            if (!strokes.has(point.strokeId)) strokes.set(point.strokeId, []);
-                            strokes.get(point.strokeId).push(point);
-                        }
-
-                        const retained = [];
-                        for (const [strokeId, points] of strokes) {
+                        let readIndex = 0;
+                        let writeIndex = 0;
+                        while (readIndex < this.trail.length) {
+                            const strokeStart = readIndex;
+                            const strokeId = this.trail[strokeStart].strokeId;
+                            while (readIndex < this.trail.length && this.trail[readIndex].strokeId === strokeId) {
+                                readIndex++;
+                            }
                             const cutoff = this.trailCutoff(strokeId, now);
-                            const firstAlive = points.findIndex(point => point.born >= cutoff);
-                            if (firstAlive < 0) {
+                            let firstAlive = strokeStart;
+                            while (firstAlive < readIndex && this.trail[firstAlive].born < cutoff) {
+                                firstAlive++;
+                            }
+                            if (firstAlive === readIndex) {
                                 this.trailRetractions.delete(strokeId);
                                 continue;
                             }
-                            retained.push(...points.slice(Math.max(0, firstAlive - 1)));
+                            const copyStart = Math.max(strokeStart, firstAlive - 1);
+                            for (let index = copyStart; index < readIndex; index++) {
+                                this.trail[writeIndex++] = this.trail[index];
+                            }
                         }
-                        this.trail = retained;
+                        this.trail.length = writeIndex;
                     }
                 }
 
-                hasActiveEffects(now) {
-                    this.prune(now);
-                    return this.down || window.effectiveAlwaysTrail || this.clicks.length > 0 ||
-                        this.distanceParticles.length > 0 || this.trail.length > 1;
+                hasActiveEffects() {
+                    const lastTrailPoint = this.trail[this.trail.length - 1];
+                    const hasVisibleLiveTip = Boolean(
+                        lastTrailPoint && this.trailTip &&
+                        lastTrailPoint.strokeId === this.trailTip.strokeId &&
+                        Math.hypot(lastTrailPoint.x - this.trailTip.x, lastTrailPoint.y - this.trailTip.y) >= 0.05
+                    );
+                    return this.clicks.length > 0 || this.distanceParticles.length > 0 ||
+                        this.trail.length > 1 || hasVisibleLiveTip;
                 }
 
                 trailStrokes(now) {
                     if (this.trailRetentionMs() <= 0 || this.trail.length === 0) return [];
-                    const groups = new Map();
-                    for (const point of this.trail) {
-                        if (!groups.has(point.strokeId)) groups.set(point.strokeId, []);
-                        groups.get(point.strokeId).push(point);
-                    }
-
                     const result = [];
-                    for (const [strokeId, source] of groups) {
-                        const cutoff = this.trailCutoff(strokeId, now);
-                        const emitted = source.filter(point => point.born <= now);
-                        const tip = this.trailTip;
-                        const last = emitted[emitted.length - 1];
-                        if (tip && tip.strokeId === strokeId && tip.born <= now &&
-                            (!last || Math.hypot(last.x - tip.x, last.y - tip.y) >= 0.05)) {
-                            emitted.push(tip);
+                    let readIndex = 0;
+                    while (readIndex < this.trail.length) {
+                        const strokeStart = readIndex;
+                        const strokeId = this.trail[strokeStart].strokeId;
+                        while (readIndex < this.trail.length && this.trail[readIndex].strokeId === strokeId) {
+                            readIndex++;
                         }
-                        if (emitted.length < 2 || emitted[emitted.length - 1].born < cutoff) continue;
-                        let firstAlive = emitted.findIndex(point => point.born >= cutoff);
-                        if (firstAlive < 0) continue;
+                        const cutoff = this.trailCutoff(strokeId, now);
+                        const tip = this.trailTip;
+                        let emittedEnd = strokeStart;
+                        while (emittedEnd < readIndex && this.trail[emittedEnd].born <= now) {
+                            emittedEnd++;
+                        }
+                        const last = emittedEnd > strokeStart ? this.trail[emittedEnd - 1] : null;
+                        const appendTip = Boolean(
+                            tip && tip.strokeId === strokeId && tip.born <= now &&
+                            (!last || Math.hypot(last.x - tip.x, last.y - tip.y) >= 0.05)
+                        );
+                        const emittedCount = emittedEnd - strokeStart + (appendTip ? 1 : 0);
+                        if (emittedCount < 2) continue;
+
+                        const pointAt = index => {
+                            if (index < emittedEnd - strokeStart) return this.trail[strokeStart + index];
+                            return tip;
+                        };
+                        let firstAlive = 0;
+                        while (firstAlive < emittedCount && pointAt(firstAlive).born < cutoff) {
+                            firstAlive++;
+                        }
+                        if (firstAlive === emittedCount) continue;
+
                         const points = [];
                         if (firstAlive > 0) {
-                            const a = emitted[firstAlive - 1];
-                            const b = emitted[firstAlive];
+                            const a = pointAt(firstAlive - 1);
+                            const b = pointAt(firstAlive);
                             const p = clamp((cutoff - a.born) / Math.max(0.001, b.born - a.born), 0, 1);
                             points.push({ x: lerp(a.x, b.x, p), y: lerp(a.y, b.y, p), born: cutoff });
                         }
-                        points.push(...emitted.slice(firstAlive));
+                        for (let index = firstAlive; index < emittedCount; index++) {
+                            points.push(pointAt(index));
+                        }
                         if (points.length >= 2) result.push(points);
                     }
                     return result;
@@ -1074,6 +1115,41 @@
                     outColor = vec4(min(srgb, vec3(alpha)), alpha);
                 }`;
 
+            // This is the exact FINAL_FRAGMENT branch used when no center disc is present.
+            // It avoids sampling three full-resolution coverage textures that cannot affect output.
+            const FINAL_NO_DISC_FRAGMENT = `#version 300 es
+                precision highp float;
+                uniform sampler2D uSource;
+                uniform sampler2D uBloom;
+                uniform float uBloomStrength;
+                uniform vec2 uBloomTexel;
+                uniform float uSampleScale;
+                in vec2 vUv;
+                out vec4 outColor;
+                vec3 linearToSrgb(vec3 value) {
+                    vec3 lo = value * 12.92;
+                    vec3 hi = 1.055 * pow(max(value, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055;
+                    return mix(hi, lo, lessThanEqual(value, vec3(0.0031308)));
+                }
+                vec3 sampleBloom(vec2 uv) {
+                    vec2 offset = uBloomTexel * (uSampleScale * 0.5);
+                    vec3 color = texture(uBloom, uv + offset * vec2(-1.0, -1.0)).rgb;
+                    color += texture(uBloom, uv + offset * vec2( 1.0, -1.0)).rgb;
+                    color += texture(uBloom, uv + offset * vec2(-1.0,  1.0)).rgb;
+                    color += texture(uBloom, uv + offset * vec2( 1.0,  1.0)).rgb;
+                    return color * 0.25;
+                }
+                void main() {
+                    vec4 source = texture(uSource, vUv);
+                    vec3 bloom = sampleBloom(vUv) * uBloomStrength;
+                    vec3 hdr = max(source.rgb + bloom, vec3(0.0));
+                    vec3 srgb = linearToSrgb(hdr);
+                    float effectCoverage = clamp(max(max(srgb.r, srgb.g), srgb.b), 0.0, 1.0);
+                    float sourceCoverage = clamp(source.a, 0.0, 1.0);
+                    float alpha = 1.0 - (1.0 - sourceCoverage) * (1.0 - effectCoverage);
+                    outColor = vec4(min(srgb, vec3(alpha)), alpha);
+                }`;
+
             const NON_DISC_ALPHA_FRAGMENT = `#version 300 es
                 precision highp float;
                 uniform sampler2D uSource;
@@ -1131,8 +1207,21 @@
                     this.msaaTargets = [];
                     this.sourceMsaaTarget = null;
                     this.msaaSamples = 1;
+                    this.blendMode = "disabled";
+                    this.trailPointPool = [];
+                    this.trailPointPoolCursor = 0;
+                    this.trailPointFactory = (x, y, born) => this.acquireTrailPoint(x, y, born);
+                    this.trailVertexScratch = [];
+                    this.arcVertexScratch = [];
+                    this.trailLengthScratch = new Float32Array(0);
+                    this.trailNormalScratchA = { x: 0, y: 0, tx: 0, ty: 0 };
+                    this.trailNormalScratchB = { x: 0, y: 0, tx: 0, ty: 0 };
+                    this.colorScratch = [0, 0, 0];
+                    this.spriteLinearColorScratch = [0, 0, 0];
+                    this.geometryLinearColorScratch = [0, 0, 0];
                     this.initPrograms();
                     this.initBuffers();
+                    this.geometryUploadScratch = new Float32Array(0);
                     this.textures = {
                         circle: this.createImageTexture(images.circle),
                         ring: this.createImageTexture(images.ring),
@@ -1151,6 +1240,54 @@
                     this.upsampleProgram = createProgram(gl, FULLSCREEN_VERTEX, UPSAMPLE_FRAGMENT);
                     this.nonDiscAlphaProgram = createProgram(gl, FULLSCREEN_VERTEX, NON_DISC_ALPHA_FRAGMENT);
                     this.finalProgram = createProgram(gl, FULLSCREEN_VERTEX, FINAL_FRAGMENT);
+                    this.finalNoDiscProgram = createProgram(gl, FULLSCREEN_VERTEX, FINAL_NO_DISC_FRAGMENT);
+                    this.spriteUniforms = this.createUniformCache(this.spriteProgram, [
+                        "uTexture", "uCenter", "uSize", "uResolution", "uUvRect", "uRotation", "uColor", "uAlpha", "uGain"
+                    ]);
+                    this.geometryUniforms = this.createUniformCache(this.geometryProgram, [
+                        "uTexture", "uResolution", "uGain"
+                    ]);
+                    this.prefilterUniforms = this.createUniformCache(this.prefilterProgram, [
+                        "uTexture", "uTexel", "uThreshold"
+                    ]);
+                    this.downsampleUniforms = this.createUniformCache(this.downsampleProgram, [
+                        "uTexture", "uTexel"
+                    ]);
+                    this.upsampleUniforms = this.createUniformCache(this.upsampleProgram, [
+                        "uHigh", "uLow", "uLowTexel", "uSampleScale"
+                    ]);
+                    this.nonDiscAlphaUniforms = this.createUniformCache(this.nonDiscAlphaProgram, [
+                        "uSource", "uBloom", "uBloomStrength", "uBloomTexel", "uSampleScale"
+                    ]);
+                    this.finalUniforms = this.createUniformCache(this.finalProgram, [
+                        "uSource", "uBloom", "uDiscMask", "uDiscFootprint", "uNonDiscAlpha",
+                        "uBloomStrength", "uBloomTexel", "uSampleScale"
+                    ]);
+                    this.finalNoDiscUniforms = this.createUniformCache(this.finalNoDiscProgram, [
+                        "uSource", "uBloom", "uBloomStrength", "uBloomTexel", "uSampleScale"
+                    ]);
+                }
+
+                createUniformCache(program, names) {
+                    const uniforms = Object.create(null);
+                    for (const name of names) {
+                        uniforms[name] = this.gl.getUniformLocation(program, name);
+                    }
+                    return uniforms;
+                }
+
+                acquireTrailPoint(x, y, born) {
+                    let point = this.trailPointPool[this.trailPointPoolCursor];
+                    if (!point) {
+                        point = { x, y, born };
+                        this.trailPointPool[this.trailPointPoolCursor] = point;
+                    } else {
+                        point.x = x;
+                        point.y = y;
+                        point.born = born;
+                    }
+                    this.trailPointPoolCursor++;
+                    return point;
                 }
 
                 initBuffers() {
@@ -1360,6 +1497,14 @@
                     this.engine.resize(width, height);
                 }
 
+                viewportNeedsResize() {
+                    const width = Math.max(1, window.innerWidth);
+                    const height = Math.max(1, window.innerHeight);
+                    const minimumDpr = width * height <= 3000000 ? 1.25 : 1;
+                    const dpr = clamp(Math.max(window.devicePixelRatio || 1, minimumDpr), 1, 2);
+                    return this.cssWidth !== width || this.cssHeight !== height || this.dpr !== dpr;
+                }
+
                 bloomParameters(glowControl) {
                     if (glowControl <= 0) {
                         return { levels: 0, sampleScale: 0, radiusScale: 0 };
@@ -1383,17 +1528,27 @@
                 }
 
                 setAdditiveBlend() {
+                    if (this.blendMode === "additive") return;
                     const gl = this.gl;
                     gl.enable(gl.BLEND);
                     gl.blendEquation(gl.FUNC_ADD);
                     gl.blendFunc(gl.ONE, gl.ONE);
+                    this.blendMode = "additive";
                 }
 
                 setPremultipliedBlend() {
+                    if (this.blendMode === "premultiplied") return;
                     const gl = this.gl;
                     gl.enable(gl.BLEND);
                     gl.blendEquation(gl.FUNC_ADD);
                     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+                    this.blendMode = "premultiplied";
+                }
+
+                disableBlend() {
+                    if (this.blendMode === "disabled") return;
+                    this.gl.disable(this.gl.BLEND);
+                    this.blendMode = "disabled";
                 }
 
                 drawSprite(
@@ -1413,21 +1568,22 @@
                     if (width <= 0.02 || height <= 0.02 || alpha <= alphaCutoff) return;
                     const gl = this.gl;
                     const program = this.spriteProgram;
+                    const uniforms = this.spriteUniforms;
                     gl.useProgram(program);
                     gl.bindVertexArray(this.spriteVao);
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, texture);
-                    gl.uniform1i(gl.getUniformLocation(program, "uTexture"), 0);
-                    gl.uniform2f(gl.getUniformLocation(program, "uCenter"), x, y);
-                    gl.uniform2f(gl.getUniformLocation(program, "uSize"), width, height);
-                    gl.uniform2f(gl.getUniformLocation(program, "uResolution"), this.cssWidth, this.cssHeight);
-                    gl.uniform4f(gl.getUniformLocation(program, "uUvRect"), ...uvRect);
-                    gl.uniform1f(gl.getUniformLocation(program, "uRotation"), rotation);
-                    const linear = linearColor(color);
-                    gl.uniform3f(gl.getUniformLocation(program, "uColor"), linear[0], linear[1], linear[2]);
+                    gl.uniform1i(uniforms.uTexture, 0);
+                    gl.uniform2f(uniforms.uCenter, x, y);
+                    gl.uniform2f(uniforms.uSize, width, height);
+                    gl.uniform2f(uniforms.uResolution, this.cssWidth, this.cssHeight);
+                    gl.uniform4f(uniforms.uUvRect, ...uvRect);
+                    gl.uniform1f(uniforms.uRotation, rotation);
+                    const linear = linearColor(color, this.spriteLinearColorScratch);
+                    gl.uniform3f(uniforms.uColor, linear[0], linear[1], linear[2]);
                     const opacity = applyEngineOpacity ? this.engine.opacity : 1;
-                    gl.uniform1f(gl.getUniformLocation(program, "uAlpha"), clamp(alpha * opacity, 0, 1));
-                    gl.uniform1f(gl.getUniformLocation(program, "uGain"), gain);
+                    gl.uniform1f(uniforms.uAlpha, clamp(alpha * opacity, 0, 1));
+                    gl.uniform1f(uniforms.uGain, gain);
                     gl.drawArrays(gl.TRIANGLES, 0, 6);
                 }
 
@@ -1435,21 +1591,37 @@
                     if (vertices.length < 24) return;
                     const gl = this.gl;
                     const program = this.geometryProgram;
+                    const uniforms = this.geometryUniforms;
+                    const valueCount = vertices.length;
+                    if (this.geometryUploadScratch.length < valueCount) {
+                        this.geometryUploadScratch = new Float32Array(2 ** Math.ceil(Math.log2(valueCount)));
+                    }
+                    this.geometryUploadScratch.set(vertices);
                     gl.useProgram(program);
                     gl.bindVertexArray(this.geometryVao);
                     gl.bindBuffer(gl.ARRAY_BUFFER, this.geometryBuffer);
-                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+                    gl.bufferData(gl.ARRAY_BUFFER, valueCount * Float32Array.BYTES_PER_ELEMENT, gl.DYNAMIC_DRAW);
+                    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.geometryUploadScratch.subarray(0, valueCount));
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, texture);
-                    gl.uniform1i(gl.getUniformLocation(program, "uTexture"), 0);
-                    gl.uniform2f(gl.getUniformLocation(program, "uResolution"), this.cssWidth, this.cssHeight);
-                    gl.uniform1f(gl.getUniformLocation(program, "uGain"), gain);
-                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertices.length / 8);
+                    gl.uniform1i(uniforms.uTexture, 0);
+                    gl.uniform2f(uniforms.uResolution, this.cssWidth, this.cssHeight);
+                    gl.uniform1f(uniforms.uGain, gain);
+                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, valueCount / 8);
                 }
 
-                pushGeometryVertex(vertices, x, y, u, v, color, alpha) {
-                    const linear = linearColor(color);
-                    vertices.push(x, y, u, v, linear[0], linear[1], linear[2], clamp(alpha * this.engine.opacity, 0, 1));
+                pushGeometryVertex(vertices, x, y, u, v, color, alpha, linear = null) {
+                    const resolvedLinear = linear || linearColor(color, this.geometryLinearColorScratch);
+                    vertices.push(
+                        x,
+                        y,
+                        u,
+                        v,
+                        resolvedLinear[0],
+                        resolvedLinear[1],
+                        resolvedLinear[2],
+                        clamp(alpha * this.engine.opacity, 0, 1)
+                    );
                 }
 
                 meshAngularVelocity(p, blend) {
@@ -1474,7 +1646,7 @@
                     const curve = Math.max(0, evalCurve(PROFILE.disc.sizeCurve, p)) * PROFILE.disc.sizeMultiplier;
                     const effectiveScale = this.engine.scale * EFFECT_RENDER_SCALE;
                     const size = PROFILE.disc.size * this.engine.worldToPx * curve * effectiveScale;
-                    const color = this.engine.displayColor(evalColor(PROFILE.disc.color, p));
+                    const color = this.engine.displayColor(evalColor(PROFILE.disc.color, p, this.colorScratch));
                     const alpha = evalGradientAlpha(PROFILE.disc.alpha, p);
                     return { size, color, alpha };
                 }
@@ -1549,7 +1721,7 @@
                     const x = particle.x + Math.cos(particle.direction) * radius;
                     const y = particle.y + Math.sin(particle.direction) * radius;
                     const size = particle.size * particle.localScale * this.engine.worldToPx * curve * effectiveScale;
-                    const color = this.engine.displayColor(evalColor(PROFILE.triangleColor, p));
+                    const color = this.engine.displayColor(evalColor(PROFILE.triangleColor, p, this.colorScratch));
                     const alpha = evalCurve(PROFILE.triangleAlpha, p) * particle.brightness;
                     this.setAdditiveBlend();
                     this.drawSprite(
@@ -1576,17 +1748,19 @@
                     const length = TAU * clamp(1 - evalCurve(PROFILE.mesh.custom, p), 0, 1);
                     if (length < 0.015 || inner <= 0.01) return;
                     const start = arc.angle + this.meshRotation(p, arc.rotationMix);
-                    const color = this.engine.displayColor(evalColor(PROFILE.mesh.color, p));
+                    const color = this.engine.displayColor(evalColor(PROFILE.mesh.color, p, this.colorScratch));
+                    const linear = linearColor(color, this.geometryLinearColorScratch);
                     const segments = Math.max(2, Math.ceil(64 * length / TAU));
-                    const vertices = [];
+                    const vertices = this.arcVertexScratch;
+                    vertices.length = 0;
                     for (let index = 0; index <= segments; index++) {
                         const progress = index / segments;
                         const angle = start + length * progress;
                         const cos = Math.cos(angle);
                         const sin = Math.sin(angle);
                         const u = 1 - progress;
-                        this.pushGeometryVertex(vertices, click.x + cos * inner, click.y + sin * inner, u, 0, color, 1);
-                        this.pushGeometryVertex(vertices, click.x + cos * outer, click.y + sin * outer, u, 1, color, 1);
+                        this.pushGeometryVertex(vertices, click.x + cos * inner, click.y + sin * inner, u, 0, color, 1, linear);
+                        this.pushGeometryVertex(vertices, click.x + cos * outer, click.y + sin * outer, u, 1, color, 1, linear);
                     }
                     this.setAdditiveBlend();
                     this.drawGeometry(this.textures.ring, vertices, PARTICLE_HDR);
@@ -1605,34 +1779,46 @@
                             TRAIL_MIN_VERTEX_WORLD * this.engine.worldToPx * TRAIL_JITTER_TOLERANCE_RATIO
                         );
                         const stabilizedPoints = simplifyTrailPath(sourcePoints, jitterTolerancePx);
+                        this.trailPointPoolCursor = 0;
                         const points = smoothTrailPath(
                             stabilizedPoints,
-                            renderSegmentPx
+                            renderSegmentPx,
+                            this.trailPointFactory
                         );
-                        const lengths = new Float32Array(points.length);
+                        if (this.trailLengthScratch.length < points.length) {
+                            this.trailLengthScratch = new Float32Array(2 ** Math.ceil(Math.log2(points.length)));
+                        }
+                        const lengths = this.trailLengthScratch;
+                        lengths[0] = 0;
                         let total = 0;
                         for (let index = 1; index < points.length; index++) {
                             total += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
                             lengths[index] = total;
                         }
                         if (total < 0.05) continue;
-                        const vertices = [];
+                        const vertices = this.trailVertexScratch;
+                        vertices.length = 0;
                         const appendPair = (point, nx, ny, offset, progress) => {
-                            const color = this.engine.displayColor(evalColor(PROFILE.trailColor, progress));
+                            const color = this.engine.displayColor(evalColor(PROFILE.trailColor, progress, this.colorScratch));
+                            const linear = linearColor(color, this.geometryLinearColorScratch);
                             const u = 1 - progress;
-                            this.pushGeometryVertex(vertices, point.x + nx * offset, point.y + ny * offset, u, 0, color, 1);
-                            this.pushGeometryVertex(vertices, point.x - nx * offset, point.y - ny * offset, u, 1, color, 1);
+                            this.pushGeometryVertex(vertices, point.x + nx * offset, point.y + ny * offset, u, 0, color, 1, linear);
+                            this.pushGeometryVertex(vertices, point.x - nx * offset, point.y - ny * offset, u, 1, color, 1, linear);
                         };
-                        const segmentNormal = index => {
+                        const segmentNormal = (index, output) => {
                             const a = points[index];
                             const b = points[index + 1];
                             const dx = b.x - a.x;
                             const dy = b.y - a.y;
                             const length = Math.max(0.0001, Math.hypot(dx, dy));
-                            return { x: -dy / length, y: dx / length, tx: dx / length, ty: dy / length };
+                            output.x = -dy / length;
+                            output.y = dx / length;
+                            output.tx = dx / length;
+                            output.ty = dy / length;
+                            return output;
                         };
 
-                        const firstNormal = segmentNormal(0);
+                        const firstNormal = segmentNormal(0, this.trailNormalScratchA);
                         appendPair({
                             x: points[0].x - firstNormal.tx * halfWidth,
                             y: points[0].y - firstNormal.ty * halfWidth
@@ -1642,8 +1828,8 @@
                         for (let index = 1; index < points.length - 1; index++) {
                             const point = points[index];
                             const progress = lengths[index] / total;
-                            const before = segmentNormal(index - 1);
-                            const after = segmentNormal(index);
+                            const before = segmentNormal(index - 1, this.trailNormalScratchA);
+                            const after = segmentNormal(index, this.trailNormalScratchB);
                             let mx = before.x + after.x;
                             let my = before.y + after.y;
                             const miterLength = Math.hypot(mx, my);
@@ -1660,7 +1846,7 @@
                         }
 
                         const lastIndex = points.length - 1;
-                        const lastNormal = segmentNormal(lastIndex - 1);
+                        const lastNormal = segmentNormal(lastIndex - 1, this.trailNormalScratchA);
                         appendPair(points[lastIndex], lastNormal.x, lastNormal.y, halfWidth, 1);
                         appendPair({
                             x: points[lastIndex].x + lastNormal.tx * halfWidth,
@@ -1734,61 +1920,62 @@
                     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                 }
 
-                bindFullscreenTexture(program, name, unit, texture) {
+                bindFullscreenTexture(uniforms, name, unit, texture) {
                     const gl = this.gl;
                     gl.activeTexture(gl.TEXTURE0 + unit);
                     gl.bindTexture(gl.TEXTURE_2D, texture);
-                    gl.uniform1i(gl.getUniformLocation(program, name), unit);
+                    gl.uniform1i(uniforms[name], unit);
                 }
 
-                drawFullscreen(program, target) {
+                drawFullscreen(target) {
                     const gl = this.gl;
                     gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.framebuffer : null);
                     gl.viewport(0, 0, target ? target.width : this.canvas.width, target ? target.height : this.canvas.height);
-                    gl.useProgram(program);
                     gl.bindVertexArray(this.fullscreenVao);
                     gl.drawArrays(gl.TRIANGLES, 0, 3);
                 }
 
                 renderNonDiscAlpha(bloom, sampleScale, glowControl) {
                     const gl = this.gl;
-                    gl.disable(gl.BLEND);
+                    const uniforms = this.nonDiscAlphaUniforms;
+                    this.disableBlend();
                     gl.useProgram(this.nonDiscAlphaProgram);
-                    this.bindFullscreenTexture(this.nonDiscAlphaProgram, "uSource", 0, this.nonDiscTarget.texture);
-                    this.bindFullscreenTexture(this.nonDiscAlphaProgram, "uBloom", 1, bloom.texture);
+                    this.bindFullscreenTexture(uniforms, "uSource", 0, this.nonDiscTarget.texture);
+                    this.bindFullscreenTexture(uniforms, "uBloom", 1, bloom.texture);
                     gl.uniform1f(
-                        gl.getUniformLocation(this.nonDiscAlphaProgram, "uBloomStrength"),
+                        uniforms.uBloomStrength,
                         BLOOM_BASE_STRENGTH * glowControl
                     );
                     gl.uniform2f(
-                        gl.getUniformLocation(this.nonDiscAlphaProgram, "uBloomTexel"),
+                        uniforms.uBloomTexel,
                         1 / bloom.width,
                         1 / bloom.height
                     );
                     gl.uniform1f(
-                        gl.getUniformLocation(this.nonDiscAlphaProgram, "uSampleScale"),
+                        uniforms.uSampleScale,
                         sampleScale
                     );
                     this.clearTarget(this.nonDiscAlphaTarget);
-                    this.drawFullscreen(this.nonDiscAlphaProgram, this.nonDiscAlphaTarget);
+                    this.drawFullscreen(this.nonDiscAlphaTarget);
                 }
 
                 renderBloom(sourceTarget, levelCount, sampleScale) {
                     const gl = this.gl;
-                    gl.disable(gl.BLEND);
+                    this.disableBlend();
                     let source = sourceTarget;
                     for (let level = 0; level < levelCount; level++) {
                         const target = this.downTargets[level];
                         const program = level === 0 ? this.prefilterProgram : this.downsampleProgram;
+                        const uniforms = level === 0 ? this.prefilterUniforms : this.downsampleUniforms;
                         gl.useProgram(program);
-                        this.bindFullscreenTexture(program, "uTexture", 0, source.texture);
-                        gl.uniform2f(gl.getUniformLocation(program, "uTexel"), 1 / source.width, 1 / source.height);
+                        this.bindFullscreenTexture(uniforms, "uTexture", 0, source.texture);
+                        gl.uniform2f(uniforms.uTexel, 1 / source.width, 1 / source.height);
                         if (level === 0) gl.uniform1f(
-                            gl.getUniformLocation(program, "uThreshold"),
+                            uniforms.uThreshold,
                             BLOOM_THRESHOLD
                         );
                         this.clearTarget(target);
-                        this.drawFullscreen(program, target);
+                        this.drawFullscreen(target);
                         source = target;
                     }
 
@@ -1797,32 +1984,53 @@
                         const high = this.downTargets[level];
                         const target = this.upTargets[level];
                         const program = this.upsampleProgram;
+                        const uniforms = this.upsampleUniforms;
                         gl.useProgram(program);
-                        this.bindFullscreenTexture(program, "uHigh", 0, high.texture);
-                        this.bindFullscreenTexture(program, "uLow", 1, low.texture);
-                        gl.uniform2f(gl.getUniformLocation(program, "uLowTexel"), 1 / low.width, 1 / low.height);
+                        this.bindFullscreenTexture(uniforms, "uHigh", 0, high.texture);
+                        this.bindFullscreenTexture(uniforms, "uLow", 1, low.texture);
+                        gl.uniform2f(uniforms.uLowTexel, 1 / low.width, 1 / low.height);
                         gl.uniform1f(
-                            gl.getUniformLocation(program, "uSampleScale"),
+                            uniforms.uSampleScale,
                             sampleScale
                         );
                         this.clearTarget(target);
-                        this.drawFullscreen(program, target);
+                        this.drawFullscreen(target);
                         low = target;
                     }
                     return low;
                 }
 
+                renderFinal(bloom, sampleScale, glowControl, hasActiveDisc) {
+                    const gl = this.gl;
+                    const program = hasActiveDisc ? this.finalProgram : this.finalNoDiscProgram;
+                    const uniforms = hasActiveDisc ? this.finalUniforms : this.finalNoDiscUniforms;
+                    this.disableBlend();
+                    gl.useProgram(program);
+                    this.bindFullscreenTexture(uniforms, "uSource", 0, this.sourceTarget.texture);
+                    this.bindFullscreenTexture(uniforms, "uBloom", 1, bloom.texture);
+                    if (hasActiveDisc) {
+                        this.bindFullscreenTexture(uniforms, "uDiscMask", 2, this.discMaskTarget.texture);
+                        this.bindFullscreenTexture(uniforms, "uDiscFootprint", 3, this.discFootprintTarget.texture);
+                        this.bindFullscreenTexture(uniforms, "uNonDiscAlpha", 4, this.nonDiscAlphaTarget.texture);
+                    }
+                    gl.uniform1f(uniforms.uBloomStrength, BLOOM_BASE_STRENGTH * glowControl);
+                    gl.uniform2f(uniforms.uBloomTexel, 1 / bloom.width, 1 / bloom.height);
+                    gl.uniform1f(uniforms.uSampleScale, sampleScale);
+                    this.clearTarget(null);
+                    this.drawFullscreen(null);
+                }
+
                 render(now) {
-                    this.resize();
+                    if (this.viewportNeedsResize()) this.resize();
                     this.engine.prune(now);
-                    this.renderSource(now, this.sourceTarget);
-                    this.renderDiscMasks(now);
                     const hasActiveDisc = this.hasActiveDisc(now);
+                    this.renderSource(now, this.sourceTarget);
                     const glowControl = clamp(this.engine.glowIntensity, 0, 3);
                     const bloomParameters = this.bloomParameters(glowControl);
                     this.activeBloomLevels = bloomParameters.levels;
                     this.bloomSampleScale = bloomParameters.sampleScale;
                     if (hasActiveDisc) {
+                        this.renderDiscMasks(now);
                         this.renderNonDiscSource(now);
                         const nonDiscBloom = glowControl > 0
                             ? this.renderBloom(this.nonDiscTarget, bloomParameters.levels, bloomParameters.sampleScale)
@@ -1832,29 +2040,7 @@
                     const bloom = glowControl > 0
                         ? this.renderBloom(this.sourceTarget, bloomParameters.levels, bloomParameters.sampleScale)
                         : this.sourceTarget;
-                    const gl = this.gl;
-                    gl.disable(gl.BLEND);
-                    gl.useProgram(this.finalProgram);
-                    this.bindFullscreenTexture(this.finalProgram, "uSource", 0, this.sourceTarget.texture);
-                    this.bindFullscreenTexture(this.finalProgram, "uBloom", 1, bloom.texture);
-                    this.bindFullscreenTexture(this.finalProgram, "uDiscMask", 2, this.discMaskTarget.texture);
-                    this.bindFullscreenTexture(this.finalProgram, "uDiscFootprint", 3, this.discFootprintTarget.texture);
-                    this.bindFullscreenTexture(this.finalProgram, "uNonDiscAlpha", 4, this.nonDiscAlphaTarget.texture);
-                    gl.uniform1f(
-                        gl.getUniformLocation(this.finalProgram, "uBloomStrength"),
-                        BLOOM_BASE_STRENGTH * glowControl
-                    );
-                    gl.uniform2f(
-                        gl.getUniformLocation(this.finalProgram, "uBloomTexel"),
-                        1 / bloom.width,
-                        1 / bloom.height
-                    );
-                    gl.uniform1f(
-                        gl.getUniformLocation(this.finalProgram, "uSampleScale"),
-                        bloomParameters.sampleScale
-                    );
-                    this.clearTarget(null);
-                    this.drawFullscreen(this.finalProgram, null);
+                    this.renderFinal(bloom, bloomParameters.sampleScale, glowControl, hasActiveDisc);
                 }
 
                 clear() {
@@ -1902,6 +2088,8 @@
             let frameId = null;
             let lastBoom = { x: Number.NaN, y: Number.NaN, time: -Infinity };
             let lastMove = { x: Number.NaN, y: Number.NaN };
+            let hostInputGeneration = 0;
+            let hostInputEnabled = true;
 
             function debugState() {
                 const worldToPx = engine.worldToPx;
@@ -1970,6 +2158,46 @@
                 window.enableAlwaysTrailEffect = Boolean(alwaysTrailEnabled);
                 window.effectiveAlwaysTrail = window.currentInputMode === "mouse" && window.enableAlwaysTrailEffect;
             };
+
+            function installHostInputBridge() {
+                const webView = window.chrome?.webview;
+                if (!webView?.addEventListener) return;
+                webView.addEventListener("message", event => {
+                    const message = event.data;
+                    if (!message || typeof message !== "object") return;
+
+                    const kind = message.kind;
+                    const generation = Number(message.generation);
+                    if (!Number.isSafeInteger(generation) || generation < hostInputGeneration) return;
+                    if (kind === "hostState") {
+                        hostInputGeneration = generation;
+                        hostInputEnabled = Boolean(message.inputEnabled);
+                        if (Object.prototype.hasOwnProperty.call(message, "renderingPaused")) {
+                            window.setRenderingPaused(Boolean(message.renderingPaused));
+                        }
+                        if (Boolean(message.truncateTrail)) {
+                            window.truncateTrail();
+                        }
+                        return;
+                    }
+
+                    if (!hostInputEnabled || generation !== hostInputGeneration) return;
+                    const x = Number(message.x);
+                    const y = Number(message.y);
+                    window.setInputContext(message.mode, message.alwaysTrail);
+                    if (kind === "down" && Number.isFinite(x) && Number.isFinite(y)) {
+                        window.externalBoom(x, y);
+                    } else if (kind === "move" && Number.isFinite(x) && Number.isFinite(y)) {
+                        window.externalMove(x, y);
+                    } else if (kind === "trailStart" && Number.isFinite(x) && Number.isFinite(y)) {
+                        window.externalTrailStart(x, y, Boolean(message.pointerDown));
+                    } else if (kind === "up") {
+                        window.externalUp();
+                    }
+                });
+            }
+
+            installHostInputBridge();
 
             window.externalBoom = (percentX, percentY) => {
                 if (window.renderingPaused) return;

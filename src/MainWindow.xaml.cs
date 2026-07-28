@@ -57,6 +57,22 @@ namespace BASpark
             public int Bottom;
         }
 
+        private sealed class InputBoundsSnapshot
+        {
+            public InputBoundsSnapshot(int left, int top, int right, int bottom)
+            {
+                Left = left;
+                Top = top;
+                Right = right;
+                Bottom = bottom;
+            }
+
+            public int Left { get; }
+            public int Top { get; }
+            public int Right { get; }
+            public int Bottom { get; }
+        }
+
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_TRANSPARENT = 0x00000020;
         private const int WS_EX_LAYERED = 0x00080000;
@@ -66,6 +82,7 @@ namespace BASpark
         private const int CURSOR_SHOWING = 0x00000001;
         private const uint EVENT_OBJECT_REORDER = 0x8004;
         private const uint WINEVENT_OUTOFCONTEXT = 0;
+        private const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
         private const uint WDA_NONE = 0x00000000;
         private const uint WDA_MONITOR = 0x00000001;
         private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
@@ -78,6 +95,9 @@ namespace BASpark
         private readonly string _screenDeviceName;
         private readonly Rectangle _screenBounds;
         private IntPtr _hwnd;
+        private InputBoundsSnapshot? _inputBounds;
+        private readonly object _inputStateSync = new();
+        private long _inputGeneration;
         private string? _lastReportedInputMode;
         private bool? _lastReportedAlwaysTrail;
         private const string InputModeMouse = "mouse";
@@ -90,6 +110,7 @@ namespace BASpark
         private WinEventDelegate? _winEventDelegate;
         private IntPtr _winEventHook = IntPtr.Zero;
         private long _lastEnsureTopmostTicks;
+        private int _topmostRefreshQueued;
         private bool _isClosing;
         // WebView2's WPF HwndHost cannot be parented reliably while a UIAccess
         // window is already topmost. Raise the overlay only after navigation
@@ -152,7 +173,7 @@ namespace BASpark
                 _winEventDelegate,
                 0,
                 0,
-                WINEVENT_OUTOFCONTEXT);
+                WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
         }
 
         private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
@@ -165,12 +186,45 @@ namespace BASpark
             _ = dwEventThread;
             _ = dwmsEventTime;
             long nowTicks = DateTime.UtcNow.Ticks;
-            if (nowTicks - _lastEnsureTopmostTicks < EnsureTopmostDebounceTicks)
+            if (nowTicks - System.Threading.Interlocked.Read(ref _lastEnsureTopmostTicks) < EnsureTopmostDebounceTicks)
             {
                 return;
             }
-            _lastEnsureTopmostTicks = nowTicks;
-            Dispatcher.BeginInvoke(new Action(SafeEnsureTopmost));
+            if (System.Threading.Interlocked.Exchange(ref _topmostRefreshQueued, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        if (_isClosing)
+                        {
+                            return;
+                        }
+
+                        long dispatchTicks = DateTime.UtcNow.Ticks;
+                        if (dispatchTicks - System.Threading.Interlocked.Read(ref _lastEnsureTopmostTicks) < EnsureTopmostDebounceTicks)
+                        {
+                            return;
+                        }
+
+                        System.Threading.Interlocked.Exchange(ref _lastEnsureTopmostTicks, dispatchTicks);
+                        SafeEnsureTopmost();
+                    }
+                    finally
+                    {
+                        System.Threading.Volatile.Write(ref _topmostRefreshQueued, 0);
+                    }
+                }));
+            }
+            catch (InvalidOperationException)
+            {
+                System.Threading.Volatile.Write(ref _topmostRefreshQueued, 0);
+            }
         }
 
         private void InitTopmostSentinel()
@@ -196,12 +250,15 @@ namespace BASpark
             if (_hwnd == IntPtr.Zero || !IsVisible || _overlayRuntimePaused || !_webViewReadyForTopmost) return;
 
             Rectangle bounds = GetScreenBounds();
-            SetWindowPos(_hwnd, HWND_TOPMOST,
+            if (SetWindowPos(_hwnd, HWND_TOPMOST,
                 bounds.Left,
                 bounds.Top - 1,
                 bounds.Width,
                 bounds.Height,
-                SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+                SWP_NOACTIVATE | SWP_NOSENDCHANGING))
+            {
+                CacheInputBounds(bounds);
+            }
         }
 
         public void UpdateColor(string color)
@@ -265,15 +322,31 @@ namespace BASpark
         /// 环境过滤终止当前指针输入并阻止后续输入。已创建的动画保持可见并按原时序结束。
         public void SetEnvironmentSuppressed(bool suppressed)
         {
-            if (_environmentInputSuppressed == suppressed)
+            lock (_inputStateSync)
             {
-                return;
-            }
+                if (_environmentInputSuppressed == suppressed)
+                {
+                    return;
+                }
 
-            _environmentInputSuppressed = suppressed;
-            if (suppressed)
-            {
-                ExecuteScript("if(window.truncateTrail) window.truncateTrail();");
+                if (suppressed)
+                {
+                    System.Threading.Volatile.Write(ref _environmentInputSuppressed, true);
+                    PostHostInputState(
+                        AdvanceInputGeneration(),
+                        inputEnabled: false,
+                        renderingPaused: null,
+                        truncateTrail: true);
+                    return;
+                }
+
+                long generation = AdvanceInputGeneration();
+                PostHostInputState(
+                    generation,
+                    inputEnabled: !System.Threading.Volatile.Read(ref _overlayRuntimePaused),
+                    renderingPaused: null,
+                    truncateTrail: false);
+                System.Threading.Volatile.Write(ref _environmentInputSuppressed, false);
             }
         }
 
@@ -314,37 +387,54 @@ namespace BASpark
 
         private void PauseOverlayRuntime()
         {
-            if (_overlayRuntimePaused)
+            lock (_inputStateSync)
             {
-                return;
+                if (_overlayRuntimePaused)
+                {
+                    return;
+                }
+
+                System.Threading.Volatile.Write(ref _overlayRuntimePaused, true);
+                PostHostInputState(
+                    AdvanceInputGeneration(),
+                    inputEnabled: false,
+                    renderingPaused: true,
+                    truncateTrail: false);
             }
 
-            _overlayRuntimePaused = true;
             PauseTopmostMonitoring();
-            ExecuteScript("if(window.setRenderingPaused) window.setRenderingPaused(true);");
             _ = TrySuspendWebViewAsync();
         }
 
         private void ResumeOverlayRuntime()
         {
-            if (!_overlayRuntimePaused)
+            lock (_inputStateSync)
             {
-                return;
+                if (!_overlayRuntimePaused)
+                {
+                    return;
+                }
+
+                if (TryGetCoreWebView2(out CoreWebView2? coreWebView))
+                {
+                    try
+                    {
+                        coreWebView.Resume();
+                    }
+                    catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+                    {
+                    }
+                }
+
+                long generation = AdvanceInputGeneration();
+                PostHostInputState(
+                    generation,
+                    inputEnabled: !System.Threading.Volatile.Read(ref _environmentInputSuppressed),
+                    renderingPaused: false,
+                    truncateTrail: false);
+                System.Threading.Volatile.Write(ref _overlayRuntimePaused, false);
             }
 
-            _overlayRuntimePaused = false;
-            if (TryGetCoreWebView2(out CoreWebView2? coreWebView))
-            {
-                try
-                {
-                    coreWebView.Resume();
-                }
-                catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
-                {
-                }
-            }
-
-            ExecuteScript("if(window.setRenderingPaused) window.setRenderingPaused(false);");
             ResumeTopmostMonitoring();
         }
 
@@ -456,7 +546,7 @@ namespace BASpark
                 coreWebView.Settings.IsStatusBarEnabled = false;
                 coreWebView.Settings.AreDevToolsEnabled = false;
                 coreWebView.Settings.AreBrowserAcceleratorKeysEnabled = false;
-                coreWebView.Settings.IsWebMessageEnabled = false;
+                coreWebView.Settings.IsWebMessageEnabled = true;
                 coreWebView.Settings.AreHostObjectsAllowed = false;
                 coreWebView.Settings.IsPasswordAutosaveEnabled = false;
                 coreWebView.Settings.IsGeneralAutofillEnabled = false;
@@ -508,10 +598,17 @@ namespace BASpark
                     UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness, ConfigManager.TrailDelay, ConfigManager.GlowIntensity);
                     UpdateTrailRefreshRate(_trailRefreshRate);
                     SyncInputContext(InputModeMouse);
-                    if (_overlayRuntimePaused)
+                    lock (_inputStateSync)
                     {
-                        ExecuteScript("if(window.setRenderingPaused) window.setRenderingPaused(true);");
-                        _ = TrySuspendWebViewAsync();
+                        PostHostInputState(
+                            System.Threading.Interlocked.Read(ref _inputGeneration),
+                            inputEnabled: !_environmentInputSuppressed && !_overlayRuntimePaused,
+                            renderingPaused: _overlayRuntimePaused,
+                            truncateTrail: _environmentInputSuppressed);
+                        if (_overlayRuntimePaused)
+                        {
+                            _ = TrySuspendWebViewAsync();
+                        }
                     }
                 };
                 coreWebView.NavigationCompleted += _navigationCompletedHandler;
@@ -740,12 +837,78 @@ namespace BASpark
             ExecuteScript(coreWebView, script);
         }
 
-        private void ExecuteWithInputContext(string inputMode, string actionScript)
+        private void PostInputMessage(
+            string kind,
+            string inputMode,
+            System.Windows.Point? percentPoint = null,
+            bool pointerDown = false)
         {
-            if (!TryGetCoreWebView2(out CoreWebView2? coreWebView)) return;
+            if (!_webViewReadyForTopmost || !TryGetCoreWebView2(out CoreWebView2? coreWebView))
+            {
+                return;
+            }
 
-            string contextScript = BuildInputContextScript(inputMode);
-            ExecuteScript(coreWebView, contextScript + actionScript);
+            long generation = System.Threading.Interlocked.Read(ref _inputGeneration);
+            if (System.Threading.Volatile.Read(ref _environmentInputSuppressed) ||
+                System.Threading.Volatile.Read(ref _overlayRuntimePaused))
+            {
+                return;
+            }
+
+            string modeJson = inputMode == InputModeTouch ? "\"touch\"" : "\"mouse\"";
+            string alwaysTrailLiteral = ConfigManager.EnableAlwaysTrailEffect ? "true" : "false";
+            string pointJson = percentPoint is System.Windows.Point point
+                ? $",\"x\":{FormatCoordinate(point.X)},\"y\":{FormatCoordinate(point.Y)}"
+                : string.Empty;
+            string pointerDownJson = kind == "trailStart"
+                ? string.Concat(",\"pointerDown\":", pointerDown ? "true" : "false")
+                : string.Empty;
+            string generationJson = generation.ToString(CultureInfo.InvariantCulture);
+            string message = $"{{\"kind\":\"{kind}\",\"generation\":{generationJson},\"mode\":{modeJson},\"alwaysTrail\":{alwaysTrailLiteral}{pointJson}{pointerDownJson}}}";
+
+            PostWebMessage(coreWebView, message);
+        }
+
+        private long AdvanceInputGeneration()
+        {
+            return System.Threading.Interlocked.Increment(ref _inputGeneration);
+        }
+
+        private void PostHostInputState(
+            long generation,
+            bool inputEnabled,
+            bool? renderingPaused,
+            bool truncateTrail)
+        {
+            if (!_webViewReadyForTopmost || !TryGetCoreWebView2(out CoreWebView2? coreWebView))
+            {
+                return;
+            }
+
+            string pausedJson = renderingPaused.HasValue
+                ? string.Concat(",\"renderingPaused\":", renderingPaused.Value ? "true" : "false")
+                : string.Empty;
+            string message = string.Concat(
+                "{\"kind\":\"hostState\",\"generation\":",
+                generation.ToString(CultureInfo.InvariantCulture),
+                ",\"inputEnabled\":",
+                inputEnabled ? "true" : "false",
+                ",\"truncateTrail\":",
+                truncateTrail ? "true" : "false",
+                pausedJson,
+                "}");
+            PostWebMessage(coreWebView, message);
+        }
+
+        private void PostWebMessage(CoreWebView2 coreWebView, string message)
+        {
+            try
+            {
+                coreWebView.PostWebMessageAsJson(message);
+            }
+            catch (Exception ex) when (IsExpectedWebViewShutdownException(ex) || !_webViewReadyForTopmost)
+            {
+            }
         }
 
         // 统一 JS 脚本执行入口
@@ -812,34 +975,27 @@ namespace BASpark
             if (!TryConvertScreenToOverlayPoint(x, y, out System.Windows.Point clientPoint)) return;
             bool touchLike = !IsCursorVisible();
             string inputMode = touchLike ? InputModeTouch : InputModeMouse;
-            string px = FormatCoordinate(clientPoint.X);
-            string py = FormatCoordinate(clientPoint.Y);
-            ExecuteWithInputContext(inputMode, $"if(window.externalBoom) window.externalBoom({px}, {py});");
+            PostInputMessage("down", inputMode, clientPoint);
         }
 
         public void EmitMove(int x, int y, bool touchLike)
         {
             if (!TryConvertScreenToOverlayPoint(x, y, out System.Windows.Point clientPoint)) return;
             string inputMode = touchLike ? InputModeTouch : InputModeMouse;
-            string px = FormatCoordinate(clientPoint.X);
-            string py = FormatCoordinate(clientPoint.Y);
-            ExecuteWithInputContext(inputMode, $"if(window.externalMove) window.externalMove({px}, {py});");
+            PostInputMessage("move", inputMode, clientPoint);
         }
 
         public void EmitTrailStart(int x, int y, bool touchLike, bool pointerDown)
         {
             if (!TryConvertScreenToOverlayPoint(x, y, out System.Windows.Point clientPoint)) return;
             string inputMode = touchLike ? InputModeTouch : InputModeMouse;
-            string px = FormatCoordinate(clientPoint.X);
-            string py = FormatCoordinate(clientPoint.Y);
-            string pointerDownLiteral = pointerDown ? "true" : "false";
-            ExecuteWithInputContext(inputMode, $"if(window.externalTrailStart) window.externalTrailStart({px}, {py}, {pointerDownLiteral});");
+            PostInputMessage("trailStart", inputMode, clientPoint, pointerDown);
         }
 
         public void EmitUp(bool touchLike)
         {
             string inputMode = touchLike ? InputModeTouch : InputModeMouse;
-            ExecuteWithInputContext(inputMode, "if(window.externalUp) window.externalUp();");
+            PostInputMessage("up", inputMode);
         }
 
         private void UpdateOverlayBounds()
@@ -856,14 +1012,17 @@ namespace BASpark
                 return;
             }
 
-            SetWindowPos(
+            if (SetWindowPos(
                 _hwnd,
                 IntPtr.Zero,
                 bounds.Left,
                 bounds.Top - 1,
                 bounds.Width,
                 bounds.Height,
-                SWP_NOACTIVATE | SWP_NOZORDER);
+                SWP_NOACTIVATE | SWP_NOZORDER))
+            {
+                CacheInputBounds(bounds);
+            }
         }
 
         public string ScreenDeviceName => _screenDeviceName;
@@ -881,19 +1040,44 @@ namespace BASpark
             return value.ToString("F6", CultureInfo.InvariantCulture);
         }
 
+        private void CacheInputBounds(Rectangle bounds)
+        {
+            System.Threading.Volatile.Write(
+                ref _inputBounds,
+                new InputBoundsSnapshot(
+                    bounds.Left,
+                    bounds.Top - 1,
+                    bounds.Right,
+                    bounds.Top - 1 + bounds.Height));
+        }
+
+        private void CacheInputBounds(RECT bounds)
+        {
+            System.Threading.Volatile.Write(
+                ref _inputBounds,
+                new InputBoundsSnapshot(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom));
+        }
+
         private bool TryConvertScreenToOverlayPoint(int screenX, int screenY, out System.Windows.Point percentPoint)
         {
             percentPoint = default;
             try
             {
-                if (!GetWindowRect(_hwnd, out RECT rect)) return false;
+                InputBoundsSnapshot? bounds = System.Threading.Volatile.Read(ref _inputBounds);
+                if (bounds == null)
+                {
+                    if (!GetWindowRect(_hwnd, out RECT rect)) return false;
+                    CacheInputBounds(rect);
+                    bounds = System.Threading.Volatile.Read(ref _inputBounds);
+                    if (bounds == null) return false;
+                }
 
-                double physWidth = rect.Right - rect.Left;
-                double physHeight = rect.Bottom - rect.Top;
+                double physWidth = bounds.Right - bounds.Left;
+                double physHeight = bounds.Bottom - bounds.Top;
                 if (physWidth <= 0 || physHeight <= 0) return false;
 
-                double percentX = (screenX - rect.Left) / physWidth;
-                double percentY = (screenY - rect.Top) / physHeight;
+                double percentX = (screenX - bounds.Left) / physWidth;
+                double percentY = (screenY - bounds.Top) / physHeight;
 
                 percentPoint = new System.Windows.Point(
                     Math.Clamp(percentX, 0.0, 1.0),
