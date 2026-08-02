@@ -492,7 +492,7 @@
                         <RadioButton Name="TabAbout" Content="关于" Style="{StaticResource NavBtn}" Click="Tab_Click" GroupName="MainGroup"/>
                     </StackPanel>
                     <StackPanel Grid.Row="1" Margin="12,8,12,0">
-                        <TextBlock x:Name="TxtSidebarVersion" Text="BASpark V1.6.2-beta2" FontSize="10" Foreground="{DynamicResource ThemeSidebarVersionBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                        <TextBlock x:Name="TxtSidebarVersion" Text="BASpark V1.6.2" FontSize="10" Foreground="{DynamicResource ThemeSidebarVersionBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                         <TextBlock x:Name="TxtSidebarCopyright" Text="Copyright © 2026 DoomVoss" FontSize="10" Foreground="{DynamicResource ThemeSidebarCopyrightBrush}" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
@@ -550,7 +550,7 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,14">
                         <TextBlock FontSize="28" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" VerticalAlignment="Center">
                             <Run Text="BASpark "/>
-                            <Run x:Name="VersionText" Text="V1.6.2-beta2" Foreground="#45AFFF" FontSize="24"/>
+                            <Run x:Name="VersionText" Text="V1.6.2" Foreground="#45AFFF" FontSize="24"/>
                         </TextBlock>
                         <Button x:Name="BtnCheckUpdate" Content="检查更新" Click="CheckUpdate_Click" Margin="18,0,0,0" Padding="12,3" Height="30" FontSize="12" Background="{DynamicResource ThemeUpdateButtonBackgroundBrush}" Foreground="#45AFFF" BorderBrush="#45AFFF" BorderThickness="1" Cursor="Hand" Style="{DynamicResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
