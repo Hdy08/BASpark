@@ -441,10 +441,11 @@ config.json
 
 # Local release outputs
 
-# Local source game archive; its extracted touch-effect inventory is versioned.
-apk/*.apks
+# Local game archives, extracted research data, and generated previews.
+apk/
 
 dist/
 src/publish_full/
 src/publish_uiaccess/
 .uiaccess-build/
+preview/
