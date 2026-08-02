@@ -9,6 +9,7 @@ public class ConfigManagerTests
     {
         Assert.Equal("95,197,255", ConfigManager.DefaultParticleColor);
         Assert.Equal(1.0, ConfigManager.DefaultTrailDelayMultiplier);
+        Assert.False(ConfigManager.ApplyCurveDraw);
     }
 
     [Theory]

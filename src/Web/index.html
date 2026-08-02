@@ -238,6 +238,7 @@
         <section class="preview-section">
             <h2>动画</h2>
             <label class="preview-toggle"><input id="previewLinkedSpeed" type="checkbox" checked><span>拖尾与点击使用同一速度</span></label>
+            <label class="preview-toggle"><input id="previewCurveDraw" type="checkbox"><span>采用曲线拖尾</span></label>
             <label id="previewUnifiedSpeed" class="preview-control"><span>动画速度</span><input id="previewSpeed" type="range" min="0.20" max="3.00" step="0.10" value="1.00"><output>1.00x</output></label>
             <div id="previewSplitSpeeds" hidden>
                 <label class="preview-control"><span>拖尾速度</span><input id="previewTrailSpeed" type="range" min="0.20" max="3.00" step="0.10" value="1.00"><output>1.00x</output></label>
@@ -431,6 +432,47 @@
                 return resampled;
             }
 
+            function curveTrailPath(source, renderSegmentPx, createPoint = null) {
+                if (source.length < 3) return source;
+                const makePoint = createPoint || ((x, y, born) => ({ x, y, born }));
+                const result = [source[0]];
+                const lastIndex = source.length - 1;
+                const sampleSpacing = Math.max(0.05, renderSegmentPx);
+                const cubic = (p0, p1, p2, p3, t) => {
+                    const inv = 1 - t;
+                    return inv * inv * inv * p0 +
+                        3 * inv * inv * t * p1 +
+                        3 * inv * t * t * p2 +
+                        t * t * t * p3;
+                };
+
+                for (let index = 0; index < lastIndex; index++) {
+                    const a0 = source[index];
+                    const a1 = source[index + 1];
+                    const previous = index > 0 ? source[index - 1] : a0;
+                    const next = index < lastIndex - 1 ? source[index + 2] : a1;
+                    const cp1x = a0.x + (a1.x - previous.x) / 6;
+                    const cp1y = a0.y + (a1.y - previous.y) / 6;
+                    const cp2x = a1.x - (next.x - a0.x) / 6;
+                    const cp2y = a1.y - (next.y - a0.y) / 6;
+                    const distance = Math.hypot(a1.x - a0.x, a1.y - a0.y);
+                    const sampleCount = Math.max(1, Math.ceil(distance / sampleSpacing));
+
+                    for (let sample = 1; sample <= sampleCount; sample++) {
+                        const t = sample / sampleCount;
+                        const x = cubic(a0.x, cp1x, cp2x, a1.x, t);
+                        const y = cubic(a0.y, cp1y, cp2y, a1.y, t);
+                        const previousPoint = result[result.length - 1];
+                        if (Math.hypot(x - previousPoint.x, y - previousPoint.y) < 0.0001 &&
+                            sample < sampleCount) {
+                            continue;
+                        }
+                        result.push(makePoint(x, y, lerp(a0.born, a1.born, t)));
+                    }
+                }
+                return result;
+            }
+
             function simplifyTrailPath(source, tolerancePx) {
                 if (source.length < 3 || tolerancePx <= 0) return source;
 
@@ -553,6 +595,7 @@
                     this.trailThickness = 1;
                     this.trailRetractionDelayMultiplier = 1;
                     this.glowIntensity = 1;
+                    this.applyCurveDraw = false;
                     this.trailRefreshRate = 60;
                     this.clicks = [];
                     this.distanceParticles = [];
@@ -1780,11 +1823,9 @@
                         );
                         const stabilizedPoints = simplifyTrailPath(sourcePoints, jitterTolerancePx);
                         this.trailPointPoolCursor = 0;
-                        const points = smoothTrailPath(
-                            stabilizedPoints,
-                            renderSegmentPx,
-                            this.trailPointFactory
-                        );
+                        const points = this.engine.applyCurveDraw
+                            ? curveTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)
+                            : smoothTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory);
                         if (this.trailLengthScratch.length < points.length) {
                             this.trailLengthScratch = new Float32Array(2 ** Math.ceil(Math.log2(points.length)));
                         }
@@ -2079,6 +2120,7 @@
             const engine = new TouchEngine();
             engine.resize(window.innerWidth, window.innerHeight);
             window.spark = engine;
+            window.ApplyCurveDraw = false;
             window.renderingPaused = false;
             window.currentInputMode = "mouse";
             window.enableAlwaysTrailEffect = false;
@@ -2118,6 +2160,7 @@
                     trailRetractionDelayMultiplier: engine.trailRetractionDelayMultiplier,
                     trailRefreshRate: engine.trailRefreshRate,
                     glowIntensity: engine.glowIntensity,
+                    curveDraw: engine.applyCurveDraw,
                     bloomResourceIntensity: BLOOM_RESOURCE_INTENSITY,
                     bloomIntensity: BLOOM_BASE_STRENGTH * engine.glowIntensity,
                     bloomLevels: renderer?.activeBloomLevels || 0,
@@ -2151,6 +2194,13 @@
                 if (!window.renderingPaused && renderer && frameId == null) {
                     frameId = requestAnimationFrame(animationFrame);
                 }
+            };
+
+            window.setCurveDraw = enabled => {
+                const value = Boolean(enabled);
+                window.ApplyCurveDraw = value;
+                engine.applyCurveDraw = value;
+                window.scheduleNextAnimationFrame();
             };
 
             window.setInputContext = (mode, alwaysTrailEnabled) => {
@@ -2328,6 +2378,7 @@
                     glow: document.getElementById("previewGlow"),
                     opacity: document.getElementById("previewOpacity"),
                     linkedSpeed: document.getElementById("previewLinkedSpeed"),
+                    curveDraw: document.getElementById("previewCurveDraw"),
                     unifiedSpeedRow: document.getElementById("previewUnifiedSpeed"),
                     speed: document.getElementById("previewSpeed"),
                     splitSpeeds: document.getElementById("previewSplitSpeeds"),
@@ -2383,6 +2434,7 @@
                     const clickSpeed = Number(linked ? controls.speed.value : controls.clickSpeed.value);
                     document.documentElement.style.setProperty("--preview-background", controls.backgroundColor.value);
                     controls.backgroundColorValue.value = controls.backgroundColor.value.toUpperCase();
+                    window.setCurveDraw(controls.curveDraw.checked);
                     window.updateColor(colorText());
                     controls.colorValue.value = colorText();
                     window.updateEffectSettings(
@@ -2399,6 +2451,7 @@
                 const resetControls = () => {
                     for (const [name, value] of Object.entries(defaults)) controls[name].value = value;
                     controls.linkedSpeed.checked = true;
+                    controls.curveDraw.checked = false;
                     controls.followRefresh.checked = true;
                     for (const [input, suffix, digits] of rangeControls) syncRangeOutput(input, suffix, digits);
                     syncConditionalControls();
@@ -2418,6 +2471,7 @@
                     syncConditionalControls();
                     applyControls();
                 });
+                controls.curveDraw.addEventListener("change", applyControls);
                 controls.followRefresh.addEventListener("change", () => {
                     syncConditionalControls();
                     applyControls();

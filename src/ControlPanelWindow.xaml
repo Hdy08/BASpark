@@ -810,6 +810,10 @@
                                                               Checked="LinkedAnimationSpeed_Changed" Unchecked="LinkedAnimationSpeed_Changed"/>
                                                     <TextBlock x:Name="TxtLinkedSpeedHint" Text="关闭此项后可单独加快或减慢拖尾衰减与移动粒子，而不影响点击波纹与爆发粒子，与下方「拖尾刷新率」不同。" FontSize="11" Foreground="{DynamicResource ThemeMutedTextBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
+                                                    <CheckBox Name="CheckApplyCurveDraw" Content="采用曲线拖尾" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,4"
+                                                              Checked="CurveDraw_Changed" Unchecked="CurveDraw_Changed"/>
+                                                    <TextBlock x:Name="TxtCurveDrawHint" Text="建议在60Hz及以上刷新率开启" FontSize="11" Foreground="{DynamicResource ThemeMutedTextBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
                                                     <StackPanel Name="PanelUnifiedAnimationSpeed" Margin="0,0,0,15">
                                                         <DockPanel LastChildFill="False">
                                                             <TextBlock x:Name="TxtAnimSpeed" Text="动画播放速度" Foreground="{DynamicResource ThemeTertiaryTextBrush}" FontSize="13" VerticalAlignment="Center"/>

@@ -622,6 +622,12 @@
     <data name="Visual_LinkedSpeedHint" xml:space="preserve">
       <value>关闭此项后可单独加快或减慢拖尾衰减与移动粒子，而不影响点击波纹与爆发粒子，与下方「拖尾刷新率」不同。</value>
     </data>
+    <data name="Visual_CurveDraw" xml:space="preserve">
+      <value>采用曲线拖尾</value>
+    </data>
+    <data name="Visual_CurveDrawHint" xml:space="preserve">
+      <value>建议在60Hz及以上刷新率开启</value>
+    </data>
     <data name="Visual_Opacity" xml:space="preserve">
       <value>全局不透明度</value>
     </data>

@@ -680,6 +680,7 @@ namespace BASpark
             SliderGlowIntensity.Value = ConfigManager.GlowIntensity;
             SliderOpacity.Value = ConfigManager.EffectOpacity;
             CheckLinkedAnimationSpeed.IsChecked = ConfigManager.UseLinkedAnimationSpeed;
+            CheckApplyCurveDraw.IsChecked = ConfigManager.ApplyCurveDraw;
             SliderSpeed.Value = ConfigManager.EffectSpeed;
             SliderTrailAnimSpeed.Value = ConfigManager.TrailAnimationSpeed;
             SliderClickAnimSpeed.Value = ConfigManager.ClickAnimationSpeed;
@@ -1577,6 +1578,7 @@ namespace BASpark
             bool isTouchscreenEnabled = CheckTouchscreenMode?.IsChecked ?? false;
             bool middleClickEnabled = CheckMiddleClickTrigger.IsChecked ?? false;
             bool screenshotCompatibilityEnabled = CheckScreenshotCompatibilityMode.IsChecked ?? false;
+            bool curveDrawEnabled = CheckApplyCurveDraw.IsChecked == true;
 
             int clickType = 0;
             if (RadioRightClick.IsChecked == true) clickType = 1;
@@ -1678,6 +1680,7 @@ namespace BASpark
             settingsSaved &= ConfigManager.Save("ClickTriggerType", clickType);
             settingsSaved &= ConfigManager.Save("EnableMiddleClickTrigger", middleClickEnabled);
             settingsSaved &= ConfigManager.Save("ScreenshotCompatibilityMode", screenshotCompatibilityEnabled);
+            settingsSaved &= ConfigManager.Save("ApplyCurveDraw", curveDrawEnabled);
 
             bool sidebarBackgroundChanged = !string.Equals(
                 sidebarBackgroundPath,
@@ -1731,6 +1734,7 @@ namespace BASpark
             App.Overlay?.RefreshEnvironmentFilterState();
             App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);
             App.Overlay?.UpdateScreenshotCompatibilityMode(screenshotCompatibilityEnabled);
+            App.Overlay?.SetCurveDraw(curveDrawEnabled);
             if (!previousEnabledScreenIds.SetEquals(selectedIds))
             {
                 App.Overlay?.RefreshScreenSelection();
@@ -1937,6 +1941,11 @@ namespace BASpark
         }
 
         private void EffectSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (!IsLoaded) return;
+        }
+
+        private void CurveDraw_Changed(object sender, RoutedEventArgs e)
         {
             if (!IsLoaded) return;
         }

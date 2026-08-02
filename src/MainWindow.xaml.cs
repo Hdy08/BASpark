@@ -280,6 +280,11 @@ namespace BASpark
             ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr}, {trailThicknessStr}, {trailDelayStr}, {glowIntensityStr});");
         }
 
+        public void SetCurveDraw(bool enabled)
+        {
+            ExecuteScript($"if(window.setCurveDraw) window.setCurveDraw({(enabled ? "true" : "false")});");
+        }
+
         private static string FormatScriptNumber(double value, double min, double max, double fallback)
         {
             double safeValue = double.IsFinite(value) ? value : fallback;
@@ -596,6 +601,7 @@ namespace BASpark
                     UpdateColor(ConfigManager.ParticleColor);
                     ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
                     UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.TrailThickness, ConfigManager.TrailDelay, ConfigManager.GlowIntensity);
+                    SetCurveDraw(ConfigManager.ApplyCurveDraw);
                     UpdateTrailRefreshRate(_trailRefreshRate);
                     SyncInputContext(InputModeMouse);
                     lock (_inputStateSync)

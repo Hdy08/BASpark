@@ -141,6 +141,7 @@ namespace BASpark
         public void UpdateColor(string color) => ForEachOverlay(w => w.UpdateColor(color));
         public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness, double trailDelay, double glowIntensity) =>
             ForEachOverlay(w => w.UpdateEffectSettings(scale, opacity, trailSpeed, clickSpeed, trailThickness, trailDelay, glowIntensity));
+        public void SetCurveDraw(bool enabled) => ForEachOverlay(w => w.SetCurveDraw(enabled));
         public void UpdateTrailRefreshRate(int hz, bool followDisplayRefreshRate)
         {
             _manualTrailRefreshRate = Math.Clamp(hz, 30, 360);

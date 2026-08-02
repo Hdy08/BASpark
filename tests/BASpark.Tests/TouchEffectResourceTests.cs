@@ -32,6 +32,7 @@ public class TouchEffectResourceTests
         Assert.Contains("window.updateColor", html, StringComparison.Ordinal);
         Assert.Contains("window.updateEffectSettings", html, StringComparison.Ordinal);
         Assert.Contains("window.updateTrailRefreshRate", html, StringComparison.Ordinal);
+        Assert.Contains("window.setCurveDraw", html, StringComparison.Ordinal);
         Assert.Contains("window.setRenderingPaused", html, StringComparison.Ordinal);
         Assert.Contains("const EFFECT_RENDER_SCALE = 0.5", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_RENDER_WIDTH_SCALE = 0.5", html, StringComparison.Ordinal);
@@ -111,6 +112,7 @@ public class TouchEffectResourceTests
         Assert.Contains("const TRAIL_JITTER_TOLERANCE_RATIO = 0.25", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_MSAA_SAMPLES = 4", html, StringComparison.Ordinal);
         Assert.Contains("function smoothTrailPath(source, renderSegmentPx, createPoint = null)", html, StringComparison.Ordinal);
+        Assert.Contains("function curveTrailPath(source, renderSegmentPx, createPoint = null)", html, StringComparison.Ordinal);
         Assert.Contains("function simplifyTrailPath(source, tolerancePx)", html, StringComparison.Ordinal);
         Assert.Contains("pass < TRAIL_SMOOTHING_PASSES", html, StringComparison.Ordinal);
         Assert.Contains("refined.push(makePoint(", html, StringComparison.Ordinal);
@@ -383,13 +385,38 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
+    public void CurveTrail_IsOptionalAndDisabledByDefault()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+
+        Assert.Contains("window.ApplyCurveDraw = false", html, StringComparison.Ordinal);
+        Assert.Contains("this.applyCurveDraw = false", html, StringComparison.Ordinal);
+        Assert.Contains("this.engine.applyCurveDraw", html, StringComparison.Ordinal);
+        Assert.Contains("curveTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)", html, StringComparison.Ordinal);
+        Assert.Contains("smoothTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"previewCurveDraw\"", html, StringComparison.Ordinal);
+        Assert.Contains("controls.curveDraw.checked = false", html, StringComparison.Ordinal);
+        Assert.Contains("window.setCurveDraw(controls.curveDraw.checked)", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StandalonePreview_IsSelfContainedAndStartsIdle()
     {
-        string previewPath = Path.Combine(FindWorkspaceRoot(), "preview", "index.html");
-        string html = File.ReadAllText(previewPath, Encoding.UTF8);
+        string embeddedRenderer = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
         const string bootstrapPrefix =
             "<script>window.__BASPARK_STANDALONE_PREVIEW__=true;window.__BASPARK_ASSETS=";
         const string bootstrapSuffix = ";</script>";
+        var previewAssets = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["circle"] = "data:image/png;base64," + Convert.ToBase64String(ReadWpfResource("web/assets/fx_tex_circle_01.png")),
+            ["ring"] = "data:image/png;base64," + Convert.ToBase64String(ReadWpfResource("web/assets/fx_tex_grad_ring3.png")),
+            ["trail"] = "data:image/png;base64," + Convert.ToBase64String(ReadWpfResource("web/assets/fx_tex_trail_03.png")),
+            ["triangle"] = "data:image/png;base64," + Convert.ToBase64String(ReadWpfResource("web/assets/fx_tex_triangle_02_1.png"))
+        };
+        string bootstrap = bootstrapPrefix +
+            System.Text.Json.JsonSerializer.Serialize(previewAssets) +
+            bootstrapSuffix;
+        string html = embeddedRenderer.Replace("<!-- BASPARK_ASSET_BOOTSTRAP -->", bootstrap, StringComparison.Ordinal);
         int bootstrapStart = html.IndexOf(bootstrapPrefix, StringComparison.Ordinal);
         Assert.True(bootstrapStart >= 0, "Standalone preview bootstrap is missing.");
         int jsonStart = bootstrapStart + bootstrapPrefix.Length;
@@ -417,8 +444,6 @@ public class TouchEffectResourceTests
         int bootstrapLength = bootstrapEnd + bootstrapSuffix.Length - bootstrapStart;
         string normalized = html.Remove(bootstrapStart, bootstrapLength)
             .Insert(bootstrapStart, "<!-- BASPARK_ASSET_BOOTSTRAP -->");
-        string embeddedRenderer = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
-
         Assert.Contains("window.__BASPARK_STANDALONE_PREVIEW__=true", html, StringComparison.Ordinal);
         Assert.Equal(4, CountOccurrences(html, "data:image/png;base64,"));
         Assert.Equal(embeddedRenderer, normalized);
