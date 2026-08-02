@@ -438,6 +438,10 @@
                 const result = [source[0]];
                 const lastIndex = source.length - 1;
                 const sampleSpacing = Math.max(0.05, renderSegmentPx);
+                const knotInterval = (a, b) => Math.max(
+                    0.0001,
+                    Math.sqrt(Math.hypot(b.x - a.x, b.y - a.y))
+                );
                 const cubic = (p0, p1, p2, p3, t) => {
                     const inv = 1 - t;
                     return inv * inv * inv * p0 +
@@ -449,14 +453,49 @@
                 for (let index = 0; index < lastIndex; index++) {
                     const a0 = source[index];
                     const a1 = source[index + 1];
-                    const previous = index > 0 ? source[index - 1] : a0;
-                    const next = index < lastIndex - 1 ? source[index + 2] : a1;
-                    const cp1x = a0.x + (a1.x - previous.x) / 6;
-                    const cp1y = a0.y + (a1.y - previous.y) / 6;
-                    const cp2x = a1.x - (next.x - a0.x) / 6;
-                    const cp2y = a1.y - (next.y - a0.y) / 6;
-                    const distance = Math.hypot(a1.x - a0.x, a1.y - a0.y);
-                    const sampleCount = Math.max(1, Math.ceil(distance / sampleSpacing));
+                    const previous = index > 0 ? source[index - 1] : {
+                        x: 2 * a0.x - a1.x,
+                        y: 2 * a0.y - a1.y
+                    };
+                    const next = index < lastIndex - 1 ? source[index + 2] : {
+                        x: 2 * a1.x - a0.x,
+                        y: 2 * a1.y - a0.y
+                    };
+                    // Centripetal knots keep short corner segments from being pulled into loops.
+                    const previousInterval = knotInterval(previous, a0);
+                    const segmentInterval = knotInterval(a0, a1);
+                    const nextInterval = knotInterval(a1, next);
+                    const previousSpan = previousInterval + segmentInterval;
+                    const nextSpan = segmentInterval + nextInterval;
+                    const tangent0x = segmentInterval * (
+                        (a0.x - previous.x) / previousInterval -
+                        (a1.x - previous.x) / previousSpan +
+                        (a1.x - a0.x) / segmentInterval
+                    );
+                    const tangent0y = segmentInterval * (
+                        (a0.y - previous.y) / previousInterval -
+                        (a1.y - previous.y) / previousSpan +
+                        (a1.y - a0.y) / segmentInterval
+                    );
+                    const tangent1x = segmentInterval * (
+                        (a1.x - a0.x) / segmentInterval -
+                        (next.x - a0.x) / nextSpan +
+                        (next.x - a1.x) / nextInterval
+                    );
+                    const tangent1y = segmentInterval * (
+                        (a1.y - a0.y) / segmentInterval -
+                        (next.y - a0.y) / nextSpan +
+                        (next.y - a1.y) / nextInterval
+                    );
+                    const cp1x = a0.x + tangent0x / 3;
+                    const cp1y = a0.y + tangent0y / 3;
+                    const cp2x = a1.x - tangent1x / 3;
+                    const cp2y = a1.y - tangent1y / 3;
+                    const controlPolygonLength =
+                        Math.hypot(cp1x - a0.x, cp1y - a0.y) +
+                        Math.hypot(cp2x - cp1x, cp2y - cp1y) +
+                        Math.hypot(a1.x - cp2x, a1.y - cp2y);
+                    const sampleCount = Math.max(1, Math.ceil(controlPolygonLength / sampleSpacing));
 
                     for (let sample = 1; sample <= sampleCount; sample++) {
                         const t = sample / sampleCount;

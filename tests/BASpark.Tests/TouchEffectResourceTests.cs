@@ -407,6 +407,29 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
+    public void CurveTrail_UsesCentripetalKnotsAndCurveLengthSampling()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        int curveStart = html.IndexOf("function curveTrailPath(", StringComparison.Ordinal);
+        int curveEnd = html.IndexOf("function simplifyTrailPath(", curveStart, StringComparison.Ordinal);
+
+        Assert.True(curveStart >= 0 && curveEnd > curveStart, "Curve trail path function is missing.");
+        string curveTrailPath = html[curveStart..curveEnd];
+        Assert.Contains("Math.sqrt(Math.hypot(b.x - a.x, b.y - a.y))", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("x: 2 * a0.x - a1.x", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("x: 2 * a1.x - a0.x", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const previousInterval = knotInterval(previous, a0)", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const segmentInterval = knotInterval(a0, a1)", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const nextInterval = knotInterval(a1, next)", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const tangent0x = segmentInterval * (", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const tangent1x = segmentInterval * (", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const controlPolygonLength =", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("Math.ceil(controlPolygonLength / sampleSpacing)", curveTrailPath, StringComparison.Ordinal);
+        Assert.DoesNotContain("Math.ceil(distance / sampleSpacing)", curveTrailPath, StringComparison.Ordinal);
+        Assert.DoesNotContain("(a1.x - previous.x) / 6", curveTrailPath, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StandalonePreviewBootstrap_PreservesRendererContract()
     {
         string embeddedRenderer = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
