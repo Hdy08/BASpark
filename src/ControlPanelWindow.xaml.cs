@@ -92,7 +92,6 @@ namespace BASpark
         private int _lastRenderedStatus = -1;
         private int _lastRenderedClickCount = -1;
         private int _themeRefreshPending;
-        private bool _skipSaveOnClosing;
         private readonly object _networkPromptLock = new();
 
         public ObservableCollection<FilterProfile> Profiles { get; set; } = new ObservableCollection<FilterProfile>();
@@ -1939,10 +1938,7 @@ namespace BASpark
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            if (!_skipSaveOnClosing)
-            {
-                ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
-            }
+            ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
             base.OnClosing(e);
         }
 
@@ -2015,13 +2011,11 @@ namespace BASpark
             {
                 try
                 {
-                    _skipSaveOnClosing = true;
                     ConfigManager.ResetAndClear();
                     System.Windows.Application.Current.Shutdown();
                 }
                 catch (Exception ex)
                 {
-                    _skipSaveOnClosing = false;
                     System.Windows.MessageBox.Show(Localization.Format("Msg_DeleteFailed", ex.Message));
                 }
             }

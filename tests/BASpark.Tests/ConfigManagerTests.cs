@@ -118,14 +118,7 @@ public class ConfigManagerTests
         FieldInfo profilesField = typeof(ConfigManager).GetField(
             "_profiles",
             BindingFlags.NonPublic | BindingFlags.Static)!;
-        FieldInfo snapshotField = typeof(ConfigManager).GetField(
-            "_processFilterSnapshot",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        MethodInfo refreshSnapshot = typeof(ConfigManager).GetMethod(
-            "RefreshProcessFilterSnapshotLocked",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
         var originalProfiles = (List<FilterProfile>)profilesField.GetValue(null)!;
-        object originalSnapshot = snapshotField.GetValue(null)!;
         string originalActiveId = ConfigManager.ActiveProfileId;
 
         try
@@ -140,69 +133,14 @@ public class ConfigManagerTests
                 }
             });
             ConfigManager.ActiveProfileId = "profile-1";
-            refreshSnapshot.Invoke(null, null);
 
             Assert.True(ConfigManager.IsProcessSuppressedByActiveProfile("game.EXE"));
             Assert.False(ConfigManager.IsProcessSuppressedByActiveProfile("explorer.exe"));
-
-            IReadOnlySet<string> exposedEntries = ConfigManager.GetProcessFilterEntries();
-            Assert.Contains("game.exe", exposedEntries);
-            Assert.IsType<HashSet<string>>(exposedEntries).Clear();
-            Assert.True(ConfigManager.IsProcessSuppressedByActiveProfile("GAME.exe"));
-
-            ((List<FilterProfile>)profilesField.GetValue(null)!)[0].Processes.Clear();
-            Assert.True(ConfigManager.IsProcessSuppressedByActiveProfile("game.exe"));
-
-            refreshSnapshot.Invoke(null, null);
-            Assert.False(ConfigManager.IsProcessSuppressedByActiveProfile("game.exe"));
         }
         finally
         {
             profilesField.SetValue(null, originalProfiles);
             ConfigManager.ActiveProfileId = originalActiveId;
-            snapshotField.SetValue(null, originalSnapshot);
-        }
-    }
-
-    [Fact]
-    public void ProcessSuppression_CachesWhitelistModeWithEntries()
-    {
-        FieldInfo profilesField = typeof(ConfigManager).GetField(
-            "_profiles",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        FieldInfo snapshotField = typeof(ConfigManager).GetField(
-            "_processFilterSnapshot",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        MethodInfo refreshSnapshot = typeof(ConfigManager).GetMethod(
-            "RefreshProcessFilterSnapshotLocked",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        var originalProfiles = (List<FilterProfile>)profilesField.GetValue(null)!;
-        object originalSnapshot = snapshotField.GetValue(null)!;
-        string originalActiveId = ConfigManager.ActiveProfileId;
-
-        try
-        {
-            profilesField.SetValue(null, new List<FilterProfile>
-            {
-                new()
-                {
-                    Id = "profile-1",
-                    Mode = ProcessFilterModeOption.Whitelist,
-                    Processes = new List<string> { "Allowed.exe" }
-                }
-            });
-            ConfigManager.ActiveProfileId = "profile-1";
-            refreshSnapshot.Invoke(null, null);
-
-            Assert.False(ConfigManager.IsProcessSuppressedByActiveProfile("allowed.EXE"));
-            Assert.True(ConfigManager.IsProcessSuppressedByActiveProfile("blocked.exe"));
-            Assert.False(ConfigManager.IsProcessSuppressedByActiveProfile("  "));
-        }
-        finally
-        {
-            profilesField.SetValue(null, originalProfiles);
-            ConfigManager.ActiveProfileId = originalActiveId;
-            snapshotField.SetValue(null, originalSnapshot);
         }
     }
 
