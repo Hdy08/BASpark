@@ -178,6 +178,78 @@ public class CurveTrailGeometryTests
             "The visible final segment no longer retains its original curvature.");
     }
 
+    [Fact]
+    public void CurveRetraction_PreservesTurnAnchorAfterDenseHistoryPruning()
+    {
+        var source = new List<TrailPoint>();
+        double born = 0;
+        for (double x = 0; x <= 100; x += 5)
+        {
+            source.Add(new(x, 0, born++));
+        }
+        for (double y = 5; y <= 100; y += 5)
+        {
+            source.Add(new(100, y, born++));
+        }
+
+        const double firstCutoffBorn = 23.5;
+        int firstAlive = source.FindIndex(point => point.Born >= firstCutoffBorn);
+        List<TrailPoint> oldRawHistory = source[Math.Max(0, firstAlive - 2)..];
+        IReadOnlyList<TrailPoint> oldClipped = ClipTrailPathToCutoff(
+            CurveTrailPath(SimplifyCurveTrailPath(oldRawHistory), RenderSegmentPx),
+            firstCutoffBorn);
+
+        var retained = new List<TrailPoint>(source);
+        for (double cutoffBorn = firstCutoffBorn; cutoffBorn <= 39.5; cutoffBorn += 0.5)
+        {
+            firstAlive = retained.FindIndex(point => point.Born >= cutoffBorn);
+            int historyStart = CurveTrailHistoryStart(retained, 0, retained.Count, firstAlive);
+            retained = retained[historyStart..];
+
+            IReadOnlyList<TrailPoint> actual = ClipTrailPathToCutoff(
+                CurveTrailPath(SimplifyCurveTrailPath(retained), RenderSegmentPx),
+                cutoffBorn);
+            IReadOnlyList<TrailPoint> expected = ClipTrailPathToCutoff(
+                CurveTrailPath(SimplifyCurveTrailPath(source), RenderSegmentPx),
+                cutoffBorn);
+
+            AssertPathEqual(expected, actual);
+            Assert.True(actual.Count >= 2, $"The curve vanished early at cutoff {cutoffBorn:F1}.");
+            if (cutoffBorn == firstCutoffBorn)
+            {
+                Assert.True(MaxDistanceFromChord(actual) > 5, "The retained final curve became visually straight.");
+            }
+        }
+
+        Assert.True(MaxDistanceFromChord(oldClipped) < 0.0001, "The regression fixture no longer reproduces the old straight tail.");
+    }
+
+    [Fact]
+    public void CurveCapacityCompaction_PreservesHistoricalTurnAnchors()
+    {
+        var source = new List<TrailPoint>();
+        double born = 0;
+        for (int x = 0; x <= 400; x++)
+        {
+            source.Add(new(x * 0.5, 0, born++));
+        }
+        for (int y = 1; y <= 599; y++)
+        {
+            source.Add(new(200, y * 0.5, born++));
+        }
+
+        List<TrailPoint> compacted = CompactCurveTrailCapacity(source, 512);
+        List<TrailPoint> simplified = SimplifyCurveTrailPath(compacted);
+        List<TrailPoint> oldHardTrim = source[^512..];
+
+        Assert.True(compacted.Count <= 512);
+        Assert.Equal(3, simplified.Count);
+        Assert.Equal(source[0], simplified[0]);
+        Assert.Equal(source[400], simplified[1]);
+        Assert.True(MaxDistanceFromChord(CurveTrailPath(simplified, RenderSegmentPx)) > 5);
+        Assert.Equal(2, SimplifyCurveTrailPath(oldHardTrim).Count);
+    }
+
     private static List<TrailPoint> SimplifyCurveTrailPath(IReadOnlyList<TrailPoint> source)
     {
         if (source.Count < 3)
@@ -191,19 +263,7 @@ public class CurveTrailGeometryTests
             TrailPoint previous = simplified[^1];
             TrailPoint point = source[index];
             TrailPoint next = source[index + 1];
-            double beforeX = point.X - previous.X;
-            double beforeY = point.Y - previous.Y;
-            double afterX = next.X - point.X;
-            double afterY = next.Y - point.Y;
-            if (Magnitude(beforeX, beforeY) < 0.0001 || Magnitude(afterX, afterY) < 0.0001)
-            {
-                continue;
-            }
-
-            double turn = Math.Abs(Math.Atan2(
-                beforeX * afterY - beforeY * afterX,
-                beforeX * afterX + beforeY * afterY));
-            if (turn > CurveCollinearTurnRadians)
+            if (CurveTrailAnchorNeeded(previous, point, next))
             {
                 simplified.Add(point);
             }
@@ -211,6 +271,91 @@ public class CurveTrailGeometryTests
 
         simplified.Add(source[^1]);
         return simplified;
+    }
+
+    private static bool CurveTrailAnchorNeeded(TrailPoint previous, TrailPoint point, TrailPoint next)
+    {
+        double beforeX = point.X - previous.X;
+        double beforeY = point.Y - previous.Y;
+        double afterX = next.X - point.X;
+        double afterY = next.Y - point.Y;
+        if (Magnitude(beforeX, beforeY) < 0.0001 || Magnitude(afterX, afterY) < 0.0001)
+        {
+            return false;
+        }
+
+        double turn = Math.Abs(Math.Atan2(
+            beforeX * afterY - beforeY * afterX,
+            beforeX * afterX + beforeY * afterY));
+        return turn > CurveCollinearTurnRadians;
+    }
+
+    private static int CurveTrailHistoryStart(
+        IReadOnlyList<TrailPoint> source,
+        int strokeStart,
+        int strokeEnd,
+        int firstAlive,
+        TrailPoint? virtualEnd = null)
+    {
+        int effectiveStrokeEnd = strokeEnd + (virtualEnd.HasValue ? 1 : 0);
+        if (firstAlive <= strokeStart || effectiveStrokeEnd - strokeStart < 3)
+        {
+            return strokeStart;
+        }
+
+        TrailPoint PointAt(int index) => index < strokeEnd ? source[index] : virtualEnd!.Value;
+
+        int previousIndex = strokeStart;
+        int olderAnchorIndex = strokeStart;
+        int newerAnchorIndex = strokeStart;
+
+        void RememberAnchor(int index)
+        {
+            if (index >= firstAlive)
+            {
+                return;
+            }
+            olderAnchorIndex = newerAnchorIndex;
+            newerAnchorIndex = index;
+        }
+
+        for (int index = strokeStart + 1; index < effectiveStrokeEnd - 1; index++)
+        {
+            if (!CurveTrailAnchorNeeded(PointAt(previousIndex), PointAt(index), PointAt(index + 1)))
+            {
+                continue;
+            }
+            previousIndex = index;
+            RememberAnchor(index);
+        }
+        int lastIndex = effectiveStrokeEnd - 1;
+        if (lastIndex < firstAlive)
+        {
+            RememberAnchor(lastIndex);
+        }
+        return olderAnchorIndex;
+    }
+
+    private static List<TrailPoint> CompactCurveTrailCapacity(
+        IReadOnlyList<TrailPoint> source,
+        int maximumPoints)
+    {
+        if (source.Count <= maximumPoints)
+        {
+            return [.. source];
+        }
+
+        const int historyBudget = 2;
+        int firstKeep = source.Count - (maximumPoints - historyBudget);
+        int historyStart = CurveTrailHistoryStart(source, 0, source.Count, firstKeep);
+        List<TrailPoint> historySource = source
+            .Skip(historyStart)
+            .Take(firstKeep - historyStart + 1)
+            .ToList();
+        List<TrailPoint> simplifiedHistory = SimplifyCurveTrailPath(historySource);
+        List<TrailPoint> history = simplifiedHistory[..^1].TakeLast(historyBudget).ToList();
+        history.AddRange(source.Skip(firstKeep));
+        return history;
     }
 
     private static List<TrailPoint> SampleAcceptedCurveInput(TrailPoint origin, TrailPoint target, double spacing)
@@ -533,6 +678,19 @@ public class CurveTrailGeometryTests
         double length = Math.Max(0.000001, Magnitude(dx, dy));
         return points.Max(point => Math.Abs(
             dx * (start.Y - point.Y) - (start.X - point.X) * dy) / length);
+    }
+
+    private static void AssertPathEqual(
+        IReadOnlyList<TrailPoint> expected,
+        IReadOnlyList<TrailPoint> actual)
+    {
+        Assert.Equal(expected.Count, actual.Count);
+        for (int index = 0; index < expected.Count; index++)
+        {
+            Assert.Equal(expected[index].X, actual[index].X, 9);
+            Assert.Equal(expected[index].Y, actual[index].Y, 9);
+            Assert.Equal(expected[index].Born, actual[index].Born, 9);
+        }
     }
 
     private static double Distance(TrailPoint a, TrailPoint b) => Distance(a.X, a.Y, b.X, b.Y);

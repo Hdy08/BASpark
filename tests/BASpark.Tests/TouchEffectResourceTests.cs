@@ -176,14 +176,43 @@ public class TouchEffectResourceTests
         Assert.DoesNotContain("../../apk/", html, StringComparison.Ordinal);
         Assert.Contains("this.trailRetractionDelayMultiplier = 1", html, StringComparison.Ordinal);
         Assert.Contains("retractAfter: time + this.trailRetentionMs()", html, StringComparison.Ordinal);
-        Assert.Contains("retraction.cutoffBorn += (currentTime - advanceFrom) * speed;", html, StringComparison.Ordinal);
+        Assert.Contains("latestBorn: time", html, StringComparison.Ordinal);
         Assert.Contains("return advanceTrailRetraction(retraction, now, this.trailSpeed);", html, StringComparison.Ordinal);
         Assert.Contains("this.syncTrailRetractions(time);", html, StringComparison.Ordinal);
         Assert.Contains("retraction.ended = true;", html, StringComparison.Ordinal);
-        Assert.Contains("if (firstAlive === readIndex && retraction?.ended)", html, StringComparison.Ordinal);
+        Assert.Contains("if (retraction?.dormant)", html, StringComparison.Ordinal);
         Assert.Contains("engine.setTrailSpeed(clamp(finite(trailSpeed, 1), 0.2, 3), engine.now());", html, StringComparison.Ordinal);
         Assert.DoesNotContain("this.trailRetentionMs() / this.trailSpeed", html, StringComparison.Ordinal);
         Assert.DoesNotContain("if (this.trailRetentionMs() <= 0)", html, StringComparison.Ordinal);
+
+        int advanceStart = html.IndexOf("function advanceTrailRetraction(", StringComparison.Ordinal);
+        int engineStart = html.IndexOf("class TouchEngine", advanceStart, StringComparison.Ordinal);
+        Assert.True(advanceStart >= 0 && engineStart > advanceStart, "Trail retraction helper is missing.");
+        string advance = html[advanceStart..engineStart];
+        Assert.Contains("if (retraction.dormant) return retraction.cutoffBorn;", advance, StringComparison.Ordinal);
+        Assert.Contains("retraction.cutoffBorn = Math.min(", advance, StringComparison.Ordinal);
+        Assert.Contains("retraction.latestBorn,", advance, StringComparison.Ordinal);
+        Assert.Contains("retraction.dormant = true;", advance, StringComparison.Ordinal);
+
+        int pointerMoveStart = html.IndexOf("pointerMove(x, y, time = this.now()) {", engineStart, StringComparison.Ordinal);
+        int pointerUpStart = html.IndexOf("pointerUp(time = this.now()) {", pointerMoveStart, StringComparison.Ordinal);
+        Assert.True(pointerMoveStart >= 0 && pointerUpStart > pointerMoveStart, "Pointer move handler is missing.");
+        string pointerMove = html[pointerMoveStart..pointerUpStart];
+        int restartCall = pointerMove.IndexOf("this.restartDormantTrailStroke(time);", StringComparison.Ordinal);
+        int emitCall = pointerMove.IndexOf("this.emitTrailTo(x, y, time);", StringComparison.Ordinal);
+        Assert.True(restartCall >= 0 && emitCall > restartCall, "Dormant stroke must restart before new geometry is emitted.");
+
+        int restartStart = html.IndexOf("restartDormantTrailStroke(time) {", pointerUpStart, StringComparison.Ordinal);
+        int trimStart = html.IndexOf("trimTrailCapacity() {", restartStart, StringComparison.Ordinal);
+        Assert.True(restartStart >= 0 && trimStart > restartStart, "Dormant stroke restart helper is missing.");
+        string restart = html[restartStart..trimStart];
+        int settleAtInput = restart.IndexOf("this.trailCutoff(tip.strokeId, time);", StringComparison.Ordinal);
+        int dormantCheck = restart.IndexOf("if (!retraction.dormant) return;", StringComparison.Ordinal);
+        int beginAtInput = restart.IndexOf("this.beginStroke(origin.x, origin.y, time);", StringComparison.Ordinal);
+        Assert.True(settleAtInput >= 0 && dormantCheck > settleAtInput, "Input resume must settle the old timeline first.");
+        Assert.True(beginAtInput > dormantCheck, "Dormant input must start a fresh current-time stroke.");
+        Assert.Contains("this.lastRaw = { x: origin.x, y: origin.y, time };", restart, StringComparison.Ordinal);
+        Assert.DoesNotContain("origin.time", restart, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -509,11 +538,22 @@ public class TouchEffectResourceTests
         Assert.True(strokesEnd > strokesStart, "Trail stroke extraction is missing.");
         string prune = html[pruneStart..strokesStart];
         string strokes = html[strokesStart..strokesEnd];
-        Assert.Contains("const historyPointCount = this.applyCurveDraw ? 2 : 1;", prune, StringComparison.Ordinal);
-        Assert.Contains("firstAlive - historyPointCount", prune, StringComparison.Ordinal);
-        Assert.Contains("const contextStart = Math.max(0, firstAlive - 2);", strokes, StringComparison.Ordinal);
+        Assert.Contains("curveTrailHistoryStart(this.trail, strokeStart, readIndex, firstAlive)", prune, StringComparison.Ordinal);
+        Assert.Contains("const absoluteFirstAlive = Math.min(strokeStart + firstAlive, emittedEnd);", strokes, StringComparison.Ordinal);
+        Assert.Contains("const contextStart = curveTrailHistoryStart(", strokes, StringComparison.Ordinal);
+        Assert.Contains("appendTip ? tip : null", strokes, StringComparison.Ordinal);
         Assert.Contains("points.cutoffBorn = cutoff;", strokes, StringComparison.Ordinal);
         Assert.Contains("continue;", strokes, StringComparison.Ordinal);
+
+        int trimStart = html.IndexOf("trimTrailCapacity() {", StringComparison.Ordinal);
+        int appendStart = html.IndexOf("appendTrail(x, y, born, strokeId) {", trimStart, StringComparison.Ordinal);
+        Assert.True(trimStart >= 0 && appendStart > trimStart, "Curve-aware trail capacity handling is missing.");
+        string trim = html[trimStart..appendStart];
+        Assert.Contains("const historyBudget = 2;", trim, StringComparison.Ordinal);
+        Assert.Contains("curveTrailHistoryStart(", trim, StringComparison.Ordinal);
+        Assert.Contains("simplifyCurveTrailPath(historySource)", trim, StringComparison.Ordinal);
+        Assert.Contains("this.trail.splice(0, firstKeep, ...history);", trim, StringComparison.Ordinal);
+        Assert.DoesNotContain("this.trail.splice(0, this.trail.length - MAX_TRAIL_POINTS)", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -526,12 +566,27 @@ public class TouchEffectResourceTests
         Assert.True(simplifyStart >= 0 && simplifyEnd > simplifyStart, "Curve-specific simplifier is missing.");
         string simplifyCurveTrailPath = html[simplifyStart..simplifyEnd];
         Assert.Contains("const previous = simplified[simplified.length - 1]", simplifyCurveTrailPath, StringComparison.Ordinal);
-        Assert.Contains("const turn = Math.abs(Math.atan2(", simplifyCurveTrailPath, StringComparison.Ordinal);
-        Assert.Contains("if (turn > TRAIL_CURVE_COLLINEAR_TURN_RADIANS)", simplifyCurveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("if (curveTrailAnchorNeeded(previous, point, next))", simplifyCurveTrailPath, StringComparison.Ordinal);
         Assert.Contains("simplified.push(point);", simplifyCurveTrailPath, StringComparison.Ordinal);
         Assert.Contains("simplified.push(source[source.length - 1]);", simplifyCurveTrailPath, StringComparison.Ordinal);
         Assert.DoesNotContain("tolerancePx", simplifyCurveTrailPath, StringComparison.Ordinal);
         Assert.DoesNotContain("toleranceSquared", simplifyCurveTrailPath, StringComparison.Ordinal);
+
+        int anchorStart = html.IndexOf("function curveTrailAnchorNeeded(", StringComparison.Ordinal);
+        int historyStart = html.IndexOf("function curveTrailHistoryStart(", anchorStart, StringComparison.Ordinal);
+        Assert.True(anchorStart >= 0 && historyStart > anchorStart, "Curve anchor helpers are missing.");
+        string anchorHelper = html[anchorStart..historyStart];
+        Assert.Contains("const turn = Math.abs(Math.atan2(", anchorHelper, StringComparison.Ordinal);
+        Assert.Contains("return turn > TRAIL_CURVE_COLLINEAR_TURN_RADIANS;", anchorHelper, StringComparison.Ordinal);
+
+        string historyHelper = html[historyStart..simplifyStart];
+        Assert.Contains("const effectiveStrokeEnd = strokeEnd + (hasVirtualEnd ? 1 : 0);", historyHelper, StringComparison.Ordinal);
+        Assert.Contains("let olderAnchorIndex = strokeStart;", historyHelper, StringComparison.Ordinal);
+        Assert.Contains("let newerAnchorIndex = strokeStart;", historyHelper, StringComparison.Ordinal);
+        Assert.Contains("olderAnchorIndex = newerAnchorIndex;", historyHelper, StringComparison.Ordinal);
+        Assert.Contains("newerAnchorIndex = index;", historyHelper, StringComparison.Ordinal);
+        Assert.Contains("curveTrailAnchorNeeded(pointAt(previousIndex), pointAt(index), pointAt(index + 1))", historyHelper, StringComparison.Ordinal);
+        Assert.Contains("return olderAnchorIndex;", historyHelper, StringComparison.Ordinal);
     }
 
     [Fact]

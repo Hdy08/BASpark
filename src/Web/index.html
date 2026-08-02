@@ -644,6 +644,48 @@
                 return result;
             }
 
+            function curveTrailAnchorNeeded(previous, point, next) {
+                const beforeX = point.x - previous.x;
+                const beforeY = point.y - previous.y;
+                const afterX = next.x - point.x;
+                const afterY = next.y - point.y;
+                if (Math.hypot(beforeX, beforeY) < 0.0001 || Math.hypot(afterX, afterY) < 0.0001) {
+                    return false;
+                }
+
+                const turn = Math.abs(Math.atan2(
+                    beforeX * afterY - beforeY * afterX,
+                    beforeX * afterX + beforeY * afterY
+                ));
+                return turn > TRAIL_CURVE_COLLINEAR_TURN_RADIANS;
+            }
+
+            function curveTrailHistoryStart(source, strokeStart, strokeEnd, firstAlive, virtualEnd = null) {
+                const hasVirtualEnd = virtualEnd != null;
+                const effectiveStrokeEnd = strokeEnd + (hasVirtualEnd ? 1 : 0);
+                if (firstAlive <= strokeStart || effectiveStrokeEnd - strokeStart < 3) return strokeStart;
+
+                const pointAt = index => index < strokeEnd ? source[index] : virtualEnd;
+
+                let previousIndex = strokeStart;
+                let olderAnchorIndex = strokeStart;
+                let newerAnchorIndex = strokeStart;
+                const rememberAnchor = index => {
+                    if (index >= firstAlive) return;
+                    olderAnchorIndex = newerAnchorIndex;
+                    newerAnchorIndex = index;
+                };
+
+                for (let index = strokeStart + 1; index < effectiveStrokeEnd - 1; index++) {
+                    if (!curveTrailAnchorNeeded(pointAt(previousIndex), pointAt(index), pointAt(index + 1))) continue;
+                    previousIndex = index;
+                    rememberAnchor(index);
+                }
+                const lastIndex = effectiveStrokeEnd - 1;
+                if (lastIndex < firstAlive) rememberAnchor(lastIndex);
+                return olderAnchorIndex;
+            }
+
             function simplifyCurveTrailPath(source) {
                 if (source.length < 3) return source;
 
@@ -652,19 +694,7 @@
                     const previous = simplified[simplified.length - 1];
                     const point = source[index];
                     const next = source[index + 1];
-                    const beforeX = point.x - previous.x;
-                    const beforeY = point.y - previous.y;
-                    const afterX = next.x - point.x;
-                    const afterY = next.y - point.y;
-                    if (Math.hypot(beforeX, beforeY) < 0.0001 || Math.hypot(afterX, afterY) < 0.0001) {
-                        continue;
-                    }
-
-                    const turn = Math.abs(Math.atan2(
-                        beforeX * afterY - beforeY * afterX,
-                        beforeX * afterX + beforeY * afterY
-                    ));
-                    if (turn > TRAIL_CURVE_COLLINEAR_TURN_RADIANS) {
+                    if (curveTrailAnchorNeeded(previous, point, next)) {
                         simplified.push(point);
                     }
                 }
@@ -810,12 +840,21 @@
             }
 
             function advanceTrailRetraction(retraction, now, speed) {
+                if (retraction.dormant) return retraction.cutoffBorn;
                 const currentTime = Math.max(retraction.lastAdvancedAt, now);
                 const advanceFrom = Math.max(retraction.lastAdvancedAt, retraction.retractAfter);
                 if (currentTime > advanceFrom) {
-                    retraction.cutoffBorn += (currentTime - advanceFrom) * speed;
+                    retraction.cutoffBorn = Math.min(
+                        retraction.latestBorn,
+                        retraction.cutoffBorn + (currentTime - advanceFrom) * speed
+                    );
                 }
                 retraction.lastAdvancedAt = currentTime;
+                if (currentTime >= retraction.retractAfter &&
+                    retraction.cutoffBorn >= retraction.latestBorn - 0.000001) {
+                    retraction.cutoffBorn = retraction.latestBorn;
+                    retraction.dormant = true;
+                }
                 return retraction.cutoffBorn;
             }
 
@@ -911,6 +950,7 @@
 
                 pointerMove(x, y, time = this.now()) {
                     if (!this.down && !window.effectiveAlwaysTrail) return;
+                    this.restartDormantTrailStroke(time);
                     if (!this.lastRaw) {
                         this.beginTrailStrokeOnly(x, y, this.down, time);
                         return;
@@ -941,7 +981,9 @@
                         cutoffBorn: time,
                         lastAdvancedAt: time,
                         retractAfter: time + this.trailRetentionMs(),
-                        ended: false
+                        latestBorn: time,
+                        ended: false,
+                        dormant: false
                     });
                     this.appendTrail(x, y, time, this.strokeId);
                     this.trailEmit = { x, y, time };
@@ -963,12 +1005,22 @@
                 }
 
                 endTrailStroke(time) {
-                    this.commitTrailTip();
                     const tip = this.trailTip;
                     const retraction = tip && this.trailRetractions.get(tip.strokeId);
                     if (!retraction || retraction.ended) return;
+                    if (retraction.dormant) {
+                        this.discardTrailStroke(tip.strokeId);
+                        this.trailRetractions.delete(tip.strokeId);
+                        return;
+                    }
 
+                    this.commitTrailTip();
                     this.trailCutoff(tip.strokeId, time);
+                    if (retraction.dormant) {
+                        this.discardTrailStroke(tip.strokeId);
+                        this.trailRetractions.delete(tip.strokeId);
+                        return;
+                    }
                     retraction.ended = true;
                 }
 
@@ -990,7 +1042,70 @@
                     this.trailSpeed = speed;
                 }
 
+                discardTrailStroke(strokeId) {
+                    let writeIndex = 0;
+                    for (let index = 0; index < this.trail.length; index++) {
+                        const point = this.trail[index];
+                        if (point.strokeId !== strokeId) this.trail[writeIndex++] = point;
+                    }
+                    this.trail.length = writeIndex;
+                }
+
+                restartDormantTrailStroke(time) {
+                    const tip = this.trailTip;
+                    const retraction = tip && this.trailRetractions.get(tip.strokeId);
+                    if (!retraction) return;
+                    this.trailCutoff(tip.strokeId, time);
+                    if (!retraction.dormant) return;
+
+                    const origin = this.lastRaw || this.trailEmit || tip;
+                    this.discardTrailStroke(tip.strokeId);
+                    this.trailRetractions.delete(tip.strokeId);
+                    this.trailTip = null;
+                    this.trailEmit = null;
+                    this.beginStroke(origin.x, origin.y, time);
+                    this.lastRaw = { x: origin.x, y: origin.y, time };
+                }
+
+                trimTrailCapacity() {
+                    const overflow = this.trail.length - MAX_TRAIL_POINTS;
+                    if (overflow <= 0) return;
+                    if (!this.applyCurveDraw) {
+                        this.trail.splice(0, overflow);
+                        return;
+                    }
+
+                    const historyBudget = 2;
+                    const firstKeep = this.trail.length - (MAX_TRAIL_POINTS - historyBudget);
+                    const strokeId = this.trail[firstKeep].strokeId;
+                    let strokeStart = firstKeep;
+                    while (strokeStart > 0 && this.trail[strokeStart - 1].strokeId === strokeId) {
+                        strokeStart--;
+                    }
+                    if (firstKeep === strokeStart) {
+                        this.trail.splice(0, firstKeep);
+                        return;
+                    }
+
+                    let strokeEnd = firstKeep + 1;
+                    while (strokeEnd < this.trail.length && this.trail[strokeEnd].strokeId === strokeId) {
+                        strokeEnd++;
+                    }
+                    const historyStart = curveTrailHistoryStart(
+                        this.trail,
+                        strokeStart,
+                        strokeEnd,
+                        firstKeep
+                    );
+                    const historySource = this.trail.slice(historyStart, firstKeep + 1);
+                    const simplifiedHistory = simplifyCurveTrailPath(historySource);
+                    const history = simplifiedHistory.slice(0, -1).slice(-historyBudget);
+                    this.trail.splice(0, firstKeep, ...history);
+                }
+
                 appendTrail(x, y, born, strokeId) {
+                    const retraction = this.trailRetractions.get(strokeId);
+                    if (retraction) retraction.latestBorn = Math.max(retraction.latestBorn, born);
                     const last = this.trail[this.trail.length - 1];
                     if (last && last.strokeId === strokeId && Math.hypot(last.x - x, last.y - y) < 0.05) {
                         last.x = x;
@@ -999,9 +1114,7 @@
                         return;
                     }
                     this.trail.push({ x, y, born, strokeId });
-                    if (this.trail.length > MAX_TRAIL_POINTS) {
-                        this.trail.splice(0, this.trail.length - MAX_TRAIL_POINTS);
-                    }
+                    this.trimTrailCapacity();
                 }
 
                 emitTrailTo(x, y, time) {
@@ -1011,6 +1124,8 @@
                     }
 
                     this.trailTip = { x, y, born: time, strokeId: this.strokeId };
+                    const retraction = this.trailRetractions.get(this.strokeId);
+                    if (retraction) retraction.latestBorn = Math.max(retraction.latestBorn, time);
                     const origin = this.trailEmit;
                     const dx = x - origin.x;
                     const dy = y - origin.y;
@@ -1129,17 +1244,22 @@
                             readIndex++;
                         }
                         const cutoff = this.trailCutoff(strokeId, now);
+                        const retraction = this.trailRetractions.get(strokeId);
+                        if (retraction?.dormant) {
+                            if (retraction.ended) this.trailRetractions.delete(strokeId);
+                            continue;
+                        }
                         let firstAlive = strokeStart;
                         while (firstAlive < readIndex && this.trail[firstAlive].born < cutoff) {
                             firstAlive++;
                         }
-                        const retraction = this.trailRetractions.get(strokeId);
                         if (firstAlive === readIndex && retraction?.ended) {
                             this.trailRetractions.delete(strokeId);
                             continue;
                         }
-                        const historyPointCount = this.applyCurveDraw ? 2 : 1;
-                        const copyStart = Math.max(strokeStart, firstAlive - historyPointCount);
+                        const copyStart = this.applyCurveDraw
+                            ? curveTrailHistoryStart(this.trail, strokeStart, readIndex, firstAlive)
+                            : Math.max(strokeStart, firstAlive - 1);
                         for (let index = copyStart; index < readIndex; index++) {
                             this.trail[writeIndex++] = this.trail[index];
                         }
@@ -1176,6 +1296,7 @@
                             readIndex++;
                         }
                         const cutoff = this.trailCutoff(strokeId, now);
+                        if (this.trailRetractions.get(strokeId)?.dormant) continue;
                         const tip = this.trailTip;
                         let emittedEnd = strokeStart;
                         while (emittedEnd < readIndex && this.trail[emittedEnd].born <= now) {
@@ -1200,7 +1321,14 @@
                         if (firstAlive === emittedCount) continue;
 
                         if (this.applyCurveDraw) {
-                            const contextStart = Math.max(0, firstAlive - 2);
+                            const absoluteFirstAlive = Math.min(strokeStart + firstAlive, emittedEnd);
+                            const contextStart = curveTrailHistoryStart(
+                                this.trail,
+                                strokeStart,
+                                emittedEnd,
+                                absoluteFirstAlive,
+                                appendTip ? tip : null
+                            ) - strokeStart;
                             const points = [];
                             for (let index = contextStart; index < emittedCount; index++) {
                                 points.push(pointAt(index));
