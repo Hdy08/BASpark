@@ -583,12 +583,6 @@
     <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
       <value>默认 1.00 ×</value>
     </data>
-    <data name="VisualReset_TrailDelay" xml:space="preserve">
-      <value>拖尾收回延迟</value>
-    </data>
-    <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
-      <value>默认 1.00 ×</value>
-    </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>拖尾刷新率</value>
     </data>
@@ -656,7 +650,7 @@
       <value>拖尾与点击使用同一动画速度</value>
     </data>
     <data name="Visual_LinkedSpeedHint" xml:space="preserve">
-      <value>关闭此项后可单独加快或减慢拖尾衰减与移动粒子，而不影响点击波纹与爆发粒子，与下方「拖尾刷新率」不同。</value>
+      <value>关闭此项后可单独调整拖尾收回等待、收回速度与移动粒子速度，而不影响点击波纹与爆发粒子，与下方「拖尾刷新率」不同。</value>
     </data>
     <data name="Visual_CurveDraw" xml:space="preserve">
       <value>采用曲线拖尾</value>
@@ -681,9 +675,6 @@
     </data>
     <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
       <value>拖尾刷新率跟随显示器</value>
-    </data>
-    <data name="Visual_TrailDelay" xml:space="preserve">
-      <value>拖尾收回延迟</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>视觉表现</value>

@@ -8,41 +8,16 @@ public class ConfigManagerTests
     public void VisualDefaults_MatchOriginalGameBaseline()
     {
         Assert.Equal("95,197,255", ConfigManager.DefaultParticleColor);
-        Assert.Equal(1.0, ConfigManager.DefaultTrailDelayMultiplier);
         Assert.False(ConfigManager.ApplyCurveDraw);
     }
 
-    [Theory]
-    [InlineData(0.00, 0.00)]
-    [InlineData(0.10, 1.00)]
-    [InlineData(0.15, 1.50)]
-    [InlineData(0.50, 2.00)]
-    public void NormalizeTrailDelayMultiplier_MigratesLegacySecondsOnce(
-        double legacyDelay,
-        double expectedMultiplier)
+    [Fact]
+    public void RemovedTrailDelaySetting_DoesNotReorderVisualResetFlags()
     {
-        Assert.Equal(expectedMultiplier, NormalizeTrailDelayMultiplier(legacyDelay, storedAsMultiplier: false));
-    }
-
-    [Theory]
-    [InlineData(0.00, 0.00)]
-    [InlineData(1.00, 1.00)]
-    [InlineData(1.50, 1.50)]
-    [InlineData(3.00, 2.00)]
-    public void NormalizeTrailDelayMultiplier_DoesNotRemigrateCurrentValues(
-        double savedMultiplier,
-        double expectedMultiplier)
-    {
-        Assert.Equal(expectedMultiplier, NormalizeTrailDelayMultiplier(savedMultiplier, storedAsMultiplier: true));
-    }
-
-    private static double NormalizeTrailDelayMultiplier(object value, bool storedAsMultiplier)
-    {
-        MethodInfo normalize = typeof(ConfigManager).GetMethod(
-            "NormalizeTrailDelayMultiplier",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        return Assert.IsType<double>(normalize.Invoke(null, [value, storedAsMultiplier]));
+        Assert.DoesNotContain("TrailDelay", Enum.GetNames<VisualAppearanceResetFlags>());
+        Assert.Null(typeof(ConfigManager).GetProperty("TrailDelay", BindingFlags.Public | BindingFlags.Static));
+        Assert.Equal(1 << 9, (int)VisualAppearanceResetFlags.GlowIntensity);
+        Assert.Equal(1 << 10, (int)VisualAppearanceResetFlags.CurveDraw);
     }
 
     [Fact]

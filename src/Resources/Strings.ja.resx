@@ -583,12 +583,6 @@
     <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
       <value>既定 1.00 ×</value>
     </data>
-    <data name="VisualReset_TrailDelay" xml:space="preserve">
-      <value>トレイル収束遅延</value>
-    </data>
-    <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
-      <value>既定 1.00 ×</value>
-    </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>トレイル更新率</value>
     </data>
@@ -656,7 +650,7 @@
       <value>トレイルとクリックで同じアニメ速度を使用</value>
     </data>
     <data name="Visual_LinkedSpeedHint" xml:space="preserve">
-      <value>オフにするとトレイルとクリックの速度を個別に設定できます（下の更新率とは別）。</value>
+      <value>オフにすると、トレイルの収束待ち時間・収束速度・移動パーティクル速度をクリック波紋・バーストパーティクルとは個別に調整できます。下のトレイル更新率とは別の設定です。</value>
     </data>
     <data name="Visual_CurveDraw" xml:space="preserve">
       <value>曲線トレイルを使用</value>
@@ -681,9 +675,6 @@
     </data>
     <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
       <value>トレイル更新率をディスプレイに合わせる</value>
-    </data>
-    <data name="Visual_TrailDelay" xml:space="preserve">
-      <value>トレイル収束遅延</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>ビジュアル</value>

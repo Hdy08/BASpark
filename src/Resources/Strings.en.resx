@@ -583,12 +583,6 @@ Download now?</value>
     <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
       <value>Default 1.00 ×</value>
     </data>
-    <data name="VisualReset_TrailDelay" xml:space="preserve">
-      <value>Trail retraction delay</value>
-    </data>
-    <data name="VisualReset_TrailDelay_Sub" xml:space="preserve">
-      <value>Default 1.00 ×</value>
-    </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>Trail refresh rate</value>
     </data>
@@ -656,7 +650,7 @@ Download now?</value>
       <value>Use same animation speed for trail and click</value>
     </data>
     <data name="Visual_LinkedSpeedHint" xml:space="preserve">
-      <value>When off, trail and click speeds are independent of trail refresh rate below.</value>
+      <value>When off, the trail retraction wait, retraction speed, and moving particle speed can be adjusted independently from click ripples and burst particles; this is separate from the trail refresh rate below.</value>
     </data>
     <data name="Visual_CurveDraw" xml:space="preserve">
       <value>Use curved trail lines</value>
@@ -681,9 +675,6 @@ Download now?</value>
     </data>
     <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
       <value>Match trail refresh rate to display</value>
-    </data>
-    <data name="Visual_TrailDelay" xml:space="preserve">
-      <value>Trail retraction delay</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>Visual</value>

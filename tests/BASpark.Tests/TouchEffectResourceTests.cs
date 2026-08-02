@@ -114,6 +114,8 @@ public class TouchEffectResourceTests
         Assert.Contains("const TRAIL_CURVE_MAX_CONTROL_TURN_RADIANS = Math.PI / 60", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_CURVE_FLATNESS_RATIO = 0.05", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_CURVE_MAX_SUBDIVISION_DEPTH = 12", html, StringComparison.Ordinal);
+        Assert.Contains("const TRAIL_CURVE_FIT_TOLERANCE_RATIO = 0.75", html, StringComparison.Ordinal);
+        Assert.Contains("const TRAIL_CURVE_TANGENT_SCALE = 0.75", html, StringComparison.Ordinal);
         Assert.Contains("const MAX_TRAIL_INNER_MITER_RATIO = 4", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_MSAA_SAMPLES = 4", html, StringComparison.Ordinal);
         Assert.Contains("function smoothTrailPath(source, renderSegmentPx, createPoint = null)", html, StringComparison.Ordinal);
@@ -131,7 +133,8 @@ public class TouchEffectResourceTests
             StringComparison.Ordinal);
         Assert.Contains("TRAIL_RENDER_SEGMENT_PX / Math.max(1, this.dpr)", html, StringComparison.Ordinal);
         Assert.Contains("const curveDrawEnabled = this.engine.applyCurveDraw", html, StringComparison.Ordinal);
-        Assert.Contains("? simplifyCurveTrailPath(sourcePoints)", html, StringComparison.Ordinal);
+        Assert.Contains("? simplifyCurveTrailPath(simplifyTrailPath(", html, StringComparison.Ordinal);
+        Assert.Contains("jitterTolerancePx * TRAIL_CURVE_FIT_TOLERANCE_RATIO", html, StringComparison.Ordinal);
         Assert.Contains(": simplifyTrailPath(sourcePoints, jitterTolerancePx)", html, StringComparison.Ordinal);
         Assert.Contains("createMultisampleTarget(width, height)", html, StringComparison.Ordinal);
         Assert.Contains("gl.renderbufferStorageMultisample", html, StringComparison.Ordinal);
@@ -165,34 +168,48 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
-    public void TrailRetractionDelayAndSpeed_UseOneIndependentTimeline()
+    public void TrailSpeed_ControlsRetractionDelayAndAdvanceOnOneTimeline()
     {
-        const double originalGameSimulationSpeed = 1.0;
-        Assert.Equal(originalGameSimulationSpeed, ConfigManager.DefaultTrailDelayMultiplier);
-
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
         Assert.Contains("const TRAIL_LIFETIME_MS = 300.00001192092896", html, StringComparison.Ordinal);
         Assert.Contains("const fallbackAssetBase = \"Assets/\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("../../apk/", html, StringComparison.Ordinal);
-        Assert.Contains("this.trailRetractionDelayMultiplier = 1", html, StringComparison.Ordinal);
-        Assert.Contains("retractAfter: time + this.trailRetentionMs()", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("trailRetractionDelayMultiplier", html, StringComparison.Ordinal);
+        Assert.Contains("waitElapsedMs: 0", html, StringComparison.Ordinal);
         Assert.Contains("latestBorn: time", html, StringComparison.Ordinal);
+        Assert.Contains("return TRAIL_LIFETIME_MS / this.trailSpeed;", html, StringComparison.Ordinal);
         Assert.Contains("return advanceTrailRetraction(retraction, now, this.trailSpeed);", html, StringComparison.Ordinal);
         Assert.Contains("this.syncTrailRetractions(time);", html, StringComparison.Ordinal);
         Assert.Contains("retraction.ended = true;", html, StringComparison.Ordinal);
         Assert.Contains("if (retraction?.dormant)", html, StringComparison.Ordinal);
         Assert.Contains("engine.setTrailSpeed(clamp(finite(trailSpeed, 1), 0.2, 3), engine.now());", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("this.trailRetentionMs() / this.trailSpeed", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("if (this.trailRetentionMs() <= 0)", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("retractAfter", html, StringComparison.Ordinal);
 
         int advanceStart = html.IndexOf("function advanceTrailRetraction(", StringComparison.Ordinal);
         int engineStart = html.IndexOf("class TouchEngine", advanceStart, StringComparison.Ordinal);
         Assert.True(advanceStart >= 0 && engineStart > advanceStart, "Trail retraction helper is missing.");
         string advance = html[advanceStart..engineStart];
         Assert.Contains("if (retraction.dormant) return retraction.cutoffBorn;", advance, StringComparison.Ordinal);
+        Assert.Contains("let scaledElapsed = (currentTime - retraction.lastAdvancedAt) * speed;", advance, StringComparison.Ordinal);
+        Assert.Contains("const waitRemaining = TRAIL_LIFETIME_MS - retraction.waitElapsedMs;", advance, StringComparison.Ordinal);
+        Assert.Contains("const waitAdvance = Math.min(waitRemaining, scaledElapsed);", advance, StringComparison.Ordinal);
+        Assert.Contains("retraction.waitElapsedMs += waitAdvance;", advance, StringComparison.Ordinal);
+        Assert.Contains("scaledElapsed -= waitAdvance;", advance, StringComparison.Ordinal);
         Assert.Contains("retraction.cutoffBorn = Math.min(", advance, StringComparison.Ordinal);
         Assert.Contains("retraction.latestBorn,", advance, StringComparison.Ordinal);
+        Assert.Contains("retraction.cutoffBorn + scaledElapsed", advance, StringComparison.Ordinal);
+        Assert.Contains("retraction.waitElapsedMs >= TRAIL_LIFETIME_MS - 0.000001", advance, StringComparison.Ordinal);
         Assert.Contains("retraction.dormant = true;", advance, StringComparison.Ordinal);
+
+        int updateSettingsStart = html.IndexOf("window.updateEffectSettings = (", engineStart, StringComparison.Ordinal);
+        int updateSettingsEnd = html.IndexOf(") => {", updateSettingsStart, StringComparison.Ordinal);
+        Assert.True(updateSettingsStart >= 0 && updateSettingsEnd > updateSettingsStart, "Effect settings bridge is missing.");
+        string updateSettingsParameters = html[updateSettingsStart..updateSettingsEnd];
+        Assert.Contains("trailSpeed", updateSettingsParameters, StringComparison.Ordinal);
+        Assert.Contains("clickSpeed", updateSettingsParameters, StringComparison.Ordinal);
+        Assert.Contains("trailThickness", updateSettingsParameters, StringComparison.Ordinal);
+        Assert.Contains("glowIntensity", updateSettingsParameters, StringComparison.Ordinal);
+        Assert.DoesNotContain("delay", updateSettingsParameters, StringComparison.OrdinalIgnoreCase);
 
         int pointerMoveStart = html.IndexOf("pointerMove(x, y, time = this.now()) {", engineStart, StringComparison.Ordinal);
         int pointerUpStart = html.IndexOf("pointerUp(time = this.now()) {", pointerMoveStart, StringComparison.Ordinal);
@@ -390,7 +407,6 @@ public class TouchEffectResourceTests
     [InlineData("previewSpeed", "min=\"0.20\" max=\"3.00\" step=\"0.10\" value=\"1.00\"")]
     [InlineData("previewTrailSpeed", "min=\"0.20\" max=\"3.00\" step=\"0.10\" value=\"1.00\"")]
     [InlineData("previewClickSpeed", "min=\"0.20\" max=\"3.00\" step=\"0.10\" value=\"1.00\"")]
-    [InlineData("previewLifetime", "min=\"0.00\" max=\"2.00\" step=\"0.10\" value=\"1.00\"")]
     [InlineData("previewRefresh", "min=\"30\" max=\"360\" step=\"10\" value=\"60\"")]
     public void Preview_ExposesProductionVisualSettingRange(string id, string expectedAttributes)
     {
@@ -408,6 +424,63 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
+    public void TrailDelaySetting_IsRemovedAndCurveToggleFollowsAnimationSpeedControls()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        Assert.DoesNotContain("previewLifetime", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("trailRetractionDelayMultiplier", html, StringComparison.Ordinal);
+
+        int webUnifiedSpeed = html.IndexOf("id=\"previewUnifiedSpeed\"", StringComparison.Ordinal);
+        int webSplitSpeeds = html.IndexOf("id=\"previewSplitSpeeds\"", webUnifiedSpeed, StringComparison.Ordinal);
+        int webCurveToggle = html.IndexOf("id=\"previewCurveDraw\"", webSplitSpeeds, StringComparison.Ordinal);
+        int webRefreshToggle = html.IndexOf("id=\"previewFollowRefresh\"", webCurveToggle, StringComparison.Ordinal);
+        Assert.True(webUnifiedSpeed >= 0, "Web unified animation speed control is missing.");
+        Assert.True(webSplitSpeeds > webUnifiedSpeed, "Web split animation speed controls must follow unified speed.");
+        Assert.True(webCurveToggle > webSplitSpeeds, "Web curve toggle must follow all animation speed controls.");
+        Assert.True(webRefreshToggle > webCurveToggle, "Web curve toggle must remain above trail refresh settings.");
+
+        string root = FindWorkspaceRoot();
+        string controlPanelXaml = File.ReadAllText(Path.Combine(root, "src", "ControlPanelWindow.xaml"), Encoding.UTF8);
+        string controlPanelSource = File.ReadAllText(Path.Combine(root, "src", "ControlPanelWindow.xaml.cs"), Encoding.UTF8);
+        string configSource = File.ReadAllText(Path.Combine(root, "src", "ConfigManager.cs"), Encoding.UTF8);
+        string mainWindowSource = File.ReadAllText(Path.Combine(root, "src", "MainWindow.xaml.cs"), Encoding.UTF8);
+        string overlayManagerSource = File.ReadAllText(Path.Combine(root, "src", "OverlayManager.cs"), Encoding.UTF8);
+        string localizerSource = File.ReadAllText(Path.Combine(root, "src", "UiLocalizer.cs"), Encoding.UTF8);
+
+        Assert.DoesNotContain("SliderTrailDelay", controlPanelXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("TxtTrailDelay", controlPanelXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("SliderTrailDelay", controlPanelSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("VisualAppearanceResetFlags.TrailDelay", controlPanelSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("Save(\"TrailDelay\"", controlPanelSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("TrailDelay", configSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("trailDelay", mainWindowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfigManager.TrailDelay", mainWindowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("trailDelay", overlayManagerSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("TxtTrailDelay", localizerSource, StringComparison.Ordinal);
+        Assert.Contains(
+            "public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed, double trailThickness, double glowIntensity)",
+            mainWindowSource,
+            StringComparison.Ordinal);
+
+        int desktopUnifiedSpeed = controlPanelXaml.IndexOf("Name=\"PanelUnifiedAnimationSpeed\"", StringComparison.Ordinal);
+        int desktopSplitSpeeds = controlPanelXaml.IndexOf("Name=\"PanelSplitAnimationSpeed\"", desktopUnifiedSpeed, StringComparison.Ordinal);
+        int desktopCurveToggle = controlPanelXaml.IndexOf("Name=\"CheckApplyCurveDraw\"", desktopSplitSpeeds, StringComparison.Ordinal);
+        int desktopRefreshToggle = controlPanelXaml.IndexOf("Name=\"CheckFollowDisplayRefreshRate\"", desktopCurveToggle, StringComparison.Ordinal);
+        Assert.True(desktopUnifiedSpeed >= 0, "Desktop unified animation speed control is missing.");
+        Assert.True(desktopSplitSpeeds > desktopUnifiedSpeed, "Desktop split animation speed controls must follow unified speed.");
+        Assert.True(desktopCurveToggle > desktopSplitSpeeds, "Desktop curve toggle must follow all animation speed controls.");
+        Assert.True(desktopRefreshToggle > desktopCurveToggle, "Desktop curve toggle must remain above trail refresh settings.");
+
+        foreach (string resourceName in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
+        {
+            string resources = File.ReadAllText(Path.Combine(root, "src", "Resources", resourceName), Encoding.UTF8);
+            Assert.DoesNotContain("name=\"Visual_TrailDelay\"", resources, StringComparison.Ordinal);
+            Assert.DoesNotContain("name=\"VisualReset_TrailDelay\"", resources, StringComparison.Ordinal);
+            Assert.DoesNotContain("name=\"VisualReset_TrailDelay_Sub\"", resources, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void CurveTrail_IsOptionalAndDisabledByDefault()
     {
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
@@ -420,7 +493,10 @@ public class TouchEffectResourceTests
         string renderTrail = html[renderTrailStart..renderTrailEnd].Replace("\r\n", "\n", StringComparison.Ordinal);
         Assert.Contains(
             "const stabilizedPoints = curveDrawEnabled\n" +
-            "                            ? simplifyCurveTrailPath(sourcePoints)\n" +
+            "                            ? simplifyCurveTrailPath(simplifyTrailPath(\n" +
+            "                                sourcePoints,\n" +
+            "                                Math.max(renderSegmentPx, jitterTolerancePx * TRAIL_CURVE_FIT_TOLERANCE_RATIO)\n" +
+            "                            ))\n" +
             "                            : simplifyTrailPath(sourcePoints, jitterTolerancePx);",
             renderTrail,
             StringComparison.Ordinal);
@@ -434,7 +510,7 @@ public class TouchEffectResourceTests
         Assert.Contains("sourcePoints.cutoffBorn", renderTrail, StringComparison.Ordinal);
         Assert.Contains(": sampledPoints;", renderTrail, StringComparison.Ordinal);
         Assert.Equal(1, CountOccurrences(renderTrail, "simplifyCurveTrailPath("));
-        Assert.Equal(1, CountOccurrences(renderTrail, "simplifyTrailPath("));
+        Assert.Equal(2, CountOccurrences(renderTrail, "simplifyTrailPath("));
         Assert.Equal(1, CountOccurrences(renderTrail, "curveTrailPath("));
         Assert.Equal(1, CountOccurrences(renderTrail, "clipTrailPathToCutoff("));
         Assert.Equal(1, CountOccurrences(renderTrail, "smoothTrailPath("));
@@ -458,7 +534,7 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
-    public void CurveTrail_InputSamplingCommitsEveryAcceptedPointerEndpoint()
+    public void CurveTrail_InputSamplingKeepsLiveTipButFiltersSubSpacingAnchors()
     {
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
         int emitStart = html.IndexOf("emitTrailTo(x, y, time) {", StringComparison.Ordinal);
@@ -466,11 +542,16 @@ public class TouchEffectResourceTests
 
         Assert.True(emitStart >= 0 && emitEnd > emitStart, "Trail input sampler is missing.");
         string emitTrailTo = html[emitStart..emitEnd].Replace("\r\n", "\n", StringComparison.Ordinal);
-        Assert.Contains("if (!this.applyCurveDraw && distance < spacing) return;", emitTrailTo, StringComparison.Ordinal);
-        Assert.DoesNotContain("if (distance < spacing) return;", emitTrailTo, StringComparison.Ordinal);
+        int liveTipUpdate = emitTrailTo.IndexOf("this.trailTip = { x, y, born: time, strokeId: this.strokeId };", StringComparison.Ordinal);
+        int spacingFilter = emitTrailTo.IndexOf("if (distance < spacing) return;", StringComparison.Ordinal);
+        int appendPoint = emitTrailTo.IndexOf("this.appendTrail(point.x, point.y, point.time, this.strokeId);", StringComparison.Ordinal);
+        Assert.True(liveTipUpdate >= 0, "Sub-spacing input must still update the visible live tip.");
+        Assert.True(spacingFilter > liveTipUpdate, "Spatial filtering must run after the visible tip is updated.");
+        Assert.True(appendPoint > spacingFilter, "Filtered samples must not become curve control anchors.");
+        Assert.DoesNotContain("if (!this.applyCurveDraw && distance < spacing) return;", emitTrailTo, StringComparison.Ordinal);
         Assert.Contains(
             "const count = this.applyCurveDraw\n" +
-            "                        ? Math.max(1, Math.ceil(distance / spacing))\n" +
+            "                        ? Math.max(1, Math.floor(distance / spacing))\n" +
             "                        : Math.floor(distance / spacing);",
             emitTrailTo,
             StringComparison.Ordinal);
@@ -481,7 +562,6 @@ public class TouchEffectResourceTests
             "                            : clamp(index * spacing / distance, 0, 1);",
             emitTrailTo,
             StringComparison.Ordinal);
-        Assert.Contains("this.appendTrail(point.x, point.y, point.time, this.strokeId);", emitTrailTo, StringComparison.Ordinal);
         Assert.Contains("this.trailEmit = point;", emitTrailTo, StringComparison.Ordinal);
     }
 
@@ -508,7 +588,10 @@ public class TouchEffectResourceTests
         Assert.Contains("const candidateX = (3 * a1.x - 4 * a0.x + previous.x) * 0.5", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("const candidateY = (3 * a1.y - 4 * a0.y + previous.y) * 0.5", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("candidateLength >= segmentLength * 0.25 && forwardProjection > 0", curveTrailPath, StringComparison.Ordinal);
-        Assert.Contains("Math.min(candidateLength, segmentLength * 2) / candidateLength", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("Math.min(candidateLength, segmentLength) / candidateLength", curveTrailPath, StringComparison.Ordinal);
+        Assert.DoesNotContain("segmentLength * 2", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("tangent0x * TRAIL_CURVE_TANGENT_SCALE / 3", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("tangent1x * TRAIL_CURVE_TANGENT_SCALE / 3", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("const vectorTurn = (ax, ay, bx, by) =>", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("const sampleCubic = (", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("const controlPolygonLength =", curveTrailPath, StringComparison.Ordinal);

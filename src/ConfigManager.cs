@@ -17,7 +17,6 @@ namespace BASpark
         TrailAnimationSpeed = 1 << 5,
         ClickAnimationSpeed = 1 << 6,
         TrailThickness = 1 << 7,
-        TrailDelay = 1 << 8,
         GlowIntensity = 1 << 9,
         CurveDraw = 1 << 10
     }
@@ -71,10 +70,8 @@ namespace BASpark
         private const string RegPath = @"Software\BASpark";
         private const int CurrentVisualSettingsSchemaVersion = 1;
         private const string VisualSettingsSchemaVersionValueName = "VisualSettingsSchemaVersion";
-        private const string TrailDelayMultiplierValueName = "TrailDelayMultiplier";
 
         public const string DefaultParticleColor = "95,197,255";
-        public const double DefaultTrailDelayMultiplier = 1.0;
 
         public static string ParticleColor { get; set; } = DefaultParticleColor;
         public static bool IsEffectEnabled { get; set; } = true;
@@ -89,7 +86,6 @@ namespace BASpark
         public static double EffectScale { get; set; } = 1.0;
         public static double TrailThickness { get; set; } = 1.0;
         public static double GlowIntensity { get; set; } = 1.0;
-        public static double TrailDelay { get; set; } = DefaultTrailDelayMultiplier;
         public static double EffectOpacity { get; set; } = 1.0;
         public static double EffectSpeed { get; set; } = 1.0;
         public static bool UseLinkedAnimationSpeed { get; set; } = true;
@@ -133,7 +129,7 @@ namespace BASpark
 
         public static void Load()
         {
-            bool shouldPersistTrailDelayMultiplier = false;
+            bool shouldPersistVisualSettingsSchemaVersion = false;
             bool shouldPersistMigratedParticleColor = false;
 
             try
@@ -162,24 +158,14 @@ namespace BASpark
                             0,
                             0,
                             int.MaxValue);
+                        shouldPersistVisualSettingsSchemaVersion =
+                            visualSettingsSchemaVersion < CurrentVisualSettingsSchemaVersion;
                         if (visualSettingsSchemaVersion < CurrentVisualSettingsSchemaVersion &&
                             string.Equals(ParticleColor, "45,175,255", StringComparison.Ordinal))
                         {
                             ParticleColor = DefaultParticleColor;
                             shouldPersistMigratedParticleColor = true;
                         }
-
-                        object? storedTrailDelayMultiplier = key.GetValue(TrailDelayMultiplierValueName, null);
-                        bool trailDelayIsMultiplier =
-                            visualSettingsSchemaVersion >= CurrentVisualSettingsSchemaVersion ||
-                            storedTrailDelayMultiplier != null;
-                        object? storedTrailDelay = storedTrailDelayMultiplier ?? key.GetValue(
-                            "TrailDelay",
-                            trailDelayIsMultiplier ? DefaultTrailDelayMultiplier : 0.10);
-                        TrailDelay = NormalizeTrailDelayMultiplier(storedTrailDelay, trailDelayIsMultiplier);
-                        shouldPersistTrailDelayMultiplier =
-                            visualSettingsSchemaVersion < CurrentVisualSettingsSchemaVersion ||
-                            storedTrailDelayMultiplier == null;
                         EffectOpacity = ReadClampedDouble(key, "EffectOpacity", 1.0, 0.1, 1.0);
                         EffectSpeed = ReadClampedDouble(key, "EffectSpeed", 1.0, 0.2, 3.0);
                         UseLinkedAnimationSpeed = ReadBool(key, "UseLinkedAnimationSpeed", true);
@@ -263,9 +249,9 @@ namespace BASpark
 
                 bool canFinalizeVisualSettingsMigration =
                     !shouldPersistMigratedParticleColor || Save("ParticleColor", ParticleColor);
-                if (shouldPersistTrailDelayMultiplier && canFinalizeVisualSettingsMigration)
+                if (shouldPersistVisualSettingsSchemaVersion && canFinalizeVisualSettingsMigration)
                 {
-                    Save("TrailDelay", TrailDelay);
+                    Save(VisualSettingsSchemaVersionValueName, CurrentVisualSettingsSchemaVersion);
                 }
             }
             catch (Exception ex)
@@ -348,16 +334,6 @@ namespace BASpark
                 result = 0;
                 return false;
             }
-        }
-
-        private static double NormalizeTrailDelayMultiplier(object? value, bool storedAsMultiplier)
-        {
-            double fallback = storedAsMultiplier ? DefaultTrailDelayMultiplier : 0.10;
-            double storedValue = TryReadDouble(value, out double parsed) && double.IsFinite(parsed)
-                ? parsed
-                : fallback;
-            double multiplier = storedAsMultiplier ? storedValue : storedValue / 0.10;
-            return Math.Round(Math.Clamp(multiplier, 0.0, 2.0), 2);
         }
 
         public static PanelScrollbarVisibility ParseScrollbarVisibility(string? raw)
@@ -558,11 +534,6 @@ namespace BASpark
                 Save("ApplyCurveDraw", false);
             }
 
-            if (flags.HasFlag(VisualAppearanceResetFlags.TrailDelay))
-            {
-                Save("TrailDelay", DefaultTrailDelayMultiplier);
-            }
-
             if (flags.HasFlag(VisualAppearanceResetFlags.UnifiedAnimationSpeed))
             {
                 Save("UseLinkedAnimationSpeed", true);
@@ -607,19 +578,6 @@ namespace BASpark
                     }
 
                     object valueToSave = value;
-                    if (string.Equals(name, "TrailDelay", StringComparison.Ordinal))
-                    {
-                        valueToSave = NormalizeTrailDelayMultiplier(value, storedAsMultiplier: true);
-
-                        // The dedicated value is self-identifying. Write it before the schema marker so
-                        // an interrupted migration can never apply the legacy seconds conversion twice.
-                        key.SetValue(TrailDelayMultiplierValueName, ToRegistryValue(valueToSave));
-                        key.SetValue(
-                            VisualSettingsSchemaVersionValueName,
-                            CurrentVisualSettingsSchemaVersion,
-                            RegistryValueKind.DWord);
-                    }
-
                     key.SetValue(name, ToRegistryValue(valueToSave));
 
                     var prop = _propertyCache.GetOrAdd(name, n => typeof(ConfigManager).GetProperty(n));
@@ -927,7 +885,6 @@ namespace BASpark
                     EffectScale = 1.0;
                     TrailThickness = 1.0;
                     GlowIntensity = 1.0;
-                    TrailDelay = DefaultTrailDelayMultiplier;
                     EffectOpacity = 1.0;
                     EffectSpeed = 1.0;
                     UseLinkedAnimationSpeed = true;

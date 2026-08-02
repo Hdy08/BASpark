@@ -7,6 +7,8 @@ public class CurveTrailGeometryTests
     private const double CurveMaxControlTurnRadians = Math.PI / 60;
     private const double CurveFlatnessRatio = 0.05;
     private const int CurveMaxSubdivisionDepth = 12;
+    private const double CurveFitTolerancePx = 1.0125;
+    private const double CurveTangentScale = 0.75;
 
     [Fact]
     public void CentripetalCurve_RemainsDenseAndRoundedAcrossRapidTurns()
@@ -123,8 +125,8 @@ public class CurveTrailGeometryTests
             new(100, 1.5, 66.7)
         ];
 
-        Assert.Equal(3, SimplifyCurveTrailPath(lowTip).Count);
-        Assert.Equal(3, SimplifyCurveTrailPath(highTip).Count);
+        Assert.Equal(3, StabilizeCurveTrailPath(lowTip).Count);
+        Assert.Equal(3, StabilizeCurveTrailPath(highTip).Count);
     }
 
     [Fact]
@@ -145,15 +147,100 @@ public class CurveTrailGeometryTests
     }
 
     [Fact]
-    public void CurveInputSampling_CommitsMotionShorterThanVertexSpacing()
+    public void CurveInputSampling_LeavesSubSpacingMotionToTheLiveTip()
     {
         IReadOnlyList<TrailPoint> points = SampleAcceptedCurveInput(
             new(20, 30, 10),
             new(22, 31, 20),
             5.4);
 
+        Assert.Empty(points);
+    }
+
+    [Fact]
+    public void CurveInputSampling_DoesNotSplitBarelyAcceptedMotionIntoShortAnchors()
+    {
+        TrailPoint target = new(5.5, 0.2, 20);
+
+        IReadOnlyList<TrailPoint> points = SampleAcceptedCurveInput(
+            new(0, 0, 10),
+            target,
+            5.4);
+
         Assert.Single(points);
-        Assert.Equal(new TrailPoint(22, 31, 20), points[0]);
+        Assert.Equal(target, points[0]);
+    }
+
+    [Fact]
+    public void SpatialSimplification_RemovesCollinearDiagonalAnchors()
+    {
+        TrailPoint[] source =
+        [
+            new(0, 0, 0),
+            new(5.4, 1, 10),
+            new(10.8, 2, 20)
+        ];
+
+        IReadOnlyList<TrailPoint> simplified = SimplifyTrailPath(source, CurveFitTolerancePx);
+
+        Assert.Equal([source[0], source[^1]], simplified);
+    }
+
+    [Fact]
+    public void CurveFit_SuppressesSlowQuantizedStraightLineWaves()
+    {
+        var source = new List<TrailPoint>();
+        for (int index = 0; index <= 24; index++)
+        {
+            double x = index * 5.4;
+            source.Add(new(x, Math.Round(x * 0.2), index * 16.7));
+        }
+
+        List<TrailPoint> stabilized = SimplifyCurveTrailPath(
+            SimplifyTrailPath(source, CurveFitTolerancePx));
+        IReadOnlyList<TrailPoint> sampled = CurveTrailPath(stabilized, RenderSegmentPx);
+
+        Assert.InRange(stabilized.Count, 2, 3);
+        Assert.True(
+            MaxDistanceFromChord(sampled) <= CurveFitTolerancePx,
+            "Quantized slow input was amplified into a visible wave.");
+    }
+
+    [Fact]
+    public void CurveFit_SuppressesAlternatingLowSpeedPointerNoise()
+    {
+        var source = new List<TrailPoint>();
+        for (int index = 0; index <= 24; index++)
+        {
+            double y = index == 0 || index == 24 ? 0 : (index % 2 == 0 ? -0.45 : 0.45);
+            source.Add(new(index * 5.4, y, index * 16.7));
+        }
+
+        List<TrailPoint> stabilized = StabilizeCurveTrailPath(source);
+        IReadOnlyList<TrailPoint> sampled = CurveTrailPath(stabilized, RenderSegmentPx);
+
+        Assert.Equal(2, stabilized.Count);
+        Assert.True(
+            MaxDistanceFromChord(sampled) < 0.0001,
+            "Alternating low-speed noise survived as a fitted wave.");
+    }
+
+    [Fact]
+    public void CurveFit_RoundsRapidTurnWithoutExcessiveOvershoot()
+    {
+        TrailPoint[] source =
+        [
+            new(0, 0, 0),
+            new(100, 0, 33.3),
+            new(100, 100, 66.7)
+        ];
+
+        IReadOnlyList<TrailPoint> sampled = CurveTrailPath(source, RenderSegmentPx);
+
+        Assert.True(
+            MaxDistanceOutsideBounds(sampled, source) <= 8,
+            "The fitted corner expanded too far outside the pointer path.");
+        Assert.True(MaxTurnDegrees(sampled) < 6, "The moderated curve became visibly angular.");
     }
 
     [Fact]
@@ -217,7 +304,7 @@ public class CurveTrailGeometryTests
             Assert.True(actual.Count >= 2, $"The curve vanished early at cutoff {cutoffBorn:F1}.");
             if (cutoffBorn == firstCutoffBorn)
             {
-                Assert.True(MaxDistanceFromChord(actual) > 5, "The retained final curve became visually straight.");
+                Assert.True(MaxDistanceFromChord(actual) > 4, "The retained final curve became visually straight.");
             }
         }
 
@@ -361,7 +448,12 @@ public class CurveTrailGeometryTests
     private static List<TrailPoint> SampleAcceptedCurveInput(TrailPoint origin, TrailPoint target, double spacing)
     {
         double distance = Distance(origin, target);
-        int count = Math.Max(1, (int)Math.Ceiling(distance / spacing));
+        if (distance < spacing)
+        {
+            return [];
+        }
+
+        int count = Math.Max(1, (int)Math.Floor(distance / spacing));
         var result = new List<TrailPoint>(count);
         for (int index = 1; index <= count; index++)
         {
@@ -374,6 +466,50 @@ public class CurveTrailGeometryTests
 
         return result;
     }
+
+    private static List<TrailPoint> SimplifyTrailPath(
+        IReadOnlyList<TrailPoint> source,
+        double tolerancePx)
+    {
+        if (source.Count < 3 || tolerancePx <= 0)
+        {
+            return [.. source];
+        }
+
+        double toleranceSquared = tolerancePx * tolerancePx;
+        var simplified = new List<TrailPoint> { source[0] };
+        for (int index = 1; index < source.Count - 1; index++)
+        {
+            TrailPoint first = simplified[^1];
+            TrailPoint point = source[index];
+            TrailPoint last = source[index + 1];
+            double dx = last.X - first.X;
+            double dy = last.Y - first.Y;
+            double lengthSquared = dx * dx + dy * dy;
+            if (lengthSquared <= 0.000001)
+            {
+                simplified.Add(point);
+                continue;
+            }
+
+            double offsetX = point.X - first.X;
+            double offsetY = point.Y - first.Y;
+            double projection = offsetX * dx + offsetY * dy;
+            double cross = Math.Abs(dx * offsetY - offsetX * dy);
+            double distanceSquared = cross * cross / lengthSquared;
+            bool liesBetweenNeighbors = projection >= 0 && projection <= lengthSquared;
+            if (!liesBetweenNeighbors || distanceSquared > toleranceSquared)
+            {
+                simplified.Add(point);
+            }
+        }
+
+        simplified.Add(source[^1]);
+        return simplified;
+    }
+
+    private static List<TrailPoint> StabilizeCurveTrailPath(IReadOnlyList<TrailPoint> source) =>
+        SimplifyCurveTrailPath(SimplifyTrailPath(source, CurveFitTolerancePx));
 
     private static List<TrailPoint> CurveTrailPath(IReadOnlyList<TrailPoint> source, double renderSegmentPx)
     {
@@ -522,17 +658,17 @@ public class CurveTrailGeometryTests
                     ) / Math.Max(0.0001, segmentLength);
                     if (candidateLength >= segmentLength * 0.25 && forwardProjection > 0)
                     {
-                        double tangentScale = Math.Min(candidateLength, segmentLength * 2) / candidateLength;
+                        double tangentScale = Math.Min(candidateLength, segmentLength) / candidateLength;
                         tangent1X = candidateX * tangentScale;
                         tangent1Y = candidateY * tangentScale;
                     }
                 }
             }
 
-            double cp1X = a0.X + tangent0X / 3;
-            double cp1Y = a0.Y + tangent0Y / 3;
-            double cp2X = a1.X - tangent1X / 3;
-            double cp2Y = a1.Y - tangent1Y / 3;
+            double cp1X = a0.X + tangent0X * CurveTangentScale / 3;
+            double cp1Y = a0.Y + tangent0Y * CurveTangentScale / 3;
+            double cp2X = a1.X - tangent1X * CurveTangentScale / 3;
+            double cp2Y = a1.Y - tangent1Y * CurveTangentScale / 3;
             SampleCubic(
                 a0,
                 a1,
