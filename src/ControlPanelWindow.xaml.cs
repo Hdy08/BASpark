@@ -1145,19 +1145,21 @@ namespace BASpark
 
         private void PickColor_Click(object sender, RoutedEventArgs e)
         {
-            using var dialog = new System.Windows.Forms.ColorDialog();
-            dialog.FullOpen = true;
-            try
+            if (!ColorPickerColorMath.TryParseRgb(
+                ConfigManager.ParticleColor,
+                out System.Windows.Media.Color initialColor))
             {
-                var parts = ConfigManager.ParticleColor.Split(',');
-                dialog.Color = System.Drawing.Color.FromArgb(
-                    byte.Parse(parts[0]), byte.Parse(parts[1]), byte.Parse(parts[2]));
+                _ = ColorPickerColorMath.TryParseRgb(ConfigManager.DefaultParticleColor, out initialColor);
             }
-            catch { /* ignore: fallback to default color */ }
 
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            var dialog = new ColorPickerWindow(initialColor)
             {
-                string newColor = $"{dialog.Color.R},{dialog.Color.G},{dialog.Color.B}";
+                Owner = this
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                string newColor = ColorPickerColorMath.ToRgbString(dialog.SelectedColor);
                 ConfigManager.ParticleColor = newColor;
                 UpdateColorPreview(newColor);
             }
@@ -1165,22 +1167,13 @@ namespace BASpark
 
         private void UpdateColorPreview(string rgbString)
         {
-            try
+            if (ColorPickerColorMath.TryParseRgb(rgbString, out System.Windows.Media.Color color))
             {
-                var parts = rgbString.Split(',');
-                if (parts.Length == 3)
-                {
-                    byte r = byte.Parse(parts[0].Trim());
-                    byte g = byte.Parse(parts[1].Trim());
-                    byte b = byte.Parse(parts[2].Trim());
-                    ColorPreview.Background = new System.Windows.Media.SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(r, g, b));
-                }
+                ColorPreview.Background = new System.Windows.Media.SolidColorBrush(color);
+                return;
             }
-            catch
-            {
-                ColorPreview.Background = System.Windows.Media.Brushes.Gray;
-            }
+
+            ColorPreview.Background = System.Windows.Media.Brushes.Gray;
         }
 
         private void OpenLink_Click(object sender, RoutedEventArgs e)

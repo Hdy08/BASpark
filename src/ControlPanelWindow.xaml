@@ -35,6 +35,8 @@
         <SolidColorBrush x:Key="ThemeNoticeTitleBrush" Color="#1976D2"/>
         <SolidColorBrush x:Key="ThemeNoticeTextBrush" Color="#424242"/>
         <SolidColorBrush x:Key="ThemeNoticeDateBrush" Color="#90CAF9"/>
+        <SolidColorBrush x:Key="ThemeNoticeIconBrush" Color="#1976D2"/>
+        <SolidColorBrush x:Key="ThemeWarningIconBrush" Color="#CC0000"/>
         <SolidColorBrush x:Key="ThemeStatsBackgroundBrush" Color="#EBF5FF"/>
         <SolidColorBrush x:Key="ThemeScrollbarThumbBrush" Color="#B8C4CE"/>
         <SolidColorBrush x:Key="ThemeToggleOffBrush" Color="#DDDDDD"/>
@@ -224,6 +226,36 @@
             <Setter Property="Template" Value="{StaticResource DarkSecondaryActionButtonTemplate}"/>
         </Style>
         <Style x:Key="SecondaryActionButton" TargetType="Button" BasedOn="{StaticResource LightSecondaryActionButton}"/>
+        <ControlTemplate x:Key="DarkPrimaryActionButtonTemplate" TargetType="Button">
+            <Border x:Name="Border"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    SnapsToDevicePixels="True">
+                <ContentPresenter
+                    Margin="{TemplateBinding Padding}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    RecognizesAccessKey="True"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                    <Setter TargetName="Border" Property="Opacity" Value="0.85"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Border" Property="Opacity" Value="0.6"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+        <Style x:Key="LightPrimaryActionButton" TargetType="Button"/>
+        <Style x:Key="DarkPrimaryActionButton" TargetType="Button">
+            <Setter Property="Template" Value="{StaticResource DarkPrimaryActionButtonTemplate}"/>
+        </Style>
+        <Style x:Key="PrimaryActionButton" TargetType="Button" BasedOn="{StaticResource LightPrimaryActionButton}"/>
         <Style x:Key="LightDangerActionButton" TargetType="Button"/>
         <Style x:Key="DarkDangerActionButton" TargetType="Button" BasedOn="{StaticResource DarkSecondaryActionButton}">
             <Setter Property="Background" Value="{DynamicResource ThemeDangerButtonBackgroundBrush}"/>
@@ -517,7 +549,7 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="📢" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Top"/>
+                            <TextBlock x:Name="NoticeIcon" Text="&#xE789;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource ThemeNoticeIconBrush}" Margin="0,0,10,0" VerticalAlignment="Top"/>
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="NoticeTitle" Text="加载中..." FontWeight="Bold" Foreground="{DynamicResource ThemeNoticeTitleBrush}" FontSize="14"/>
                                 <TextBlock x:Name="NoticeContent" Text="..." Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource ThemeNoticeTextBrush}" FontSize="13" LineHeight="18"/>
@@ -561,14 +593,14 @@
 
                     <Border Background="{DynamicResource ThemeDangerButtonBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,0,20" BorderBrush="{DynamicResource ThemeDangerButtonBorderBrush}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⚠️" Margin="0,0,8,0" VerticalAlignment="Top"/>
+                            <TextBlock x:Name="SecurityWarningIcon" Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource ThemeWarningIconBrush}" Margin="0,0,8,0" VerticalAlignment="Top"/>
                             <TextBlock x:Name="TxtSecurityWarning" Text="安全提示：请务必确保从官方渠道下载。第三方分发渠道的版本可能存在报毒风险或恶意篡改。" Foreground="{DynamicResource ThemeDangerButtonForegroundBrush}" FontSize="12" TextWrapping="Wrap" MaxWidth="380"/>
                         </StackPanel>
                     </Border>
 
                     <TextBlock x:Name="TxtAboutSupport" Text="如果你喜欢本应用，欢迎支持开发者持续维护 ☕" Foreground="#45AFFF" Margin="0,0,0,25"/>
                     
-                    <Button x:Name="BtnOfficialSite" Click="OpenLink_Click" Width="220" Height="38" Background="#45AFFF" Foreground="White" BorderThickness="0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,0,0,10"/>
+                    <Button x:Name="BtnOfficialSite" Click="OpenLink_Click" Width="220" Height="38" Background="#45AFFF" Foreground="White" BorderThickness="0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,0,0,10" Style="{DynamicResource PrimaryActionButton}"/>
                     <Button x:Name="BtnGithub" Tag="https://github.com/DoomVoss/BASpark" Click="OpenLink_Click" Width="220" Height="38" Background="#333" Foreground="White" BorderThickness="0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,0,0,10"/>
                     <Button x:Name="BtnBilibili" Tag="https://space.bilibili.com/3493116084488813" Click="OpenLink_Click" Width="220" Height="38" Background="#FB7299" Foreground="White" BorderThickness="0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,0,0,10"/>
                     <Button x:Name="BtnQQ" Tag="https://qm.qq.com/q/lgvVto3yPm" Click="OpenLink_Click" Width="220" Height="38" Background="#12B7F5" Foreground="White" BorderThickness="0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,0,0,10"/>
@@ -617,7 +649,7 @@
                                 <TextBlock x:Name="TxtSettingsTitle" Text="参数配置" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource ThemePrimaryTextBrush}"/>
                                 <TextBlock x:Name="TxtSettingsHint" Text="*修改设置后，请点击右侧 [应用更改] 按钮生效。" FontSize="11" Foreground="#FF6B6B" FontWeight="SemiBold" Margin="0,4,0,0" Opacity="0.9"/>
                             </StackPanel>
-                            <Button x:Name="BtnApplySettings" Grid.Column="1" Content="应用更改" Click="SaveSettings_Click" Width="120" Height="36" Background="#45AFFF" Foreground="White" BorderThickness="0" Cursor="Hand" FontWeight="Bold" FontSize="14">
+                            <Button x:Name="BtnApplySettings" Grid.Column="1" Content="应用更改" Click="SaveSettings_Click" Width="120" Height="36" Background="#45AFFF" Foreground="White" BorderThickness="0" Cursor="Hand" FontWeight="Bold" FontSize="14" Style="{DynamicResource PrimaryActionButton}">
                                 <Button.Resources>
                                     <Style TargetType="Border">
                                         <Setter Property="CornerRadius" Value="18"/>
@@ -998,7 +1030,7 @@
                                                         <TextBox x:Name="ManualProcessInput" Height="30" VerticalContentAlignment="Center" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Padding="5,0">
                                                             <TextBox.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></TextBox.Resources>
                                                         </TextBox>
-                                                        <Button x:Name="BtnAddProcess" Grid.Column="1" Content="添加" Margin="5,0,0,0" Padding="12,0" Height="30" Click="AddManualProcess_Click" Background="#45AFFF" Foreground="White">
+                                                        <Button x:Name="BtnAddProcess" Grid.Column="1" Content="添加" Margin="5,0,0,0" Padding="12,0" Height="30" Click="AddManualProcess_Click" Background="#45AFFF" Foreground="White" Style="{DynamicResource PrimaryActionButton}">
                                                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                                                         </Button>
                                                         <Button x:Name="BtnBrowseProcess" Grid.Column="2" Content="浏览..." Margin="5,0,0,0" Padding="12,0" Height="30" Click="BrowseProcess_Click" Background="{DynamicResource ThemeButtonBackgroundBrush}" Style="{DynamicResource SecondaryActionButton}">
@@ -1134,7 +1166,10 @@
                         <TextBlock Text="🔍" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="8,0,0,0" Foreground="{DynamicResource ThemeMutedTextBrush}" IsHitTestVisible="False"/>
                     </Grid>
 
-                    <ListBox Name="ListRunningProcesses" Grid.Row="2" Background="{DynamicResource ThemeListBackgroundBrush}" BorderBrush="{DynamicResource ThemeListBorderBrush}" BorderThickness="1">
+                    <ListBox Name="ListRunningProcesses" Grid.Row="2" Background="{DynamicResource ThemeListBackgroundBrush}" BorderBrush="{DynamicResource ThemeListBorderBrush}" BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.Resources>
+                            <Style TargetType="ScrollBar" BasedOn="{StaticResource ThinScrollBar}"/>
+                        </ListBox.Resources>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <CheckBox IsChecked="{Binding IsSelected}" Margin="2,4" VerticalContentAlignment="Center">
@@ -1151,7 +1186,7 @@
                         <Button x:Name="BtnOverlayCancel" Content="取消" Click="CloseRunningProcessOverlay_Click" Width="80" Height="32" Background="{DynamicResource ThemeButtonBackgroundBrush}" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Margin="0,0,10,0" Style="{DynamicResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
-                        <Button x:Name="BtnOverlayConfirmAdd" Content="确认添加" Click="ConfirmAddRunningProcesses_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0">
+                        <Button x:Name="BtnOverlayConfirmAdd" Content="确认添加" Click="ConfirmAddRunningProcesses_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0" Style="{DynamicResource PrimaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
                     </StackPanel>
@@ -1179,7 +1214,10 @@
                         <TextBlock Text="🔍" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="8,0,0,0" Foreground="{DynamicResource ThemeMutedTextBrush}" IsHitTestVisible="False"/>
                     </Grid>
 
-                    <ListBox Name="ListVisualResetItems" Grid.Row="2" Background="{DynamicResource ThemeListBackgroundBrush}" BorderBrush="{DynamicResource ThemeListBorderBrush}" BorderThickness="1">
+                    <ListBox Name="ListVisualResetItems" Grid.Row="2" Background="{DynamicResource ThemeListBackgroundBrush}" BorderBrush="{DynamicResource ThemeListBorderBrush}" BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.Resources>
+                            <Style TargetType="ScrollBar" BasedOn="{StaticResource ThinScrollBar}"/>
+                        </ListBox.Resources>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <CheckBox IsChecked="{Binding IsSelected}" Margin="2,4" VerticalContentAlignment="Center">
@@ -1196,7 +1234,7 @@
                         <Button x:Name="BtnOverlayVisualCancel" Content="取消" Click="CloseVisualResetOverlay_Click" Width="80" Height="32" Background="{DynamicResource ThemeButtonBackgroundBrush}" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Margin="0,0,10,0" Style="{DynamicResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
-                        <Button x:Name="BtnOverlayVisualConfirm" Content="确认重置" Click="ConfirmVisualReset_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0">
+                        <Button x:Name="BtnOverlayVisualConfirm" Content="确认重置" Click="ConfirmVisualReset_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0" Style="{DynamicResource PrimaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
                     </StackPanel>
@@ -1216,7 +1254,7 @@
                         <Button x:Name="BtnOverlayRenameCancel" Content="取消" Click="CloseRenameOverlay_Click" Width="80" Height="32" Background="{DynamicResource ThemeButtonBackgroundBrush}" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" Margin="0,0,10,0" Style="{DynamicResource SecondaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
-                        <Button x:Name="BtnOverlayRenameConfirm" Content="确认修改" Click="ConfirmRenameProfile_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0">
+                        <Button x:Name="BtnOverlayRenameConfirm" Content="确认修改" Click="ConfirmRenameProfile_Click" Width="100" Height="32" Background="#45AFFF" Foreground="White" BorderThickness="0" Style="{DynamicResource PrimaryActionButton}">
                             <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                         </Button>
                     </StackPanel>

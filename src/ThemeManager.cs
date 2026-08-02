@@ -56,6 +56,8 @@ namespace BASpark
             ("ThemeNoticeTitleBrush", "#1976D2", "#6DB8FF"),
             ("ThemeNoticeTextBrush", "#424242", "#E7EDF4"),
             ("ThemeNoticeDateBrush", "#90CAF9", "#8FB9D8"),
+            ("ThemeNoticeIconBrush", "#1976D2", "#E7EDF4"),
+            ("ThemeWarningIconBrush", "#CC0000", "#E7EDF4"),
             ("ThemeStatsBackgroundBrush", "#EBF5FF", "#202731"),
             ("ThemeScrollbarThumbBrush", "#B8C4CE", "#5A6A7F"),
             ("ThemeToggleOffBrush", "#DDDDDD", "#52606D"),
@@ -124,6 +126,7 @@ namespace BASpark
         ];
         private static readonly (object ActiveKey, string LightKey, string DarkKey)[] NamedThemeStyleEntries =
         [
+            ("PrimaryActionButton", "LightPrimaryActionButton", "DarkPrimaryActionButton"),
             ("SecondaryActionButton", "LightSecondaryActionButton", "DarkSecondaryActionButton"),
             ("DangerActionButton", "LightDangerActionButton", "DarkDangerActionButton"),
         ];
