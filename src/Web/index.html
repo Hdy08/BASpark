@@ -809,6 +809,16 @@
                 return linear;
             }
 
+            function advanceTrailRetraction(retraction, now, speed) {
+                const currentTime = Math.max(retraction.lastAdvancedAt, now);
+                const advanceFrom = Math.max(retraction.lastAdvancedAt, retraction.retractAfter);
+                if (currentTime > advanceFrom) {
+                    retraction.cutoffBorn += (currentTime - advanceFrom) * speed;
+                }
+                retraction.lastAdvancedAt = currentTime;
+                return retraction.cutoffBorn;
+            }
+
             class TouchEngine {
                 constructor() {
                     this.width = 1;
@@ -927,6 +937,12 @@
                 beginStroke(x, y, time) {
                     if (this.trailTip) this.endTrailStroke(time);
                     this.strokeId++;
+                    this.trailRetractions.set(this.strokeId, {
+                        cutoffBorn: time,
+                        lastAdvancedAt: time,
+                        retractAfter: time + this.trailRetentionMs(),
+                        ended: false
+                    });
                     this.appendTrail(x, y, time, this.strokeId);
                     this.trailEmit = { x, y, time };
                     this.trailTip = { x, y, born: time, strokeId: this.strokeId };
@@ -949,24 +965,29 @@
                 endTrailStroke(time) {
                     this.commitTrailTip();
                     const tip = this.trailTip;
-                    if (!tip || this.trailRetractions.has(tip.strokeId)) return;
+                    const retraction = tip && this.trailRetractions.get(tip.strokeId);
+                    if (!retraction || retraction.ended) return;
 
-                    const retentionMs = this.trailRetentionMs();
-                    const cutoffAtRelease = this.trailCutoff(tip.strokeId, time);
-                    this.trailRetractions.set(tip.strokeId, {
-                        releasedAt: time,
-                        cutoffAtRelease,
-                        retentionMs
-                    });
+                    this.trailCutoff(tip.strokeId, time);
+                    retraction.ended = true;
                 }
 
                 trailCutoff(strokeId, now) {
                     const retraction = this.trailRetractions.get(strokeId);
-                    if (!retraction) return now - this.trailRetentionMs() / this.trailSpeed;
+                    if (!retraction) return now;
+                    return advanceTrailRetraction(retraction, now, this.trailSpeed);
+                }
 
-                    // Preserve the sampled history first, then advance its removal boundary independently.
-                    return retraction.cutoffAtRelease +
-                        Math.max(0, now - retraction.releasedAt) * this.trailSpeed;
+                syncTrailRetractions(time) {
+                    for (const retraction of this.trailRetractions.values()) {
+                        advanceTrailRetraction(retraction, time, this.trailSpeed);
+                    }
+                }
+
+                setTrailSpeed(speed, time = this.now()) {
+                    if (speed === this.trailSpeed) return;
+                    this.syncTrailRetractions(time);
+                    this.trailSpeed = speed;
                 }
 
                 appendTrail(x, y, born, strokeId) {
@@ -1098,34 +1119,38 @@
                     }
                     this.distanceParticles.length = particleWriteIndex;
 
-                    if (this.trailRetentionMs() <= 0) {
-                        this.trail.length = 0;
-                        this.trailRetractions.clear();
-                    } else {
-                        let readIndex = 0;
-                        let writeIndex = 0;
-                        while (readIndex < this.trail.length) {
-                            const strokeStart = readIndex;
-                            const strokeId = this.trail[strokeStart].strokeId;
-                            while (readIndex < this.trail.length && this.trail[readIndex].strokeId === strokeId) {
-                                readIndex++;
-                            }
-                            const cutoff = this.trailCutoff(strokeId, now);
-                            let firstAlive = strokeStart;
-                            while (firstAlive < readIndex && this.trail[firstAlive].born < cutoff) {
-                                firstAlive++;
-                            }
-                            if (firstAlive === readIndex) {
-                                this.trailRetractions.delete(strokeId);
-                                continue;
-                            }
-                            const historyPointCount = this.applyCurveDraw ? 2 : 1;
-                            const copyStart = Math.max(strokeStart, firstAlive - historyPointCount);
-                            for (let index = copyStart; index < readIndex; index++) {
-                                this.trail[writeIndex++] = this.trail[index];
-                            }
+                    let readIndex = 0;
+                    let writeIndex = 0;
+                    const retainedStrokeIds = new Set();
+                    while (readIndex < this.trail.length) {
+                        const strokeStart = readIndex;
+                        const strokeId = this.trail[strokeStart].strokeId;
+                        while (readIndex < this.trail.length && this.trail[readIndex].strokeId === strokeId) {
+                            readIndex++;
                         }
-                        this.trail.length = writeIndex;
+                        const cutoff = this.trailCutoff(strokeId, now);
+                        let firstAlive = strokeStart;
+                        while (firstAlive < readIndex && this.trail[firstAlive].born < cutoff) {
+                            firstAlive++;
+                        }
+                        const retraction = this.trailRetractions.get(strokeId);
+                        if (firstAlive === readIndex && retraction?.ended) {
+                            this.trailRetractions.delete(strokeId);
+                            continue;
+                        }
+                        const historyPointCount = this.applyCurveDraw ? 2 : 1;
+                        const copyStart = Math.max(strokeStart, firstAlive - historyPointCount);
+                        for (let index = copyStart; index < readIndex; index++) {
+                            this.trail[writeIndex++] = this.trail[index];
+                        }
+                        retainedStrokeIds.add(strokeId);
+                    }
+                    this.trail.length = writeIndex;
+                    const activeStrokeId = this.trailTip?.strokeId;
+                    for (const [strokeId, retraction] of this.trailRetractions) {
+                        if (retraction.ended && strokeId !== activeStrokeId && !retainedStrokeIds.has(strokeId)) {
+                            this.trailRetractions.delete(strokeId);
+                        }
                     }
                 }
 
@@ -1141,7 +1166,7 @@
                 }
 
                 trailStrokes(now) {
-                    if (this.trailRetentionMs() <= 0 || this.trail.length === 0) return [];
+                    if (this.trail.length === 0) return [];
                     const result = [];
                     let readIndex = 0;
                     while (readIndex < this.trail.length) {
@@ -2581,7 +2606,7 @@
                 const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
                 engine.scale = clamp(finite(scale, 1), 0.5, 3);
                 engine.opacity = clamp(finite(opacity, 1), 0.1, 1);
-                engine.trailSpeed = clamp(finite(trailSpeed, 1), 0.2, 3);
+                engine.setTrailSpeed(clamp(finite(trailSpeed, 1), 0.2, 3), engine.now());
                 engine.clickSpeed = clamp(finite(clickSpeed, 1), 0.2, 3);
                 engine.trailThickness = clamp(finite(trailThickness, 1), 0.5, 3);
                 engine.trailRetractionDelayMultiplier = clamp(finite(trailRetractionDelayMultiplier, 1), 0, 2);

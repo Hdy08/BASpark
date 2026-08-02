@@ -165,7 +165,7 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
-    public void TrailRetractionDelayAndSpeed_ControlHeldAndReleasedStrokes()
+    public void TrailRetractionDelayAndSpeed_UseOneIndependentTimeline()
     {
         const double originalGameSimulationSpeed = 1.0;
         Assert.Equal(originalGameSimulationSpeed, ConfigManager.DefaultTrailDelayMultiplier);
@@ -175,14 +175,15 @@ public class TouchEffectResourceTests
         Assert.Contains("const fallbackAssetBase = \"Assets/\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("../../apk/", html, StringComparison.Ordinal);
         Assert.Contains("this.trailRetractionDelayMultiplier = 1", html, StringComparison.Ordinal);
-        Assert.Contains("return now - this.trailRetentionMs() / this.trailSpeed;", html, StringComparison.Ordinal);
-        Assert.Contains("const cutoffAtRelease = this.trailCutoff(tip.strokeId, time);", html, StringComparison.Ordinal);
-        Assert.Contains("cutoffAtRelease,", html, StringComparison.Ordinal);
-        Assert.Contains(
-            "Math.max(0, now - retraction.releasedAt) * this.trailSpeed",
-            html,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("cutoffAtRelease: time - retentionMs", html, StringComparison.Ordinal);
+        Assert.Contains("retractAfter: time + this.trailRetentionMs()", html, StringComparison.Ordinal);
+        Assert.Contains("retraction.cutoffBorn += (currentTime - advanceFrom) * speed;", html, StringComparison.Ordinal);
+        Assert.Contains("return advanceTrailRetraction(retraction, now, this.trailSpeed);", html, StringComparison.Ordinal);
+        Assert.Contains("this.syncTrailRetractions(time);", html, StringComparison.Ordinal);
+        Assert.Contains("retraction.ended = true;", html, StringComparison.Ordinal);
+        Assert.Contains("if (firstAlive === readIndex && retraction?.ended)", html, StringComparison.Ordinal);
+        Assert.Contains("engine.setTrailSpeed(clamp(finite(trailSpeed, 1), 0.2, 3), engine.now());", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("this.trailRetentionMs() / this.trailSpeed", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("if (this.trailRetentionMs() <= 0)", html, StringComparison.Ordinal);
     }
 
     [Fact]
