@@ -1413,6 +1413,7 @@ namespace BASpark
             VisualResetItems.Clear();
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectScale, Localization.Get("VisualReset_Scale"), Localization.Get("VisualReset_Scale_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailThickness, Localization.Get("VisualReset_TrailThickness"), Localization.Get("VisualReset_TrailThickness_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.CurveDraw, Localization.Get("VisualReset_CurveDraw"), Localization.Get("VisualReset_CurveDraw_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), Localization.Get("VisualReset_GlowIntensity_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectOpacity, Localization.Get("VisualReset_Opacity"), Localization.Get("VisualReset_Opacity_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), Localization.Get("VisualReset_UnifiedSpeed_Sub")));
@@ -1510,6 +1511,7 @@ namespace BASpark
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, trailSp, clickSp, trailThickness, trailDelay, glowIntensity);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
+            App.Overlay?.SetCurveDraw(ConfigManager.ApplyCurveDraw);
 
             VisualResetOverlay.Visibility = Visibility.Collapsed;
             System.Windows.MessageBox.Show(

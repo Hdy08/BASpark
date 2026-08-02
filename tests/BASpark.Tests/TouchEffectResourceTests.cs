@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Resources;
 using System.Security.Cryptography;
 using System.Text;
@@ -388,19 +389,42 @@ public class TouchEffectResourceTests
     public void CurveTrail_IsOptionalAndDisabledByDefault()
     {
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        int renderTrailStart = html.IndexOf("renderTrail(now) {", StringComparison.Ordinal);
+        int renderTrailEnd = html.IndexOf("renderSource(now, target", renderTrailStart, StringComparison.Ordinal);
 
         Assert.Contains("window.ApplyCurveDraw = false", html, StringComparison.Ordinal);
         Assert.Contains("this.applyCurveDraw = false", html, StringComparison.Ordinal);
-        Assert.Contains("this.engine.applyCurveDraw", html, StringComparison.Ordinal);
-        Assert.Contains("curveTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)", html, StringComparison.Ordinal);
-        Assert.Contains("smoothTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)", html, StringComparison.Ordinal);
+        Assert.True(renderTrailStart >= 0 && renderTrailEnd > renderTrailStart, "Trail renderer is missing.");
+        string renderTrail = html[renderTrailStart..renderTrailEnd].Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Contains(
+            "const points = this.engine.applyCurveDraw\n" +
+            "                            ? curveTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)\n" +
+            "                            : smoothTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory);",
+            renderTrail,
+            StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(renderTrail, "curveTrailPath("));
+        Assert.Equal(1, CountOccurrences(renderTrail, "smoothTrailPath("));
         Assert.Contains("id=\"previewCurveDraw\"", html, StringComparison.Ordinal);
         Assert.Contains("controls.curveDraw.checked = false", html, StringComparison.Ordinal);
         Assert.Contains("window.setCurveDraw(controls.curveDraw.checked)", html, StringComparison.Ordinal);
+
+        string root = FindWorkspaceRoot();
+        string configSource = File.ReadAllText(Path.Combine(root, "src", "ConfigManager.cs"), Encoding.UTF8);
+        string mainWindowSource = File.ReadAllText(Path.Combine(root, "src", "MainWindow.xaml.cs"), Encoding.UTF8);
+        string controlPanelSource = File.ReadAllText(Path.Combine(root, "src", "ControlPanelWindow.xaml.cs"), Encoding.UTF8);
+        Assert.Contains("public static bool ApplyCurveDraw { get; set; } = false;", configSource, StringComparison.Ordinal);
+        Assert.Contains("ApplyCurveDraw = ReadBool(key, \"ApplyCurveDraw\", false);", configSource, StringComparison.Ordinal);
+        Assert.Contains("CurveDraw = 1 << 10", configSource, StringComparison.Ordinal);
+        Assert.Contains("Save(\"ApplyCurveDraw\", false);", configSource, StringComparison.Ordinal);
+        Assert.Contains("SetCurveDraw(ConfigManager.ApplyCurveDraw);", mainWindowSource, StringComparison.Ordinal);
+        Assert.Contains("settingsSaved &= ConfigManager.Save(\"ApplyCurveDraw\", curveDrawEnabled);", controlPanelSource, StringComparison.Ordinal);
+        Assert.Contains("App.Overlay?.SetCurveDraw(curveDrawEnabled);", controlPanelSource, StringComparison.Ordinal);
+        Assert.Contains("VisualAppearanceResetFlags.CurveDraw", controlPanelSource, StringComparison.Ordinal);
+        Assert.Contains("App.Overlay?.SetCurveDraw(ConfigManager.ApplyCurveDraw);", controlPanelSource, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void StandalonePreview_IsSelfContainedAndStartsIdle()
+    public void StandalonePreviewBootstrap_PreservesRendererContract()
     {
         string embeddedRenderer = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
         const string bootstrapPrefix =
@@ -456,6 +480,126 @@ public class TouchEffectResourceTests
         Assert.DoesNotContain("runPreviewDemo", html, StringComparison.Ordinal);
         Assert.DoesNotContain("setInterval(", html, StringComparison.Ordinal);
         Assert.DoesNotContain("setTimeout(", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StandalonePreviewGenerator_ProducesSelfContainedIdlePreview()
+    {
+        string root = FindWorkspaceRoot();
+        string sourcePath = Path.Combine(root, "src", "Web", "index.html");
+        string scriptPath = Path.Combine(root, "scripts", "Generate-StandalonePreview.ps1");
+        string temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "BASpark.Tests",
+            Guid.NewGuid().ToString("N"));
+        string outputPath = Path.Combine(temporaryDirectory, "preview.html");
+
+        try
+        {
+            string powershellPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                "WindowsPowerShell",
+                "v1.0",
+                "powershell.exe");
+            Assert.True(File.Exists(powershellPath), $"Windows PowerShell was not found at '{powershellPath}'.");
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = powershellPath,
+                WorkingDirectory = root,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            startInfo.ArgumentList.Add("-NoLogo");
+            startInfo.ArgumentList.Add("-NoProfile");
+            startInfo.ArgumentList.Add("-NonInteractive");
+            startInfo.ArgumentList.Add("-ExecutionPolicy");
+            startInfo.ArgumentList.Add("Bypass");
+            startInfo.ArgumentList.Add("-File");
+            startInfo.ArgumentList.Add(scriptPath);
+            startInfo.ArgumentList.Add("-SourcePath");
+            startInfo.ArgumentList.Add(sourcePath);
+            startInfo.ArgumentList.Add("-OutputPath");
+            startInfo.ArgumentList.Add(outputPath);
+
+            using Process process = Assert.IsType<Process>(Process.Start(startInfo));
+            Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
+            Task<string> standardError = process.StandardError.ReadToEndAsync();
+            bool exited = false;
+            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
+            {
+                try
+                {
+                    await process.WaitForExitAsync(timeout.Token);
+                    exited = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    exited = process.HasExited;
+                    if (!exited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                        await process.WaitForExitAsync();
+                    }
+                }
+            }
+
+            string output = await standardOutput;
+            string error = await standardError;
+            Assert.True(exited, $"Standalone preview generation timed out.\n{output}\n{error}");
+            Assert.True(process.ExitCode == 0, $"Standalone preview generation failed.\n{output}\n{error}");
+            Assert.True(File.Exists(outputPath), "Standalone preview generator did not create its requested output file.");
+
+            string source = File.ReadAllText(sourcePath, Encoding.UTF8);
+            string html = File.ReadAllText(outputPath, Encoding.UTF8);
+            Assert.Contains("window.__BASPARK_STANDALONE_PREVIEW__=true", html, StringComparison.Ordinal);
+            Assert.Equal(4, CountOccurrences(html, "data:image/png;base64,"));
+            Assert.DoesNotContain("<!-- BASPARK_ASSET_BOOTSTRAP -->", html, StringComparison.Ordinal);
+            Assert.DoesNotContain(" src=", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(" href=", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("runPreviewDemo", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("setInterval(", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("setTimeout(", html, StringComparison.Ordinal);
+
+            const string bootstrapPrefix =
+                "<script>window.__BASPARK_STANDALONE_PREVIEW__=true;window.__BASPARK_ASSETS=";
+            const string bootstrapSuffix = ";</script>";
+            int bootstrapStart = html.IndexOf(bootstrapPrefix, StringComparison.Ordinal);
+            Assert.True(bootstrapStart >= 0, "Generated asset bootstrap is missing.");
+            int jsonStart = bootstrapStart + bootstrapPrefix.Length;
+            int bootstrapEnd = html.IndexOf(bootstrapSuffix, jsonStart, StringComparison.Ordinal);
+            Assert.True(bootstrapEnd > jsonStart, "Generated asset bootstrap is incomplete.");
+
+            using var generatedAssets = System.Text.Json.JsonDocument.Parse(html[jsonStart..bootstrapEnd]);
+            var expectedResources = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["circle"] = "web/assets/fx_tex_circle_01.png",
+                ["ring"] = "web/assets/fx_tex_grad_ring3.png",
+                ["trail"] = "web/assets/fx_tex_trail_03.png",
+                ["triangle"] = "web/assets/fx_tex_triangle_02_1.png"
+            };
+            Assert.Equal(expectedResources.Count, generatedAssets.RootElement.EnumerateObject().Count());
+            foreach ((string key, string resourceName) in expectedResources)
+            {
+                string dataUrl = generatedAssets.RootElement.GetProperty(key).GetString()!;
+                const string dataUrlPrefix = "data:image/png;base64,";
+                Assert.StartsWith(dataUrlPrefix, dataUrl, StringComparison.Ordinal);
+                Assert.Equal(ReadWpfResource(resourceName), Convert.FromBase64String(dataUrl[dataUrlPrefix.Length..]));
+            }
+
+            string normalized = html.Remove(bootstrapStart, bootstrapEnd + bootstrapSuffix.Length - bootstrapStart)
+                .Insert(bootstrapStart, "<!-- BASPARK_ASSET_BOOTSTRAP -->");
+            Assert.Equal(source, normalized);
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryDirectory))
+            {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
     }
 
     private static byte[] ReadWpfResource(string resourceName)

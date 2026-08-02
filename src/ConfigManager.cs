@@ -18,7 +18,8 @@ namespace BASpark
         ClickAnimationSpeed = 1 << 6,
         TrailThickness = 1 << 7,
         TrailDelay = 1 << 8,
-        GlowIntensity = 1 << 9
+        GlowIntensity = 1 << 9,
+        CurveDraw = 1 << 10
     }
 
     public enum ProcessFilterModeOption
@@ -550,6 +551,11 @@ namespace BASpark
             if (flags.HasFlag(VisualAppearanceResetFlags.GlowIntensity))
             {
                 Save("GlowIntensity", 1.0);
+            }
+
+            if (flags.HasFlag(VisualAppearanceResetFlags.CurveDraw))
+            {
+                Save("ApplyCurveDraw", false);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.TrailDelay))

@@ -571,6 +571,12 @@
     <data name="VisualReset_TrailThickness_Sub" xml:space="preserve">
       <value>默认 1.00 ×</value>
     </data>
+    <data name="VisualReset_CurveDraw" xml:space="preserve">
+      <value>曲线拖尾</value>
+    </data>
+    <data name="VisualReset_CurveDraw_Sub" xml:space="preserve">
+      <value>默认关闭</value>
+    </data>
     <data name="VisualReset_GlowIntensity" xml:space="preserve">
       <value>发光强度</value>
     </data>

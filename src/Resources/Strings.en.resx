@@ -571,6 +571,12 @@ Download now?</value>
     <data name="VisualReset_TrailThickness_Sub" xml:space="preserve">
       <value>Default 1.00 ×</value>
     </data>
+    <data name="VisualReset_CurveDraw" xml:space="preserve">
+      <value>Curved trail</value>
+    </data>
+    <data name="VisualReset_CurveDraw_Sub" xml:space="preserve">
+      <value>Off by default</value>
+    </data>
     <data name="VisualReset_GlowIntensity" xml:space="preserve">
       <value>Glow intensity</value>
     </data>
