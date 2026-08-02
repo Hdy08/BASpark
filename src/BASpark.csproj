@@ -11,10 +11,10 @@
     <UseVisualBasic>true</UseVisualBasic>
     <ApplicationIcon>app.ico</ApplicationIcon>
 
-    <Version>1.6.2-beta2</Version>
+    <Version>1.6.2</Version>
     <AssemblyVersion>1.6.2.0</AssemblyVersion>
     <FileVersion>1.6.2.0</FileVersion>
-    <InformationalVersion>1.6.2-beta2</InformationalVersion>
+    <InformationalVersion>1.6.2</InformationalVersion>
     
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     
