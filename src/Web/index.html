@@ -615,6 +615,35 @@
                 return result;
             }
 
+            function clipTrailPathToCutoff(source, cutoffBorn, createPoint = null) {
+                if (source.length < 2 || !Number.isFinite(cutoffBorn)) return source;
+                let firstAlive = 0;
+                while (firstAlive < source.length && source[firstAlive].born < cutoffBorn) {
+                    firstAlive++;
+                }
+                if (firstAlive === 0) return source;
+                if (firstAlive === source.length) return [];
+
+                const makePoint = createPoint || ((x, y, born) => ({ x, y, born }));
+                const before = source[firstAlive - 1];
+                const after = source[firstAlive];
+                const progress = clamp(
+                    (cutoffBorn - before.born) / Math.max(0.001, after.born - before.born),
+                    0,
+                    1
+                );
+                const x = lerp(before.x, after.x, progress);
+                const y = lerp(before.y, after.y, progress);
+                const result = [];
+                if (Math.hypot(x - after.x, y - after.y) >= 0.0001) {
+                    result.push(makePoint(x, y, cutoffBorn));
+                }
+                for (let index = firstAlive; index < source.length; index++) {
+                    result.push(source[index]);
+                }
+                return result;
+            }
+
             function simplifyCurveTrailPath(source) {
                 if (source.length < 3) return source;
 
@@ -923,16 +952,17 @@
                     if (!tip || this.trailRetractions.has(tip.strokeId)) return;
 
                     const retentionMs = this.trailRetentionMs();
+                    const cutoffAtRelease = this.trailCutoff(tip.strokeId, time);
                     this.trailRetractions.set(tip.strokeId, {
                         releasedAt: time,
-                        cutoffAtRelease: time - retentionMs,
+                        cutoffAtRelease,
                         retentionMs
                     });
                 }
 
                 trailCutoff(strokeId, now) {
                     const retraction = this.trailRetractions.get(strokeId);
-                    if (!retraction) return now - this.trailRetentionMs();
+                    if (!retraction) return now - this.trailRetentionMs() / this.trailSpeed;
 
                     // Preserve the sampled history first, then advance its removal boundary independently.
                     return retraction.cutoffAtRelease +
@@ -1089,7 +1119,8 @@
                                 this.trailRetractions.delete(strokeId);
                                 continue;
                             }
-                            const copyStart = Math.max(strokeStart, firstAlive - 1);
+                            const historyPointCount = this.applyCurveDraw ? 2 : 1;
+                            const copyStart = Math.max(strokeStart, firstAlive - historyPointCount);
                             for (let index = copyStart; index < readIndex; index++) {
                                 this.trail[writeIndex++] = this.trail[index];
                             }
@@ -1142,6 +1173,17 @@
                             firstAlive++;
                         }
                         if (firstAlive === emittedCount) continue;
+
+                        if (this.applyCurveDraw) {
+                            const contextStart = Math.max(0, firstAlive - 2);
+                            const points = [];
+                            for (let index = contextStart; index < emittedCount; index++) {
+                                points.push(pointAt(index));
+                            }
+                            points.cutoffBorn = cutoff;
+                            if (points.length >= 2) result.push(points);
+                            continue;
+                        }
 
                         const points = [];
                         if (firstAlive > 0) {
@@ -2030,9 +2072,17 @@
                             ? simplifyCurveTrailPath(sourcePoints)
                             : simplifyTrailPath(sourcePoints, jitterTolerancePx);
                         this.trailPointPoolCursor = 0;
-                        const points = curveDrawEnabled
+                        const sampledPoints = curveDrawEnabled
                             ? curveTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)
                             : smoothTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory);
+                        const points = curveDrawEnabled
+                            ? clipTrailPathToCutoff(
+                                sampledPoints,
+                                sourcePoints.cutoffBorn,
+                                this.trailPointFactory
+                            )
+                            : sampledPoints;
+                        if (points.length < 2) continue;
                         if (this.trailLengthScratch.length < points.length) {
                             this.trailLengthScratch = new Float32Array(2 ** Math.ceil(Math.log2(points.length)));
                         }

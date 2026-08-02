@@ -118,6 +118,7 @@ public class TouchEffectResourceTests
         Assert.Contains("const TRAIL_MSAA_SAMPLES = 4", html, StringComparison.Ordinal);
         Assert.Contains("function smoothTrailPath(source, renderSegmentPx, createPoint = null)", html, StringComparison.Ordinal);
         Assert.Contains("function curveTrailPath(source, renderSegmentPx, createPoint = null)", html, StringComparison.Ordinal);
+        Assert.Contains("function clipTrailPathToCutoff(source, cutoffBorn, createPoint = null)", html, StringComparison.Ordinal);
         Assert.Contains("function simplifyCurveTrailPath(source)", html, StringComparison.Ordinal);
         Assert.Contains("function simplifyTrailPath(source, tolerancePx)", html, StringComparison.Ordinal);
         Assert.Contains("pass < TRAIL_SMOOTHING_PASSES", html, StringComparison.Ordinal);
@@ -164,7 +165,7 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
-    public void TrailRetractionDelayAndSpeed_UseIndependentGameMatchedDefaults()
+    public void TrailRetractionDelayAndSpeed_ControlHeldAndReleasedStrokes()
     {
         const double originalGameSimulationSpeed = 1.0;
         Assert.Equal(originalGameSimulationSpeed, ConfigManager.DefaultTrailDelayMultiplier);
@@ -174,13 +175,14 @@ public class TouchEffectResourceTests
         Assert.Contains("const fallbackAssetBase = \"Assets/\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("../../apk/", html, StringComparison.Ordinal);
         Assert.Contains("this.trailRetractionDelayMultiplier = 1", html, StringComparison.Ordinal);
-        Assert.Contains("return now - this.trailRetentionMs();", html, StringComparison.Ordinal);
-        Assert.Contains("cutoffAtRelease: time - retentionMs", html, StringComparison.Ordinal);
+        Assert.Contains("return now - this.trailRetentionMs() / this.trailSpeed;", html, StringComparison.Ordinal);
+        Assert.Contains("const cutoffAtRelease = this.trailCutoff(tip.strokeId, time);", html, StringComparison.Ordinal);
+        Assert.Contains("cutoffAtRelease,", html, StringComparison.Ordinal);
         Assert.Contains(
             "Math.max(0, now - retraction.releasedAt) * this.trailSpeed",
             html,
             StringComparison.Ordinal);
-        Assert.DoesNotContain("lifetime / this.trailSpeed", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("cutoffAtRelease: time - retentionMs", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -393,14 +395,18 @@ public class TouchEffectResourceTests
             renderTrail,
             StringComparison.Ordinal);
         Assert.Contains(
-            "const points = curveDrawEnabled\n" +
+            "const sampledPoints = curveDrawEnabled\n" +
             "                            ? curveTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)\n" +
             "                            : smoothTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory);",
             renderTrail,
             StringComparison.Ordinal);
+        Assert.Contains("? clipTrailPathToCutoff(", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("sourcePoints.cutoffBorn", renderTrail, StringComparison.Ordinal);
+        Assert.Contains(": sampledPoints;", renderTrail, StringComparison.Ordinal);
         Assert.Equal(1, CountOccurrences(renderTrail, "simplifyCurveTrailPath("));
         Assert.Equal(1, CountOccurrences(renderTrail, "simplifyTrailPath("));
         Assert.Equal(1, CountOccurrences(renderTrail, "curveTrailPath("));
+        Assert.Equal(1, CountOccurrences(renderTrail, "clipTrailPathToCutoff("));
         Assert.Equal(1, CountOccurrences(renderTrail, "smoothTrailPath("));
         Assert.Contains("id=\"previewCurveDraw\"", html, StringComparison.Ordinal);
         Assert.Contains("controls.curveDraw.checked = false", html, StringComparison.Ordinal);
@@ -488,6 +494,25 @@ public class TouchEffectResourceTests
         Assert.Contains("0, 1, 0", curveTrailPath, StringComparison.Ordinal);
         Assert.DoesNotContain("Math.ceil(distance / sampleSpacing)", curveTrailPath, StringComparison.Ordinal);
         Assert.DoesNotContain("(a1.x - previous.x) / 6", curveTrailPath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CurveTrail_RetractionKeepsControlContextUntilAfterCurveSampling()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        int pruneStart = html.IndexOf("prune(now) {", StringComparison.Ordinal);
+        int strokesStart = html.IndexOf("trailStrokes(now) {", pruneStart, StringComparison.Ordinal);
+        int strokesEnd = html.IndexOf("return result;", strokesStart, StringComparison.Ordinal);
+
+        Assert.True(pruneStart >= 0 && strokesStart > pruneStart, "Trail pruning logic is missing.");
+        Assert.True(strokesEnd > strokesStart, "Trail stroke extraction is missing.");
+        string prune = html[pruneStart..strokesStart];
+        string strokes = html[strokesStart..strokesEnd];
+        Assert.Contains("const historyPointCount = this.applyCurveDraw ? 2 : 1;", prune, StringComparison.Ordinal);
+        Assert.Contains("firstAlive - historyPointCount", prune, StringComparison.Ordinal);
+        Assert.Contains("const contextStart = Math.max(0, firstAlive - 2);", strokes, StringComparison.Ordinal);
+        Assert.Contains("points.cutoffBorn = cutoff;", strokes, StringComparison.Ordinal);
+        Assert.Contains("continue;", strokes, StringComparison.Ordinal);
     }
 
     [Fact]

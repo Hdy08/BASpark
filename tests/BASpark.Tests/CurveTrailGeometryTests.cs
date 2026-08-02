@@ -156,6 +156,28 @@ public class CurveTrailGeometryTests
         Assert.Equal(new TrailPoint(22, 31, 20), points[0]);
     }
 
+    [Fact]
+    public void CurveRetraction_PreservesCurvatureAfterCutoffPassesPenultimateAnchor()
+    {
+        TrailPoint[] source =
+        [
+            new(0, 0, 0),
+            new(100, 0, 100),
+            new(100, 100, 200)
+        ];
+
+        IReadOnlyList<TrailPoint> sampled = CurveTrailPath(source, RenderSegmentPx);
+        IReadOnlyList<TrailPoint> clipped = ClipTrailPathToCutoff(sampled, 150);
+
+        Assert.True(clipped.Count > 2, "The final curved source segment collapsed to a line.");
+        Assert.Equal(150, clipped[0].Born, 10);
+        Assert.Equal(source[^1], clipped[^1]);
+        Assert.All(clipped, point => Assert.True(point.Born >= 150));
+        Assert.True(
+            MaxDistanceFromChord(clipped) > 0.5,
+            "The visible final segment no longer retains its original curvature.");
+    }
+
     private static List<TrailPoint> SimplifyCurveTrailPath(IReadOnlyList<TrailPoint> source)
     {
         if (source.Count < 3)
@@ -385,6 +407,47 @@ public class CurveTrailGeometryTests
         return result;
     }
 
+    private static List<TrailPoint> ClipTrailPathToCutoff(IReadOnlyList<TrailPoint> source, double cutoffBorn)
+    {
+        if (source.Count < 2 || !double.IsFinite(cutoffBorn))
+        {
+            return [.. source];
+        }
+
+        int firstAlive = 0;
+        while (firstAlive < source.Count && source[firstAlive].Born < cutoffBorn)
+        {
+            firstAlive++;
+        }
+        if (firstAlive == 0)
+        {
+            return [.. source];
+        }
+        if (firstAlive == source.Count)
+        {
+            return [];
+        }
+
+        TrailPoint before = source[firstAlive - 1];
+        TrailPoint after = source[firstAlive];
+        double progress = Math.Clamp(
+            (cutoffBorn - before.Born) / Math.Max(0.001, after.Born - before.Born),
+            0,
+            1);
+        double x = Lerp(before.X, after.X, progress);
+        double y = Lerp(before.Y, after.Y, progress);
+        var result = new List<TrailPoint>(source.Count - firstAlive + 1);
+        if (Distance(x, y, after.X, after.Y) >= 0.0001)
+        {
+            result.Add(new(x, y, cutoffBorn));
+        }
+        for (int index = firstAlive; index < source.Count; index++)
+        {
+            result.Add(source[index]);
+        }
+        return result;
+    }
+
     private static double KnotInterval(TrailPoint a, TrailPoint b) =>
         Math.Max(0.0001, Math.Sqrt(Distance(a.X, a.Y, b.X, b.Y)));
 
@@ -459,6 +522,17 @@ public class CurveTrailGeometryTests
             double outsideY = Math.Max(Math.Max(minimumY - point.Y, 0), point.Y - maximumY);
             return Math.Sqrt(outsideX * outsideX + outsideY * outsideY);
         });
+    }
+
+    private static double MaxDistanceFromChord(IReadOnlyList<TrailPoint> points)
+    {
+        TrailPoint start = points[0];
+        TrailPoint end = points[^1];
+        double dx = end.X - start.X;
+        double dy = end.Y - start.Y;
+        double length = Math.Max(0.000001, Magnitude(dx, dy));
+        return points.Max(point => Math.Abs(
+            dx * (start.Y - point.Y) - (start.X - point.X) * dy) / length);
     }
 
     private static double Distance(TrailPoint a, TrailPoint b) => Distance(a.X, a.Y, b.X, b.Y);
