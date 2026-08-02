@@ -125,6 +125,25 @@ namespace BASpark
 
         private static List<FilterProfile> _profiles = new List<FilterProfile>();
 
+        private sealed class ProcessFilterSnapshot
+        {
+            public static readonly ProcessFilterSnapshot Empty = new(
+                ProcessFilterModeOption.Disabled,
+                Array.Empty<string>());
+
+            public ProcessFilterSnapshot(ProcessFilterModeOption mode, IEnumerable<string> entries)
+            {
+                Mode = mode;
+                Entries = entries.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            }
+
+            public ProcessFilterModeOption Mode { get; }
+            public HashSet<string> Entries { get; }
+        }
+
+        // Published as one immutable snapshot so the overlay hot path never locks or scans a list.
+        private static ProcessFilterSnapshot _processFilterSnapshot = ProcessFilterSnapshot.Empty;
+
         // 缓存属性元数据，避免 Save() 每次都反射查找
         private static readonly ConcurrentDictionary<string, PropertyInfo?> _propertyCache = new();
 
@@ -257,6 +276,8 @@ namespace BASpark
                             {
                                 ActiveProfileId = _profiles[0].Id;
                             }
+
+                            RefreshProcessFilterSnapshotLocked();
                         }
                     }
                 }
@@ -438,31 +459,19 @@ namespace BASpark
                 return false;
             }
 
-            lock (_syncLock)
+            ProcessFilterSnapshot snapshot = Volatile.Read(ref _processFilterSnapshot);
+            if (snapshot.Mode == ProcessFilterModeOption.Disabled)
             {
-                FilterProfile? profile = _profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? _profiles.FirstOrDefault();
-                if (profile == null || profile.Mode == ProcessFilterModeOption.Disabled)
-                {
-                    return false;
-                }
-
-                bool isListed = false;
-                foreach (string configuredProcess in profile.Processes)
-                {
-                    if (string.Equals(configuredProcess, processName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        isListed = true;
-                        break;
-                    }
-                }
-
-                return profile.Mode switch
-                {
-                    ProcessFilterModeOption.Blacklist => isListed,
-                    ProcessFilterModeOption.Whitelist => !isListed,
-                    _ => false
-                };
+                return false;
             }
+
+            bool isListed = snapshot.Entries.Contains(processName);
+            return snapshot.Mode switch
+            {
+                ProcessFilterModeOption.Blacklist => isListed,
+                ProcessFilterModeOption.Whitelist => !isListed,
+                _ => false
+            };
         }
 
         public static bool SaveProfiles(List<FilterProfile> profiles, string activeId)
@@ -494,8 +503,18 @@ namespace BASpark
                 }
 
                 _profiles = normalizedProfiles;
+                RefreshProcessFilterSnapshotLocked();
                 return true;
             }
+        }
+
+        private static void RefreshProcessFilterSnapshotLocked()
+        {
+            FilterProfile? profile = _profiles.FirstOrDefault(p => p.Id == ActiveProfileId) ?? _profiles.FirstOrDefault();
+            ProcessFilterSnapshot snapshot = profile == null
+                ? ProcessFilterSnapshot.Empty
+                : new ProcessFilterSnapshot(profile.Mode, profile.Processes);
+            Volatile.Write(ref _processFilterSnapshot, snapshot);
         }
 
         private static List<FilterProfile> DeserializeProfiles(string json)
@@ -720,10 +739,8 @@ namespace BASpark
 
         public static IReadOnlySet<string> GetProcessFilterEntries()
         {
-            var profile = GetActiveProfile();
-            if (profile == null) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            return profile.Processes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            ProcessFilterSnapshot snapshot = Volatile.Read(ref _processFilterSnapshot);
+            return new HashSet<string>(snapshot.Entries, StringComparer.OrdinalIgnoreCase);
         }
 
         public static HashSet<string> GetEnabledScreenIds()
@@ -942,6 +959,7 @@ namespace BASpark
                     FilterProfiles = "";
                     ActiveProfileId = "";
                     _profiles.Clear();
+                    Volatile.Write(ref _processFilterSnapshot, ProcessFilterSnapshot.Empty);
                     IsTouchscreenMode = false;
                     ClickTriggerType = 0;
                     EnableMiddleClickTrigger = false;
