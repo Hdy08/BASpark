@@ -270,6 +270,11 @@
             const TRAIL_SMOOTHING_PASSES = 3;
             const TRAIL_RENDER_SEGMENT_PX = 0.5;
             const TRAIL_JITTER_TOLERANCE_RATIO = 0.25;
+            const TRAIL_CURVE_COLLINEAR_TURN_RADIANS = Math.PI / 360;
+            const TRAIL_CURVE_MAX_CONTROL_TURN_RADIANS = Math.PI / 60;
+            const TRAIL_CURVE_FLATNESS_RATIO = 0.05;
+            const TRAIL_CURVE_MAX_SUBDIVISION_DEPTH = 12;
+            const MAX_TRAIL_INNER_MITER_RATIO = 4;
             const TRAIL_MSAA_SAMPLES = 4;
             const EFFECT_RENDER_SCALE = 0.5;
             const TRAIL_RENDER_WIDTH_SCALE = 0.5;
@@ -449,6 +454,97 @@
                         3 * inv * t * t * p2 +
                         t * t * t * p3;
                 };
+                const vectorTurn = (ax, ay, bx, by) => {
+                    if (Math.hypot(ax, ay) < 0.00000001 || Math.hypot(bx, by) < 0.00000001) return 0;
+                    return Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
+                };
+                const appendSample = (a0, a1, x, y, t) => {
+                    const previousPoint = result[result.length - 1];
+                    if (Math.hypot(x - previousPoint.x, y - previousPoint.y) < 0.0001 && t < 1) return;
+                    result.push(makePoint(x, y, lerp(a0.born, a1.born, t)));
+                };
+                const sampleCubic = (
+                    a0,
+                    a1,
+                    p0x,
+                    p0y,
+                    p1x,
+                    p1y,
+                    p2x,
+                    p2y,
+                    p3x,
+                    p3y,
+                    t0,
+                    t1,
+                    depth
+                ) => {
+                    const edge0x = p1x - p0x;
+                    const edge0y = p1y - p0y;
+                    const edge1x = p2x - p1x;
+                    const edge1y = p2y - p1y;
+                    const edge2x = p3x - p2x;
+                    const edge2y = p3y - p2y;
+                    const controlPolygonLength =
+                        Math.hypot(edge0x, edge0y) +
+                        Math.hypot(edge1x, edge1y) +
+                        Math.hypot(edge2x, edge2y);
+                    const chordX = p3x - p0x;
+                    const chordY = p3y - p0y;
+                    const chordLength = Math.hypot(chordX, chordY);
+                    const flatness = chordLength < 0.00000001
+                        ? Math.max(Math.hypot(p1x - p0x, p1y - p0y), Math.hypot(p2x - p0x, p2y - p0y))
+                        : Math.max(
+                            Math.abs(chordX * (p1y - p0y) - chordY * (p1x - p0x)) / chordLength,
+                            Math.abs(chordX * (p2y - p0y) - chordY * (p2x - p0x)) / chordLength
+                        );
+                    const maximumControlTurn = Math.max(
+                        vectorTurn(edge0x, edge0y, edge1x, edge1y),
+                        vectorTurn(edge1x, edge1y, edge2x, edge2y)
+                    );
+                    const shouldSubdivide = depth < TRAIL_CURVE_MAX_SUBDIVISION_DEPTH && (
+                        maximumControlTurn > TRAIL_CURVE_MAX_CONTROL_TURN_RADIANS ||
+                        flatness > sampleSpacing * TRAIL_CURVE_FLATNESS_RATIO
+                    );
+
+                    if (shouldSubdivide) {
+                        const p01x = (p0x + p1x) * 0.5;
+                        const p01y = (p0y + p1y) * 0.5;
+                        const p12x = (p1x + p2x) * 0.5;
+                        const p12y = (p1y + p2y) * 0.5;
+                        const p23x = (p2x + p3x) * 0.5;
+                        const p23y = (p2y + p3y) * 0.5;
+                        const p012x = (p01x + p12x) * 0.5;
+                        const p012y = (p01y + p12y) * 0.5;
+                        const p123x = (p12x + p23x) * 0.5;
+                        const p123y = (p12y + p23y) * 0.5;
+                        const midpointX = (p012x + p123x) * 0.5;
+                        const midpointY = (p012y + p123y) * 0.5;
+                        const midpointT = (t0 + t1) * 0.5;
+                        sampleCubic(
+                            a0, a1,
+                            p0x, p0y, p01x, p01y, p012x, p012y, midpointX, midpointY,
+                            t0, midpointT, depth + 1
+                        );
+                        sampleCubic(
+                            a0, a1,
+                            midpointX, midpointY, p123x, p123y, p23x, p23y, p3x, p3y,
+                            midpointT, t1, depth + 1
+                        );
+                        return;
+                    }
+
+                    const sampleCount = Math.max(1, Math.ceil(controlPolygonLength / sampleSpacing));
+                    for (let sample = 1; sample <= sampleCount; sample++) {
+                        const localT = sample / sampleCount;
+                        appendSample(
+                            a0,
+                            a1,
+                            cubic(p0x, p1x, p2x, p3x, localT),
+                            cubic(p0y, p1y, p2y, p3y, localT),
+                            lerp(t0, t1, localT)
+                        );
+                    }
+                };
 
                 for (let index = 0; index < lastIndex; index++) {
                     const a0 = source[index];
@@ -477,39 +573,104 @@
                         (a1.y - previous.y) / previousSpan +
                         (a1.y - a0.y) / segmentInterval
                     );
-                    const tangent1x = segmentInterval * (
+                    let tangent1x = segmentInterval * (
                         (a1.x - a0.x) / segmentInterval -
                         (next.x - a0.x) / nextSpan +
                         (next.x - a1.x) / nextInterval
                     );
-                    const tangent1y = segmentInterval * (
+                    let tangent1y = segmentInterval * (
                         (a1.y - a0.y) / segmentInterval -
                         (next.y - a0.y) / nextSpan +
                         (next.y - a1.y) / nextInterval
                     );
+                    // Sparse live samples need a causal endpoint tangent instead of the mirrored final chord.
+                    if (index === lastIndex - 1 && index > 0) {
+                        const previousLength = Math.hypot(a0.x - previous.x, a0.y - previous.y);
+                        const segmentLength = Math.hypot(a1.x - a0.x, a1.y - a0.y);
+                        const lengthRatio = segmentLength / Math.max(0.0001, previousLength);
+                        if (lengthRatio >= 0.5 && lengthRatio <= 2) {
+                            const candidateX = (3 * a1.x - 4 * a0.x + previous.x) * 0.5;
+                            const candidateY = (3 * a1.y - 4 * a0.y + previous.y) * 0.5;
+                            const candidateLength = Math.hypot(candidateX, candidateY);
+                            const forwardProjection = (
+                                candidateX * (a1.x - a0.x) + candidateY * (a1.y - a0.y)
+                            ) / Math.max(0.0001, segmentLength);
+                            if (candidateLength >= segmentLength * 0.25 && forwardProjection > 0) {
+                                const tangentScale = Math.min(candidateLength, segmentLength * 2) / candidateLength;
+                                tangent1x = candidateX * tangentScale;
+                                tangent1y = candidateY * tangentScale;
+                            }
+                        }
+                    }
                     const cp1x = a0.x + tangent0x / 3;
                     const cp1y = a0.y + tangent0y / 3;
                     const cp2x = a1.x - tangent1x / 3;
                     const cp2y = a1.y - tangent1y / 3;
-                    const controlPolygonLength =
-                        Math.hypot(cp1x - a0.x, cp1y - a0.y) +
-                        Math.hypot(cp2x - cp1x, cp2y - cp1y) +
-                        Math.hypot(a1.x - cp2x, a1.y - cp2y);
-                    const sampleCount = Math.max(1, Math.ceil(controlPolygonLength / sampleSpacing));
-
-                    for (let sample = 1; sample <= sampleCount; sample++) {
-                        const t = sample / sampleCount;
-                        const x = cubic(a0.x, cp1x, cp2x, a1.x, t);
-                        const y = cubic(a0.y, cp1y, cp2y, a1.y, t);
-                        const previousPoint = result[result.length - 1];
-                        if (Math.hypot(x - previousPoint.x, y - previousPoint.y) < 0.0001 &&
-                            sample < sampleCount) {
-                            continue;
-                        }
-                        result.push(makePoint(x, y, lerp(a0.born, a1.born, t)));
-                    }
+                    sampleCubic(
+                        a0, a1,
+                        a0.x, a0.y, cp1x, cp1y, cp2x, cp2y, a1.x, a1.y,
+                        0, 1, 0
+                    );
                 }
                 return result;
+            }
+
+            function simplifyCurveTrailPath(source) {
+                if (source.length < 3) return source;
+
+                const simplified = [source[0]];
+                for (let index = 1; index < source.length - 1; index++) {
+                    const previous = simplified[simplified.length - 1];
+                    const point = source[index];
+                    const next = source[index + 1];
+                    const beforeX = point.x - previous.x;
+                    const beforeY = point.y - previous.y;
+                    const afterX = next.x - point.x;
+                    const afterY = next.y - point.y;
+                    if (Math.hypot(beforeX, beforeY) < 0.0001 || Math.hypot(afterX, afterY) < 0.0001) {
+                        continue;
+                    }
+
+                    const turn = Math.abs(Math.atan2(
+                        beforeX * afterY - beforeY * afterX,
+                        beforeX * afterX + beforeY * afterY
+                    ));
+                    if (turn > TRAIL_CURVE_COLLINEAR_TURN_RADIANS) {
+                        simplified.push(point);
+                    }
+                }
+                simplified.push(source[source.length - 1]);
+                return simplified;
+            }
+
+            function curveTrailJoinNeedsBreak(point, before, after, halfWidth) {
+                const turn = before.tx * after.ty - before.ty * after.tx;
+                const directionDot = before.tx * after.tx + before.ty * after.ty;
+                if (directionDot < -0.5) return true;
+                if (Math.abs(turn) <= 0.000001) return false;
+
+                const innerSign = turn > 0 ? 1 : -1;
+                const previousInnerX = point.x + before.x * halfWidth * innerSign;
+                const previousInnerY = point.y + before.y * halfWidth * innerSign;
+                const nextInnerX = point.x + after.x * halfWidth * innerSign;
+                const nextInnerY = point.y + after.y * halfWidth * innerSign;
+                const innerScale = (
+                    (nextInnerX - previousInnerX) * after.ty -
+                    (nextInnerY - previousInnerY) * after.tx
+                ) / turn;
+                const innerX = previousInnerX + before.tx * innerScale;
+                const innerY = previousInnerY + before.ty * innerScale;
+                const offsetX = innerX - point.x;
+                const offsetY = innerY - point.y;
+                const innerDistance = Math.hypot(offsetX, offsetY);
+                const previousProjection = offsetX * before.tx + offsetY * before.ty;
+                const nextProjection = offsetX * after.tx + offsetY * after.ty;
+                return !Number.isFinite(innerDistance) ||
+                    innerDistance > halfWidth * MAX_TRAIL_INNER_MITER_RATIO ||
+                    previousProjection < -before.length - 0.000001 ||
+                    previousProjection > 0.000001 ||
+                    nextProjection < -0.000001 ||
+                    nextProjection > after.length + 0.000001;
             }
 
             function simplifyTrailPath(source, tolerancePx) {
@@ -804,11 +965,15 @@
                     const dy = y - origin.y;
                     const distance = Math.hypot(dx, dy);
                     const spacing = TRAIL_MIN_VERTEX_WORLD * this.worldToPx;
-                    if (distance < spacing) return;
+                    if (!this.applyCurveDraw && distance < spacing) return;
 
-                    const count = Math.floor(distance / spacing);
+                    const count = this.applyCurveDraw
+                        ? Math.max(1, Math.ceil(distance / spacing))
+                        : Math.floor(distance / spacing);
                     for (let index = 1; index <= count; index++) {
-                        const p = clamp(index * spacing / distance, 0, 1);
+                        const p = this.applyCurveDraw
+                            ? index / count
+                            : clamp(index * spacing / distance, 0, 1);
                         const point = {
                             x: origin.x + dx * p,
                             y: origin.y + dy * p,
@@ -1860,9 +2025,12 @@
                             renderSegmentPx,
                             TRAIL_MIN_VERTEX_WORLD * this.engine.worldToPx * TRAIL_JITTER_TOLERANCE_RATIO
                         );
-                        const stabilizedPoints = simplifyTrailPath(sourcePoints, jitterTolerancePx);
+                        const curveDrawEnabled = this.engine.applyCurveDraw;
+                        const stabilizedPoints = curveDrawEnabled
+                            ? simplifyCurveTrailPath(sourcePoints)
+                            : simplifyTrailPath(sourcePoints, jitterTolerancePx);
                         this.trailPointPoolCursor = 0;
-                        const points = this.engine.applyCurveDraw
+                        const points = curveDrawEnabled
                             ? curveTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)
                             : smoothTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory);
                         if (this.trailLengthScratch.length < points.length) {
@@ -1885,16 +2053,33 @@
                             this.pushGeometryVertex(vertices, point.x + nx * offset, point.y + ny * offset, u, 0, color, 1, linear);
                             this.pushGeometryVertex(vertices, point.x - nx * offset, point.y - ny * offset, u, 1, color, 1, linear);
                         };
+                        const appendPairAfterBreak = (point, nx, ny, offset, progress) => {
+                            const lastVertexOffset = vertices.length - 8;
+                            for (let component = 0; component < 8; component++) {
+                                vertices.push(vertices[lastVertexOffset + component]);
+                            }
+                            const color = this.engine.displayColor(evalColor(PROFILE.trailColor, progress, this.colorScratch));
+                            const linear = linearColor(color, this.geometryLinearColorScratch);
+                            const u = 1 - progress;
+                            this.pushGeometryVertex(vertices, point.x + nx * offset, point.y + ny * offset, u, 0, color, 1, linear);
+                            const positiveVertexOffset = vertices.length - 8;
+                            for (let component = 0; component < 8; component++) {
+                                vertices.push(vertices[positiveVertexOffset + component]);
+                            }
+                            this.pushGeometryVertex(vertices, point.x - nx * offset, point.y - ny * offset, u, 1, color, 1, linear);
+                        };
                         const segmentNormal = (index, output) => {
                             const a = points[index];
                             const b = points[index + 1];
                             const dx = b.x - a.x;
                             const dy = b.y - a.y;
-                            const length = Math.max(0.0001, Math.hypot(dx, dy));
+                            const rawLength = Math.hypot(dx, dy);
+                            const length = Math.max(0.0001, rawLength);
                             output.x = -dy / length;
                             output.y = dx / length;
                             output.tx = dx / length;
                             output.ty = dy / length;
+                            output.length = rawLength;
                             return output;
                         };
 
@@ -1910,6 +2095,12 @@
                             const progress = lengths[index] / total;
                             const before = segmentNormal(index - 1, this.trailNormalScratchA);
                             const after = segmentNormal(index, this.trailNormalScratchB);
+                            // Restart the strip before a short inner miter can fold the ribbon across itself.
+                            if (curveDrawEnabled && curveTrailJoinNeedsBreak(point, before, after, halfWidth)) {
+                                appendPair(point, before.x, before.y, halfWidth, progress);
+                                appendPairAfterBreak(point, after.x, after.y, halfWidth, progress);
+                                continue;
+                            }
                             let mx = before.x + after.x;
                             let my = before.y + after.y;
                             const miterLength = Math.hypot(mx, my);

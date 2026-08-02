@@ -50,7 +50,6 @@ public class TouchEffectResourceTests
             html,
             StringComparison.Ordinal);
         Assert.Contains("this.trailTip = { x, y, born: time, strokeId: this.strokeId }", html, StringComparison.Ordinal);
-        Assert.Contains("const count = Math.floor(distance / spacing)", html, StringComparison.Ordinal);
         Assert.Contains("Math.log2(Math.max(levelWidth, levelHeight)) + BLOOM_DIFFUSION - 10", html, StringComparison.Ordinal);
         Assert.Contains("const BLOOM_RESOURCE_INTENSITY = 1.7000000476837158", html, StringComparison.Ordinal);
         Assert.Contains("const BLOOM_BASE_STRENGTH = 0.05", html, StringComparison.Ordinal);
@@ -111,9 +110,15 @@ public class TouchEffectResourceTests
         Assert.Contains("const TRAIL_SMOOTHING_PASSES = 3", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_RENDER_SEGMENT_PX = 0.5", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_JITTER_TOLERANCE_RATIO = 0.25", html, StringComparison.Ordinal);
+        Assert.Contains("const TRAIL_CURVE_COLLINEAR_TURN_RADIANS = Math.PI / 360", html, StringComparison.Ordinal);
+        Assert.Contains("const TRAIL_CURVE_MAX_CONTROL_TURN_RADIANS = Math.PI / 60", html, StringComparison.Ordinal);
+        Assert.Contains("const TRAIL_CURVE_FLATNESS_RATIO = 0.05", html, StringComparison.Ordinal);
+        Assert.Contains("const TRAIL_CURVE_MAX_SUBDIVISION_DEPTH = 12", html, StringComparison.Ordinal);
+        Assert.Contains("const MAX_TRAIL_INNER_MITER_RATIO = 4", html, StringComparison.Ordinal);
         Assert.Contains("const TRAIL_MSAA_SAMPLES = 4", html, StringComparison.Ordinal);
         Assert.Contains("function smoothTrailPath(source, renderSegmentPx, createPoint = null)", html, StringComparison.Ordinal);
         Assert.Contains("function curveTrailPath(source, renderSegmentPx, createPoint = null)", html, StringComparison.Ordinal);
+        Assert.Contains("function simplifyCurveTrailPath(source)", html, StringComparison.Ordinal);
         Assert.Contains("function simplifyTrailPath(source, tolerancePx)", html, StringComparison.Ordinal);
         Assert.Contains("pass < TRAIL_SMOOTHING_PASSES", html, StringComparison.Ordinal);
         Assert.Contains("refined.push(makePoint(", html, StringComparison.Ordinal);
@@ -124,7 +129,9 @@ public class TouchEffectResourceTests
             html,
             StringComparison.Ordinal);
         Assert.Contains("TRAIL_RENDER_SEGMENT_PX / Math.max(1, this.dpr)", html, StringComparison.Ordinal);
-        Assert.Contains("const stabilizedPoints = simplifyTrailPath(sourcePoints, jitterTolerancePx)", html, StringComparison.Ordinal);
+        Assert.Contains("const curveDrawEnabled = this.engine.applyCurveDraw", html, StringComparison.Ordinal);
+        Assert.Contains("? simplifyCurveTrailPath(sourcePoints)", html, StringComparison.Ordinal);
+        Assert.Contains(": simplifyTrailPath(sourcePoints, jitterTolerancePx)", html, StringComparison.Ordinal);
         Assert.Contains("createMultisampleTarget(width, height)", html, StringComparison.Ordinal);
         Assert.Contains("gl.renderbufferStorageMultisample", html, StringComparison.Ordinal);
         Assert.Contains("this.resolveSourceMultisample(target);", html, StringComparison.Ordinal);
@@ -380,11 +387,19 @@ public class TouchEffectResourceTests
         Assert.True(renderTrailStart >= 0 && renderTrailEnd > renderTrailStart, "Trail renderer is missing.");
         string renderTrail = html[renderTrailStart..renderTrailEnd].Replace("\r\n", "\n", StringComparison.Ordinal);
         Assert.Contains(
-            "const points = this.engine.applyCurveDraw\n" +
+            "const stabilizedPoints = curveDrawEnabled\n" +
+            "                            ? simplifyCurveTrailPath(sourcePoints)\n" +
+            "                            : simplifyTrailPath(sourcePoints, jitterTolerancePx);",
+            renderTrail,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "const points = curveDrawEnabled\n" +
             "                            ? curveTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory)\n" +
             "                            : smoothTrailPath(stabilizedPoints, renderSegmentPx, this.trailPointFactory);",
             renderTrail,
             StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(renderTrail, "simplifyCurveTrailPath("));
+        Assert.Equal(1, CountOccurrences(renderTrail, "simplifyTrailPath("));
         Assert.Equal(1, CountOccurrences(renderTrail, "curveTrailPath("));
         Assert.Equal(1, CountOccurrences(renderTrail, "smoothTrailPath("));
         Assert.Contains("id=\"previewCurveDraw\"", html, StringComparison.Ordinal);
@@ -407,11 +422,39 @@ public class TouchEffectResourceTests
     }
 
     [Fact]
-    public void CurveTrail_UsesCentripetalKnotsAndCurveLengthSampling()
+    public void CurveTrail_InputSamplingCommitsEveryAcceptedPointerEndpoint()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        int emitStart = html.IndexOf("emitTrailTo(x, y, time) {", StringComparison.Ordinal);
+        int emitEnd = html.IndexOf("emitDistanceParticles(start, x, y, time) {", emitStart, StringComparison.Ordinal);
+
+        Assert.True(emitStart >= 0 && emitEnd > emitStart, "Trail input sampler is missing.");
+        string emitTrailTo = html[emitStart..emitEnd].Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Contains("if (!this.applyCurveDraw && distance < spacing) return;", emitTrailTo, StringComparison.Ordinal);
+        Assert.DoesNotContain("if (distance < spacing) return;", emitTrailTo, StringComparison.Ordinal);
+        Assert.Contains(
+            "const count = this.applyCurveDraw\n" +
+            "                        ? Math.max(1, Math.ceil(distance / spacing))\n" +
+            "                        : Math.floor(distance / spacing);",
+            emitTrailTo,
+            StringComparison.Ordinal);
+        Assert.Contains("for (let index = 1; index <= count; index++)", emitTrailTo, StringComparison.Ordinal);
+        Assert.Contains(
+            "const p = this.applyCurveDraw\n" +
+            "                            ? index / count\n" +
+            "                            : clamp(index * spacing / distance, 0, 1);",
+            emitTrailTo,
+            StringComparison.Ordinal);
+        Assert.Contains("this.appendTrail(point.x, point.y, point.time, this.strokeId);", emitTrailTo, StringComparison.Ordinal);
+        Assert.Contains("this.trailEmit = point;", emitTrailTo, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CurveTrail_UsesAdaptiveCentripetalSamplingAndStableEndpointTangent()
     {
         string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
         int curveStart = html.IndexOf("function curveTrailPath(", StringComparison.Ordinal);
-        int curveEnd = html.IndexOf("function simplifyTrailPath(", curveStart, StringComparison.Ordinal);
+        int curveEnd = html.IndexOf("function simplifyCurveTrailPath(", curveStart, StringComparison.Ordinal);
 
         Assert.True(curveStart >= 0 && curveEnd > curveStart, "Curve trail path function is missing.");
         string curveTrailPath = html[curveStart..curveEnd];
@@ -422,11 +465,75 @@ public class TouchEffectResourceTests
         Assert.Contains("const segmentInterval = knotInterval(a0, a1)", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("const nextInterval = knotInterval(a1, next)", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("const tangent0x = segmentInterval * (", curveTrailPath, StringComparison.Ordinal);
-        Assert.Contains("const tangent1x = segmentInterval * (", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("let tangent1x = segmentInterval * (", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("if (index === lastIndex - 1 && index > 0)", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const lengthRatio = segmentLength / Math.max(0.0001, previousLength)", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("if (lengthRatio >= 0.5 && lengthRatio <= 2)", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const candidateX = (3 * a1.x - 4 * a0.x + previous.x) * 0.5", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const candidateY = (3 * a1.y - 4 * a0.y + previous.y) * 0.5", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("candidateLength >= segmentLength * 0.25 && forwardProjection > 0", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("Math.min(candidateLength, segmentLength * 2) / candidateLength", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const vectorTurn = (ax, ay, bx, by) =>", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const sampleCubic = (", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("const controlPolygonLength =", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const maximumControlTurn = Math.max(", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("depth < TRAIL_CURVE_MAX_SUBDIVISION_DEPTH", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("maximumControlTurn > TRAIL_CURVE_MAX_CONTROL_TURN_RADIANS", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("flatness > sampleSpacing * TRAIL_CURVE_FLATNESS_RATIO", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const midpointT = (t0 + t1) * 0.5", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("t0, midpointT, depth + 1", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("midpointT, t1, depth + 1", curveTrailPath, StringComparison.Ordinal);
         Assert.Contains("Math.ceil(controlPolygonLength / sampleSpacing)", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("lerp(t0, t1, localT)", curveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("0, 1, 0", curveTrailPath, StringComparison.Ordinal);
         Assert.DoesNotContain("Math.ceil(distance / sampleSpacing)", curveTrailPath, StringComparison.Ordinal);
         Assert.DoesNotContain("(a1.x - previous.x) / 6", curveTrailPath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CurveTrail_UsesDedicatedAnchorSimplification()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        int simplifyStart = html.IndexOf("function simplifyCurveTrailPath(source) {", StringComparison.Ordinal);
+        int simplifyEnd = html.IndexOf("function curveTrailJoinNeedsBreak(", simplifyStart, StringComparison.Ordinal);
+
+        Assert.True(simplifyStart >= 0 && simplifyEnd > simplifyStart, "Curve-specific simplifier is missing.");
+        string simplifyCurveTrailPath = html[simplifyStart..simplifyEnd];
+        Assert.Contains("const previous = simplified[simplified.length - 1]", simplifyCurveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("const turn = Math.abs(Math.atan2(", simplifyCurveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("if (turn > TRAIL_CURVE_COLLINEAR_TURN_RADIANS)", simplifyCurveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("simplified.push(point);", simplifyCurveTrailPath, StringComparison.Ordinal);
+        Assert.Contains("simplified.push(source[source.length - 1]);", simplifyCurveTrailPath, StringComparison.Ordinal);
+        Assert.DoesNotContain("tolerancePx", simplifyCurveTrailPath, StringComparison.Ordinal);
+        Assert.DoesNotContain("toleranceSquared", simplifyCurveTrailPath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CurveTrail_InvalidMiterRestartsStripWithDegenerateVertices()
+    {
+        string html = Encoding.UTF8.GetString(ReadWpfResource("web/index.html"));
+        int joinStart = html.IndexOf("function curveTrailJoinNeedsBreak(", StringComparison.Ordinal);
+        int joinEnd = html.IndexOf("function simplifyTrailPath(", joinStart, StringComparison.Ordinal);
+        int renderTrailStart = html.IndexOf("renderTrail(now) {", StringComparison.Ordinal);
+        int renderTrailEnd = html.IndexOf("renderSource(now, target", renderTrailStart, StringComparison.Ordinal);
+
+        Assert.True(joinStart >= 0 && joinEnd > joinStart, "Curve miter validation is missing.");
+        Assert.True(renderTrailStart >= 0 && renderTrailEnd > renderTrailStart, "Trail renderer is missing.");
+        string curveTrailJoinNeedsBreak = html[joinStart..joinEnd];
+        string renderTrail = html[renderTrailStart..renderTrailEnd];
+        Assert.Contains("if (directionDot < -0.5) return true;", curveTrailJoinNeedsBreak, StringComparison.Ordinal);
+        Assert.Contains("innerDistance > halfWidth * MAX_TRAIL_INNER_MITER_RATIO", curveTrailJoinNeedsBreak, StringComparison.Ordinal);
+        Assert.Contains("previousProjection < -before.length - 0.000001", curveTrailJoinNeedsBreak, StringComparison.Ordinal);
+        Assert.Contains("nextProjection > after.length + 0.000001", curveTrailJoinNeedsBreak, StringComparison.Ordinal);
+        Assert.Contains("const appendPairAfterBreak = (point, nx, ny, offset, progress) =>", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("const lastVertexOffset = vertices.length - 8", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("vertices.push(vertices[lastVertexOffset + component]);", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("const positiveVertexOffset = vertices.length - 8", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("vertices.push(vertices[positiveVertexOffset + component]);", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("if (curveDrawEnabled && curveTrailJoinNeedsBreak(point, before, after, halfWidth))", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("appendPair(point, before.x, before.y, halfWidth, progress);", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("appendPairAfterBreak(point, after.x, after.y, halfWidth, progress);", renderTrail, StringComparison.Ordinal);
+        Assert.Contains("continue;", renderTrail, StringComparison.Ordinal);
     }
 
     [Fact]
