@@ -396,9 +396,32 @@
             const lerp = (a, b, t) => a + (b - a) * t;
             const randomRange = (a, b) => a + (b - a) * Math.random();
 
+            function currentRenderDpr() {
+                const width = Math.max(1, window.innerWidth);
+                const height = Math.max(1, window.innerHeight);
+                const minimumDpr = width * height <= 3000000 ? 1.25 : 1;
+                return clamp(Math.max(window.devicePixelRatio || 1, minimumDpr), 1, 2);
+            }
+
+            function curveFitTolerancePx(worldToPx, dpr) {
+                const renderSegmentPx = TRAIL_RENDER_SEGMENT_PX / Math.max(1, dpr);
+                const jitterTolerancePx = Math.max(
+                    renderSegmentPx,
+                    TRAIL_MIN_VERTEX_WORLD * worldToPx * TRAIL_JITTER_TOLERANCE_RATIO
+                );
+                return Math.max(
+                    renderSegmentPx,
+                    jitterTolerancePx * TRAIL_CURVE_FIT_TOLERANCE_RATIO
+                );
+            }
+
+            const pointTrailBorn = point => Number.isFinite(point.trailBorn)
+                ? point.trailBorn
+                : point.born;
+
             function smoothTrailPath(source, renderSegmentPx, createPoint = null) {
                 if (source.length < 3) return source;
-                const makePoint = createPoint || ((x, y, born) => ({ x, y, born }));
+                const makePoint = createPoint || ((x, y, born, trailBorn) => ({ x, y, born, trailBorn }));
                 let points = source;
                 for (let pass = 0; pass < TRAIL_SMOOTHING_PASSES; pass++) {
                     const refined = [points[0]];
@@ -408,12 +431,14 @@
                         refined.push(makePoint(
                             lerp(a.x, b.x, 0.25),
                             lerp(a.y, b.y, 0.25),
-                            lerp(a.born, b.born, 0.25)
+                            lerp(a.born, b.born, 0.25),
+                            lerp(pointTrailBorn(a), pointTrailBorn(b), 0.25)
                         ));
                         refined.push(makePoint(
                             lerp(a.x, b.x, 0.75),
                             lerp(a.y, b.y, 0.75),
-                            lerp(a.born, b.born, 0.75)
+                            lerp(a.born, b.born, 0.75),
+                            lerp(pointTrailBorn(a), pointTrailBorn(b), 0.75)
                         ));
                     }
                     refined.push(points[points.length - 1]);
@@ -431,7 +456,8 @@
                         resampled.push(makePoint(
                             lerp(a.x, b.x, t),
                             lerp(a.y, b.y, t),
-                            lerp(a.born, b.born, t)
+                            lerp(a.born, b.born, t),
+                            lerp(pointTrailBorn(a), pointTrailBorn(b), t)
                         ));
                     }
                 }
@@ -440,7 +466,7 @@
 
             function curveTrailPath(source, renderSegmentPx, createPoint = null) {
                 if (source.length < 3) return source;
-                const makePoint = createPoint || ((x, y, born) => ({ x, y, born }));
+                const makePoint = createPoint || ((x, y, born, trailBorn) => ({ x, y, born, trailBorn }));
                 const result = [source[0]];
                 const lastIndex = source.length - 1;
                 const sampleSpacing = Math.max(0.05, renderSegmentPx);
@@ -462,7 +488,12 @@
                 const appendSample = (a0, a1, x, y, t) => {
                     const previousPoint = result[result.length - 1];
                     if (Math.hypot(x - previousPoint.x, y - previousPoint.y) < 0.0001 && t < 1) return;
-                    result.push(makePoint(x, y, lerp(a0.born, a1.born, t)));
+                    result.push(makePoint(
+                        x,
+                        y,
+                        lerp(a0.born, a1.born, t),
+                        lerp(pointTrailBorn(a0), pointTrailBorn(a1), t)
+                    ));
                 };
                 const sampleCubic = (
                     a0,
@@ -616,28 +647,30 @@
                 return result;
             }
 
-            function clipTrailPathToCutoff(source, cutoffBorn, createPoint = null) {
-                if (source.length < 2 || !Number.isFinite(cutoffBorn)) return source;
+            function clipTrailPathToCutoff(source, cutoffTrailBorn, createPoint = null) {
+                if (source.length < 2 || !Number.isFinite(cutoffTrailBorn)) return source;
                 let firstAlive = 0;
-                while (firstAlive < source.length && source[firstAlive].born < cutoffBorn) {
+                while (firstAlive < source.length && pointTrailBorn(source[firstAlive]) < cutoffTrailBorn) {
                     firstAlive++;
                 }
                 if (firstAlive === 0) return source;
                 if (firstAlive === source.length) return [];
 
-                const makePoint = createPoint || ((x, y, born) => ({ x, y, born }));
+                const makePoint = createPoint || ((x, y, born, trailBorn) => ({ x, y, born, trailBorn }));
                 const before = source[firstAlive - 1];
                 const after = source[firstAlive];
                 const progress = clamp(
-                    (cutoffBorn - before.born) / Math.max(0.001, after.born - before.born),
+                    (cutoffTrailBorn - pointTrailBorn(before)) /
+                        Math.max(0.001, pointTrailBorn(after) - pointTrailBorn(before)),
                     0,
                     1
                 );
                 const x = lerp(before.x, after.x, progress);
                 const y = lerp(before.y, after.y, progress);
+                const born = lerp(before.born, after.born, progress);
                 const result = [];
                 if (Math.hypot(x - after.x, y - after.y) >= 0.0001) {
-                    result.push(makePoint(x, y, cutoffBorn));
+                    result.push(makePoint(x, y, born, cutoffTrailBorn));
                 }
                 for (let index = firstAlive; index < source.length; index++) {
                     result.push(source[index]);
@@ -661,29 +694,31 @@
                 return turn > TRAIL_CURVE_COLLINEAR_TURN_RADIANS;
             }
 
-            function curveTrailHistoryStart(source, strokeStart, strokeEnd, firstAlive, virtualEnd = null) {
+            function curveTrailHistoryStart(
+                source,
+                strokeStart,
+                strokeEnd,
+                firstAlive,
+                tolerancePx,
+                virtualEnd = null
+            ) {
                 const hasVirtualEnd = virtualEnd != null;
                 const effectiveStrokeEnd = strokeEnd + (hasVirtualEnd ? 1 : 0);
                 if (firstAlive <= strokeStart || effectiveStrokeEnd - strokeStart < 3) return strokeStart;
 
-                const pointAt = index => index < strokeEnd ? source[index] : virtualEnd;
-
-                let previousIndex = strokeStart;
+                const fitSource = source.slice(strokeStart, strokeEnd);
+                if (hasVirtualEnd) fitSource.push(virtualEnd);
+                const anchors = stabilizeCurveTrailPath(fitSource, tolerancePx);
                 let olderAnchorIndex = strokeStart;
                 let newerAnchorIndex = strokeStart;
-                const rememberAnchor = index => {
-                    if (index >= firstAlive) return;
+                for (const anchor of anchors) {
+                    const index = anchor === virtualEnd
+                        ? strokeEnd
+                        : source.indexOf(anchor, strokeStart);
+                    if (index < strokeStart || index >= firstAlive) break;
                     olderAnchorIndex = newerAnchorIndex;
                     newerAnchorIndex = index;
-                };
-
-                for (let index = strokeStart + 1; index < effectiveStrokeEnd - 1; index++) {
-                    if (!curveTrailAnchorNeeded(pointAt(previousIndex), pointAt(index), pointAt(index + 1))) continue;
-                    previousIndex = index;
-                    rememberAnchor(index);
                 }
-                const lastIndex = effectiveStrokeEnd - 1;
-                if (lastIndex < firstAlive) rememberAnchor(lastIndex);
                 return olderAnchorIndex;
             }
 
@@ -764,6 +799,10 @@
                 return simplified;
             }
 
+            function stabilizeCurveTrailPath(source, tolerancePx) {
+                return simplifyCurveTrailPath(simplifyTrailPath(source, tolerancePx));
+            }
+
             function evalCurve(stops, t, fallback = 1) {
                 if (!stops || stops.length === 0) return fallback;
                 if (t <= stops[0].t) return stops[0].v;
@@ -841,7 +880,7 @@
             }
 
             function advanceTrailRetraction(retraction, now, speed) {
-                if (retraction.dormant) return retraction.cutoffBorn;
+                if (retraction.dormant) return retraction.cutoffTrailBorn;
                 const currentTime = Math.max(retraction.lastAdvancedAt, now);
                 let scaledElapsed = (currentTime - retraction.lastAdvancedAt) * speed;
                 if (retraction.waitElapsedMs < TRAIL_LIFETIME_MS) {
@@ -851,18 +890,18 @@
                     scaledElapsed -= waitAdvance;
                 }
                 if (scaledElapsed > 0) {
-                    retraction.cutoffBorn = Math.min(
-                        retraction.latestBorn,
-                        retraction.cutoffBorn + scaledElapsed
+                    retraction.cutoffTrailBorn = Math.min(
+                        retraction.latestTrailBorn,
+                        retraction.cutoffTrailBorn + scaledElapsed
                     );
                 }
                 retraction.lastAdvancedAt = currentTime;
                 if (retraction.waitElapsedMs >= TRAIL_LIFETIME_MS - 0.000001 &&
-                    retraction.cutoffBorn >= retraction.latestBorn - 0.000001) {
-                    retraction.cutoffBorn = retraction.latestBorn;
+                    retraction.cutoffTrailBorn >= retraction.latestTrailBorn - 0.000001) {
+                    retraction.cutoffTrailBorn = retraction.latestTrailBorn;
                     retraction.dormant = true;
                 }
-                return retraction.cutoffBorn;
+                return retraction.cutoffTrailBorn;
             }
 
             class TouchEngine {
@@ -984,16 +1023,19 @@
                     if (this.trailTip) this.endTrailStroke(time);
                     this.strokeId++;
                     this.trailRetractions.set(this.strokeId, {
-                        cutoffBorn: time,
+                        cutoffTrailBorn: time,
                         lastAdvancedAt: time,
                         waitElapsedMs: 0,
-                        latestBorn: time,
+                        inputTrailBorn: time,
+                        lastInputAt: time,
+                        latestTrailBorn: time,
+                        curveFitTolerancePx: curveFitTolerancePx(this.worldToPx, currentRenderDpr()),
                         ended: false,
                         dormant: false
                     });
-                    this.appendTrail(x, y, time, this.strokeId);
-                    this.trailEmit = { x, y, time };
-                    this.trailTip = { x, y, born: time, strokeId: this.strokeId };
+                    this.appendTrail(x, y, time, time, this.strokeId);
+                    this.trailEmit = { x, y, time, trailBorn: time };
+                    this.trailTip = { x, y, born: time, trailBorn: time, strokeId: this.strokeId };
                 }
 
                 commitTrailTip() {
@@ -1002,7 +1044,7 @@
                     const last = this.trail[this.trail.length - 1];
                     if (!last || last.strokeId !== tip.strokeId ||
                         Math.hypot(last.x - tip.x, last.y - tip.y) >= 0.05) {
-                        this.appendTrail(tip.x, tip.y, tip.born, tip.strokeId);
+                        this.appendTrail(tip.x, tip.y, tip.born, tip.trailBorn, tip.strokeId);
                     }
                 }
 
@@ -1042,9 +1084,27 @@
                     }
                 }
 
+                advanceTrailInputClock(retraction, time, speed = this.trailSpeed) {
+                    const currentTime = Math.max(retraction.lastInputAt, time);
+                    if (currentTime > retraction.lastInputAt) {
+                        retraction.inputTrailBorn += (currentTime - retraction.lastInputAt) * speed;
+                    }
+                    retraction.lastInputAt = currentTime;
+                    return retraction.inputTrailBorn;
+                }
+
+                syncTrailInputClocks(time) {
+                    for (const retraction of this.trailRetractions.values()) {
+                        if (!retraction.ended && !retraction.dormant) {
+                            this.advanceTrailInputClock(retraction, time, this.trailSpeed);
+                        }
+                    }
+                }
+
                 setTrailSpeed(speed, time = this.now()) {
                     if (speed === this.trailSpeed) return;
                     this.syncTrailRetractions(time);
+                    this.syncTrailInputClocks(time);
                     this.trailSpeed = speed;
                 }
 
@@ -1097,29 +1157,37 @@
                     while (strokeEnd < this.trail.length && this.trail[strokeEnd].strokeId === strokeId) {
                         strokeEnd++;
                     }
+                    const retraction = this.trailRetractions.get(strokeId);
+                    const tolerancePx = retraction?.curveFitTolerancePx ??
+                        curveFitTolerancePx(this.worldToPx, currentRenderDpr());
                     const historyStart = curveTrailHistoryStart(
                         this.trail,
                         strokeStart,
                         strokeEnd,
-                        firstKeep
+                        firstKeep,
+                        tolerancePx,
+                        this.trailTip?.strokeId === strokeId ? this.trailTip : null
                     );
                     const historySource = this.trail.slice(historyStart, firstKeep + 1);
-                    const simplifiedHistory = simplifyCurveTrailPath(historySource);
+                    const simplifiedHistory = stabilizeCurveTrailPath(historySource, tolerancePx);
                     const history = simplifiedHistory.slice(0, -1).slice(-historyBudget);
                     this.trail.splice(0, firstKeep, ...history);
                 }
 
-                appendTrail(x, y, born, strokeId) {
+                appendTrail(x, y, born, trailBorn, strokeId) {
                     const retraction = this.trailRetractions.get(strokeId);
-                    if (retraction) retraction.latestBorn = Math.max(retraction.latestBorn, born);
+                    if (retraction) {
+                        retraction.latestTrailBorn = Math.max(retraction.latestTrailBorn, trailBorn);
+                    }
                     const last = this.trail[this.trail.length - 1];
                     if (last && last.strokeId === strokeId && Math.hypot(last.x - x, last.y - y) < 0.05) {
                         last.x = x;
                         last.y = y;
                         last.born = born;
+                        last.trailBorn = trailBorn;
                         return;
                     }
-                    this.trail.push({ x, y, born, strokeId });
+                    this.trail.push({ x, y, born, trailBorn, strokeId });
                     this.trimTrailCapacity();
                 }
 
@@ -1129,9 +1197,11 @@
                         return;
                     }
 
-                    this.trailTip = { x, y, born: time, strokeId: this.strokeId };
                     const retraction = this.trailRetractions.get(this.strokeId);
-                    if (retraction) retraction.latestBorn = Math.max(retraction.latestBorn, time);
+                    if (!retraction) return;
+                    const trailBorn = this.advanceTrailInputClock(retraction, time);
+                    this.trailTip = { x, y, born: time, trailBorn, strokeId: this.strokeId };
+                    retraction.latestTrailBorn = Math.max(retraction.latestTrailBorn, trailBorn);
                     const origin = this.trailEmit;
                     const dx = x - origin.x;
                     const dy = y - origin.y;
@@ -1149,9 +1219,16 @@
                         const point = {
                             x: origin.x + dx * p,
                             y: origin.y + dy * p,
-                            time: lerp(origin.time, time, p)
+                            time: lerp(origin.time, time, p),
+                            trailBorn: lerp(origin.trailBorn, trailBorn, p)
                         };
-                        this.appendTrail(point.x, point.y, point.time, this.strokeId);
+                        this.appendTrail(
+                            point.x,
+                            point.y,
+                            point.time,
+                            point.trailBorn,
+                            this.strokeId
+                        );
                         this.trailEmit = point;
                     }
                 }
@@ -1256,7 +1333,8 @@
                             continue;
                         }
                         let firstAlive = strokeStart;
-                        while (firstAlive < readIndex && this.trail[firstAlive].born < cutoff) {
+                        while (firstAlive < readIndex &&
+                            pointTrailBorn(this.trail[firstAlive]) < cutoff) {
                             firstAlive++;
                         }
                         if (firstAlive === readIndex && retraction?.ended) {
@@ -1264,7 +1342,15 @@
                             continue;
                         }
                         const copyStart = this.applyCurveDraw
-                            ? curveTrailHistoryStart(this.trail, strokeStart, readIndex, firstAlive)
+                            ? curveTrailHistoryStart(
+                                this.trail,
+                                strokeStart,
+                                readIndex,
+                                firstAlive,
+                                retraction?.curveFitTolerancePx ??
+                                    curveFitTolerancePx(this.worldToPx, currentRenderDpr()),
+                                this.trailTip?.strokeId === strokeId ? this.trailTip : null
+                            )
                             : Math.max(strokeStart, firstAlive - 1);
                         for (let index = copyStart; index < readIndex; index++) {
                             this.trail[writeIndex++] = this.trail[index];
@@ -1321,25 +1407,32 @@
                             return tip;
                         };
                         let firstAlive = 0;
-                        while (firstAlive < emittedCount && pointAt(firstAlive).born < cutoff) {
+                        while (firstAlive < emittedCount &&
+                            pointTrailBorn(pointAt(firstAlive)) < cutoff) {
                             firstAlive++;
                         }
                         if (firstAlive === emittedCount) continue;
 
                         if (this.applyCurveDraw) {
+                            const retraction = this.trailRetractions.get(strokeId);
+                            const tolerancePx = retraction?.curveFitTolerancePx ??
+                                curveFitTolerancePx(this.worldToPx, currentRenderDpr());
                             const absoluteFirstAlive = Math.min(strokeStart + firstAlive, emittedEnd);
                             const contextStart = curveTrailHistoryStart(
                                 this.trail,
                                 strokeStart,
                                 emittedEnd,
                                 absoluteFirstAlive,
+                                tolerancePx,
                                 appendTip ? tip : null
                             ) - strokeStart;
                             const points = [];
                             for (let index = contextStart; index < emittedCount; index++) {
                                 points.push(pointAt(index));
                             }
-                            points.cutoffBorn = cutoff;
+                            points.cutoffTrailBorn = cutoff;
+                            points.curveFitTolerancePx = tolerancePx;
+                            points.strokeId = strokeId;
                             if (points.length >= 2) result.push(points);
                             continue;
                         }
@@ -1348,8 +1441,18 @@
                         if (firstAlive > 0) {
                             const a = pointAt(firstAlive - 1);
                             const b = pointAt(firstAlive);
-                            const p = clamp((cutoff - a.born) / Math.max(0.001, b.born - a.born), 0, 1);
-                            points.push({ x: lerp(a.x, b.x, p), y: lerp(a.y, b.y, p), born: cutoff });
+                            const p = clamp(
+                                (cutoff - pointTrailBorn(a)) /
+                                    Math.max(0.001, pointTrailBorn(b) - pointTrailBorn(a)),
+                                0,
+                                1
+                            );
+                            points.push({
+                                x: lerp(a.x, b.x, p),
+                                y: lerp(a.y, b.y, p),
+                                born: lerp(a.born, b.born, p),
+                                trailBorn: cutoff
+                            });
                         }
                         for (let index = firstAlive; index < emittedCount; index++) {
                             points.push(pointAt(index));
@@ -1658,7 +1761,8 @@
                     this.blendMode = "disabled";
                     this.trailPointPool = [];
                     this.trailPointPoolCursor = 0;
-                    this.trailPointFactory = (x, y, born) => this.acquireTrailPoint(x, y, born);
+                    this.trailPointFactory = (x, y, born, trailBorn) =>
+                        this.acquireTrailPoint(x, y, born, trailBorn);
                     this.trailVertexScratch = [];
                     this.arcVertexScratch = [];
                     this.trailLengthScratch = new Float32Array(0);
@@ -1724,15 +1828,16 @@
                     return uniforms;
                 }
 
-                acquireTrailPoint(x, y, born) {
+                acquireTrailPoint(x, y, born, trailBorn) {
                     let point = this.trailPointPool[this.trailPointPoolCursor];
                     if (!point) {
-                        point = { x, y, born };
+                        point = { x, y, born, trailBorn };
                         this.trailPointPool[this.trailPointPoolCursor] = point;
                     } else {
                         point.x = x;
                         point.y = y;
                         point.born = born;
+                        point.trailBorn = trailBorn;
                     }
                     this.trailPointPoolCursor++;
                     return point;
@@ -1903,8 +2008,7 @@
                 resize() {
                     const width = Math.max(1, window.innerWidth);
                     const height = Math.max(1, window.innerHeight);
-                    const minimumDpr = width * height <= 3000000 ? 1.25 : 1;
-                    const dpr = clamp(Math.max(window.devicePixelRatio || 1, minimumDpr), 1, 2);
+                    const dpr = currentRenderDpr();
                     const pixelWidth = Math.max(1, Math.round(width * dpr));
                     const pixelHeight = Math.max(1, Math.round(height * dpr));
                     if (this.canvas.width === pixelWidth && this.canvas.height === pixelHeight &&
@@ -1948,8 +2052,7 @@
                 viewportNeedsResize() {
                     const width = Math.max(1, window.innerWidth);
                     const height = Math.max(1, window.innerHeight);
-                    const minimumDpr = width * height <= 3000000 ? 1.25 : 1;
-                    const dpr = clamp(Math.max(window.devicePixelRatio || 1, minimumDpr), 1, 2);
+                    const dpr = currentRenderDpr();
                     return this.cssWidth !== width || this.cssHeight !== height || this.dpr !== dpr;
                 }
 
@@ -2228,10 +2331,13 @@
                         );
                         const curveDrawEnabled = this.engine.applyCurveDraw;
                         const stabilizedPoints = curveDrawEnabled
-                            ? simplifyCurveTrailPath(simplifyTrailPath(
+                            ? stabilizeCurveTrailPath(
                                 sourcePoints,
-                                Math.max(renderSegmentPx, jitterTolerancePx * TRAIL_CURVE_FIT_TOLERANCE_RATIO)
-                            ))
+                                sourcePoints.curveFitTolerancePx ?? curveFitTolerancePx(
+                                    this.engine.worldToPx,
+                                    this.dpr
+                                )
+                            )
                             : simplifyTrailPath(sourcePoints, jitterTolerancePx);
                         this.trailPointPoolCursor = 0;
                         const sampledPoints = curveDrawEnabled
@@ -2240,7 +2346,7 @@
                         const points = curveDrawEnabled
                             ? clipTrailPathToCutoff(
                                 sampledPoints,
-                                sourcePoints.cutoffBorn,
+                                sourcePoints.cutoffTrailBorn,
                                 this.trailPointFactory
                             )
                             : sampledPoints;

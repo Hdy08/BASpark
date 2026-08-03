@@ -49,6 +49,7 @@ public class CurveTrailGeometryTests
                 Assert.True(double.IsFinite(point.X));
                 Assert.True(double.IsFinite(point.Y));
                 Assert.True(double.IsFinite(point.Born));
+                Assert.True(double.IsFinite(point.TrailBorn));
             });
             double maxStep = MaxStep(points);
             double maxTurnDegrees = MaxTurnDegrees(points);
@@ -63,6 +64,7 @@ public class CurveTrailGeometryTests
             for (int index = 1; index < points.Count; index++)
             {
                 Assert.True(points[index].Born >= points[index - 1].Born);
+                Assert.True(points[index].TrailBorn >= points[index - 1].TrailBorn);
             }
         }
     }
@@ -102,10 +104,12 @@ public class CurveTrailGeometryTests
             Assert.True(double.IsFinite(point.X));
             Assert.True(double.IsFinite(point.Y));
             Assert.True(double.IsFinite(point.Born));
+            Assert.True(double.IsFinite(point.TrailBorn));
         });
         for (int index = 1; index < points.Count; index++)
         {
             Assert.True(points[index].Born >= points[index - 1].Born);
+            Assert.True(points[index].TrailBorn >= points[index - 1].TrailBorn);
         }
     }
 
@@ -196,8 +200,7 @@ public class CurveTrailGeometryTests
             source.Add(new(x, Math.Round(x * 0.2), index * 16.7));
         }
 
-        List<TrailPoint> stabilized = SimplifyCurveTrailPath(
-            SimplifyTrailPath(source, CurveFitTolerancePx));
+        List<TrailPoint> stabilized = StabilizeCurveTrailPath(source);
         IReadOnlyList<TrailPoint> sampled = CurveTrailPath(stabilized, RenderSegmentPx);
 
         Assert.InRange(stabilized.Count, 2, 3);
@@ -257,47 +260,135 @@ public class CurveTrailGeometryTests
         IReadOnlyList<TrailPoint> clipped = ClipTrailPathToCutoff(sampled, 150);
 
         Assert.True(clipped.Count > 2, "The final curved source segment collapsed to a line.");
-        Assert.Equal(150, clipped[0].Born, 10);
+        Assert.Equal(150, clipped[0].TrailBorn, 10);
         Assert.Equal(source[^1], clipped[^1]);
-        Assert.All(clipped, point => Assert.True(point.Born >= 150));
+        Assert.All(clipped, point => Assert.True(point.TrailBorn >= 150));
         Assert.True(
             MaxDistanceFromChord(clipped) > 0.5,
             "The visible final segment no longer retains its original curvature.");
     }
 
     [Fact]
+    public void CurveRetraction_PreservesExistingGeometryForMinimalHistoryFixture()
+    {
+        double[] y = [-0.9, -0.8, -1.8, -1.2, -2.7];
+        var source = new List<TrailPoint>();
+        for (int index = 0; index < y.Length; index++)
+        {
+            source.Add(new(
+                index * 5.4,
+                y[index],
+                1000 + index * 17,
+                index));
+        }
+
+        int firstAlive = source.FindIndex(point => point.TrailBorn >= 2.25);
+        Assert.Equal(0, CurveTrailHistoryStart(
+            source,
+            0,
+            source.Count,
+            firstAlive,
+            CurveFitTolerancePx));
+
+        AssertRetractionPruningPreservesGeometry(
+            source,
+            Enumerable.Range(1, 15).Select(index => index * 0.25));
+    }
+
+    [Fact]
+    public void CurveRetraction_PreservesExistingGeometryForSlowNoisyCurve()
+    {
+        var source = new List<TrailPoint>();
+        for (int index = 0; index < 45; index++)
+        {
+            double y = 20 * Math.Sin(index / 8.0) + (index % 2 == 0 ? -0.45 : 0.45);
+            source.Add(new(
+                index * 5.4,
+                y,
+                5000 + index * 16.7,
+                index));
+        }
+
+        AssertRetractionPruningPreservesGeometry(
+            source,
+            Enumerable.Range(1, 175).Select(index => index * 0.25),
+            requireDestructivePrune: true);
+    }
+
+    [Fact]
+    public void CurveRetraction_PreservesExistingGeometryWithLiveTipContext()
+    {
+        double[] y = [-0.1, 0.7, -0.7, -0.5, 0.4, -1.1, -0.7];
+        var source = new List<TrailPoint>();
+        for (int index = 0; index < y.Length; index++)
+        {
+            source.Add(new(
+                index * 5.4,
+                y[index],
+                9000 + index * 13,
+                index));
+        }
+        var liveTip = new TrailPoint(7 * 5.4, 0, 9100, 7);
+
+        int firstAlive = source.FindIndex(point => point.TrailBorn >= 4.25);
+        Assert.Equal(1, CurveTrailHistoryStart(
+            source,
+            0,
+            source.Count,
+            firstAlive,
+            CurveFitTolerancePx));
+        Assert.Equal(0, CurveTrailHistoryStart(
+            source,
+            0,
+            source.Count,
+            firstAlive,
+            CurveFitTolerancePx,
+            liveTip));
+
+        AssertRetractionPruningPreservesGeometry(
+            source,
+            Enumerable.Range(17, 11).Select(index => index * 0.25),
+            liveTip);
+    }
+
+    [Fact]
     public void CurveRetraction_PreservesTurnAnchorAfterDenseHistoryPruning()
     {
         var source = new List<TrailPoint>();
-        double born = 0;
+        double trailBorn = 0;
         for (double x = 0; x <= 100; x += 5)
         {
-            source.Add(new(x, 0, born++));
+            source.Add(new(x, 0, 1000 + trailBorn * 10, trailBorn++));
         }
         for (double y = 5; y <= 100; y += 5)
         {
-            source.Add(new(100, y, born++));
+            source.Add(new(100, y, 1000 + trailBorn * 10, trailBorn++));
         }
 
         const double firstCutoffBorn = 23.5;
-        int firstAlive = source.FindIndex(point => point.Born >= firstCutoffBorn);
+        int firstAlive = source.FindIndex(point => point.TrailBorn >= firstCutoffBorn);
         List<TrailPoint> oldRawHistory = source[Math.Max(0, firstAlive - 2)..];
         IReadOnlyList<TrailPoint> oldClipped = ClipTrailPathToCutoff(
-            CurveTrailPath(SimplifyCurveTrailPath(oldRawHistory), RenderSegmentPx),
+            CurveTrailPath(StabilizeCurveTrailPath(oldRawHistory), RenderSegmentPx),
             firstCutoffBorn);
 
         var retained = new List<TrailPoint>(source);
         for (double cutoffBorn = firstCutoffBorn; cutoffBorn <= 39.5; cutoffBorn += 0.5)
         {
-            firstAlive = retained.FindIndex(point => point.Born >= cutoffBorn);
-            int historyStart = CurveTrailHistoryStart(retained, 0, retained.Count, firstAlive);
+            firstAlive = retained.FindIndex(point => point.TrailBorn >= cutoffBorn);
+            int historyStart = CurveTrailHistoryStart(
+                retained,
+                0,
+                retained.Count,
+                firstAlive,
+                CurveFitTolerancePx);
             retained = retained[historyStart..];
 
             IReadOnlyList<TrailPoint> actual = ClipTrailPathToCutoff(
-                CurveTrailPath(SimplifyCurveTrailPath(retained), RenderSegmentPx),
+                CurveTrailPath(StabilizeCurveTrailPath(retained), RenderSegmentPx),
                 cutoffBorn);
             IReadOnlyList<TrailPoint> expected = ClipTrailPathToCutoff(
-                CurveTrailPath(SimplifyCurveTrailPath(source), RenderSegmentPx),
+                CurveTrailPath(StabilizeCurveTrailPath(source), RenderSegmentPx),
                 cutoffBorn);
 
             AssertPathEqual(expected, actual);
@@ -314,27 +405,180 @@ public class CurveTrailGeometryTests
     [Fact]
     public void CurveCapacityCompaction_PreservesHistoricalTurnAnchors()
     {
+        const double inputSpacing = 5.4;
         var source = new List<TrailPoint>();
         double born = 0;
         for (int x = 0; x <= 400; x++)
         {
-            source.Add(new(x * 0.5, 0, born++));
+            source.Add(new(x * inputSpacing, 0, born++));
         }
         for (int y = 1; y <= 599; y++)
         {
-            source.Add(new(200, y * 0.5, born++));
+            source.Add(new(400 * inputSpacing, y * inputSpacing, born++));
         }
 
-        List<TrailPoint> compacted = CompactCurveTrailCapacity(source, 512);
-        List<TrailPoint> simplified = SimplifyCurveTrailPath(compacted);
+        var compacted = new List<TrailPoint>();
+        foreach (TrailPoint point in source)
+        {
+            compacted.Add(point);
+            compacted = CompactCurveTrailCapacity(compacted, 512);
+        }
+        List<TrailPoint> simplified = StabilizeCurveTrailPath(compacted);
+        List<TrailPoint> expected = StabilizeCurveTrailPath(source);
         List<TrailPoint> oldHardTrim = source[^512..];
 
         Assert.True(compacted.Count <= 512);
         Assert.Equal(3, simplified.Count);
+        AssertPathEqual(expected, simplified);
         Assert.Equal(source[0], simplified[0]);
         Assert.Equal(source[400], simplified[1]);
         Assert.True(MaxDistanceFromChord(CurveTrailPath(simplified, RenderSegmentPx)) > 5);
-        Assert.Equal(2, SimplifyCurveTrailPath(oldHardTrim).Count);
+        Assert.Equal(2, StabilizeCurveTrailPath(oldHardTrim).Count);
+    }
+
+    [Fact]
+    public void CurveRetraction_RemainsStableAfterRepeatedCapacityCompaction()
+    {
+        const int maximumPoints = 512;
+        var retained = new List<TrailPoint>();
+        for (int index = 0; index < 1024; index++)
+        {
+            double y = 30 * Math.Sin(index / 35.0) + (index % 2 == 0 ? -0.45 : 0.45);
+            retained.Add(new(
+                index * 5.4,
+                y,
+                5000 + index * 16.7,
+                index));
+            retained = CompactCurveTrailCapacity(retained, maximumPoints);
+        }
+
+        Assert.True(retained.Count <= maximumPoints);
+        double firstTrailBorn = retained[0].TrailBorn;
+        double retainedSpan = retained[^1].TrailBorn - firstTrailBorn;
+        AssertRetractionPruningPreservesGeometry(
+            retained,
+            Enumerable.Range(1, 24).Select(index =>
+                firstTrailBorn + retainedSpan * index / 30),
+            requireDestructivePrune: true);
+    }
+
+    private static void AssertRetractionPruningPreservesGeometry(
+        IReadOnlyList<TrailPoint> source,
+        IEnumerable<double> cutoffs,
+        TrailPoint? liveTip = null,
+        bool requireDestructivePrune = false)
+    {
+        var fullSource = new List<TrailPoint>(source);
+        if (liveTip.HasValue)
+        {
+            fullSource.Add(liveTip.Value);
+        }
+        IReadOnlyList<TrailPoint> fixedCurve = CurveTrailPath(
+            StabilizeCurveTrailPath(fullSource),
+            RenderSegmentPx);
+        var retained = new List<TrailPoint>(source);
+        IReadOnlyList<TrailPoint>? previousFrame = null;
+        bool pruned = false;
+
+        foreach (double cutoffTrailBorn in cutoffs)
+        {
+            int firstAlive = retained.FindIndex(point => point.TrailBorn >= cutoffTrailBorn);
+            if (firstAlive < 0)
+            {
+                firstAlive = retained.Count;
+            }
+            int historyStart = CurveTrailHistoryStart(
+                retained,
+                0,
+                retained.Count,
+                firstAlive,
+                CurveFitTolerancePx,
+                liveTip);
+            pruned |= historyStart > 0;
+            retained = retained[historyStart..];
+
+            var frameSource = new List<TrailPoint>(retained);
+            if (liveTip.HasValue)
+            {
+                frameSource.Add(liveTip.Value);
+            }
+            IReadOnlyList<TrailPoint> actual = ClipTrailPathToCutoff(
+                CurveTrailPath(StabilizeCurveTrailPath(frameSource), RenderSegmentPx),
+                cutoffTrailBorn);
+            IReadOnlyList<TrailPoint> expected = ClipTrailPathToCutoff(
+                fixedCurve,
+                cutoffTrailBorn);
+
+            AssertPathEqual(expected, actual);
+            if (previousFrame is not null)
+            {
+                AssertCommonGeometryEqual(previousFrame, actual, cutoffTrailBorn);
+            }
+            previousFrame = actual;
+        }
+
+        if (requireDestructivePrune)
+        {
+            Assert.True(pruned, "The fixture did not exercise destructive history pruning.");
+        }
+    }
+
+    private static void AssertCommonGeometryEqual(
+        IReadOnlyList<TrailPoint> previous,
+        IReadOnlyList<TrailPoint> current,
+        double cutoffTrailBorn)
+    {
+        if (previous.Count < 2 || current.Count < 2)
+        {
+            return;
+        }
+
+        double endTrailBorn = Math.Min(previous[^1].TrailBorn, current[^1].TrailBorn);
+        int comparisonCount = 0;
+        for (double trailBorn = cutoffTrailBorn + 0.125;
+             trailBorn <= endTrailBorn + 0.000000001;
+             trailBorn += 0.125)
+        {
+            TrailPoint previousPoint = InterpolateAtTrailBorn(previous, trailBorn);
+            TrailPoint currentPoint = InterpolateAtTrailBorn(current, trailBorn);
+            Assert.Equal(previousPoint.X, currentPoint.X, 8);
+            Assert.Equal(previousPoint.Y, currentPoint.Y, 8);
+            Assert.Equal(previousPoint.Born, currentPoint.Born, 8);
+            Assert.Equal(trailBorn, currentPoint.TrailBorn, 8);
+            comparisonCount++;
+        }
+        Assert.True(comparisonCount > 0, "Successive frames did not retain any comparable curve geometry.");
+    }
+
+    private static TrailPoint InterpolateAtTrailBorn(
+        IReadOnlyList<TrailPoint> source,
+        double trailBorn)
+    {
+        if (trailBorn <= source[0].TrailBorn)
+        {
+            return source[0];
+        }
+        for (int index = 1; index < source.Count; index++)
+        {
+            TrailPoint after = source[index];
+            if (after.TrailBorn < trailBorn)
+            {
+                continue;
+            }
+
+            TrailPoint before = source[index - 1];
+            double progress = Math.Clamp(
+                (trailBorn - before.TrailBorn) /
+                    Math.Max(0.001, after.TrailBorn - before.TrailBorn),
+                0,
+                1);
+            return new(
+                Lerp(before.X, after.X, progress),
+                Lerp(before.Y, after.Y, progress),
+                Lerp(before.Born, after.Born, progress),
+                trailBorn);
+        }
+        return source[^1];
     }
 
     private static List<TrailPoint> SimplifyCurveTrailPath(IReadOnlyList<TrailPoint> source)
@@ -382,6 +626,7 @@ public class CurveTrailGeometryTests
         int strokeStart,
         int strokeEnd,
         int firstAlive,
+        double tolerancePx,
         TrailPoint? virtualEnd = null)
     {
         int effectiveStrokeEnd = strokeEnd + (virtualEnd.HasValue ? 1 : 0);
@@ -390,35 +635,28 @@ public class CurveTrailGeometryTests
             return strokeStart;
         }
 
-        TrailPoint PointAt(int index) => index < strokeEnd ? source[index] : virtualEnd!.Value;
-
-        int previousIndex = strokeStart;
+        List<TrailPoint> fitSource = source
+            .Skip(strokeStart)
+            .Take(strokeEnd - strokeStart)
+            .ToList();
+        if (virtualEnd.HasValue)
+        {
+            fitSource.Add(virtualEnd.Value);
+        }
+        List<TrailPoint> anchors = StabilizeCurveTrailPath(fitSource, tolerancePx);
         int olderAnchorIndex = strokeStart;
         int newerAnchorIndex = strokeStart;
-
-        void RememberAnchor(int index)
+        foreach (TrailPoint anchor in anchors)
         {
-            if (index >= firstAlive)
+            int index = virtualEnd.HasValue && anchor.Equals(virtualEnd.Value)
+                ? strokeEnd
+                : IndexOf(source, anchor, strokeStart, strokeEnd);
+            if (index < strokeStart || index >= firstAlive)
             {
-                return;
+                break;
             }
             olderAnchorIndex = newerAnchorIndex;
             newerAnchorIndex = index;
-        }
-
-        for (int index = strokeStart + 1; index < effectiveStrokeEnd - 1; index++)
-        {
-            if (!CurveTrailAnchorNeeded(PointAt(previousIndex), PointAt(index), PointAt(index + 1)))
-            {
-                continue;
-            }
-            previousIndex = index;
-            RememberAnchor(index);
-        }
-        int lastIndex = effectiveStrokeEnd - 1;
-        if (lastIndex < firstAlive)
-        {
-            RememberAnchor(lastIndex);
         }
         return olderAnchorIndex;
     }
@@ -434,12 +672,17 @@ public class CurveTrailGeometryTests
 
         const int historyBudget = 2;
         int firstKeep = source.Count - (maximumPoints - historyBudget);
-        int historyStart = CurveTrailHistoryStart(source, 0, source.Count, firstKeep);
+        int historyStart = CurveTrailHistoryStart(
+            source,
+            0,
+            source.Count,
+            firstKeep,
+            CurveFitTolerancePx);
         List<TrailPoint> historySource = source
             .Skip(historyStart)
             .Take(firstKeep - historyStart + 1)
             .ToList();
-        List<TrailPoint> simplifiedHistory = SimplifyCurveTrailPath(historySource);
+        List<TrailPoint> simplifiedHistory = StabilizeCurveTrailPath(historySource);
         List<TrailPoint> history = simplifiedHistory[..^1].TakeLast(historyBudget).ToList();
         history.AddRange(source.Skip(firstKeep));
         return history;
@@ -461,7 +704,8 @@ public class CurveTrailGeometryTests
             result.Add(new(
                 Lerp(origin.X, target.X, progress),
                 Lerp(origin.Y, target.Y, progress),
-                Lerp(origin.Born, target.Born, progress)));
+                Lerp(origin.Born, target.Born, progress),
+                Lerp(origin.TrailBorn, target.TrailBorn, progress)));
         }
 
         return result;
@@ -508,8 +752,10 @@ public class CurveTrailGeometryTests
         return simplified;
     }
 
-    private static List<TrailPoint> StabilizeCurveTrailPath(IReadOnlyList<TrailPoint> source) =>
-        SimplifyCurveTrailPath(SimplifyTrailPath(source, CurveFitTolerancePx));
+    private static List<TrailPoint> StabilizeCurveTrailPath(
+        IReadOnlyList<TrailPoint> source,
+        double tolerancePx = CurveFitTolerancePx) =>
+        SimplifyCurveTrailPath(SimplifyTrailPath(source, tolerancePx));
 
     private static List<TrailPoint> CurveTrailPath(IReadOnlyList<TrailPoint> source, double renderSegmentPx)
     {
@@ -530,7 +776,11 @@ public class CurveTrailGeometryTests
                 return;
             }
 
-            result.Add(new(x, y, Lerp(a0.Born, a1.Born, progress)));
+            result.Add(new(
+                x,
+                y,
+                Lerp(a0.Born, a1.Born, progress),
+                Lerp(a0.TrailBorn, a1.TrailBorn, progress)));
         }
 
         void SampleCubic(
@@ -688,15 +938,17 @@ public class CurveTrailGeometryTests
         return result;
     }
 
-    private static List<TrailPoint> ClipTrailPathToCutoff(IReadOnlyList<TrailPoint> source, double cutoffBorn)
+    private static List<TrailPoint> ClipTrailPathToCutoff(
+        IReadOnlyList<TrailPoint> source,
+        double cutoffTrailBorn)
     {
-        if (source.Count < 2 || !double.IsFinite(cutoffBorn))
+        if (source.Count < 2 || !double.IsFinite(cutoffTrailBorn))
         {
             return [.. source];
         }
 
         int firstAlive = 0;
-        while (firstAlive < source.Count && source[firstAlive].Born < cutoffBorn)
+        while (firstAlive < source.Count && source[firstAlive].TrailBorn < cutoffTrailBorn)
         {
             firstAlive++;
         }
@@ -712,15 +964,17 @@ public class CurveTrailGeometryTests
         TrailPoint before = source[firstAlive - 1];
         TrailPoint after = source[firstAlive];
         double progress = Math.Clamp(
-            (cutoffBorn - before.Born) / Math.Max(0.001, after.Born - before.Born),
+            (cutoffTrailBorn - before.TrailBorn) /
+                Math.Max(0.001, after.TrailBorn - before.TrailBorn),
             0,
             1);
         double x = Lerp(before.X, after.X, progress);
         double y = Lerp(before.Y, after.Y, progress);
+        double born = Lerp(before.Born, after.Born, progress);
         var result = new List<TrailPoint>(source.Count - firstAlive + 1);
         if (Distance(x, y, after.X, after.Y) >= 0.0001)
         {
-            result.Add(new(x, y, cutoffBorn));
+            result.Add(new(x, y, born, cutoffTrailBorn));
         }
         for (int index = firstAlive; index < source.Count; index++)
         {
@@ -826,7 +1080,24 @@ public class CurveTrailGeometryTests
             Assert.Equal(expected[index].X, actual[index].X, 9);
             Assert.Equal(expected[index].Y, actual[index].Y, 9);
             Assert.Equal(expected[index].Born, actual[index].Born, 9);
+            Assert.Equal(expected[index].TrailBorn, actual[index].TrailBorn, 9);
         }
+    }
+
+    private static int IndexOf(
+        IReadOnlyList<TrailPoint> source,
+        TrailPoint point,
+        int start,
+        int end)
+    {
+        for (int index = start; index < end; index++)
+        {
+            if (source[index].Equals(point))
+            {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private static double Distance(TrailPoint a, TrailPoint b) => Distance(a.X, a.Y, b.X, b.Y);
@@ -838,5 +1109,15 @@ public class CurveTrailGeometryTests
 
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;
 
-    private readonly record struct TrailPoint(double X, double Y, double Born);
+    private readonly record struct TrailPoint(
+        double X,
+        double Y,
+        double Born,
+        double TrailBorn)
+    {
+        public TrailPoint(double x, double y, double born)
+            : this(x, y, born, born)
+        {
+        }
+    }
 }
