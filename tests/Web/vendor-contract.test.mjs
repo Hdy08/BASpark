@@ -6,7 +6,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const expectedSha256 =
-  '038A80308F04517BFF69C0A8AB37776F1D0412D80E455E8508E21F51FA7B3839';
+  '66009D7C1B662B27AE9CF283F025F9A59750B5F38E5953EEF49ECA9D2C0DA7B7';
 const vendorPath = new URL(
   '../../src/Web/vendor/ba-click-fx.iife.js',
   import.meta.url,
@@ -20,6 +20,8 @@ const legacyTemplatePath = new URL(
 
 function createLegacyHarness()
 {
+  const eventListeners = new Map();
+
   function createContext()
   {
     return {
@@ -97,8 +99,9 @@ function createLegacyHarness()
   };
   const windowMock =
   {
-    addEventListener()
+    addEventListener(type, listener)
     {
+      eventListeners.set(type, listener);
     },
     devicePixelRatio: 1,
     innerHeight: 600,
@@ -149,16 +152,27 @@ function createLegacyHarness()
 
   return {
     bufferContext,
+    eventListeners,
     window: windowMock,
   };
 }
 
-test('vendored artifact matches the reviewed v1.2.23 build', () =>
+test('vendored artifact matches BASpark\'s reviewed 1px sampling patch', () =>
 {
   const bytes = readFileSync(vendorPath);
   const actual = createHash('sha256').update(bytes).digest('hex').toUpperCase();
 
   assert.equal(actual, expectedSha256);
+});
+
+test('vendored renderer uses a fixed 1px trail sample threshold', () =>
+{
+  const source = readFileSync(vendorPath, 'utf8');
+
+  assert.equal(
+    source.includes('i=this._getScale(),a=1;if(r<a)return;let o=Math.min(512,Math.floor(r/a))'),
+    true,
+  );
 });
 
 test('vendored IIFE exposes every host API required by BASpark', () =>
@@ -239,11 +253,18 @@ test('renderer template contains one deterministic injection marker', () =>
 test('legacy renderer applies independent trail and click scales', () =>
 {
   const harness = createLegacyHarness();
-  const { bufferContext, window } = harness;
+  const { bufferContext, eventListeners, window } = harness;
 
   assert.equal(window.spark.scale, 1);
   assert.equal(window.spark.trailScale, 1);
   assert.equal(window.spark.clickScale, 1);
+
+  const mouseMove = eventListeners.get('mousemove');
+  assert.equal(typeof mouseMove, 'function');
+  window.spark.isDown = true;
+  window.spark.lastPos = { x: 10, y: 10 };
+  mouseMove({ clientX: 11, clientY: 10 });
+  assert.equal(window.spark.trail.length, 1);
 
   window.externalTrailStart(0.5, 0.25);
   assert.equal(window.spark.isDown, true);

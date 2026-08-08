@@ -20,7 +20,6 @@
         [
             'trail.geometryWidth',
             'trail.width',
-            'trail.minVertexDistance',
             'trail.outerGlowWidth',
             'shards.trailRadius',
             'shards.trailSpeedMin',

@@ -112,7 +112,7 @@
                         this.lastPos = p;
                         return;
                     }
-                    if (dist(p, prev) > 2) {
+                    if (dist(p, prev) >= 1) {
                         this.trail.push({ x: p.x, y: p.y, life: 1 });
                         if (this.trail.length > this.maxTrail) this.trail.shift();
 

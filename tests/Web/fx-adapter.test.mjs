@@ -292,7 +292,7 @@ test('maps independent trail and click scales to the renderer', () =>
   assert.equal(settings.scale, 2);
   assert.equal(patch['trail.geometryWidth'], 1);
   assert.equal(patch['trail.width'], 0.75);
-  assert.equal(patch['trail.minVertexDistance'], 1.25);
+  assert.equal(patch['trail.minVertexDistance'], undefined);
   assert.equal(patch['trail.outerGlowWidth'], 1.75);
   assert.equal(patch['shards.trailRadius'], 2.75);
   assert.equal(patch['shards.trailSpeedMin'], 3.25);
