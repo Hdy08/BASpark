@@ -91,6 +91,21 @@ public class DarkThemeUiTests
     }
 
     [Fact]
+    public void AnimationSpeedHint_FollowsTheLinkedSpeedToggle()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement toggle = GetNamedElement(document, "CheckLinkedAnimationSpeed");
+        XElement hint = GetNamedElement(document, "TxtLinkedSpeedHint");
+        XElement parent = Assert.IsType<XElement>(toggle.Parent);
+        List<XElement> children = parent.Elements().ToList();
+
+        Assert.Same(parent, hint.Parent);
+        Assert.Equal(children.IndexOf(toggle) + 1, children.IndexOf(hint));
+        Assert.True(children.IndexOf(hint) < children.IndexOf(GetNamedElement(document, "PanelUnifiedAnimationSpeed")));
+        Assert.True(children.IndexOf(hint) < children.IndexOf(GetNamedElement(document, "PanelSplitAnimationSpeed")));
+    }
+
+    [Fact]
     public void ThemeManager_UsesSeparatePalettesAndRestoresLightControlStyles()
     {
         string source = ReadSource("src", "ThemeManager.cs");
