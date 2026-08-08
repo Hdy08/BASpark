@@ -6,7 +6,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const expectedSha256 =
-  '66009D7C1B662B27AE9CF283F025F9A59750B5F38E5953EEF49ECA9D2C0DA7B7';
+  '90347D99C70CE196C01D851FF1C2EF6821515CBADCEF429E81259AD42C508328';
 const vendorPath = new URL(
   '../../src/Web/vendor/ba-click-fx.iife.js',
   import.meta.url,
@@ -179,7 +179,7 @@ function createLegacyHarness()
   };
 }
 
-test('vendored artifact matches BASpark\'s reviewed 1px sampling patch', () =>
+test('vendored artifact matches BASpark\'s reviewed local patches', () =>
 {
   const bytes = readFileSync(vendorPath);
   const actual = createHash('sha256').update(bytes).digest('hex').toUpperCase();
@@ -194,6 +194,32 @@ test('vendored renderer uses a fixed 1px trail sample threshold', () =>
   assert.equal(
     source.includes('i=this._getScale(),a=1;if(r<a)return;let o=Math.min(512,Math.floor(r/a))'),
     true,
+  );
+});
+
+test('vendored renderer fades disk emission with lifecycle alpha on every renderer path', () =>
+{
+  const source = readFileSync(vendorPath, 'utf8');
+
+  assert.match(
+    source,
+    /float particleAlpha = clamp\(v_particleAlpha, 0\.0, 1\.0\);\s+vec3 color = sampleColor\.rgb \*\s+max\(v_materialColor, vec3\(0\.0\)\) \* textureAlpha \* particleAlpha \*\s+max\(u_emissionScale, 0\.0\);/,
+  );
+  assert.match(
+    source,
+    /let particleAlpha = clamp\(input\.particleAlpha, 0\.0, 1\.0\);\s+let color = sampleColor\.rgb \* max\(input\.color, vec3f\(0\.0\)\) \*\s+textureAlpha \* particleAlpha \* max\(geometry\.diskEmissionScale, 0\.0\);/,
+  );
+  assert.match(
+    source,
+    /f=Ni\(Y\(s\.alphaKeys,n\)\*i\*c\.diskAlpha,c\.clickEmissionScale\)/,
+  );
+  assert.match(
+    source,
+    /d=Y\(o\.alphaKeys,n\)\*i\*s\.diskEmissionAlpha/,
+  );
+  assert.match(
+    source,
+    /s=Y\(i\.alphaKeys,r\)\*n\*a\.diskEmissionAlpha\*a\.clickEmissionScale/,
   );
 });
 
