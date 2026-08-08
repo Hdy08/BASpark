@@ -15,8 +15,7 @@
             opacity: 1,
             trailSpeed: 1,
             clickSpeed: 1,
-            trailGlowIntensity: 1,
-            clickGlowIntensity: 1,
+            glowIntensity: 1,
         });
     const TRAIL_SCALE_PARAM_PATHS = Object.freeze(
         [
@@ -28,11 +27,6 @@
             'shards.trailSpeedMax',
             'shards.trailSpacing',
         ]);
-    const GLOW_INTENSITY_PARAM_PATHS = Object.freeze(
-        {
-            trail: 'bloom.trailEmission',
-            click: 'bloom.clickEmissionScale',
-        });
     const DOM_CONTENT_LOADED_OPTIONS =
     {
         once: true,
@@ -55,10 +49,7 @@
         trailScaleBaseline: null,
         appliedTrailScaleRatio: 1,
         glowIntensityBaseline: null,
-        appliedTrailGlowIntensity: 1,
-        appliedClickGlowIntensity: 1,
-        shardGlowIntensityPatchPrototype: null,
-        shardGlowIntensityConfigCache: null,
+        appliedGlowIntensity: 1,
         lastBoomX: -1,
         lastBoomY: -1,
         lastBoomTime: 0,
@@ -240,7 +231,6 @@
         applyTrailScale();
         applyTrailShardScale();
         applyGlowIntensity();
-        installShardGlowIntensityShim();
     }
 
     function parseRgbColor(rgbString)
@@ -354,27 +344,15 @@
         }
 
         const config = state.fx.getFxConfig();
-        const trail = readFxConfigNumber(
-            config,
-            GLOW_INTENSITY_PARAM_PATHS.trail,
-        );
-        const click = readFxConfigNumber(
-            config,
-            GLOW_INTENSITY_PARAM_PATHS.click,
-        );
+        const intensity = readFxConfigNumber(config, 'bloom.intensity');
 
-        if (!Number.isFinite(trail) || !Number.isFinite(click))
+        if (!Number.isFinite(intensity))
         {
             return;
         }
 
-        state.glowIntensityBaseline =
-        {
-            trail,
-            click,
-        };
-        state.appliedTrailGlowIntensity = 1;
-        state.appliedClickGlowIntensity = 1;
+        state.glowIntensityBaseline = intensity;
+        state.appliedGlowIntensity = 1;
     }
 
     function getTrailScaleRatio()
@@ -463,16 +441,11 @@
             return;
         }
 
-        const trailGlowIntensity = state.settings.trailGlowIntensity;
-        const clickGlowIntensity = state.settings.clickGlowIntensity;
+        const glowIntensity = state.settings.glowIntensity;
 
         if (
-            !Number.isFinite(trailGlowIntensity) ||
-            !Number.isFinite(clickGlowIntensity) ||
-            (
-                Math.abs(trailGlowIntensity - state.appliedTrailGlowIntensity) < 0.000001 &&
-                Math.abs(clickGlowIntensity - state.appliedClickGlowIntensity) < 0.000001
-            )
+            !Number.isFinite(glowIntensity) ||
+            Math.abs(glowIntensity - state.appliedGlowIntensity) < 0.000001
         )
         {
             return;
@@ -480,10 +453,7 @@
 
         const result = state.fx.setFxParams(
             {
-                [GLOW_INTENSITY_PARAM_PATHS.trail]:
-                    state.glowIntensityBaseline.trail * trailGlowIntensity,
-                [GLOW_INTENSITY_PARAM_PATHS.click]:
-                    state.glowIntensityBaseline.click * clickGlowIntensity,
+                'bloom.intensity': state.glowIntensityBaseline * glowIntensity,
             },
             {
                 strict: true,
@@ -491,126 +461,12 @@
 
         if (result?.committed === true)
         {
-            state.appliedTrailGlowIntensity = trailGlowIntensity;
-            state.appliedClickGlowIntensity = clickGlowIntensity;
+            state.appliedGlowIntensity = glowIntensity;
         }
         else
         {
             console.warn('[BASpark FX] 辉光亮度参数未能应用。');
         }
-    }
-
-    function getShardGlowIntensityConfig(fxConfig, kind)
-    {
-        if (kind !== 'trail' && kind !== 'click')
-        {
-            return fxConfig;
-        }
-
-        const shards = fxConfig?.shards;
-        const baseIntensity = Number(shards?.hdrIntensity);
-        const trailIntensity = state.settings.trailGlowIntensity;
-        const clickIntensity = state.settings.clickGlowIntensity;
-
-        if (
-            !shards ||
-            !Number.isFinite(baseIntensity) ||
-            !Number.isFinite(trailIntensity) ||
-            !Number.isFinite(clickIntensity)
-        )
-        {
-            return fxConfig;
-        }
-
-        const intensity = kind === 'trail' ? trailIntensity : clickIntensity;
-
-        if (Math.abs(intensity - 1) < 0.000001)
-        {
-            return fxConfig;
-        }
-
-        const cache = state.shardGlowIntensityConfigCache;
-
-        if (
-            !cache ||
-            cache.sourceConfig !== fxConfig ||
-            cache.sourceShards !== shards ||
-            cache.baseIntensity !== baseIntensity ||
-            cache.trailIntensity !== trailIntensity ||
-            cache.clickIntensity !== clickIntensity
-        )
-        {
-            const trailConfig = Object.create(fxConfig);
-            const clickConfig = Object.create(fxConfig);
-
-            trailConfig.shards =
-            {
-                ...shards,
-                hdrIntensity: baseIntensity * trailIntensity,
-            };
-            clickConfig.shards =
-            {
-                ...shards,
-                hdrIntensity: baseIntensity * clickIntensity,
-            };
-
-            state.shardGlowIntensityConfigCache =
-            {
-                sourceConfig: fxConfig,
-                sourceShards: shards,
-                baseIntensity,
-                trailIntensity,
-                clickIntensity,
-                trailConfig,
-                clickConfig,
-            };
-        }
-
-        return kind === 'trail'
-            ? state.shardGlowIntensityConfigCache.trailConfig
-            : state.shardGlowIntensityConfigCache.clickConfig;
-    }
-
-    function installShardGlowIntensityShim()
-    {
-        if (state.shardGlowIntensityPatchPrototype || !state.fx)
-        {
-            return;
-        }
-
-        const shard = state.fx.shards?.[0];
-        const prototype = shard ? Object.getPrototypeOf(shard) : null;
-        const methodNames =
-        [
-            'draw',
-            'drawBloom',
-            'appendWebGLBloom',
-        ];
-
-        if (
-            !prototype ||
-            methodNames.some((methodName) =>
-            {
-                return typeof prototype[methodName] !== 'function';
-            })
-        )
-        {
-            return;
-        }
-
-        // Vendor shards share one HDR setting; render with a per-kind derived config.
-        for (const methodName of methodNames)
-        {
-            const original = prototype[methodName];
-
-            prototype[methodName] = function (...args)
-            {
-                args[3] = getShardGlowIntensityConfig(args[3], this.kind);
-                return original.apply(this, args);
-            };
-        }
-
-        state.shardGlowIntensityPatchPrototype = prototype;
     }
 
     window.externalBoom = function (percentX, percentY)
@@ -653,7 +509,6 @@
             if (accepted)
             {
                 state.activePointerKind = 'press';
-                installShardGlowIntensityShim();
             }
 
             return accepted;
@@ -695,7 +550,6 @@
                 if (accepted)
                 {
                     state.activePointerKind = 'press';
-                    installShardGlowIntensityShim();
                 }
 
                 return accepted;
@@ -745,7 +599,6 @@
             if (accepted)
             {
                 applyTrailShardScale();
-                installShardGlowIntensityShim();
             }
 
             if (
@@ -903,8 +756,7 @@
         opacity,
         trailSpeed,
         clickSpeed,
-        trailGlowIntensity,
-        clickGlowIntensity
+        glowIntensity
     )
     {
         const numericOpacity = Number(opacity);
@@ -928,13 +780,9 @@
                 : DEFAULT_SETTINGS.opacity,
             trailSpeed: safeTrailSpeed,
             clickSpeed: normalizeSpeed(clickSpeed, safeTrailSpeed),
-            trailGlowIntensity: normalizeGlowIntensity(
-                trailGlowIntensity,
-                DEFAULT_SETTINGS.trailGlowIntensity,
-            ),
-            clickGlowIntensity: normalizeGlowIntensity(
-                clickGlowIntensity,
-                DEFAULT_SETTINGS.clickGlowIntensity,
+            glowIntensity: normalizeGlowIntensity(
+                glowIntensity,
+                DEFAULT_SETTINGS.glowIntensity,
             ),
         };
 

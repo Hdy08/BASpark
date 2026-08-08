@@ -29,29 +29,6 @@ function createHarness(options = {})
   const windowListeners = new Map();
   const canvasListeners = new Map();
 
-  class FakeShard
-  {
-    constructor(kind)
-    {
-      this.kind = kind;
-    }
-
-    draw(...args)
-    {
-      this.drawConfig = args[3];
-    }
-
-    drawBloom(...args)
-    {
-      this.drawBloomConfig = args[3];
-    }
-
-    appendWebGLBloom(...args)
-    {
-      this.webglBloomConfig = args[3];
-    }
-  }
-
   class FakeFx
   {
     constructor(config)
@@ -121,8 +98,7 @@ function createHarness(options = {})
           trailSpacing: 19,
         },
         bloom: {
-          trailEmission: 23.968628,
-          clickEmissionScale: 1,
+          intensity: 1.7,
         },
       };
     }
@@ -232,7 +208,6 @@ function createHarness(options = {})
   return {
     calls,
     canvasListeners,
-    FakeShard,
     fx: FakeFx.instance,
     window: windowMock,
     windowListeners,
@@ -330,43 +305,22 @@ test('maps independent trail and click scales to the renderer', () =>
   assert.equal(patch['shards.trailSpacing'], 4.75);
 });
 
-test('maps independent trail and click glow brightness to the renderer', () =>
+test('maps unified glow brightness to Bloom intensity', () =>
 {
   const harness = createHarness();
 
-  harness.window.updateEffectSettings(1, 1, 1, 1, 1, 0, 3);
+  harness.window.updateEffectSettings(1, 1, 1, 1, 1, 1);
+  assert.equal(harness.calls.setFxParams.length, 0);
+
+  harness.window.updateEffectSettings(1, 1, 1, 1, 1, 0);
   let patch = harness.calls.setFxParams.at(-1).patch;
-  assert.equal(patch['bloom.trailEmission'], 0);
-  assert.equal(patch['bloom.clickEmissionScale'], 3);
+  assert.deepEqual(Object.keys(patch), ['bloom.intensity']);
+  assert.equal(patch['bloom.intensity'], 0);
 
-  harness.window.updateEffectSettings(1, 1, 1, 1, 1, 3, 0);
+  harness.window.updateEffectSettings(1, 1, 1, 1, 1, 3);
   patch = harness.calls.setFxParams.at(-1).patch;
-  assert.equal(patch['bloom.trailEmission'], 23.968628 * 3);
-  assert.equal(patch['bloom.clickEmissionScale'], 0);
-});
-
-test('scales trail and click shard glow separately without mutating renderer config', () =>
-{
-  const harness = createHarness();
-  const trailShard = new harness.FakeShard('trail');
-  const clickShard = new harness.FakeShard('click');
-  const fxConfig = harness.fx.getFxConfig();
-  harness.fx.shards.push(trailShard, clickShard);
-
-  harness.window.updateEffectSettings(1, 1, 1, 1, 1, 1, 1);
-  trailShard.draw(null, 1, 1, fxConfig);
-  assert.equal(trailShard.drawConfig, fxConfig);
-
-  harness.window.updateEffectSettings(1, 1, 1, 1, 1, 0, 3);
-
-  trailShard.draw(null, 1, 1, fxConfig);
-  clickShard.drawBloom(null, 1, 1, fxConfig);
-  clickShard.appendWebGLBloom(null, 1, 1, fxConfig);
-
-  assert.equal(trailShard.drawConfig.shards.hdrIntensity, 0);
-  assert.equal(clickShard.drawBloomConfig.shards.hdrIntensity, 5.992157 * 3);
-  assert.equal(clickShard.webglBloomConfig.shards.hdrIntensity, 5.992157 * 3);
-  assert.equal(fxConfig.shards.hdrIntensity, 5.992157);
+  assert.deepEqual(Object.keys(patch), ['bloom.intensity']);
+  assert.equal(patch['bloom.intensity'], 5.1);
 });
 
 test('starts a pressed trail without creating a click boom', () =>

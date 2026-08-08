@@ -222,17 +222,16 @@ namespace BASpark
             ExecuteScript($"if(window.updateColor) window.updateColor({colorJson});");
         }
 
-        public void UpdateEffectSettings(double trailScale, double clickScale, double opacity, double trailSpeed, double clickSpeed, double trailGlowIntensity, double clickGlowIntensity)
+        public void UpdateEffectSettings(double trailScale, double clickScale, double opacity, double trailSpeed, double clickSpeed, double glowIntensity)
         {
             string trailScaleStr = trailScale.ToString("F2", CultureInfo.InvariantCulture);
             string clickScaleStr = clickScale.ToString("F2", CultureInfo.InvariantCulture);
             string opacityStr = opacity.ToString("F2", CultureInfo.InvariantCulture);
             string trailStr = trailSpeed.ToString("F2", CultureInfo.InvariantCulture);
             string clickStr = clickSpeed.ToString("F2", CultureInfo.InvariantCulture);
-            string trailGlowStr = trailGlowIntensity.ToString("F2", CultureInfo.InvariantCulture);
-            string clickGlowStr = clickGlowIntensity.ToString("F2", CultureInfo.InvariantCulture);
+            string glowStr = glowIntensity.ToString("F2", CultureInfo.InvariantCulture);
 
-            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({trailScaleStr}, {clickScaleStr}, {opacityStr}, {trailStr}, {clickStr}, {trailGlowStr}, {clickGlowStr});");
+            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({trailScaleStr}, {clickScaleStr}, {opacityStr}, {trailStr}, {clickStr}, {glowStr});");
         }
 
         public void UpdateTrailRefreshRate(int hz)
@@ -590,8 +589,7 @@ namespace BASpark
             UpdateColor(ConfigManager.ParticleColor);
             ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
-            ConfigManager.GetGlowIntensitiesForOverlay(out double trailGlowIntensity, out double clickGlowIntensity);
-            UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSp, clickSp, trailGlowIntensity, clickGlowIntensity);
+            UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.GlowIntensity);
             SyncInputContext(InputModeMouse);
             ApplyEnvironmentInputSuppression();
             if (_overlayRuntimePaused)

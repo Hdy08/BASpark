@@ -301,8 +301,6 @@ test('legacy renderer applies independent trail and click scales', () =>
   assert.equal(window.spark.scale, 1);
   assert.equal(window.spark.trailScale, 1);
   assert.equal(window.spark.clickScale, 1);
-  assert.equal(window.spark.trailGlowIntensity, 1);
-  assert.equal(window.spark.clickGlowIntensity, 1);
 
   const mouseMove = eventListeners.get('mousemove');
   assert.equal(typeof mouseMove, 'function');
@@ -322,10 +320,8 @@ test('legacy renderer applies independent trail and click scales', () =>
   assert.equal(window.spark.scale, 1);
   assert.equal(window.spark.trailScale, 1);
   assert.equal(window.spark.clickScale, 1);
-  assert.equal(window.spark.trailGlowIntensity, 1);
-  assert.equal(window.spark.clickGlowIntensity, 1);
 
-  window.updateEffectSettings(0.5, 3, 1, 1, 1, 1, 1);
+  window.updateEffectSettings(0.5, 3, 1, 1, 1);
 
   const spark = window.spark;
   spark.trail = [{ x: 10, y: 10, life: 1 }];
@@ -369,10 +365,6 @@ test('legacy renderer applies independent trail and click scales', () =>
   spark._updateWaves(1);
 
   assert.equal(lineWidths.at(0), 0.8);
-
-  window.updateEffectSettings(1, 1, 1, 1, 1, 0, 3);
-  assert.equal(window.spark.trailGlowIntensity, 0);
-  assert.equal(window.spark.clickGlowIntensity, 3);
 });
 
 test('legacy environment filtering releases input without clearing existing effects', () =>

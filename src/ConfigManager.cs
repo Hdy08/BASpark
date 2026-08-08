@@ -21,9 +21,7 @@ namespace BASpark
         ClickAnimationSpeed = 1 << 6,
         TrailEffectScale = 1 << 7,
         ClickEffectScale = 1 << 8,
-        UnifiedGlowIntensity = 1 << 9,
-        TrailGlowIntensity = 1 << 10,
-        ClickGlowIntensity = 1 << 11
+        GlowIntensity = 1 << 9
     }
 
     public enum ProcessFilterModeOption
@@ -89,10 +87,7 @@ namespace BASpark
         public static double TrailEffectScale { get; set; } = 1.0;
         public static double ClickEffectScale { get; set; } = 1.0;
         public static double EffectOpacity { get; set; } = 1.0;
-        public static bool UseLinkedGlowIntensity { get; set; } = true;
         public static double GlowIntensity { get; set; } = 1.0;
-        public static double TrailGlowIntensity { get; set; } = 1.0;
-        public static double ClickGlowIntensity { get; set; } = 1.0;
         public static double EffectSpeed { get; set; } = 1.0;
         public static bool UseLinkedAnimationSpeed { get; set; } = true;
         public static bool ApplyCurveDraw { get; set; } = false;
@@ -160,10 +155,7 @@ namespace BASpark
                         TrailEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("TrailEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
                         ClickEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("ClickEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
                         EffectOpacity = Math.Clamp(Convert.ToDouble(key.GetValue("EffectOpacity", 1.0), CultureInfo.InvariantCulture), 0.1, 1.0);
-                        UseLinkedGlowIntensity = Convert.ToBoolean(key.GetValue("UseLinkedGlowIntensity", true));
                         GlowIntensity = Math.Clamp(Convert.ToDouble(key.GetValue("GlowIntensity", 1.0), CultureInfo.InvariantCulture), 0.0, 3.0);
-                        TrailGlowIntensity = Math.Clamp(Convert.ToDouble(key.GetValue("TrailGlowIntensity", GlowIntensity), CultureInfo.InvariantCulture), 0.0, 3.0);
-                        ClickGlowIntensity = Math.Clamp(Convert.ToDouble(key.GetValue("ClickGlowIntensity", GlowIntensity), CultureInfo.InvariantCulture), 0.0, 3.0);
                         EffectSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("EffectSpeed", 1.0), CultureInfo.InvariantCulture), 0.2, 3.0);
                         UseLinkedAnimationSpeed = Convert.ToBoolean(key.GetValue("UseLinkedAnimationSpeed", true));
                         ApplyCurveDraw = Convert.ToBoolean(key.GetValue("ApplyCurveDraw", false));
@@ -335,20 +327,6 @@ namespace BASpark
             }
         }
 
-        public static void GetGlowIntensitiesForOverlay(out double trailGlowIntensity, out double clickGlowIntensity)
-        {
-            if (UseLinkedGlowIntensity)
-            {
-                trailGlowIntensity = GlowIntensity;
-                clickGlowIntensity = GlowIntensity;
-            }
-            else
-            {
-                trailGlowIntensity = TrailGlowIntensity;
-                clickGlowIntensity = ClickGlowIntensity;
-            }
-        }
-
         public static List<FilterProfile> GetProfiles()
         {
             lock (_syncLock) { return [.. _profiles]; }
@@ -408,22 +386,9 @@ namespace BASpark
                 Save("EffectOpacity", 1.0);
             }
 
-            if (flags.HasFlag(VisualAppearanceResetFlags.UnifiedGlowIntensity))
+            if (flags.HasFlag(VisualAppearanceResetFlags.GlowIntensity))
             {
-                Save("UseLinkedGlowIntensity", true);
                 Save("GlowIntensity", 1.0);
-                Save("TrailGlowIntensity", 1.0);
-                Save("ClickGlowIntensity", 1.0);
-            }
-
-            if (flags.HasFlag(VisualAppearanceResetFlags.TrailGlowIntensity))
-            {
-                Save("TrailGlowIntensity", 1.0);
-            }
-
-            if (flags.HasFlag(VisualAppearanceResetFlags.ClickGlowIntensity))
-            {
-                Save("ClickGlowIntensity", 1.0);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.UnifiedAnimationSpeed))
@@ -679,10 +644,7 @@ namespace BASpark
                     TrailEffectScale = 1.0;
                     ClickEffectScale = 1.0;
                     EffectOpacity = 1.0;
-                    UseLinkedGlowIntensity = true;
                     GlowIntensity = 1.0;
-                    TrailGlowIntensity = 1.0;
-                    ClickGlowIntensity = 1.0;
                     EffectSpeed = 1.0;
                     UseLinkedAnimationSpeed = true;
                     ApplyCurveDraw = false;

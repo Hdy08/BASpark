@@ -64,14 +64,6 @@
                 this.trailScale = opts.trailScale != null ? opts.trailScale : this.scale;
                 this.clickScale = opts.clickScale != null ? opts.clickScale : this.scale;
                 this.opacity = opts.opacity || 1.0;
-                const trailGlowIntensity = Number(opts.trailGlowIntensity);
-                const clickGlowIntensity = Number(opts.clickGlowIntensity);
-                this.trailGlowIntensity = Number.isFinite(trailGlowIntensity)
-                    ? Math.max(0, Math.min(3, trailGlowIntensity))
-                    : 1.0;
-                this.clickGlowIntensity = Number.isFinite(clickGlowIntensity)
-                    ? Math.max(0, Math.min(3, clickGlowIntensity))
-                    : 1.0;
                 this.trailSpeed = opts.trailSpeed != null ? opts.trailSpeed : (opts.speed || 1.0);
                 this.clickSpeed = opts.clickSpeed != null ? opts.clickSpeed : (opts.speed || 1.0);
                 this.maxTrail = opts.maxTrail || 16;
@@ -183,8 +175,8 @@
                 }
             }
 
-            alpha(value, intensity = 1) {
-                return Math.max(0, Math.min(1, value * intensity * this.opacity));
+            alpha(value) {
+                return Math.max(0, Math.min(1, value * this.opacity));
             }
 
             resize() {
@@ -342,11 +334,8 @@
                 // 逐段渲染：每段的透明度基于数组索引位置，而非空间位置
                 // 防止当鼠标锐角转动时，尾迹变淡后突然出现的问题
                 ctx.lineWidth = 5.0 * trailScaleFactor;
-                const trailGlowIntensity = this.trailGlowIntensity;
-                ctx.shadowColor = trailGlowIntensity > 0
-                    ? `rgba(${this.color}, ${Math.min(1, 0.6 * trailGlowIntensity)})`
-                    : 'transparent';
-                ctx.shadowBlur = 3 * trailScaleFactor * Math.sqrt(trailGlowIntensity);
+                ctx.shadowColor = `rgba(${this.color}, 0.6)`;
+                ctx.shadowBlur = 3 * trailScaleFactor;
                 ctx.shadowOffsetX = 0;
                 ctx.shadowOffsetY = 0;
 
@@ -385,7 +374,6 @@
                 const rings = RINGS_ANIM_CFG;
                 const ctx = this.bufferCtx;
                 const clickScaleFactor = this.clickScale / 1.5;
-                const clickGlowIntensity = this.clickGlowIntensity;
 
                 const updateFilledCircle = (w, waveProg) => {
                     w.life += clickFrameScale;
@@ -395,7 +383,7 @@
                     if (alpha > 0) {
                         ctx.beginPath();
                         ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
-                        ctx.fillStyle = `rgba(${this.color},${this.alpha(alpha, clickGlowIntensity)})`;
+                        ctx.fillStyle = `rgba(${this.color},${this.alpha(alpha)})`;
                         // 优化：减少阴影效果
                         ctx.fill();
                     }
@@ -440,7 +428,7 @@
 
                         const lineWidthMul = Math.min(-0.8 * (ringProg - 0.8) + 1, 1);
                         const [rr, gg, bb] = ringRgbAt(ringProg);
-                        const alphaRing = Math.max(0, Math.min(1, getAlpha(ringProg) * clickGlowIntensity));
+                        const alphaRing = getAlpha(ringProg);
 
                         for (let k = 0; k < rings.segNum; k++) {
                             const t0 = k / rings.segNum;
@@ -500,8 +488,7 @@
                     ctx.moveTo(0, -s.s);
                     ctx.lineTo(s.s * 0.6, s.s * 0.6);
                     ctx.lineTo(-s.s * 0.6, s.s * 0.6);
-                    const glowIntensity = s.fromClick ? this.clickGlowIntensity : this.trailGlowIntensity;
-                    ctx.fillStyle = `rgba(255,255,255,${this.alpha(s.a, glowIntensity)})`;
+                    ctx.fillStyle = `rgba(255,255,255,${this.alpha(s.a)})`;
                     ctx.fill();
                     ctx.restore();
                 }
@@ -812,7 +799,7 @@
             }
         };
 
-        window.updateEffectSettings = (trailScale, clickScale, opacity, trailSpeed, clickSpeed, trailGlowIntensity, clickGlowIntensity) => {
+        window.updateEffectSettings = (trailScale, clickScale, opacity, trailSpeed, clickSpeed) => {
             if (!window.spark) return;
             let tScale = Number(trailScale);
             if (!Number.isFinite(tScale)) tScale = 1.0;
@@ -828,12 +815,6 @@
             if (!Number.isFinite(c)) c = t;
             window.spark.trailSpeed = Math.max(0.2, Math.min(3, t));
             window.spark.clickSpeed = Math.max(0.2, Math.min(3, c));
-            let tGlow = Number(trailGlowIntensity);
-            if (!Number.isFinite(tGlow)) tGlow = 1.0;
-            let cGlow = Number(clickGlowIntensity);
-            if (!Number.isFinite(cGlow)) cGlow = 1.0;
-            window.spark.trailGlowIntensity = Math.max(0, Math.min(3, tGlow));
-            window.spark.clickGlowIntensity = Math.max(0, Math.min(3, cGlow));
         };
 
         window.externalTrailStart = (percentX, percentY) => {
