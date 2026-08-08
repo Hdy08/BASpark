@@ -12,13 +12,15 @@ namespace BASpark
     public enum VisualAppearanceResetFlags
     {
         None = 0,
-        EffectScale = 1 << 0,
+        UnifiedEffectScale = 1 << 0,
         EffectOpacity = 1 << 1,
         UnifiedAnimationSpeed = 1 << 2,
         TrailRefreshRate = 1 << 3,
         ParticleColor = 1 << 4,
         TrailAnimationSpeed = 1 << 5,
-        ClickAnimationSpeed = 1 << 6
+        ClickAnimationSpeed = 1 << 6,
+        TrailEffectScale = 1 << 7,
+        ClickEffectScale = 1 << 8
     }
 
     public enum ProcessFilterModeOption
@@ -68,6 +70,9 @@ namespace BASpark
     public static class ConfigManager
     {
         private const string RegPath = @"Software\BASpark";
+        private const string EffectScaleSemanticsVersionKey = "EffectScaleSemanticsVersion";
+        private const int CurrentEffectScaleSemanticsVersion = 1;
+        public const double MinimumEffectScale = 1.0 / 3.0;
 
         public static string ParticleColor { get; set; } = "45,175,255";
         public static bool IsEffectEnabled { get; set; } = true;
@@ -79,17 +84,18 @@ namespace BASpark
         public static bool EnableAlwaysTrailEffect { get; set; } = false;
         public static bool StartSilent { get; set; } = false;
         public static bool RunAsAdmin { get; set; } = false;
-        public static double EffectScale { get; set; } = 1.5;
+        public static double EffectScale { get; set; } = 1.0;
         public static bool UseLinkedEffectScale { get; set; } = true;
-        public static double TrailEffectScale { get; set; } = 1.5;
-        public static double ClickEffectScale { get; set; } = 1.5;
+        public static double TrailEffectScale { get; set; } = 1.0;
+        public static double ClickEffectScale { get; set; } = 1.0;
         public static double EffectOpacity { get; set; } = 1.0;
         public static double EffectSpeed { get; set; } = 1.0;
         public static bool UseLinkedAnimationSpeed { get; set; } = true;
         public static bool ApplyCurveDraw { get; set; } = false;
         public static double TrailAnimationSpeed { get; set; } = 1.0;
         public static double ClickAnimationSpeed { get; set; } = 1.0;
-        public static int TrailRefreshRate { get; set; } = 40;
+        public static int TrailRefreshRate { get; set; } = 60;
+        public static bool FollowDisplayRefreshRate { get; set; } = true;
         public static bool EnableEnvironmentFilter { get; set; } = false;
         public static bool HideInFullscreen { get; set; } = true;
         public static bool ShowEffectOnDesktop { get; set; } = true;
@@ -130,7 +136,7 @@ namespace BASpark
         {
             try
             {
-                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(RegPath))
+                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(RegPath, writable: true))
                 {
                     if (key != null)
                     {
@@ -145,17 +151,26 @@ namespace BASpark
                         EnableAlwaysTrailEffect = Convert.ToBoolean(key.GetValue("EnableAlwaysTrailEffect", false));
                         StartSilent = Convert.ToBoolean(key.GetValue("StartSilent", false));
                         RunAsAdmin = Convert.ToBoolean(key.GetValue("RunAsAdmin", false));
-                        EffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("EffectScale", 1.5), CultureInfo.InvariantCulture), 0.5, 3.0);
+                        object? effectScaleValue = key.GetValue("EffectScale");
+                        object? trailEffectScaleValue = key.GetValue("TrailEffectScale");
+                        object? clickEffectScaleValue = key.GetValue("ClickEffectScale");
+                        EffectScale = Math.Clamp(Convert.ToDouble(effectScaleValue ?? 1.0, CultureInfo.InvariantCulture), MinimumEffectScale, 3.0);
                         UseLinkedEffectScale = Convert.ToBoolean(key.GetValue("UseLinkedEffectScale", true));
-                        TrailEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("TrailEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
-                        ClickEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("ClickEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
+                        TrailEffectScale = Math.Clamp(Convert.ToDouble(trailEffectScaleValue ?? EffectScale, CultureInfo.InvariantCulture), MinimumEffectScale, 3.0);
+                        ClickEffectScale = Math.Clamp(Convert.ToDouble(clickEffectScaleValue ?? EffectScale, CultureInfo.InvariantCulture), MinimumEffectScale, 3.0);
+                        MigrateEffectScaleSemantics(
+                            key,
+                            effectScaleValue != null,
+                            trailEffectScaleValue != null,
+                            clickEffectScaleValue != null);
                         EffectOpacity = Math.Clamp(Convert.ToDouble(key.GetValue("EffectOpacity", 1.0), CultureInfo.InvariantCulture), 0.1, 1.0);
                         EffectSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("EffectSpeed", 1.0), CultureInfo.InvariantCulture), 0.2, 3.0);
                         UseLinkedAnimationSpeed = Convert.ToBoolean(key.GetValue("UseLinkedAnimationSpeed", true));
                         ApplyCurveDraw = Convert.ToBoolean(key.GetValue("ApplyCurveDraw", false));
                         TrailAnimationSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("TrailAnimationSpeed", EffectSpeed), CultureInfo.InvariantCulture), 0.2, 3.0);
                         ClickAnimationSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("ClickAnimationSpeed", EffectSpeed), CultureInfo.InvariantCulture), 0.2, 3.0);
-                        TrailRefreshRate = Math.Clamp(Convert.ToInt32(key.GetValue("TrailRefreshRate", 40), CultureInfo.InvariantCulture), 10, 240);
+                        TrailRefreshRate = Math.Clamp(Convert.ToInt32(key.GetValue("TrailRefreshRate", 60), CultureInfo.InvariantCulture), 30, 360);
+                        FollowDisplayRefreshRate = Convert.ToBoolean(key.GetValue("FollowDisplayRefreshRate", true));
                         EnableEnvironmentFilter = Convert.ToBoolean(key.GetValue("EnableEnvironmentFilter", false));
                         HideInFullscreen = Convert.ToBoolean(key.GetValue("HideInFullscreen", true));
                         ShowEffectOnDesktop = Convert.ToBoolean(key.GetValue("ShowEffectOnDesktop", true));
@@ -228,6 +243,10 @@ namespace BASpark
                         // 加载成功后立即刷新进程过滤器缓存
                         UpdateProcessFilterCache();
                     }
+                    else
+                    {
+                        Save(EffectScaleSemanticsVersionKey, CurrentEffectScaleSemanticsVersion);
+                    }
                 }
             }
             catch (Exception ex)
@@ -276,6 +295,37 @@ namespace BASpark
 
             return NetworkRegionOption.Auto;
         }
+
+        private static void MigrateEffectScaleSemantics(
+            RegistryKey key,
+            bool hasEffectScale,
+            bool hasTrailEffectScale,
+            bool hasClickEffectScale)
+        {
+            int storedVersion = 0;
+            string? rawVersion = key.GetValue(EffectScaleSemanticsVersionKey)?.ToString();
+            _ = int.TryParse(rawVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out storedVersion);
+            if (storedVersion >= CurrentEffectScaleSemanticsVersion)
+            {
+                return;
+            }
+
+            EffectScale = hasEffectScale ? NormalizeLegacyEffectScale(EffectScale) : 1.0;
+            TrailEffectScale = hasTrailEffectScale
+                ? NormalizeLegacyEffectScale(TrailEffectScale)
+                : hasEffectScale ? EffectScale : 1.0;
+            ClickEffectScale = hasClickEffectScale
+                ? NormalizeLegacyEffectScale(ClickEffectScale)
+                : hasEffectScale ? EffectScale : 1.0;
+
+            key.SetValue("EffectScale", EffectScale.ToString(CultureInfo.InvariantCulture));
+            key.SetValue("TrailEffectScale", TrailEffectScale.ToString(CultureInfo.InvariantCulture));
+            key.SetValue("ClickEffectScale", ClickEffectScale.ToString(CultureInfo.InvariantCulture));
+            key.SetValue(EffectScaleSemanticsVersionKey, CurrentEffectScaleSemanticsVersion);
+        }
+
+        private static double NormalizeLegacyEffectScale(double scale) =>
+            Math.Clamp(scale / 1.5, MinimumEffectScale, 3.0);
 
         public static DarkModeOption ParseDarkMode(string? raw)
         {
@@ -356,12 +406,22 @@ namespace BASpark
                 return;
             }
 
-            if (flags.HasFlag(VisualAppearanceResetFlags.EffectScale))
+            if (flags.HasFlag(VisualAppearanceResetFlags.UnifiedEffectScale))
             {
-                Save("EffectScale", 1.5);
+                Save("EffectScale", 1.0);
                 Save("UseLinkedEffectScale", true);
-                Save("TrailEffectScale", 1.5);
-                Save("ClickEffectScale", 1.5);
+                Save("TrailEffectScale", 1.0);
+                Save("ClickEffectScale", 1.0);
+            }
+
+            if (flags.HasFlag(VisualAppearanceResetFlags.TrailEffectScale))
+            {
+                Save("TrailEffectScale", 1.0);
+            }
+
+            if (flags.HasFlag(VisualAppearanceResetFlags.ClickEffectScale))
+            {
+                Save("ClickEffectScale", 1.0);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.EffectOpacity))
@@ -389,7 +449,8 @@ namespace BASpark
 
             if (flags.HasFlag(VisualAppearanceResetFlags.TrailRefreshRate))
             {
-                Save("TrailRefreshRate", 40);
+                Save("TrailRefreshRate", 60);
+                Save("FollowDisplayRefreshRate", true);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.ParticleColor))
@@ -616,17 +677,18 @@ namespace BASpark
                     EnableAlwaysTrailEffect = false;
                     StartSilent = false;
                     RunAsAdmin = false;
-                    EffectScale = 1.5;
+                    EffectScale = 1.0;
                     UseLinkedEffectScale = true;
-                    TrailEffectScale = 1.5;
-                    ClickEffectScale = 1.5;
+                    TrailEffectScale = 1.0;
+                    ClickEffectScale = 1.0;
                     EffectOpacity = 1.0;
                     EffectSpeed = 1.0;
                     UseLinkedAnimationSpeed = true;
                     ApplyCurveDraw = false;
                     TrailAnimationSpeed = 1.0;
                     ClickAnimationSpeed = 1.0;
-                    TrailRefreshRate = 40;
+                    TrailRefreshRate = 60;
+                    FollowDisplayRefreshRate = true;
                     EnableEnvironmentFilter = false;
                     HideInFullscreen = true;
                     ShowEffectOnDesktop = true;

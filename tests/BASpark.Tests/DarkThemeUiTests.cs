@@ -106,6 +106,72 @@ public class DarkThemeUiTests
     }
 
     [Fact]
+    public void TrailRefreshRate_CanFollowTheDisplayAndKeepsTheManualRange()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement toggle = GetNamedElement(document, "CheckFollowDisplayRefreshRate");
+        XElement hint = GetNamedElement(document, "TxtFollowDisplayRefreshRateHint");
+        XElement panel = GetNamedElement(document, "PanelTrailRefreshRate");
+        XElement slider = GetNamedElement(document, "SliderTrailRefresh");
+        List<XElement> children = Assert.IsType<XElement>(toggle.Parent).Elements().ToList();
+
+        Assert.Equal(children.IndexOf(toggle) + 1, children.IndexOf(hint));
+        Assert.Equal(children.IndexOf(hint) + 1, children.IndexOf(panel));
+        Assert.Equal("30", (string?)slider.Attribute("Minimum"));
+        Assert.Equal("360", (string?)slider.Attribute("Maximum"));
+
+        XElement trigger = Assert.Single(panel.Descendants(Presentation + "DataTrigger"));
+        Assert.Equal("{Binding IsChecked, ElementName=CheckFollowDisplayRefreshRate}", (string?)trigger.Attribute("Binding"));
+        Assert.Equal("True", (string?)trigger.Attribute("Value"));
+        Assert.Contains(trigger.Descendants(Presentation + "Setter"), setter =>
+            (string?)setter.Attribute("Property") == "Visibility" &&
+            (string?)setter.Attribute("Value") == "Collapsed");
+
+        string configSource = ReadSource("src", "ConfigManager.cs");
+        string overlaySource = ReadSource("src", "OverlayManager.cs");
+        Assert.Contains("TrailRefreshRate { get; set; } = 60", configSource, StringComparison.Ordinal);
+        Assert.Contains("FollowDisplayRefreshRate { get; set; } = true", configSource, StringComparison.Ordinal);
+        Assert.Contains("EffectScaleSemanticsVersionKey", configSource, StringComparison.Ordinal);
+        Assert.Contains("NormalizeLegacyEffectScale", configSource, StringComparison.Ordinal);
+        Assert.Contains("MinimumEffectScale = 1.0 / 3.0", configSource, StringComparison.Ordinal);
+        Assert.Contains("Math.Clamp(hz, 30, 360)", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("hoveredTarget.EmitTrailStart", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("long moveInterval = target?.TrailMoveIntervalTimestamp", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("RestartDisplaySettingsRecoveryTimer", overlaySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void VisualReset_SeparatesUnifiedAndIndependentScaleDefaults()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        string panelSource = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string configSource = ReadSource("src", "ConfigManager.cs");
+
+        Assert.Contains("VisualAppearanceResetFlags.UnifiedEffectScale", panelSource, StringComparison.Ordinal);
+        Assert.Contains("VisualAppearanceResetFlags.TrailEffectScale", panelSource, StringComparison.Ordinal);
+        Assert.Contains("VisualAppearanceResetFlags.ClickEffectScale", panelSource, StringComparison.Ordinal);
+        Assert.Contains("Save(\"EffectScale\", 1.0)", configSource, StringComparison.Ordinal);
+        Assert.Contains("Save(\"TrailEffectScale\", 1.0)", configSource, StringComparison.Ordinal);
+        Assert.Contains("Save(\"ClickEffectScale\", 1.0)", configSource, StringComparison.Ordinal);
+
+        foreach (string sliderName in new[] { "SliderScale", "SliderTrailScale", "SliderClickScale" })
+        {
+            XElement slider = GetNamedElement(document, sliderName);
+            Assert.Equal("0.3333333333333333", (string?)slider.Attribute("Minimum"));
+            Assert.Equal("0.01", (string?)slider.Attribute("TickFrequency"));
+        }
+
+        foreach (string resourcePath in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
+        {
+            string resources = ReadSource("src", "Resources", resourcePath);
+            Assert.Contains("VisualReset_UnifiedScale", resources, StringComparison.Ordinal);
+            Assert.Contains("VisualReset_TrailScale", resources, StringComparison.Ordinal);
+            Assert.Contains("VisualReset_ClickScale", resources, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void ThemeManager_UsesSeparatePalettesAndRestoresLightControlStyles()
     {
         string source = ReadSource("src", "ThemeManager.cs");

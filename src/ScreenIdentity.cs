@@ -18,6 +18,11 @@ namespace BASpark
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern bool EnumDisplayDevices(string? lpDevice, uint iDevNum, ref DISPLAY_DEVICE lpDisplayDevice, uint dwFlags);
 
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern bool EnumDisplaySettings(string? lpszDeviceName, int iModeNum, ref DEVMODE lpDevMode);
+
+        private const int ENUM_CURRENT_SETTINGS = -1;
+
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         private struct DISPLAY_DEVICE
         {
@@ -36,6 +41,44 @@ namespace BASpark
 
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
             public string DeviceKey;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct DEVMODE
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public string dmDeviceName;
+            public short dmSpecVersion;
+            public short dmDriverVersion;
+            public short dmSize;
+            public short dmDriverExtra;
+            public int dmFields;
+            public int dmPositionX;
+            public int dmPositionY;
+            public int dmDisplayOrientation;
+            public int dmDisplayFixedOutput;
+            public short dmColor;
+            public short dmDuplex;
+            public short dmYResolution;
+            public short dmTTOption;
+            public short dmCollate;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public string dmFormName;
+            public short dmLogPixels;
+            public int dmBitsPerPel;
+            public int dmPelsWidth;
+            public int dmPelsHeight;
+            public int dmDisplayFlags;
+            public int dmDisplayFrequency;
+            public int dmICMMethod;
+            public int dmICMIntent;
+            public int dmMediaType;
+            public int dmDitherType;
+            public int dmReserved1;
+            public int dmReserved2;
+            public int dmPanningWidth;
+            public int dmPanningHeight;
         }
 
         public static ScreenIdentityInfo FromScreen(Screen screen)
@@ -70,6 +113,37 @@ namespace BASpark
                 IdentityKey = identityKey,
                 DisplayName = displayName
             };
+        }
+
+        public static int GetRefreshRate(string deviceName, int fallback = 60)
+        {
+            int normalizedFallback = Math.Clamp(fallback, 30, 360);
+            if (string.IsNullOrWhiteSpace(deviceName))
+            {
+                return normalizedFallback;
+            }
+
+            try
+            {
+                var mode = new DEVMODE
+                {
+                    dmDeviceName = string.Empty,
+                    dmFormName = string.Empty,
+                    dmSize = (short)Marshal.SizeOf<DEVMODE>()
+                };
+
+                if (EnumDisplaySettings(deviceName, ENUM_CURRENT_SETTINGS, ref mode) &&
+                    mode.dmDisplayFrequency > 1)
+                {
+                    return Math.Clamp(mode.dmDisplayFrequency, 30, 360);
+                }
+            }
+            catch
+            {
+                // Fall back to the configured manual rate when the driver does not expose a mode.
+            }
+
+            return normalizedFallback;
         }
 
         private static DISPLAY_DEVICE CreateDisplayDevice()

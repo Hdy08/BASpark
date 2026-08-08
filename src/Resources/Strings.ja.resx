@@ -553,17 +553,29 @@
     <data name="VisualReset_Opacity_Sub" xml:space="preserve">
       <value>既定 100 %</value>
     </data>
-    <data name="VisualReset_Scale" xml:space="preserve">
-      <value>拡大率</value>
+    <data name="VisualReset_UnifiedScale" xml:space="preserve">
+      <value>統一拡大率</value>
     </data>
-    <data name="VisualReset_Scale_Sub" xml:space="preserve">
-      <value>既定 1.50 ×</value>
+    <data name="VisualReset_UnifiedScale_Sub" xml:space="preserve">
+      <value>同一倍率、既定 1.00 ×</value>
+    </data>
+    <data name="VisualReset_TrailScale" xml:space="preserve">
+      <value>トレイルの拡大率</value>
+    </data>
+    <data name="VisualReset_TrailScale_Sub" xml:space="preserve">
+      <value>個別項目の既定 1.00 ×</value>
+    </data>
+    <data name="VisualReset_ClickScale" xml:space="preserve">
+      <value>クリックの拡大率</value>
+    </data>
+    <data name="VisualReset_ClickScale_Sub" xml:space="preserve">
+      <value>個別項目の既定 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>トレイル更新率</value>
     </data>
     <data name="VisualReset_TrailRefresh_Sub" xml:space="preserve">
-      <value>既定 40 Hz</value>
+      <value>既定: ディスプレイに追従</value>
     </data>
     <data name="VisualReset_TrailSpeed" xml:space="preserve">
       <value>トレイルのアニメ速度</value>
@@ -639,6 +651,12 @@
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
       <value>60Hz以上のリフレッシュレートでの使用を推奨します</value>
+    </data>
+    <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
+      <value>トレイル更新率をディスプレイに合わせる</value>
+    </data>
+    <data name="Visual_FollowDisplayRefreshRateHint" xml:space="preserve">
+      <value>オンにすると、トレイル更新率はマウスがあるディスプレイの更新率に自動設定されます。</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
       <value>全体の不透明度</value>

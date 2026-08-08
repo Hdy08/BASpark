@@ -600,6 +600,7 @@ namespace BASpark
             SliderSpeed.Value = ConfigManager.EffectSpeed;
             SliderTrailAnimSpeed.Value = ConfigManager.TrailAnimationSpeed;
             SliderClickAnimSpeed.Value = ConfigManager.ClickAnimationSpeed;
+            CheckFollowDisplayRefreshRate.IsChecked = ConfigManager.FollowDisplayRefreshRate;
             SliderTrailRefresh.Value = ConfigManager.TrailRefreshRate;
             UpdateEffectScalePanelVisibility();
             UpdateAnimationSpeedPanelVisibility();
@@ -1265,7 +1266,9 @@ namespace BASpark
         private void RebuildVisualResetItems()
         {
             VisualResetItems.Clear();
-            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectScale, Localization.Get("VisualReset_Scale"), Localization.Get("VisualReset_Scale_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.UnifiedEffectScale, Localization.Get("VisualReset_UnifiedScale"), Localization.Get("VisualReset_UnifiedScale_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailEffectScale, Localization.Get("VisualReset_TrailScale"), Localization.Get("VisualReset_TrailScale_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ClickEffectScale, Localization.Get("VisualReset_ClickScale"), Localization.Get("VisualReset_ClickScale_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectOpacity, Localization.Get("VisualReset_Opacity"), Localization.Get("VisualReset_Opacity_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), Localization.Get("VisualReset_UnifiedSpeed_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), Localization.Get("VisualReset_TrailSpeed_Sub")));
@@ -1351,12 +1354,13 @@ namespace BASpark
             LoadSettings();
 
             int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
+            bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsChecked == true;
             ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             App.Overlay?.UpdateEffectSettings(trailScale, clickScale, effectOpacity, trailSp, clickSp);
-            App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
+            App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
             App.Overlay?.SetCurveDraw(CheckApplyCurveDraw.IsChecked ?? false);
 
             VisualResetOverlay.Visibility = Visibility.Collapsed;
@@ -1435,6 +1439,7 @@ namespace BASpark
             }
 
             int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
+            bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsChecked == true;
             bool autoStartEnabled = CheckAutoStart.IsChecked ?? false;
             bool startSilentEnabled = CheckStartSilent.IsChecked ?? false;
             bool runAsAdminEnabled = CheckRunAsAdmin.IsChecked ?? false;
@@ -1469,6 +1474,7 @@ namespace BASpark
             ConfigManager.Save("TrailAnimationSpeed", trailAnimSpeed);
             ConfigManager.Save("ClickAnimationSpeed", clickAnimSpeed);
             ConfigManager.Save("TrailRefreshRate", trailRefreshRate);
+            ConfigManager.Save("FollowDisplayRefreshRate", followDisplayRefreshRate);
             ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
             ConfigManager.Save("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch.IsChecked ?? false);
             var scrollbarVisibility = RadioScrollbarAlways.IsChecked == true
@@ -1544,7 +1550,7 @@ namespace BASpark
             GetUiEffectScales(out double overlayTrailScale, out double overlayClickScale);
             GetUiAnimationSpeeds(out double overlayTrail, out double overlayClick);
             App.Overlay?.UpdateEffectSettings(overlayTrailScale, overlayClickScale, effectOpacity, overlayTrail, overlayClick);
-            App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
+            App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
             App.Overlay?.RefreshEnvironmentFilterState();
             App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);
             App.Overlay?.UpdateScreenshotCompatibilityMode(screenshotCompatibilityEnabled);
@@ -1812,11 +1818,11 @@ namespace BASpark
             if (linked)
             {
                 double avg = Math.Round((SliderTrailScale.Value + SliderClickScale.Value) / 2.0, 2);
-                SliderScale.Value = Math.Clamp(avg, 0.5, 3.0);
+                SliderScale.Value = Math.Clamp(avg, ConfigManager.MinimumEffectScale, 3.0);
             }
             else
             {
-                double value = Math.Clamp(Math.Round(SliderScale.Value, 2), 0.5, 3.0);
+                double value = Math.Clamp(Math.Round(SliderScale.Value, 2), ConfigManager.MinimumEffectScale, 3.0);
                 SliderTrailScale.Value = value;
                 SliderClickScale.Value = value;
             }

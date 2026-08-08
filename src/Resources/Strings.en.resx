@@ -553,17 +553,29 @@ Download now?</value>
     <data name="VisualReset_Opacity_Sub" xml:space="preserve">
       <value>Default 100 %</value>
     </data>
-    <data name="VisualReset_Scale" xml:space="preserve">
-      <value>Scale</value>
+    <data name="VisualReset_UnifiedScale" xml:space="preserve">
+      <value>Unified scale</value>
     </data>
-    <data name="VisualReset_Scale_Sub" xml:space="preserve">
-      <value>Default 1.50 ×</value>
+    <data name="VisualReset_UnifiedScale_Sub" xml:space="preserve">
+      <value>Linked scale, default 1.00 ×</value>
+    </data>
+    <data name="VisualReset_TrailScale" xml:space="preserve">
+      <value>Trail scale</value>
+    </data>
+    <data name="VisualReset_TrailScale_Sub" xml:space="preserve">
+      <value>Default 1.00 ×</value>
+    </data>
+    <data name="VisualReset_ClickScale" xml:space="preserve">
+      <value>Click scale</value>
+    </data>
+    <data name="VisualReset_ClickScale_Sub" xml:space="preserve">
+      <value>Default 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>Trail refresh rate</value>
     </data>
     <data name="VisualReset_TrailRefresh_Sub" xml:space="preserve">
-      <value>Default 40 Hz</value>
+      <value>Default: follow display</value>
     </data>
     <data name="VisualReset_TrailSpeed" xml:space="preserve">
       <value>Trail animation speed</value>
@@ -639,6 +651,12 @@ Download now?</value>
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
       <value>Recommended for 60Hz and above</value>
+    </data>
+    <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
+      <value>Match trail refresh rate to display</value>
+    </data>
+    <data name="Visual_FollowDisplayRefreshRateHint" xml:space="preserve">
+      <value>When enabled, the trail refresh rate follows the display under the mouse pointer.</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
       <value>Global opacity</value>

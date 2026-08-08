@@ -10,8 +10,8 @@
             : '';
     const DEFAULT_SETTINGS = Object.freeze(
         {
-            trailScale: 1.5,
-            clickScale: 1.5,
+            trailScale: 1,
+            clickScale: 1,
             opacity: 1,
             trailSpeed: 1,
             clickSpeed: 1,
@@ -215,8 +215,7 @@
 
         state.fx.updateConfig(
             {
-                // 旧引擎以 1.5 为默认尺寸，新引擎以 1 为默认尺寸。
-                scale: Math.max(0.01, state.settings.clickScale / 1.5),
+                scale: Math.max(0.01, state.settings.clickScale),
                 opacity: state.settings.opacity,
                 trailTimeScale: state.settings.trailSpeed,
                 clickTimeScale: state.settings.clickSpeed,
@@ -269,7 +268,7 @@
             return fallback;
         }
 
-        return clamp(numeric, 0.5, 3);
+        return clamp(numeric, 1 / 3, 3);
     }
 
     function readFxConfigNumber(config, path)
@@ -434,6 +433,55 @@
             }
 
             return accepted;
+        });
+    };
+
+    window.externalTrailStart = function (percentX, percentY)
+    {
+        if (state.paused || !state.fx)
+        {
+            return false;
+        }
+
+        const point = toCanvasPoint(percentX, percentY);
+
+        if (!point)
+        {
+            return false;
+        }
+
+        state.lastMoveX = Number(percentX);
+        state.lastMoveY = Number(percentY);
+
+        return invokeFx('externalTrailStart', function ()
+        {
+            // BAClickFX starts a pressed trail through pointerDown. Temporarily
+            // disabling clicks preserves that input state without adding a boom.
+            const clickEnabled = state.fx.getConfig().clickEnabled !== false;
+            cancelActivePointer();
+            state.fx.updateConfig(
+                {
+                    clickEnabled: false,
+                });
+
+            try
+            {
+                const accepted = state.fx.pointerDown(point);
+
+                if (accepted)
+                {
+                    state.activePointerKind = 'press';
+                }
+
+                return accepted;
+            }
+            finally
+            {
+                state.fx.updateConfig(
+                    {
+                        clickEnabled,
+                    });
+            }
         });
     };
 

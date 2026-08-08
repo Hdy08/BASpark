@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Globalization;
@@ -77,6 +78,7 @@ namespace BASpark
 
         private readonly string _screenDeviceName;
         private readonly Rectangle _screenBounds;
+        private long _trailMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / 60);
         private IntPtr _hwnd;
         private string? _lastReportedInputMode;
         private bool? _lastReportedAlwaysTrail;
@@ -124,7 +126,7 @@ namespace BASpark
             uint dwEventThread,
             uint dwmsEventTime);
 
-        public MainWindow(Screen screen)
+        public MainWindow(Screen screen, int trailRefreshRate)
         {
             _screenDeviceName = screen.DeviceName;
             _screenBounds = screen.Bounds;
@@ -132,7 +134,7 @@ namespace BASpark
 
             InitializeComponent();
             webView.DefaultBackgroundColor = System.Drawing.Color.Transparent;
-            UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
+            UpdateTrailRefreshRate(trailRefreshRate);
             _ = InitWebView();
         }
 
@@ -233,7 +235,8 @@ namespace BASpark
 
         public void UpdateTrailRefreshRate(int hz)
         {
-            _ = hz;
+            int clampedHz = Math.Clamp(hz, 30, 360);
+            _trailMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / clampedHz);
         }
 
         public void SetCurveDraw(bool enabled)
@@ -1089,6 +1092,15 @@ namespace BASpark
             ExecuteWithInputContext(inputMode, $"if(window.externalBoom) window.externalBoom({px}, {py});");
         }
 
+        public void EmitTrailStart(int x, int y, bool touchLike)
+        {
+            if (!TryConvertScreenToOverlayPoint(x, y, out System.Windows.Point clientPoint)) return;
+            string inputMode = touchLike ? InputModeTouch : InputModeMouse;
+            string px = FormatCoordinate(clientPoint.X);
+            string py = FormatCoordinate(clientPoint.Y);
+            ExecuteWithInputContext(inputMode, $"if(window.externalTrailStart) window.externalTrailStart({px}, {py});");
+        }
+
         public void EmitMove(int x, int y, bool touchLike)
         {
             if (!TryConvertScreenToOverlayPoint(x, y, out System.Windows.Point clientPoint)) return;
@@ -1137,6 +1149,7 @@ namespace BASpark
         }
 
         public string ScreenDeviceName => _screenDeviceName;
+        public long TrailMoveIntervalTimestamp => _trailMoveIntervalTimestamp;
 
         private Rectangle GetScreenBounds()
         {

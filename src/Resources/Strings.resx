@@ -553,17 +553,29 @@
     <data name="VisualReset_Opacity_Sub" xml:space="preserve">
       <value>默认 100 %</value>
     </data>
-    <data name="VisualReset_Scale" xml:space="preserve">
-      <value>缩放比例</value>
+    <data name="VisualReset_UnifiedScale" xml:space="preserve">
+      <value>统一缩放比例</value>
     </data>
-    <data name="VisualReset_Scale_Sub" xml:space="preserve">
-      <value>默认 1.50 ×</value>
+    <data name="VisualReset_UnifiedScale_Sub" xml:space="preserve">
+      <value>开启「同一比例」并默认 1.00 ×</value>
+    </data>
+    <data name="VisualReset_TrailScale" xml:space="preserve">
+      <value>拖尾缩放比例</value>
+    </data>
+    <data name="VisualReset_TrailScale_Sub" xml:space="preserve">
+      <value>独立项默认 1.00 ×</value>
+    </data>
+    <data name="VisualReset_ClickScale" xml:space="preserve">
+      <value>点击缩放比例</value>
+    </data>
+    <data name="VisualReset_ClickScale_Sub" xml:space="preserve">
+      <value>独立项默认 1.00 ×</value>
     </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>拖尾刷新率</value>
     </data>
     <data name="VisualReset_TrailRefresh_Sub" xml:space="preserve">
-      <value>默认 40 Hz</value>
+      <value>默认跟随显示器</value>
     </data>
     <data name="VisualReset_TrailSpeed" xml:space="preserve">
       <value>拖尾动画速度</value>
@@ -639,6 +651,12 @@
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
       <value>建议在60Hz及以上刷新率开启</value>
+    </data>
+    <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
+      <value>拖尾刷新率跟随显示器</value>
+    </data>
+    <data name="Visual_FollowDisplayRefreshRateHint" xml:space="preserve">
+      <value>开启此项后拖尾刷新率自动设置为鼠标所在显示器的刷新率</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
       <value>全局不透明度</value>

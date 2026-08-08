@@ -226,6 +226,7 @@ test('initializes the vendored renderer in manual WebView2 mode', () =>
   assert.equal(harness.fx.config.isolatedCompositing, false);
   assert.equal(harness.fx.config.lightBackgroundContrastAlpha, 0);
   assert.equal(harness.fx.config.maxDpr, 2);
+  assert.equal(harness.calls.updateConfig.at(-1).scale, 1);
   assert.equal(harness.calls.setCompositingReference.length, 0);
   assert.equal(harness.calls.messages.at(-1).type, 'ready');
   assert.equal(harness.calls.messages.at(-1).generation, 'test-generation');
@@ -247,7 +248,7 @@ test('maps normalized host input and BASpark settings to BAClickFX', () =>
 {
   const harness = createHarness();
 
-  harness.window.updateEffectSettings(1.5, 1.5, 0.75, 1.2, 0.8);
+  harness.window.updateEffectSettings(1, 1, 0.75, 1.2, 0.8);
   const settings = harness.calls.updateConfig.at(-1);
   assert.equal(settings.scale, 1);
   assert.equal(settings.opacity, 0.75);
@@ -288,7 +289,7 @@ test('maps independent trail and click scales to the renderer', () =>
   const settings = harness.calls.updateConfig.at(-1);
   const patch = harness.calls.setFxParams.at(-1).patch;
 
-  assert.equal(settings.scale, 2);
+  assert.equal(settings.scale, 3);
   assert.equal(patch['trail.geometryWidth'], 1);
   assert.equal(patch['trail.width'], 0.75);
   assert.equal(patch['trail.minVertexDistance'], 1.25);
@@ -297,6 +298,38 @@ test('maps independent trail and click scales to the renderer', () =>
   assert.equal(patch['shards.trailSpeedMin'], 3.25);
   assert.equal(patch['shards.trailSpeedMax'], 4.25);
   assert.equal(patch['shards.trailSpacing'], 4.75);
+});
+
+test('starts a pressed trail without creating a click boom', () =>
+{
+  const harness = createHarness();
+  const updateCount = harness.calls.updateConfig.length;
+
+  harness.window.externalTrailStart(0.5, 0.25);
+
+  assert.equal(harness.calls.pointerDown.length, 1);
+  assert.equal(harness.calls.pointerDown.at(-1).x, 400);
+  assert.equal(harness.calls.pointerDown.at(-1).y, 150);
+  const clickConfigUpdates = harness.calls.updateConfig.slice(updateCount);
+  assert.equal(clickConfigUpdates.length, 2);
+  assert.equal(clickConfigUpdates[0].clickEnabled, false);
+  assert.equal(clickConfigUpdates[1].clickEnabled, true);
+});
+
+test('uses 1.00 scale when host scale input is invalid', () =>
+{
+  const harness = createHarness();
+
+  harness.window.updateEffectSettings('invalid', 'invalid', 1, 1, 1);
+  assert.equal(harness.calls.updateConfig.at(-1).scale, 1);
+});
+
+test('retains the migrated one-third minimum scale', () =>
+{
+  const harness = createHarness();
+
+  harness.window.updateEffectSettings(1 / 3, 1 / 3, 1, 1, 1);
+  assert.equal(harness.calls.updateConfig.at(-1).scale, 1 / 3);
 });
 
 test('keeps the current color when host configuration is invalid', () =>

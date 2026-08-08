@@ -103,6 +103,8 @@ namespace BASpark
             w.TxtLinkedSpeedHint.Text = Localization.Get("Visual_LinkedSpeedHint");
             w.CheckApplyCurveDraw.Content = Localization.Get("Visual_CurveDraw");
             w.TxtCurveDrawHint.Text = Localization.Get("Visual_CurveDrawHint");
+            w.CheckFollowDisplayRefreshRate.Content = Localization.Get("Visual_FollowDisplayRefreshRate");
+            w.TxtFollowDisplayRefreshRateHint.Text = Localization.Get("Visual_FollowDisplayRefreshRateHint");
             w.TxtAnimSpeed.Text = Localization.Get("Visual_AnimSpeed");
             w.TxtTrailAnimSpeed.Text = Localization.Get("Visual_TrailAnimSpeed");
             w.TxtClickAnimSpeed.Text = Localization.Get("Visual_ClickAnimSpeed");

@@ -76,6 +76,7 @@ namespace BASpark
         private const uint WINEVENT_OUTOFCONTEXT = 0;
         private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
         private const int FullscreenTolerance = 2;
+        private const int DisplaySettingsRecoveryDebounceMilliseconds = 400;
         private static readonly long SuppressionCacheDurationTicks = TimeSpan.FromMilliseconds(250).Ticks;
         private const long ClickIntervalTicks = 300000;
 
@@ -83,9 +84,12 @@ namespace BASpark
         private IKeyboardMouseEvents? _globalHook;
         private MainWindow? _activePointerOverlay;
         private MainWindow? _lastTrailOverlay;
-        private long _lastMoveTicks;
+        private MainWindow? _lastTrailThrottleOverlay;
+        private long _lastMoveTimestamp;
         private long _lastClickTicks;
-        private long _moveIntervalTicks = 250000;
+        private long _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / 60);
+        private int _manualTrailRefreshRate = 60;
+        private bool _followDisplayRefreshRate = true;
         private bool _isPrimaryPointerDown;
         private bool _isTouchLikeInput;
         private bool _isSuppressedByEnvironment;
@@ -101,6 +105,7 @@ namespace BASpark
         private WinEventProcDelegate? _foregroundWinEventDelegate;
         private System.Threading.Timer? _screenshotFailsafeTimer;
         private DispatcherTimer? _screenshotEndDebounceTimer;
+        private DispatcherTimer? _displaySettingsRecoveryTimer;
         private long _lastResumeRecoveryTicks;
         private static readonly long ResumeRecoveryDebounceTicks = TimeSpan.FromSeconds(2).Ticks;
 
@@ -123,9 +128,9 @@ namespace BASpark
 
         public void Start()
         {
+            UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
             RebuildWindows(forceRebuild: true);
             SetupGlobalHooks();
-            UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
             RefreshEnvironmentFilterState();
             SystemEvents.DisplaySettingsChanged += HandleDisplaySettingsChanged;
             SystemEvents.PowerModeChanged += HandlePowerModeChanged;
@@ -135,11 +140,21 @@ namespace BASpark
         public void UpdateColor(string color) => ForEachOverlay(w => w.UpdateColor(color));
         public void UpdateEffectSettings(double trailScale, double clickScale, double opacity, double trailSpeed, double clickSpeed) =>
             ForEachOverlay(w => w.UpdateEffectSettings(trailScale, clickScale, opacity, trailSpeed, clickSpeed));
-        public void UpdateTrailRefreshRate(int hz)
+        public void UpdateTrailRefreshRate(int hz, bool followDisplayRefreshRate)
         {
-            hz = Math.Clamp(hz, 10, 240);
-            _moveIntervalTicks = TimeSpan.FromSeconds(1.0 / hz).Ticks;
-            ForEachOverlay(w => w.UpdateTrailRefreshRate(hz));
+            _manualTrailRefreshRate = Math.Clamp(hz, 30, 360);
+            _followDisplayRefreshRate = followDisplayRefreshRate;
+            _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / _manualTrailRefreshRate);
+            _lastTrailThrottleOverlay = null;
+            _lastMoveTimestamp = 0;
+
+            foreach (var pair in _overlays)
+            {
+                int effectiveRefreshRate = _followDisplayRefreshRate
+                    ? ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)
+                    : _manualTrailRefreshRate;
+                pair.Value.UpdateTrailRefreshRate(effectiveRefreshRate);
+            }
         }
         public void UpdateTouchMode(bool enabled) => ForEachOverlay(w => w.UpdateTouchMode(enabled));
         public void UpdateScreenshotCompatibilityMode(bool enabled)
@@ -584,10 +599,12 @@ namespace BASpark
             if (!ConfigManager.IsTrailEffectActive)
             {
                 SwitchAlwaysTrailOverlay(null);
+                _lastTrailThrottleOverlay = null;
                 return;
             }
             if (!CanRenderEffects())
             {
+                _lastTrailThrottleOverlay = null;
                 return;
             }
 
@@ -595,15 +612,9 @@ namespace BASpark
             if (!cursorVisible && !_isPrimaryPointerDown)
             {
                 SwitchAlwaysTrailOverlay(null);
+                _lastTrailThrottleOverlay = null;
                 return;
             }
-
-            long currentTicks = DateTime.Now.Ticks;
-            if (currentTicks - _lastMoveTicks < _moveIntervalTicks)
-            {
-                return;
-            }
-            _lastMoveTicks = currentTicks;
 
             if (!TryGetPhysicalCursorPosition(out int cursorX, out int cursorY))
             {
@@ -611,7 +622,28 @@ namespace BASpark
                 cursorY = e.Y;
             }
 
-            MainWindow? target = _activePointerOverlay ?? ResolveTargetOverlay(cursorX, cursorY);
+            MainWindow? hoveredTarget = ResolveTargetOverlay(cursorX, cursorY);
+            if (_isPrimaryPointerDown &&
+                hoveredTarget != null &&
+                !ReferenceEquals(_activePointerOverlay, hoveredTarget))
+            {
+                _activePointerOverlay?.EmitCancel();
+                _activePointerOverlay = hoveredTarget;
+                hoveredTarget.EmitTrailStart(cursorX, cursorY, _isTouchLikeInput || !cursorVisible);
+            }
+
+            MainWindow? target = _activePointerOverlay ?? hoveredTarget;
+            bool targetChanged = !ReferenceEquals(target, _lastTrailThrottleOverlay);
+            long currentTimestamp = Stopwatch.GetTimestamp();
+            long moveInterval = target?.TrailMoveIntervalTimestamp ?? _idleMoveIntervalTimestamp;
+            if (!targetChanged && currentTimestamp - _lastMoveTimestamp < moveInterval)
+            {
+                return;
+            }
+
+            _lastMoveTimestamp = currentTimestamp;
+            _lastTrailThrottleOverlay = target;
+
             if (!_isPrimaryPointerDown)
             {
                 SwitchAlwaysTrailOverlay(
@@ -678,6 +710,8 @@ namespace BASpark
 
             ResetPrimaryPointerState();
             _lastTrailOverlay = null;
+            _lastTrailThrottleOverlay = null;
+            _lastMoveTimestamp = 0;
         }
 
         private void ReleasePointerState()
@@ -762,7 +796,10 @@ namespace BASpark
                     continue;
                 }
 
-                var win = new MainWindow(pair.Value);
+                int refreshRate = _followDisplayRefreshRate
+                    ? ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)
+                    : _manualTrailRefreshRate;
+                var win = new MainWindow(pair.Value, refreshRate);
                 _overlays[pair.Key] = win;
                 win.Show();
             }
@@ -792,6 +829,11 @@ namespace BASpark
             if (ReferenceEquals(_lastTrailOverlay, overlay))
             {
                 _lastTrailOverlay = null;
+            }
+            if (ReferenceEquals(_lastTrailThrottleOverlay, overlay))
+            {
+                _lastTrailThrottleOverlay = null;
+                _lastMoveTimestamp = 0;
             }
 
             try
@@ -1044,7 +1086,44 @@ namespace BASpark
         {
             _ = sender;
             _ = e;
-            System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => RecoverAfterSystemResume()));
+            if (_disposed)
+            {
+                return;
+            }
+
+            System.Windows.Application.Current.Dispatcher.BeginInvoke(
+                new Action(RestartDisplaySettingsRecoveryTimer));
+        }
+
+        private void RestartDisplaySettingsRecoveryTimer()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (_displaySettingsRecoveryTimer == null)
+            {
+                _displaySettingsRecoveryTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(DisplaySettingsRecoveryDebounceMilliseconds)
+                };
+                _displaySettingsRecoveryTimer.Tick += DisplaySettingsRecoveryTimer_Tick;
+            }
+
+            _displaySettingsRecoveryTimer.Stop();
+            _displaySettingsRecoveryTimer.Start();
+        }
+
+        private void DisplaySettingsRecoveryTimer_Tick(object? sender, EventArgs e)
+        {
+            _ = sender;
+            _ = e;
+            _displaySettingsRecoveryTimer?.Stop();
+            if (!_disposed)
+            {
+                RecoverAfterSystemResume();
+            }
         }
 
         private void HandlePowerModeChanged(object sender, PowerModeChangedEventArgs e)
@@ -1094,9 +1173,9 @@ namespace BASpark
 
         private void RecoverAfterSystemResume()
         {
+            UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
             RebuildWindows(forceRebuild: true);
             SetupGlobalHooks();
-            UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate);
             RefreshEnvironmentFilterState();
         }
 
@@ -1116,6 +1195,12 @@ namespace BASpark
             SystemEvents.DisplaySettingsChanged -= HandleDisplaySettingsChanged;
             SystemEvents.PowerModeChanged -= HandlePowerModeChanged;
             SystemEvents.SessionSwitch -= HandleSessionSwitch;
+            if (_displaySettingsRecoveryTimer != null)
+            {
+                _displaySettingsRecoveryTimer.Stop();
+                _displaySettingsRecoveryTimer.Tick -= DisplaySettingsRecoveryTimer_Tick;
+                _displaySettingsRecoveryTimer = null;
+            }
             TeardownScreenshotCompatCaptureSurfaces();
             EndScreenshotCaptureSession();
             if (_globalHook != null)
