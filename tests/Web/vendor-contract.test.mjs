@@ -21,6 +21,13 @@ const legacyTemplatePath = new URL(
 function createLegacyHarness()
 {
   const eventListeners = new Map();
+  const math = Object.assign(Object.create(Math),
+    {
+      random()
+      {
+        return 0.5;
+      },
+    });
 
   class FakeMouseEvent
   {
@@ -148,6 +155,7 @@ function createLegacyHarness()
           return mainCanvas;
         },
       },
+      Math: math,
       MouseEvent: FakeMouseEvent,
       performance:
       {
@@ -199,6 +207,10 @@ test('vendored IIFE exposes every host API required by BASpark', () =>
     {
       return Buffer.from(encoded, 'base64').toString('latin1');
     },
+    structuredClone(value)
+    {
+      return JSON.parse(JSON.stringify(value));
+    },
   };
 
   vm.runInNewContext(source, context, { filename: 'ba-click-fx.iife.js' });
@@ -226,6 +238,23 @@ test('vendored IIFE exposes every host API required by BASpark', () =>
   assert.equal(lightBackgroundConfig.overlayAlphaLimit, 0.85);
   assert.equal(lightBackgroundConfig.hostCompositing, 'source-over');
   assert.equal(lightBackgroundConfig.hostCompositingSurface, 'transparent-window');
+
+  const glowPatch = context.BAClickFX.applyFxParamPatch(
+    {
+      'bloom.trailEmission': 23.968628 * 3,
+      'bloom.clickEmissionScale': 3,
+    },
+    {
+      strict: true,
+    },
+  );
+  assert.equal(glowPatch.committed, true);
+  assert.equal(glowPatch.rejected.length, 0);
+  assert.equal(glowPatch.applied.length, 2);
+  assert.equal(glowPatch.applied[0].path, 'bloom.trailEmission');
+  assert.equal(glowPatch.applied[0].value, 23.968628 * 3);
+  assert.equal(glowPatch.applied[1].path, 'bloom.clickEmissionScale');
+  assert.equal(glowPatch.applied[1].value, 3);
 
   const prototype = context.BAClickFX.BAClickFX.prototype;
   for (const method of [
@@ -272,6 +301,8 @@ test('legacy renderer applies independent trail and click scales', () =>
   assert.equal(window.spark.scale, 1);
   assert.equal(window.spark.trailScale, 1);
   assert.equal(window.spark.clickScale, 1);
+  assert.equal(window.spark.trailGlowIntensity, 1);
+  assert.equal(window.spark.clickGlowIntensity, 1);
 
   const mouseMove = eventListeners.get('mousemove');
   assert.equal(typeof mouseMove, 'function');
@@ -291,8 +322,10 @@ test('legacy renderer applies independent trail and click scales', () =>
   assert.equal(window.spark.scale, 1);
   assert.equal(window.spark.trailScale, 1);
   assert.equal(window.spark.clickScale, 1);
+  assert.equal(window.spark.trailGlowIntensity, 1);
+  assert.equal(window.spark.clickGlowIntensity, 1);
 
-  window.updateEffectSettings(0.5, 3, 1, 1, 1);
+  window.updateEffectSettings(0.5, 3, 1, 1, 1, 1, 1);
 
   const spark = window.spark;
   spark.trail = [{ x: 10, y: 10, life: 1 }];
@@ -336,6 +369,10 @@ test('legacy renderer applies independent trail and click scales', () =>
   spark._updateWaves(1);
 
   assert.equal(lineWidths.at(0), 0.8);
+
+  window.updateEffectSettings(1, 1, 1, 1, 1, 0, 3);
+  assert.equal(window.spark.trailGlowIntensity, 0);
+  assert.equal(window.spark.clickGlowIntensity, 3);
 });
 
 test('legacy environment filtering releases input without clearing existing effects', () =>

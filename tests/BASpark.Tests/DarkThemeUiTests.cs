@@ -161,6 +161,67 @@ public class DarkThemeUiTests
     }
 
     [Fact]
+    public void GlowBrightness_UsesLinkedAndIndependentControlsWithExpectedDefaults()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement toggle = GetNamedElement(document, "CheckLinkedGlowIntensity");
+        XElement hint = GetNamedElement(document, "TxtLinkedGlowIntensityHint");
+        XElement unifiedPanel = GetNamedElement(document, "PanelUnifiedGlowIntensity");
+        XElement splitPanel = GetNamedElement(document, "PanelSplitGlowIntensity");
+        XElement trailRefreshPanel = GetNamedElement(document, "PanelTrailRefreshRate");
+        XElement effectColor = GetNamedElement(document, "TxtEffectColor");
+        List<XElement> children = Assert.IsType<XElement>(toggle.Parent).Elements().ToList();
+
+        Assert.Equal("LinkedGlowIntensity_Changed", (string?)toggle.Attribute("Checked"));
+        Assert.Equal("LinkedGlowIntensity_Changed", (string?)toggle.Attribute("Unchecked"));
+        Assert.Equal(children.IndexOf(toggle) + 1, children.IndexOf(hint));
+        Assert.True(children.IndexOf(trailRefreshPanel) < children.IndexOf(toggle));
+        Assert.True(children.IndexOf(effectColor) < children.IndexOf(toggle));
+        Assert.Equal(children.IndexOf(hint) + 1, children.IndexOf(unifiedPanel));
+        Assert.Equal(children.IndexOf(unifiedPanel) + 1, children.IndexOf(splitPanel));
+        Assert.Equal("Collapsed", (string?)splitPanel.Attribute("Visibility"));
+
+        foreach (string sliderName in new[]
+        {
+            "SliderGlowIntensity",
+            "SliderTrailGlowIntensity",
+            "SliderClickGlowIntensity",
+        })
+        {
+            XElement slider = GetNamedElement(document, sliderName);
+            Assert.Equal("0.0", (string?)slider.Attribute("Minimum"));
+            Assert.Equal("3.0", (string?)slider.Attribute("Maximum"));
+            Assert.Equal("0.1", (string?)slider.Attribute("TickFrequency"));
+        }
+
+        string panelSource = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string configSource = ReadSource("src", "ConfigManager.cs");
+        Assert.Contains("UseLinkedGlowIntensity { get; set; } = true", configSource, StringComparison.Ordinal);
+        Assert.Contains("GlowIntensity { get; set; } = 1.0", configSource, StringComparison.Ordinal);
+        Assert.Contains("TrailGlowIntensity { get; set; } = 1.0", configSource, StringComparison.Ordinal);
+        Assert.Contains("ClickGlowIntensity { get; set; } = 1.0", configSource, StringComparison.Ordinal);
+        Assert.Contains("GetGlowIntensitiesForOverlay", configSource, StringComparison.Ordinal);
+        Assert.Contains("VisualAppearanceResetFlags.UnifiedGlowIntensity", panelSource, StringComparison.Ordinal);
+        Assert.Contains("VisualAppearanceResetFlags.TrailGlowIntensity", panelSource, StringComparison.Ordinal);
+        Assert.Contains("VisualAppearanceResetFlags.ClickGlowIntensity", panelSource, StringComparison.Ordinal);
+        Assert.Contains("Save(\"GlowIntensity\", 1.0)", configSource, StringComparison.Ordinal);
+        Assert.Contains("Save(\"TrailGlowIntensity\", 1.0)", configSource, StringComparison.Ordinal);
+        Assert.Contains("Save(\"ClickGlowIntensity\", 1.0)", configSource, StringComparison.Ordinal);
+
+        foreach (string resourcePath in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
+        {
+            string resources = ReadSource("src", "Resources", resourcePath);
+            Assert.Contains("Visual_LinkedGlowIntensity", resources, StringComparison.Ordinal);
+            Assert.Contains("Visual_GlowIntensity", resources, StringComparison.Ordinal);
+            Assert.Contains("Visual_TrailGlowIntensity", resources, StringComparison.Ordinal);
+            Assert.Contains("Visual_ClickGlowIntensity", resources, StringComparison.Ordinal);
+            Assert.Contains("VisualReset_UnifiedGlowIntensity", resources, StringComparison.Ordinal);
+            Assert.Contains("VisualReset_TrailGlowIntensity", resources, StringComparison.Ordinal);
+            Assert.Contains("VisualReset_ClickGlowIntensity", resources, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void ThemeManager_UsesSeparatePalettesAndRestoresLightControlStyles()
     {
         string source = ReadSource("src", "ThemeManager.cs");

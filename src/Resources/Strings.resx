@@ -571,6 +571,24 @@
     <data name="VisualReset_ClickScale_Sub" xml:space="preserve">
       <value>独立项默认 1.00 ×</value>
     </data>
+    <data name="VisualReset_UnifiedGlowIntensity" xml:space="preserve">
+      <value>统一辉光亮度</value>
+    </data>
+    <data name="VisualReset_UnifiedGlowIntensity_Sub" xml:space="preserve">
+      <value>开启「同一辉光亮度」并默认 1.00 ×</value>
+    </data>
+    <data name="VisualReset_TrailGlowIntensity" xml:space="preserve">
+      <value>拖尾辉光亮度</value>
+    </data>
+    <data name="VisualReset_TrailGlowIntensity_Sub" xml:space="preserve">
+      <value>独立项默认 1.00 ×</value>
+    </data>
+    <data name="VisualReset_ClickGlowIntensity" xml:space="preserve">
+      <value>点击辉光亮度</value>
+    </data>
+    <data name="VisualReset_ClickGlowIntensity_Sub" xml:space="preserve">
+      <value>独立项默认 1.00 ×</value>
+    </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>拖尾刷新率</value>
     </data>
@@ -646,6 +664,12 @@
     <data name="Visual_LinkedScaleHint" xml:space="preserve">
       <value>关闭此项后可分别调整拖尾和点击特效的大小。</value>
     </data>
+    <data name="Visual_LinkedGlowIntensity" xml:space="preserve">
+      <value>拖尾与点击使用同一辉光亮度</value>
+    </data>
+    <data name="Visual_LinkedGlowIntensityHint" xml:space="preserve">
+      <value>关闭此项后可分别调整拖尾和点击特效的辉光亮度。</value>
+    </data>
     <data name="Visual_CurveDraw" xml:space="preserve">
       <value>采用曲线拖尾</value>
     </data>
@@ -672,6 +696,15 @@
     </data>
     <data name="Visual_ClickScale" xml:space="preserve">
       <value>点击缩放比例</value>
+    </data>
+    <data name="Visual_GlowIntensity" xml:space="preserve">
+      <value>辉光亮度</value>
+    </data>
+    <data name="Visual_TrailGlowIntensity" xml:space="preserve">
+      <value>拖尾辉光亮度</value>
+    </data>
+    <data name="Visual_ClickGlowIntensity" xml:space="preserve">
+      <value>点击辉光亮度</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>视觉表现</value>

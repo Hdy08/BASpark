@@ -571,6 +571,24 @@ Download now?</value>
     <data name="VisualReset_ClickScale_Sub" xml:space="preserve">
       <value>Default 1.00 ×</value>
     </data>
+    <data name="VisualReset_UnifiedGlowIntensity" xml:space="preserve">
+      <value>Unified glow brightness</value>
+    </data>
+    <data name="VisualReset_UnifiedGlowIntensity_Sub" xml:space="preserve">
+      <value>Linked glow brightness, default 1.00 ×</value>
+    </data>
+    <data name="VisualReset_TrailGlowIntensity" xml:space="preserve">
+      <value>Trail glow brightness</value>
+    </data>
+    <data name="VisualReset_TrailGlowIntensity_Sub" xml:space="preserve">
+      <value>Default 1.00 ×</value>
+    </data>
+    <data name="VisualReset_ClickGlowIntensity" xml:space="preserve">
+      <value>Click glow brightness</value>
+    </data>
+    <data name="VisualReset_ClickGlowIntensity_Sub" xml:space="preserve">
+      <value>Default 1.00 ×</value>
+    </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>Trail refresh rate</value>
     </data>
@@ -646,6 +664,12 @@ Download now?</value>
     <data name="Visual_LinkedScaleHint" xml:space="preserve">
       <value>When off, trail and click scales can be adjusted independently.</value>
     </data>
+    <data name="Visual_LinkedGlowIntensity" xml:space="preserve">
+      <value>Use same glow brightness for trail and click</value>
+    </data>
+    <data name="Visual_LinkedGlowIntensityHint" xml:space="preserve">
+      <value>When off, trail and click glow brightness can be adjusted independently.</value>
+    </data>
     <data name="Visual_CurveDraw" xml:space="preserve">
       <value>Use curved trail lines</value>
     </data>
@@ -672,6 +696,15 @@ Download now?</value>
     </data>
     <data name="Visual_ClickScale" xml:space="preserve">
       <value>Click scale</value>
+    </data>
+    <data name="Visual_GlowIntensity" xml:space="preserve">
+      <value>Glow brightness</value>
+    </data>
+    <data name="Visual_TrailGlowIntensity" xml:space="preserve">
+      <value>Trail glow brightness</value>
+    </data>
+    <data name="Visual_ClickGlowIntensity" xml:space="preserve">
+      <value>Click glow brightness</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>Visual</value>

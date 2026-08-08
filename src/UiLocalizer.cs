@@ -99,6 +99,11 @@ namespace BASpark
             w.TxtTrailScale.Text = Localization.Get("Visual_TrailScale");
             w.TxtClickScale.Text = Localization.Get("Visual_ClickScale");
             w.TxtVisualOpacity.Text = Localization.Get("Visual_Opacity");
+            w.CheckLinkedGlowIntensity.Content = Localization.Get("Visual_LinkedGlowIntensity");
+            w.TxtLinkedGlowIntensityHint.Text = Localization.Get("Visual_LinkedGlowIntensityHint");
+            w.TxtGlowIntensity.Text = Localization.Get("Visual_GlowIntensity");
+            w.TxtTrailGlowIntensity.Text = Localization.Get("Visual_TrailGlowIntensity");
+            w.TxtClickGlowIntensity.Text = Localization.Get("Visual_ClickGlowIntensity");
             w.CheckLinkedAnimationSpeed.Content = Localization.Get("Visual_LinkedSpeed");
             w.TxtLinkedSpeedHint.Text = Localization.Get("Visual_LinkedSpeedHint");
             w.CheckApplyCurveDraw.Content = Localization.Get("Visual_CurveDraw");

@@ -81,6 +81,7 @@ namespace BASpark
         private bool _isCheckingUpdate = false;
         private bool _suspendLinkedEffectScaleUiHandlers;
         private bool _suspendLinkedAnimationUiHandlers;
+        private bool _suspendLinkedGlowIntensityUiHandlers;
         private string _languageAtLoad = Localization.CultureZhCn;
         private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
         private bool _autoNetworkFailurePromptShown;
@@ -549,6 +550,7 @@ namespace BASpark
         {
             _suspendLinkedEffectScaleUiHandlers = true;
             _suspendLinkedAnimationUiHandlers = true;
+            _suspendLinkedGlowIntensityUiHandlers = true;
             try
             {
                 LoadSettingsCore();
@@ -557,6 +559,7 @@ namespace BASpark
             {
                 _suspendLinkedEffectScaleUiHandlers = false;
                 _suspendLinkedAnimationUiHandlers = false;
+                _suspendLinkedGlowIntensityUiHandlers = false;
             }
         }
 
@@ -595,6 +598,10 @@ namespace BASpark
             SliderTrailScale.Value = ConfigManager.TrailEffectScale;
             SliderClickScale.Value = ConfigManager.ClickEffectScale;
             SliderOpacity.Value = ConfigManager.EffectOpacity * 100;
+            CheckLinkedGlowIntensity.IsChecked = ConfigManager.UseLinkedGlowIntensity;
+            SliderGlowIntensity.Value = ConfigManager.GlowIntensity;
+            SliderTrailGlowIntensity.Value = ConfigManager.TrailGlowIntensity;
+            SliderClickGlowIntensity.Value = ConfigManager.ClickGlowIntensity;
             CheckLinkedAnimationSpeed.IsChecked = ConfigManager.UseLinkedAnimationSpeed;
             CheckApplyCurveDraw.IsChecked = ConfigManager.ApplyCurveDraw;
             SliderSpeed.Value = ConfigManager.EffectSpeed;
@@ -604,6 +611,7 @@ namespace BASpark
             SliderTrailRefresh.Value = ConfigManager.TrailRefreshRate;
             UpdateEffectScalePanelVisibility();
             UpdateAnimationSpeedPanelVisibility();
+            UpdateGlowIntensityPanelVisibility();
 
             if (ConfigManager.ScrollbarVisibility == PanelScrollbarVisibility.Always)
             {
@@ -1274,6 +1282,9 @@ namespace BASpark
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), Localization.Get("VisualReset_TrailSpeed_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ClickAnimationSpeed, Localization.Get("VisualReset_ClickSpeed"), Localization.Get("VisualReset_ClickSpeed_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, Localization.Get("VisualReset_TrailRefresh"), Localization.Get("VisualReset_TrailRefresh_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.UnifiedGlowIntensity, Localization.Get("VisualReset_UnifiedGlowIntensity"), Localization.Get("VisualReset_UnifiedGlowIntensity_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailGlowIntensity, Localization.Get("VisualReset_TrailGlowIntensity"), Localization.Get("VisualReset_TrailGlowIntensity_Sub")));
+            VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ClickGlowIntensity, Localization.Get("VisualReset_ClickGlowIntensity"), Localization.Get("VisualReset_ClickGlowIntensity_Sub")));
             VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ParticleColor, Localization.Get("VisualReset_Color"), Localization.Get("VisualReset_Color_Sub")));
         }
 
@@ -1357,9 +1368,10 @@ namespace BASpark
             bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsChecked == true;
             ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
+            ConfigManager.GetGlowIntensitiesForOverlay(out double trailGlowIntensity, out double clickGlowIntensity);
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
-            App.Overlay?.UpdateEffectSettings(trailScale, clickScale, effectOpacity, trailSp, clickSp);
+            App.Overlay?.UpdateEffectSettings(trailScale, clickScale, effectOpacity, trailSp, clickSp, trailGlowIntensity, clickGlowIntensity);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
             App.Overlay?.SetCurveDraw(CheckApplyCurveDraw.IsChecked ?? false);
 
@@ -1421,6 +1433,23 @@ namespace BASpark
             }
 
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
+            bool useLinkedGlowIntensity = CheckLinkedGlowIntensity.IsChecked == true;
+            double trailGlowIntensity;
+            double clickGlowIntensity;
+            double glowIntensityForRegistry;
+            if (useLinkedGlowIntensity)
+            {
+                glowIntensityForRegistry = Math.Round(SliderGlowIntensity.Value, 2);
+                trailGlowIntensity = glowIntensityForRegistry;
+                clickGlowIntensity = glowIntensityForRegistry;
+            }
+            else
+            {
+                trailGlowIntensity = Math.Round(SliderTrailGlowIntensity.Value, 2);
+                clickGlowIntensity = Math.Round(SliderClickGlowIntensity.Value, 2);
+                glowIntensityForRegistry = clickGlowIntensity;
+            }
+
             bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsChecked == true;
             double trailAnimSpeed;
             double clickAnimSpeed;
@@ -1469,6 +1498,10 @@ namespace BASpark
             ConfigManager.Save("TrailEffectScale", trailEffectScale);
             ConfigManager.Save("ClickEffectScale", clickEffectScale);
             ConfigManager.Save("EffectOpacity", effectOpacity);
+            ConfigManager.Save("UseLinkedGlowIntensity", useLinkedGlowIntensity);
+            ConfigManager.Save("GlowIntensity", glowIntensityForRegistry);
+            ConfigManager.Save("TrailGlowIntensity", trailGlowIntensity);
+            ConfigManager.Save("ClickGlowIntensity", clickGlowIntensity);
             ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
             ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
             ConfigManager.Save("TrailAnimationSpeed", trailAnimSpeed);
@@ -1549,7 +1582,8 @@ namespace BASpark
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             GetUiEffectScales(out double overlayTrailScale, out double overlayClickScale);
             GetUiAnimationSpeeds(out double overlayTrail, out double overlayClick);
-            App.Overlay?.UpdateEffectSettings(overlayTrailScale, overlayClickScale, effectOpacity, overlayTrail, overlayClick);
+            GetUiGlowIntensities(out double overlayTrailGlowIntensity, out double overlayClickGlowIntensity);
+            App.Overlay?.UpdateEffectSettings(overlayTrailScale, overlayClickScale, effectOpacity, overlayTrail, overlayClick, overlayTrailGlowIntensity, overlayClickGlowIntensity);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
             App.Overlay?.RefreshEnvironmentFilterState();
             App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);
@@ -1849,6 +1883,51 @@ namespace BASpark
             {
                 trailScale = Math.Round(SliderTrailScale.Value, 2);
                 clickScale = Math.Round(SliderClickScale.Value, 2);
+            }
+        }
+
+        private void LinkedGlowIntensity_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!IsLoaded || _suspendLinkedGlowIntensityUiHandlers)
+            {
+                return;
+            }
+
+            bool linked = CheckLinkedGlowIntensity.IsChecked == true;
+            if (linked)
+            {
+                double average = Math.Round((SliderTrailGlowIntensity.Value + SliderClickGlowIntensity.Value) / 2.0, 2);
+                SliderGlowIntensity.Value = Math.Clamp(average, 0.0, 3.0);
+            }
+            else
+            {
+                double value = Math.Clamp(Math.Round(SliderGlowIntensity.Value, 2), 0.0, 3.0);
+                SliderTrailGlowIntensity.Value = value;
+                SliderClickGlowIntensity.Value = value;
+            }
+
+            UpdateGlowIntensityPanelVisibility();
+        }
+
+        private void UpdateGlowIntensityPanelVisibility()
+        {
+            bool linked = CheckLinkedGlowIntensity.IsChecked == true;
+            PanelUnifiedGlowIntensity.Visibility = linked ? Visibility.Visible : Visibility.Collapsed;
+            PanelSplitGlowIntensity.Visibility = linked ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void GetUiGlowIntensities(out double trailGlowIntensity, out double clickGlowIntensity)
+        {
+            if (CheckLinkedGlowIntensity.IsChecked == true)
+            {
+                double value = Math.Round(SliderGlowIntensity.Value, 2);
+                trailGlowIntensity = value;
+                clickGlowIntensity = value;
+            }
+            else
+            {
+                trailGlowIntensity = Math.Round(SliderTrailGlowIntensity.Value, 2);
+                clickGlowIntensity = Math.Round(SliderClickGlowIntensity.Value, 2);
             }
         }
 

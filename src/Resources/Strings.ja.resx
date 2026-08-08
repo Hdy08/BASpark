@@ -571,6 +571,24 @@
     <data name="VisualReset_ClickScale_Sub" xml:space="preserve">
       <value>個別項目の既定 1.00 ×</value>
     </data>
+    <data name="VisualReset_UnifiedGlowIntensity" xml:space="preserve">
+      <value>統一グロー明るさ</value>
+    </data>
+    <data name="VisualReset_UnifiedGlowIntensity_Sub" xml:space="preserve">
+      <value>同じグロー明るさ、既定 1.00 ×</value>
+    </data>
+    <data name="VisualReset_TrailGlowIntensity" xml:space="preserve">
+      <value>トレイルのグロー明るさ</value>
+    </data>
+    <data name="VisualReset_TrailGlowIntensity_Sub" xml:space="preserve">
+      <value>個別項目の既定 1.00 ×</value>
+    </data>
+    <data name="VisualReset_ClickGlowIntensity" xml:space="preserve">
+      <value>クリックのグロー明るさ</value>
+    </data>
+    <data name="VisualReset_ClickGlowIntensity_Sub" xml:space="preserve">
+      <value>個別項目の既定 1.00 ×</value>
+    </data>
     <data name="VisualReset_TrailRefresh" xml:space="preserve">
       <value>トレイル更新率</value>
     </data>
@@ -646,6 +664,12 @@
     <data name="Visual_LinkedScaleHint" xml:space="preserve">
       <value>オフにすると、トレイルとクリックの拡大率を個別に調整できます。</value>
     </data>
+    <data name="Visual_LinkedGlowIntensity" xml:space="preserve">
+      <value>トレイルとクリックで同じグロー明るさを使用</value>
+    </data>
+    <data name="Visual_LinkedGlowIntensityHint" xml:space="preserve">
+      <value>オフにすると、トレイルとクリックのグロー明るさを個別に調整できます。</value>
+    </data>
     <data name="Visual_CurveDraw" xml:space="preserve">
       <value>曲線トレイルを使用</value>
     </data>
@@ -672,6 +696,15 @@
     </data>
     <data name="Visual_ClickScale" xml:space="preserve">
       <value>クリックの拡大率</value>
+    </data>
+    <data name="Visual_GlowIntensity" xml:space="preserve">
+      <value>グロー明るさ</value>
+    </data>
+    <data name="Visual_TrailGlowIntensity" xml:space="preserve">
+      <value>トレイルのグロー明るさ</value>
+    </data>
+    <data name="Visual_ClickGlowIntensity" xml:space="preserve">
+      <value>クリックのグロー明るさ</value>
     </data>
     <data name="Visual_Title" xml:space="preserve">
       <value>ビジュアル</value>
