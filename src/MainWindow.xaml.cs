@@ -109,7 +109,7 @@ namespace BASpark
         private bool _screenshotCompatibilityMode = ConfigManager.ScreenshotCompatibilityMode;
         private static readonly long EnsureTopmostDebounceTicks = TimeSpan.FromMilliseconds(80).Ticks;
         private bool _hiddenForExternalScreenshotCapture;
-        private bool _hiddenByEnvironmentSuppression;
+        private bool _environmentInputSuppressed;
         private bool _overlayRuntimePaused;
         private bool _rendererReady;
         private bool _usingLegacyRenderer;
@@ -267,20 +267,20 @@ namespace BASpark
             SyncOverlayPresentationState();
         }
 
-        /// 环境过滤时隐藏叠加层并暂停 WebView 渲染
+        /// 环境过滤时终止当前输入并阻止后续输入，保留已创建的动画自然结束。
         public void SetEnvironmentSuppressed(bool suppressed)
         {
-            if (_hiddenByEnvironmentSuppression == suppressed)
+            if (_environmentInputSuppressed == suppressed)
             {
                 return;
             }
 
-            _hiddenByEnvironmentSuppression = suppressed;
-            SyncOverlayPresentationState();
+            _environmentInputSuppressed = suppressed;
+            ApplyEnvironmentInputSuppression();
         }
 
         private bool ShouldOverlayBeVisible =>
-            !_hiddenForExternalScreenshotCapture && !_hiddenByEnvironmentSuppression;
+            !_hiddenForExternalScreenshotCapture;
 
         private void SyncOverlayPresentationState()
         {
@@ -590,6 +590,7 @@ namespace BASpark
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
             UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSp, clickSp);
             SyncInputContext(InputModeMouse);
+            ApplyEnvironmentInputSuppression();
             if (_overlayRuntimePaused)
             {
                 ExecuteScript("if(window.setRenderingPaused) window.setRenderingPaused(true);");
@@ -1013,6 +1014,12 @@ namespace BASpark
             if (string.IsNullOrEmpty(script)) return;
 
             ExecuteScript(coreWebView, script);
+        }
+
+        private void ApplyEnvironmentInputSuppression()
+        {
+            string suppressed = _environmentInputSuppressed ? "true" : "false";
+            ExecuteScript($"if(window.setEnvironmentInputSuppressed) window.setEnvironmentInputSuppressed({suppressed});");
         }
 
         private void ExecuteWithInputContext(string inputMode, string actionScript)

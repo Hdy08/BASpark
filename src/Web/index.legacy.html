@@ -691,6 +691,7 @@
 
         window.spark = new MouseSpark();
         window.renderingPaused = false;
+        window.environmentInputSuppressed = false;
         window.animationFramePending = false;
 
         let lastBoomX = -1, lastBoomY = -1;
@@ -742,7 +743,7 @@
 
         // 接收 C# 传来的物理百分比 (0.0 ~ 1.0)，由前端根据真实的画布宽度自行计算
         window.externalBoom = (percentX, percentY) => {
-            if (window.renderingPaused) return;
+            if (window.renderingPaused || window.environmentInputSuppressed) return;
             const now = Date.now();
             if (percentX === lastBoomX && percentY === lastBoomY && (now - lastBoomTime) < 25) return;
             lastBoomX = percentX;
@@ -757,7 +758,7 @@
         };
 
         window.externalMove = (percentX, percentY) => {
-            if (window.renderingPaused) return;
+            if (window.renderingPaused || window.environmentInputSuppressed) return;
             if (percentX === lastMoveX && percentY === lastMoveY) return;
             lastMoveX = percentX;
             lastMoveY = percentY;
@@ -773,6 +774,22 @@
             if (window.renderingPaused) return;
             window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
             window.scheduleNextAnimationFrame();
+        };
+
+        window.setEnvironmentInputSuppressed = (suppressed) => {
+            const nextSuppressed = Boolean(suppressed);
+            if (nextSuppressed === window.environmentInputSuppressed) return false;
+
+            if (nextSuppressed) {
+                window.externalUp();
+                lastBoomX = -1;
+                lastBoomY = -1;
+                lastMoveX = -1;
+                lastMoveY = -1;
+            }
+
+            window.environmentInputSuppressed = nextSuppressed;
+            return true;
         };
 
         window.updateColor = (rgbString) => {
@@ -801,7 +818,7 @@
         };
 
         window.externalTrailStart = (percentX, percentY) => {
-            if (window.renderingPaused || !window.spark) return;
+            if (window.renderingPaused || window.environmentInputSuppressed || !window.spark) return;
             const x = percentX * window.innerWidth;
             const y = percentY * window.innerHeight;
             lastMoveX = percentX;

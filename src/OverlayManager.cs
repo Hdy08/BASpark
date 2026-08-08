@@ -663,7 +663,7 @@ namespace BASpark
 
             if (ShouldSuppressEffects())
             {
-                ReleasePointerStateSilent();
+                ReleasePointerStateForEnvironmentSuppression();
                 return;
             }
 
@@ -685,7 +685,7 @@ namespace BASpark
 
             if (!skipSuppressionCheck && ShouldSuppressEffects())
             {
-                ReleasePointerStateSilent();
+                ReleasePointerStateForEnvironmentSuppression();
                 return false;
             }
 
@@ -708,6 +708,15 @@ namespace BASpark
                 _lastTrailOverlay.EmitCancel();
             }
 
+            ResetPrimaryPointerState();
+            _lastTrailOverlay = null;
+            _lastTrailThrottleOverlay = null;
+            _lastMoveTimestamp = 0;
+        }
+
+        // 环境过滤通过 SetEnvironmentSuppressed 释放渲染器，此处只清理宿主侧路由状态。
+        private void ReleasePointerStateForEnvironmentSuppression()
+        {
             ResetPrimaryPointerState();
             _lastTrailOverlay = null;
             _lastTrailThrottleOverlay = null;
@@ -953,7 +962,7 @@ namespace BASpark
         {
             if (isSuppressed)
             {
-                ReleasePointerStateSilent();
+                ReleasePointerStateForEnvironmentSuppression();
             }
 
             ForEachOverlay(w => w.SetEnvironmentSuppressed(isSuppressed));

@@ -22,6 +22,15 @@ function createLegacyHarness()
 {
   const eventListeners = new Map();
 
+  class FakeMouseEvent
+  {
+    constructor(type, options = {})
+    {
+      this.type = type;
+      Object.assign(this, options);
+    }
+  }
+
   function createContext()
   {
     return {
@@ -103,6 +112,10 @@ function createLegacyHarness()
     {
       eventListeners.set(type, listener);
     },
+    dispatchEvent(event)
+    {
+      eventListeners.get(event.type)?.(event);
+    },
     devicePixelRatio: 1,
     innerHeight: 600,
     innerWidth: 800,
@@ -135,6 +148,7 @@ function createLegacyHarness()
           return mainCanvas;
         },
       },
+      MouseEvent: FakeMouseEvent,
       performance:
       {
         now()
@@ -322,4 +336,28 @@ test('legacy renderer applies independent trail and click scales', () =>
   spark._updateWaves(1);
 
   assert.equal(lineWidths.at(0), 0.8);
+});
+
+test('legacy environment filtering releases input without clearing existing effects', () =>
+{
+  const { window } = createLegacyHarness();
+  const spark = window.spark;
+
+  window.externalTrailStart(0.5, 0.25);
+  spark.trail = [{ x: 10, y: 10, life: 1 }];
+  spark.waves = [{ x: 10, y: 10, r: 4, life: 1 }];
+  spark.sparks = [{ x: 10, y: 10, life: 1 }];
+
+  assert.equal(window.setEnvironmentInputSuppressed(true), true);
+  assert.equal(spark.isDown, false);
+  assert.equal(spark.trail.length, 1);
+  assert.equal(spark.waves.length, 1);
+  assert.equal(spark.sparks.length, 1);
+
+  window.externalTrailStart(0.4, 0.5);
+  assert.equal(spark.isDown, false);
+
+  assert.equal(window.setEnvironmentInputSuppressed(false), true);
+  window.externalTrailStart(0.4, 0.5);
+  assert.equal(spark.isDown, true);
 });

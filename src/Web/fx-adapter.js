@@ -35,6 +35,7 @@
         fx: null,
         initialized: false,
         paused: false,
+        environmentInputSuppressed: false,
         inputMode: 'mouse',
         alwaysTrailEnabled: false,
         effectiveAlwaysTrail: false,
@@ -130,6 +131,11 @@
         state.lastBoomTime = 0;
         state.lastMoveX = -1;
         state.lastMoveY = -1;
+    }
+
+    function canAcceptHostInput()
+    {
+        return !state.paused && !state.environmentInputSuppressed && state.fx !== null;
     }
 
     function pointerType()
@@ -391,7 +397,7 @@
 
     window.externalBoom = function (percentX, percentY)
     {
-        if (state.paused || !state.fx)
+        if (!canAcceptHostInput())
         {
             return false;
         }
@@ -437,7 +443,7 @@
 
     window.externalTrailStart = function (percentX, percentY)
     {
-        if (state.paused || !state.fx)
+        if (!canAcceptHostInput())
         {
             return false;
         }
@@ -486,7 +492,7 @@
 
     window.externalMove = function (percentX, percentY)
     {
-        if (state.paused || !state.fx)
+        if (!canAcceptHostInput())
         {
             return false;
         }
@@ -552,6 +558,26 @@
 
             return accepted;
         });
+    };
+
+    window.setEnvironmentInputSuppressed = function (suppressed)
+    {
+        const nextSuppressed = Boolean(suppressed);
+
+        if (nextSuppressed === state.environmentInputSuppressed)
+        {
+            return false;
+        }
+
+        if (nextSuppressed)
+        {
+            // End the active stroke without cancelling its already-emitted visuals.
+            window.externalUp();
+            resetInputCache();
+        }
+
+        state.environmentInputSuppressed = nextSuppressed;
+        return true;
     };
 
     window.externalCancel = function ()

@@ -363,6 +363,32 @@ test('disables always-trail for touch and blocks input while paused', () =>
   assert.equal(harness.calls.setPaused.at(-1).pauseOptions, undefined);
 });
 
+test('environment filtering releases input without clearing in-flight effects', () =>
+{
+  const harness = createHarness();
+
+  harness.window.externalTrailStart(0.2, 0.3);
+  assert.equal(harness.calls.pointerDown.length, 1);
+
+  const cancelCount = harness.calls.pointerCancel.length;
+  const clearTrailCount = harness.calls.clearTrail;
+  const moveCount = harness.calls.pointerMove.length;
+
+  assert.equal(harness.window.setEnvironmentInputSuppressed(true), true);
+  assert.deepEqual(harness.calls.pointerUp, [1]);
+  assert.equal(harness.calls.pointerCancel.length, cancelCount);
+  assert.equal(harness.calls.clearTrail, clearTrailCount);
+
+  assert.equal(harness.window.externalBoom(0.4, 0.5), false);
+  assert.equal(harness.window.externalMove(0.4, 0.5), false);
+  assert.equal(harness.window.externalTrailStart(0.4, 0.5), false);
+  assert.equal(harness.calls.pointerMove.length, moveCount);
+
+  assert.equal(harness.window.setEnvironmentInputSuppressed(false), true);
+  assert.equal(harness.window.externalMove(0.4, 0.5), true);
+  assert.equal(harness.calls.pointerMove.length, moveCount + 1);
+});
+
 test('changes a software Bloom fallback to the bounded native backend', () =>
 {
   const harness = createHarness();
