@@ -549,7 +549,7 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="📢" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Top"/>
+                            <TextBlock x:Name="NoticeIcon" Text="&#xE789;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource ThemeNoticeIconBrush}" Margin="0,0,10,0" VerticalAlignment="Top"/>
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="NoticeTitle" Text="加载中..." FontWeight="Bold" Foreground="{DynamicResource ThemeNoticeTitleBrush}" FontSize="14"/>
                                 <TextBlock x:Name="NoticeContent" Text="..." Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource ThemeNoticeTextBrush}" FontSize="13" LineHeight="18"/>
@@ -577,10 +577,10 @@
                 </StackPanel>
 
                 <StackPanel Name="PageAbout" Visibility="Collapsed">
-                    <TextBlock x:Name="TxtAboutTitle" Text="关于" FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
+                    <TextBlock x:Name="TxtAboutTitle" Text="关于" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" Margin="0,0,0,20"/>
                     
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,14">
-                        <TextBlock FontSize="28" FontWeight="Bold" VerticalAlignment="Center">
+                        <TextBlock FontSize="28" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" VerticalAlignment="Center">
                             <Run Text="BASpark "/>
                             <Run x:Name="VersionText" Text="v1.1.0" Foreground="#45AFFF" FontSize="24"/>
                         </TextBlock>
@@ -593,7 +593,7 @@
 
                     <Border Background="{DynamicResource ThemeDangerButtonBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,0,20" BorderBrush="{DynamicResource ThemeDangerButtonBorderBrush}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⚠️" Margin="0,0,8,0" VerticalAlignment="Top"/>
+                            <TextBlock x:Name="SecurityWarningIcon" Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource ThemeWarningIconBrush}" Margin="0,0,8,0" VerticalAlignment="Top"/>
                             <TextBlock x:Name="TxtSecurityWarning" Text="安全提示：请务必确保从官方渠道下载。第三方分发渠道的版本可能存在报毒风险或恶意篡改。" Foreground="{DynamicResource ThemeDangerButtonForegroundBrush}" FontSize="12" TextWrapping="Wrap" MaxWidth="380"/>
                         </StackPanel>
                     </Border>
@@ -694,9 +694,9 @@
                                         <TextBlock x:Name="TxtDarkMode" Text="深色模式" Foreground="{DynamicResource ThemeSecondaryTextBrush}" Margin="0,0,0,8" FontSize="12"/>
                                         <Border Background="{DynamicResource ThemeSubtleBackgroundBrush}" CornerRadius="8" Padding="2" HorizontalAlignment="Left">
                                             <StackPanel Orientation="Horizontal">
-                                                <RadioButton x:Name="RadioDarkModeOff" Content="关闭" GroupName="DarkMode" Width="72" Style="{StaticResource SegmentBtn}" Checked="DarkMode_Changed"/>
-                                                <RadioButton x:Name="RadioDarkModeOn" Content="开启" GroupName="DarkMode" Width="72" Style="{StaticResource SegmentBtn}" Checked="DarkMode_Changed"/>
-                                                <RadioButton x:Name="RadioDarkModeSystem" Content="跟随系统" GroupName="DarkMode" IsChecked="True" Width="120" Style="{StaticResource SegmentBtn}" Checked="DarkMode_Changed"/>
+                                                <RadioButton x:Name="RadioDarkModeOff" Content="关闭" GroupName="DarkMode" Width="72" Style="{StaticResource SegmentBtn}"/>
+                                                <RadioButton x:Name="RadioDarkModeOn" Content="开启" GroupName="DarkMode" Width="72" Style="{StaticResource SegmentBtn}"/>
+                                                <RadioButton x:Name="RadioDarkModeSystem" Content="跟随系统" GroupName="DarkMode" IsChecked="True" Width="120" Style="{StaticResource SegmentBtn}"/>
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
@@ -1117,7 +1117,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     
-                    <TextBlock x:Name="TxtOverlayRunning" Text="从运行中进程添加" FontSize="18" FontWeight="Bold" Margin="0,0,0,15"/>
+                    <TextBlock x:Name="TxtOverlayRunning" Text="从运行中进程添加" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" Margin="0,0,0,15"/>
                     
                     <Grid Grid.Row="1" Margin="0,0,0,10">
                         <TextBox x:Name="SearchRunningProcess" Height="30" VerticalContentAlignment="Center" TextChanged="SearchRunningProcess_TextChanged" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Padding="26,0,5,0">
@@ -1162,7 +1162,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock x:Name="TxtOverlayVisualReset" Text="选择要恢复默认的视觉表现项" FontSize="18" FontWeight="Bold" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TxtOverlayVisualReset" Text="选择要恢复默认的视觉表现项" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" Margin="0,0,0,8" TextWrapping="Wrap"/>
 
                     <Grid Grid.Row="1" Margin="0,0,0,10">
                         <TextBox x:Name="SearchVisualReset" Height="30" VerticalContentAlignment="Center" TextChanged="SearchVisualReset_TextChanged" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="{DynamicResource ThemeControlBorderBrush}" Padding="26,0,5,0">

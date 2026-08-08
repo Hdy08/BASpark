@@ -53,7 +53,41 @@ public class DarkThemeUiTests
         Assert.Equal("DarkMode", (string?)GetNamedElement(document, "RadioDarkModeOff").Attribute("GroupName"));
         Assert.Equal("DarkMode", (string?)GetNamedElement(document, "RadioDarkModeOn").Attribute("GroupName"));
         Assert.Equal("DarkMode", (string?)GetNamedElement(document, "RadioDarkModeSystem").Attribute("GroupName"));
-        Assert.Equal("DarkMode_Changed", (string?)GetNamedElement(document, "RadioDarkModeOn").Attribute("Checked"));
+        Assert.Null((string?)GetNamedElement(document, "RadioDarkModeOn").Attribute("Checked"));
+
+        Assert.Equal("Segoe MDL2 Assets", (string?)GetNamedElement(document, "NoticeIcon").Attribute("FontFamily"));
+        Assert.Equal("{DynamicResource ThemeNoticeIconBrush}", (string?)GetNamedElement(document, "NoticeIcon").Attribute("Foreground"));
+        Assert.Equal("Segoe MDL2 Assets", (string?)GetNamedElement(document, "SecurityWarningIcon").Attribute("FontFamily"));
+        Assert.Equal("{DynamicResource ThemeWarningIconBrush}", (string?)GetNamedElement(document, "SecurityWarningIcon").Attribute("Foreground"));
+
+        const string dynamicControlTextBrush = "{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}";
+        Assert.Equal(dynamicControlTextBrush, (string?)GetNamedElement(document, "TxtAboutTitle").Attribute("Foreground"));
+        Assert.Equal(dynamicControlTextBrush, (string?)GetNamedElement(document, "TxtOverlayRunning").Attribute("Foreground"));
+        Assert.Equal(dynamicControlTextBrush, (string?)GetNamedElement(document, "TxtOverlayVisualReset").Attribute("Foreground"));
+        Assert.Equal("{DynamicResource ThemeSidebarVersionBrush}", (string?)GetNamedElement(document, "TxtSidebarVersion").Attribute("Foreground"));
+
+        XElement versionText = GetNamedElement(document, "VersionText");
+        Assert.Equal(dynamicControlTextBrush, (string?)versionText.Parent?.Attribute("Foreground"));
+    }
+
+    [Fact]
+    public void ApplyingSettings_RefreshesThemeWithoutChangingItAtRadioSelection()
+    {
+        string xaml = ReadSource("src", "ControlPanelWindow.xaml");
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+
+        Assert.DoesNotContain("DarkMode_Changed", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("DarkMode_Changed", source, StringComparison.Ordinal);
+
+        int saveIndex = source.IndexOf("ConfigManager.Save(\"DarkMode\", selectedDarkMode);", StringComparison.Ordinal);
+        int applyIndex = source.IndexOf("ApplyDarkMode();", saveIndex, StringComparison.Ordinal);
+        int titleBarIndex = source.IndexOf("ThemeManager.RefreshTitleBarAfterInput(this);", applyIndex, StringComparison.Ordinal);
+        int trayIndex = source.IndexOf("RefreshTrayTheme();", titleBarIndex, StringComparison.Ordinal);
+
+        Assert.True(saveIndex >= 0);
+        Assert.True(applyIndex > saveIndex);
+        Assert.True(titleBarIndex > applyIndex);
+        Assert.True(trayIndex > titleBarIndex);
     }
 
     [Fact]

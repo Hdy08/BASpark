@@ -81,7 +81,6 @@ namespace BASpark
         private bool _isCheckingUpdate = false;
         private bool _suspendLinkedEffectScaleUiHandlers;
         private bool _suspendLinkedAnimationUiHandlers;
-        private bool _suspendDarkModeUiHandlers;
         private string _languageAtLoad = Localization.CultureZhCn;
         private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
         private bool _autoNetworkFailurePromptShown;
@@ -550,7 +549,6 @@ namespace BASpark
         {
             _suspendLinkedEffectScaleUiHandlers = true;
             _suspendLinkedAnimationUiHandlers = true;
-            _suspendDarkModeUiHandlers = true;
             try
             {
                 LoadSettingsCore();
@@ -559,7 +557,6 @@ namespace BASpark
             {
                 _suspendLinkedEffectScaleUiHandlers = false;
                 _suspendLinkedAnimationUiHandlers = false;
-                _suspendDarkModeUiHandlers = false;
             }
         }
 
@@ -1389,7 +1386,6 @@ namespace BASpark
 
         private void SaveSettings_Click(object sender, RoutedEventArgs e)
         {
-            DarkModeOption previousDarkMode = ConfigManager.DarkMode;
             DarkModeOption selectedDarkMode = GetSelectedDarkMode();
             string? selectedLanguage = GetSelectedLanguage();
             bool languageChanged = !string.IsNullOrWhiteSpace(selectedLanguage) &&
@@ -1613,11 +1609,7 @@ namespace BASpark
             }
 
             ApplyDarkMode();
-            if (selectedDarkMode != previousDarkMode)
-            {
-                ThemeManager.RefreshTitleBarAfterInput(this);
-            }
-
+            ThemeManager.RefreshTitleBarAfterInput(this);
             (System.Windows.Application.Current as App)?.RefreshTrayTheme();
 
         }
@@ -1889,21 +1881,6 @@ namespace BASpark
         {
             ThemeManager.ApplyControlPanel(this);
             UpdateEnvironmentFilterInterlock();
-        }
-
-        private void DarkMode_Changed(object sender, RoutedEventArgs e)
-        {
-            _ = sender;
-            _ = e;
-            if (!IsLoaded || _suspendDarkModeUiHandlers)
-            {
-                return;
-            }
-
-            ConfigManager.Save("DarkMode", GetSelectedDarkMode());
-            ApplyDarkMode();
-            ThemeManager.RefreshTitleBarAfterInput(this);
-            (System.Windows.Application.Current as App)?.RefreshTrayTheme();
         }
 
         private void SystemEvents_UserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
