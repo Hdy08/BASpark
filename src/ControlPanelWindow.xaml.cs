@@ -1818,11 +1818,11 @@ namespace BASpark
             if (linked)
             {
                 double avg = Math.Round((SliderTrailScale.Value + SliderClickScale.Value) / 2.0, 2);
-                SliderScale.Value = Math.Clamp(avg, ConfigManager.MinimumEffectScale, 3.0);
+                SliderScale.Value = Math.Clamp(avg, 0.5, 3.0);
             }
             else
             {
-                double value = Math.Clamp(Math.Round(SliderScale.Value, 2), ConfigManager.MinimumEffectScale, 3.0);
+                double value = Math.Clamp(Math.Round(SliderScale.Value, 2), 0.5, 3.0);
                 SliderTrailScale.Value = value;
                 SliderClickScale.Value = value;
             }

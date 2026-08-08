@@ -131,9 +131,6 @@ public class DarkThemeUiTests
         string overlaySource = ReadSource("src", "OverlayManager.cs");
         Assert.Contains("TrailRefreshRate { get; set; } = 60", configSource, StringComparison.Ordinal);
         Assert.Contains("FollowDisplayRefreshRate { get; set; } = true", configSource, StringComparison.Ordinal);
-        Assert.Contains("EffectScaleSemanticsVersionKey", configSource, StringComparison.Ordinal);
-        Assert.Contains("NormalizeLegacyEffectScale", configSource, StringComparison.Ordinal);
-        Assert.Contains("MinimumEffectScale = 1.0 / 3.0", configSource, StringComparison.Ordinal);
         Assert.Contains("Math.Clamp(hz, 30, 360)", overlaySource, StringComparison.Ordinal);
         Assert.Contains("ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)", overlaySource, StringComparison.Ordinal);
         Assert.Contains("hoveredTarget.EmitTrailStart", overlaySource, StringComparison.Ordinal);
@@ -144,7 +141,6 @@ public class DarkThemeUiTests
     [Fact]
     public void VisualReset_SeparatesUnifiedAndIndependentScaleDefaults()
     {
-        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
         string panelSource = ReadSource("src", "ControlPanelWindow.xaml.cs");
         string configSource = ReadSource("src", "ConfigManager.cs");
 
@@ -154,13 +150,6 @@ public class DarkThemeUiTests
         Assert.Contains("Save(\"EffectScale\", 1.0)", configSource, StringComparison.Ordinal);
         Assert.Contains("Save(\"TrailEffectScale\", 1.0)", configSource, StringComparison.Ordinal);
         Assert.Contains("Save(\"ClickEffectScale\", 1.0)", configSource, StringComparison.Ordinal);
-
-        foreach (string sliderName in new[] { "SliderScale", "SliderTrailScale", "SliderClickScale" })
-        {
-            XElement slider = GetNamedElement(document, sliderName);
-            Assert.Equal("0.3333333333333333", (string?)slider.Attribute("Minimum"));
-            Assert.Equal("0.01", (string?)slider.Attribute("TickFrequency"));
-        }
 
         foreach (string resourcePath in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
         {

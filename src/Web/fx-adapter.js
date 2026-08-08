@@ -215,7 +215,7 @@
 
         state.fx.updateConfig(
             {
-                scale: Math.max(0.01, state.settings.clickScale),
+                scale: Math.max(0.01, state.settings.clickScale / 1.5),
                 opacity: state.settings.opacity,
                 trailTimeScale: state.settings.trailSpeed,
                 clickTimeScale: state.settings.clickSpeed,
@@ -268,7 +268,7 @@
             return fallback;
         }
 
-        return clamp(numeric, 1 / 3, 3);
+        return clamp(numeric, 0.5, 3);
     }
 
     function readFxConfigNumber(config, path)

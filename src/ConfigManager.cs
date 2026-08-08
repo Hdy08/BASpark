@@ -70,9 +70,6 @@ namespace BASpark
     public static class ConfigManager
     {
         private const string RegPath = @"Software\BASpark";
-        private const string EffectScaleSemanticsVersionKey = "EffectScaleSemanticsVersion";
-        private const int CurrentEffectScaleSemanticsVersion = 1;
-        public const double MinimumEffectScale = 1.0 / 3.0;
 
         public static string ParticleColor { get; set; } = "45,175,255";
         public static bool IsEffectEnabled { get; set; } = true;
@@ -136,7 +133,7 @@ namespace BASpark
         {
             try
             {
-                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(RegPath, writable: true))
+                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(RegPath))
                 {
                     if (key != null)
                     {
@@ -151,18 +148,10 @@ namespace BASpark
                         EnableAlwaysTrailEffect = Convert.ToBoolean(key.GetValue("EnableAlwaysTrailEffect", false));
                         StartSilent = Convert.ToBoolean(key.GetValue("StartSilent", false));
                         RunAsAdmin = Convert.ToBoolean(key.GetValue("RunAsAdmin", false));
-                        object? effectScaleValue = key.GetValue("EffectScale");
-                        object? trailEffectScaleValue = key.GetValue("TrailEffectScale");
-                        object? clickEffectScaleValue = key.GetValue("ClickEffectScale");
-                        EffectScale = Math.Clamp(Convert.ToDouble(effectScaleValue ?? 1.0, CultureInfo.InvariantCulture), MinimumEffectScale, 3.0);
+                        EffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("EffectScale", 1.0), CultureInfo.InvariantCulture), 0.5, 3.0);
                         UseLinkedEffectScale = Convert.ToBoolean(key.GetValue("UseLinkedEffectScale", true));
-                        TrailEffectScale = Math.Clamp(Convert.ToDouble(trailEffectScaleValue ?? EffectScale, CultureInfo.InvariantCulture), MinimumEffectScale, 3.0);
-                        ClickEffectScale = Math.Clamp(Convert.ToDouble(clickEffectScaleValue ?? EffectScale, CultureInfo.InvariantCulture), MinimumEffectScale, 3.0);
-                        MigrateEffectScaleSemantics(
-                            key,
-                            effectScaleValue != null,
-                            trailEffectScaleValue != null,
-                            clickEffectScaleValue != null);
+                        TrailEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("TrailEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
+                        ClickEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("ClickEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
                         EffectOpacity = Math.Clamp(Convert.ToDouble(key.GetValue("EffectOpacity", 1.0), CultureInfo.InvariantCulture), 0.1, 1.0);
                         EffectSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("EffectSpeed", 1.0), CultureInfo.InvariantCulture), 0.2, 3.0);
                         UseLinkedAnimationSpeed = Convert.ToBoolean(key.GetValue("UseLinkedAnimationSpeed", true));
@@ -243,10 +232,6 @@ namespace BASpark
                         // 加载成功后立即刷新进程过滤器缓存
                         UpdateProcessFilterCache();
                     }
-                    else
-                    {
-                        Save(EffectScaleSemanticsVersionKey, CurrentEffectScaleSemanticsVersion);
-                    }
                 }
             }
             catch (Exception ex)
@@ -295,37 +280,6 @@ namespace BASpark
 
             return NetworkRegionOption.Auto;
         }
-
-        private static void MigrateEffectScaleSemantics(
-            RegistryKey key,
-            bool hasEffectScale,
-            bool hasTrailEffectScale,
-            bool hasClickEffectScale)
-        {
-            int storedVersion = 0;
-            string? rawVersion = key.GetValue(EffectScaleSemanticsVersionKey)?.ToString();
-            _ = int.TryParse(rawVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out storedVersion);
-            if (storedVersion >= CurrentEffectScaleSemanticsVersion)
-            {
-                return;
-            }
-
-            EffectScale = hasEffectScale ? NormalizeLegacyEffectScale(EffectScale) : 1.0;
-            TrailEffectScale = hasTrailEffectScale
-                ? NormalizeLegacyEffectScale(TrailEffectScale)
-                : hasEffectScale ? EffectScale : 1.0;
-            ClickEffectScale = hasClickEffectScale
-                ? NormalizeLegacyEffectScale(ClickEffectScale)
-                : hasEffectScale ? EffectScale : 1.0;
-
-            key.SetValue("EffectScale", EffectScale.ToString(CultureInfo.InvariantCulture));
-            key.SetValue("TrailEffectScale", TrailEffectScale.ToString(CultureInfo.InvariantCulture));
-            key.SetValue("ClickEffectScale", ClickEffectScale.ToString(CultureInfo.InvariantCulture));
-            key.SetValue(EffectScaleSemanticsVersionKey, CurrentEffectScaleSemanticsVersion);
-        }
-
-        private static double NormalizeLegacyEffectScale(double scale) =>
-            Math.Clamp(scale / 1.5, MinimumEffectScale, 3.0);
 
         public static DarkModeOption ParseDarkMode(string? raw)
         {

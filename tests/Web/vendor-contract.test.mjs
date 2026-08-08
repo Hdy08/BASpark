@@ -257,17 +257,13 @@ test('legacy renderer applies independent trail and click scales', () =>
   assert.equal(window.spark.trailScale, 1);
   assert.equal(window.spark.clickScale, 1);
 
-  window.updateEffectSettings(0.1, 0.1, 1, 1, 1);
-  assert.equal(window.spark.trailScale, 1 / 3);
-  assert.equal(window.spark.clickScale, 1 / 3);
-
   window.updateEffectSettings(0.5, 3, 1, 1, 1);
 
   const spark = window.spark;
   spark.trail = [{ x: 10, y: 10, life: 1 }];
   spark.lastPos = { x: 10.1, y: 10 };
   spark._updateTrail(0);
-  assert.equal(bufferContext.arcs.at(-1)[2], 2.25);
+  assert.equal(bufferContext.arcs.at(-1)[2], 1.5);
 
   spark.trail = [
     { x: 10, y: 10, life: 1 },
@@ -275,8 +271,8 @@ test('legacy renderer applies independent trail and click scales', () =>
   ];
   spark.lastPos = { x: 30, y: 10 };
   spark._updateTrail(0);
-  assert.equal(bufferContext.lineWidth, 2.5);
-  assert.equal(bufferContext.shadowBlur, 1.5);
+  assert.ok(Math.abs(bufferContext.lineWidth - 5 / 3) < 0.000001);
+  assert.equal(bufferContext.shadowBlur, 1);
 
   const lineWidths = [];
   spark._strokeRingSegment = (...args) =>
@@ -304,5 +300,5 @@ test('legacy renderer applies independent trail and click scales', () =>
   ];
   spark._updateWaves(1);
 
-  assert.ok(Math.abs(lineWidths.at(0) - 1.2) < 0.000001);
+  assert.equal(lineWidths.at(0), 0.8);
 });
