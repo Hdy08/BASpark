@@ -72,7 +72,7 @@ namespace BASpark
     {
         private const string RegPath = @"Software\BASpark";
 
-        public static string ParticleColor { get; set; } = "45,175,255";
+        public static string ParticleColor { get; set; } = "76,167,255";
         public static bool IsEffectEnabled { get; set; } = true;
         public static bool AutoStart { get; set; } = false;
         public static bool AgreedToPrivacy { get; set; } = false;
@@ -139,7 +139,7 @@ namespace BASpark
                 {
                     if (key != null)
                     {
-                        ParticleColor = key.GetValue("ParticleColor", "45,175,255")?.ToString() ?? "45,175,255";
+                        ParticleColor = key.GetValue("ParticleColor", "76,167,255")?.ToString() ?? "76,167,255";
 
                         IsEffectEnabled = Convert.ToBoolean(key.GetValue("IsEffectEnabled", true));
                         AutoStart = Convert.ToBoolean(key.GetValue("AutoStart", false));
@@ -417,7 +417,7 @@ namespace BASpark
 
             if (flags.HasFlag(VisualAppearanceResetFlags.ParticleColor))
             {
-                Save("ParticleColor", "45,175,255");
+                Save("ParticleColor", "76,167,255");
             }
         }
 
@@ -629,7 +629,7 @@ namespace BASpark
                         System.IO.File.Delete(oldJson);
                     }
 
-                    ParticleColor = "45,175,255";
+                    ParticleColor = "76,167,255";
                     IsEffectEnabled = true;
                     AutoStart = false;
                     AgreedToPrivacy = false;

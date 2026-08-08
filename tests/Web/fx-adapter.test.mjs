@@ -221,12 +221,12 @@ test('initializes the vendored renderer in manual WebView2 mode', () =>
   assert.equal(harness.fx.config.inputSource, 'manual');
   assert.equal(harness.fx.config.effectBackend, 'webgl2');
   assert.equal(harness.fx.config.bloomBackend, 'webgl2');
-  assert.equal(harness.fx.config.outputCompositing, 'browser-overlay');
-  assert.equal(harness.fx.config.overlayAlphaPolicy, 'visual-max');
-  assert.equal(harness.fx.config.overlayColorCompensation, 'bright-core');
-  assert.equal(harness.fx.config.overlayAlphaLimit, 0.85);
+  assert.equal(harness.fx.config.outputCompositing, 'scene');
+  assert.equal(harness.fx.config.overlayAlphaPolicy, 'coverage');
+  assert.equal(harness.fx.config.overlayColorCompensation, 'none');
+  assert.equal(harness.fx.config.overlayAlphaLimit, 250 / 255);
   assert.equal(harness.fx.config.hostCompositing, 'source-over');
-  assert.equal(harness.fx.config.hostCompositingSurface, 'transparent-window');
+  assert.equal(harness.fx.config.hostCompositingSurface, 'dom-backdrop');
   assert.equal(harness.fx.config.isolatedCompositing, false);
   assert.equal(harness.fx.config.lightBackgroundContrastAlpha, 0);
   assert.equal(harness.fx.config.maxDpr, 2);
@@ -260,8 +260,8 @@ test('maps normalized host input and BASpark settings to BAClickFX', () =>
   assert.equal(settings.clickTimeScale, 0.8);
   assert.equal(harness.calls.setFxParams.length, 0);
 
-  harness.window.updateColor('45,175,255');
-  assert.equal(harness.calls.setThemeColor.at(-1), '#2dafff');
+  harness.window.updateColor('76,167,255');
+  assert.equal(harness.calls.setThemeColor.at(-1), '#4ca7ff');
 
   harness.window.setInputContext('mouse', true);
   assert.equal(harness.calls.updateConfig.at(-1).trailAlways, true);

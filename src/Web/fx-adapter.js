@@ -3,7 +3,7 @@
     'use strict';
 
     const POINTER_ID = 1;
-    const DEFAULT_COLOR = '#2dafff';
+    const DEFAULT_COLOR = '#4ca7ff';
     const HOST_GENERATION =
         typeof window.__basparkRendererGeneration === 'string'
             ? window.__basparkRendererGeneration
@@ -882,16 +882,14 @@
             state.fx = new window.BAClickFX.BAClickFX(
                 {
                     inputSource: 'manual',
-                    // WebView2 无法读取窗口后的桌面背景；使用 source-over，
-                    // 再以浅色背景补偿和 Alpha 上限提高未知背景上的可见性。
                     effectBackend: 'webgl2',
                     bloomBackend: 'webgl2',
-                    outputCompositing: 'browser-overlay',
-                    overlayAlphaPolicy: 'visual-max',
-                    overlayColorCompensation: 'bright-core',
-                    overlayAlphaLimit: 0.85,
+                    outputCompositing: 'scene',
+                    overlayAlphaPolicy: 'coverage',
+                    overlayColorCompensation: 'none',
+                    overlayAlphaLimit: 250 / 255,
                     hostCompositing: 'source-over',
-                    hostCompositingSurface: 'transparent-window',
+                    hostCompositingSurface: 'dom-backdrop',
                     isolatedCompositing: false,
                     lightBackgroundContrastAlpha: 0,
                     maxDpr: 2,

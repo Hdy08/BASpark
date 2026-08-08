@@ -545,7 +545,7 @@ Download now?</value>
       <value>Effect color</value>
     </data>
     <data name="VisualReset_Color_Sub" xml:space="preserve">
-      <value>Default RGB(45,175,255)</value>
+      <value>Default RGB(76,167,255)</value>
     </data>
     <data name="VisualReset_Opacity" xml:space="preserve">
       <value>Global opacity</value>

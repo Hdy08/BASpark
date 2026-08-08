@@ -545,7 +545,7 @@
       <value>特效主题颜色</value>
     </data>
     <data name="VisualReset_Color_Sub" xml:space="preserve">
-      <value>默认 RGB(45,175,255)</value>
+      <value>默认 RGB(76,167,255)</value>
     </data>
     <data name="VisualReset_Opacity" xml:space="preserve">
       <value>全局不透明度</value>

@@ -1004,7 +1004,7 @@ namespace BASpark
                     ConfigManager.ParticleColor,
                     out System.Windows.Media.Color initialColor))
             {
-                initialColor = System.Windows.Media.Color.FromRgb(45, 175, 255);
+                initialColor = System.Windows.Media.Color.FromRgb(76, 167, 255);
             }
 
             var dialog = new ColorPickerWindow(initialColor)
