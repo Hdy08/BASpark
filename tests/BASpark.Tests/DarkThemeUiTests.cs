@@ -171,8 +171,7 @@ public class DarkThemeUiTests
         List<XElement> children = Assert.IsType<XElement>(glowPanel.Parent).Elements().ToList();
 
         Assert.True(children.IndexOf(trailRefreshPanel) < children.IndexOf(glowPanel));
-        Assert.True(children.IndexOf(effectColor) < children.IndexOf(glowPanel));
-        Assert.Equal(children.Count - 1, children.IndexOf(glowPanel));
+        Assert.Equal(children.IndexOf(glowPanel) + 1, children.IndexOf(effectColor));
         Assert.Equal("0.0", (string?)slider.Attribute("Minimum"));
         Assert.Equal("3.0", (string?)slider.Attribute("Maximum"));
         Assert.Equal("0.1", (string?)slider.Attribute("TickFrequency"));

@@ -935,15 +935,7 @@
                                                     </StackPanel>
 
                                                     <Separator Background="{DynamicResource ThemeSubtleBackgroundBrush}" Margin="0,2,0,12"/>
-                                                    <TextBlock x:Name="TxtEffectColor" Text="特效主题颜色" Foreground="{DynamicResource ThemeSecondaryTextBrush}" Margin="0,0,0,8" FontSize="12"/>
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <Border Name="ColorPreview" Width="40" Height="28" CornerRadius="6" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" BorderThickness="1" Margin="0,0,10,0"/>
-                                                        <Button x:Name="BtnPickColor" Content="更改颜色" Click="PickColor_Click" Width="90" Height="28" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="#45AFFF" Foreground="#45AFFF" Cursor="Hand" FontSize="12" Style="{DynamicResource SecondaryActionButton}">
-                                                            <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
-                                                        </Button>
-                                                    </StackPanel>
-
-                                                    <StackPanel Name="PanelGlowIntensity" Margin="0,15,0,15">
+                                                    <StackPanel Name="PanelGlowIntensity" Margin="0,0,0,15">
                                                         <DockPanel LastChildFill="False">
                                                             <TextBlock x:Name="TxtGlowIntensity" Text="辉光亮度" Foreground="{DynamicResource ThemeTertiaryTextBrush}" FontSize="13" VerticalAlignment="Center"/>
                                                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
@@ -958,6 +950,14 @@
                                                         </DockPanel>
                                                         <Slider Name="SliderGlowIntensity" Minimum="0.0" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
+                                                    </StackPanel>
+
+                                                    <TextBlock x:Name="TxtEffectColor" Text="特效主题颜色" Foreground="{DynamicResource ThemeSecondaryTextBrush}" Margin="0,0,0,8" FontSize="12"/>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Name="ColorPreview" Width="40" Height="28" CornerRadius="6" BorderBrush="{DynamicResource ThemeNeutralBorderBrush}" BorderThickness="1" Margin="0,0,10,0"/>
+                                                        <Button x:Name="BtnPickColor" Content="更改颜色" Click="PickColor_Click" Width="90" Height="28" Background="{DynamicResource ThemeElevatedBackgroundBrush}" BorderBrush="#45AFFF" Foreground="#45AFFF" Cursor="Hand" FontSize="12" Style="{DynamicResource SecondaryActionButton}">
+                                                            <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="4"/></Style></Button.Resources>
+                                                        </Button>
                                                     </StackPanel>
                                                 </StackPanel>
                                             </Border>
