@@ -1,0 +1,306 @@
+<Window x:Class="BASpark.ColorPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="650" Height="430"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Background="{DynamicResource ThemePageBackgroundBrush}"
+        Icon="app.ico">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="ThemePageBackgroundBrush" Color="#F5F7FA"/>
+        <SolidColorBrush x:Key="ThemeSurfaceBackgroundBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ThemeInputBackgroundBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ThemeControlBorderBrush" Color="#D6DEE8"/>
+        <SolidColorBrush x:Key="ThemePrimaryTextBrush" Color="#333333"/>
+        <SolidColorBrush x:Key="ThemeSecondaryTextBrush" Color="#666666"/>
+        <SolidColorBrush x:Key="NavHoverBrush" Color="#E0F2FF"/>
+        <SolidColorBrush x:Key="ThemeSecondaryButtonHoverBrush" Color="#F2F7FF"/>
+        <SolidColorBrush x:Key="ThemeSecondaryButtonHoverBorderBrush" Color="#BFD6EC"/>
+        <SolidColorBrush x:Key="ThemeSecondaryButtonPressedBrush" Color="#E8F1FB"/>
+
+        <Style x:Key="ColorPickerTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeInputBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}"/>
+            <Setter Property="SelectionBrush" Value="#8045AFFF"/>
+        </Style>
+
+        <Style x:Key="ColorPickerSecondaryButton" TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="MinWidth" Value="88"/>
+            <Setter Property="Padding" Value="16,5"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeControlBorderBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource ThemeSecondaryButtonHoverBrush}"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource ThemeSecondaryButtonHoverBorderBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource ThemeSecondaryButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="ColorPickerPrimaryButtonTemplate" TargetType="Button">
+            <Border x:Name="ButtonBorder"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="6">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                    <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.85"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.6"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="ColorPickerPrimaryButton" TargetType="Button" BasedOn="{StaticResource ColorPickerSecondaryButton}">
+            <Setter Property="Background" Value="#45AFFF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#45AFFF"/>
+            <Setter Property="Template" Value="{StaticResource ColorPickerPrimaryButtonTemplate}"/>
+        </Style>
+
+        <Style x:Key="TransparentTrackButton" TargetType="RepeatButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BrightnessSliderStyle" TargetType="Slider">
+            <Setter Property="Width" Value="42"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="IsDirectionReversed" Value="False"/>
+            <Setter Property="SmallChange" Value="0.01"/>
+            <Setter Property="LargeChange" Value="0.1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Margin="5,0">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"/>
+                            <Track x:Name="PART_Track"
+                                   Orientation="Vertical"
+                                   IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource TransparentTrackButton}"
+                                                  Command="{x:Static Slider.DecreaseLarge}"
+                                                  CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource TransparentTrackButton}"
+                                                  Command="{x:Static Slider.IncreaseLarge}"
+                                                  CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="40" Height="9" Cursor="SizeNS">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border BorderBrush="#99000000" BorderThickness="1" CornerRadius="3" Padding="1">
+                                                    <Border BorderBrush="#FFF8FBFF" BorderThickness="1" CornerRadius="2"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="72"/>
+        </Grid.RowDefinitions>
+
+        <Grid Margin="22,20,22,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="340"/>
+                <ColumnDefinition Width="24"/>
+                <ColumnDefinition Width="64"/>
+                <ColumnDefinition Width="28"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="LblHueSaturation"
+                           Foreground="{DynamicResource ThemeSecondaryTextBrush}"
+                           FontSize="12"/>
+                <Border x:Name="ColorField"
+                        Grid.Row="2"
+                        BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="5"
+                        Cursor="Cross"
+                        MouseLeftButtonDown="ColorField_MouseLeftButtonDown"
+                        MouseMove="ColorField_MouseMove"
+                        MouseLeftButtonUp="ColorField_MouseLeftButtonUp"
+                        LostMouseCapture="ColorField_LostMouseCapture">
+                    <Grid ClipToBounds="True">
+                        <Rectangle>
+                            <Rectangle.Fill>
+                                <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                    <GradientStop Color="#FFFF0000" Offset="0"/>
+                                    <GradientStop Color="#FFFFFF00" Offset="0.166667"/>
+                                    <GradientStop Color="#FF00FF00" Offset="0.333333"/>
+                                    <GradientStop Color="#FF00FFFF" Offset="0.5"/>
+                                    <GradientStop Color="#FF0000FF" Offset="0.666667"/>
+                                    <GradientStop Color="#FFFF00FF" Offset="0.833333"/>
+                                    <GradientStop Color="#FFFF0000" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                        <Rectangle IsHitTestVisible="False">
+                            <Rectangle.Fill>
+                                <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                                    <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                    <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                        <Rectangle x:Name="BrightnessOverlay" Fill="Black" Opacity="0" IsHitTestVisible="False"/>
+                        <Canvas x:Name="ColorFieldMarkerCanvas" IsHitTestVisible="False">
+                            <Grid x:Name="ColorFieldMarker" Width="16" Height="16">
+                                <Ellipse Stroke="#99000000" StrokeThickness="3"/>
+                                <Ellipse Margin="2" Stroke="#FFF8FBFF" StrokeThickness="1.5"/>
+                            </Grid>
+                        </Canvas>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="LblBrightness"
+                           Foreground="{DynamicResource ThemeSecondaryTextBrush}"
+                           FontSize="12"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"/>
+                <Slider x:Name="BrightnessSlider"
+                        Grid.Row="2"
+                        Minimum="0"
+                        Maximum="1"
+                        Orientation="Vertical"
+                        Style="{StaticResource BrightnessSliderStyle}"
+                        ValueChanged="BrightnessSlider_ValueChanged"/>
+            </Grid>
+
+            <StackPanel Grid.Column="4">
+                <TextBlock x:Name="LblPreview"
+                           Foreground="{DynamicResource ThemeSecondaryTextBrush}"
+                           FontSize="12"
+                           Margin="0,0,0,8"/>
+                <Border x:Name="ColorPreview"
+                        Height="62"
+                        BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="5"
+                        Margin="0,0,0,18"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="42"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="30"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="30"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="30"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="30"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock x:Name="LblRed" VerticalAlignment="Center" Foreground="{DynamicResource ThemeSecondaryTextBrush}"/>
+                    <TextBox x:Name="TxtRed" Grid.Column="1" MaxLength="3" Style="{StaticResource ColorPickerTextBox}"
+                             LostKeyboardFocus="RgbTextBox_LostKeyboardFocus" PreviewKeyDown="ColorInput_PreviewKeyDown" GotKeyboardFocus="ColorInput_GotKeyboardFocus"/>
+
+                    <TextBlock x:Name="LblGreen" Grid.Row="2" VerticalAlignment="Center" Foreground="{DynamicResource ThemeSecondaryTextBrush}"/>
+                    <TextBox x:Name="TxtGreen" Grid.Row="2" Grid.Column="1" MaxLength="3" Style="{StaticResource ColorPickerTextBox}"
+                             LostKeyboardFocus="RgbTextBox_LostKeyboardFocus" PreviewKeyDown="ColorInput_PreviewKeyDown" GotKeyboardFocus="ColorInput_GotKeyboardFocus"/>
+
+                    <TextBlock x:Name="LblBlue" Grid.Row="4" VerticalAlignment="Center" Foreground="{DynamicResource ThemeSecondaryTextBrush}"/>
+                    <TextBox x:Name="TxtBlue" Grid.Row="4" Grid.Column="1" MaxLength="3" Style="{StaticResource ColorPickerTextBox}"
+                             LostKeyboardFocus="RgbTextBox_LostKeyboardFocus" PreviewKeyDown="ColorInput_PreviewKeyDown" GotKeyboardFocus="ColorInput_GotKeyboardFocus"/>
+
+                    <TextBlock x:Name="LblHex" Grid.Row="6" VerticalAlignment="Center" Foreground="{DynamicResource ThemeSecondaryTextBrush}"/>
+                    <TextBox x:Name="TxtHex" Grid.Row="6" Grid.Column="1" MaxLength="7" Style="{StaticResource ColorPickerTextBox}"
+                             LostKeyboardFocus="HexTextBox_LostKeyboardFocus" PreviewKeyDown="ColorInput_PreviewKeyDown" GotKeyboardFocus="ColorInput_GotKeyboardFocus"/>
+                </Grid>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1"
+                Background="{DynamicResource ThemeSurfaceBackgroundBrush}"
+                BorderBrush="{DynamicResource ThemeControlBorderBrush}"
+                BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="22,0">
+                <Button x:Name="BtnCancel"
+                        IsCancel="True"
+                        Click="Cancel_Click"
+                        Style="{StaticResource ColorPickerSecondaryButton}"
+                        Margin="0,0,10,0"/>
+                <Button x:Name="BtnConfirm"
+                        IsDefault="True"
+                        PreviewMouseLeftButtonDown="Confirm_PreviewMouseLeftButtonDown"
+                        Click="Confirm_Click"
+                        Style="{StaticResource ColorPickerPrimaryButton}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

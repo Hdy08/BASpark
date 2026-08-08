@@ -8,7 +8,10 @@ namespace BASpark
     {
         public PrivacyWindow() 
         { 
-            InitializeComponent(); 
+            InitializeComponent();
+            ThemeManager.ApplyWindow(this);
+            SourceInitialized += (_, _) => ThemeManager.ApplyTitleBar(this);
+            Activated += (_, _) => ThemeManager.ApplyTitleBar(this);
             LoadVersion();
         }
 

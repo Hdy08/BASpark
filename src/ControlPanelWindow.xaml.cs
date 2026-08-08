@@ -20,6 +20,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Input;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace BASpark
 {
@@ -80,10 +81,12 @@ namespace BASpark
         private bool _isCheckingUpdate = false;
         private bool _suspendLinkedEffectScaleUiHandlers;
         private bool _suspendLinkedAnimationUiHandlers;
+        private bool _suspendDarkModeUiHandlers;
         private string _languageAtLoad = Localization.CultureZhCn;
         private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
         private bool _autoNetworkFailurePromptShown;
         private bool _logViewInitialized;
+        private int _themeRefreshPending;
         private readonly object _networkPromptLock = new();
 
         public ObservableCollection<FilterProfile> Profiles { get; set; } = new ObservableCollection<FilterProfile>();
@@ -95,6 +98,8 @@ namespace BASpark
         public ControlPanelWindow()
         {
             InitializeComponent();
+            SourceInitialized += (_, _) => ThemeManager.ApplyTitleBar(this);
+            Activated += (_, _) => ThemeManager.ApplyTitleBar(this);
 
             _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
                 ? Localization.CurrentCultureName
@@ -112,10 +117,12 @@ namespace BASpark
             ApplyScrollbarSettings();
             UiLocalizer.ApplyControlPanel(this);
             LoadScreenOptions();
+            ApplyDarkMode();
             CheckAdminStatus();
             InitLogView();
             AppLogger.EntryAdded += OnAppLogEntryAdded;
-            Closed += (_, _) => AppLogger.EntryAdded -= OnAppLogEntryAdded;
+            SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
+            Closed += ControlPanelWindow_Closed;
             _ = ApplySidebarBackgroundAsync(ConfigManager.SidebarBackgroundImagePath);
             _ = LoadRemoteNoticeAsync(isManual: false);
 
@@ -543,6 +550,7 @@ namespace BASpark
         {
             _suspendLinkedEffectScaleUiHandlers = true;
             _suspendLinkedAnimationUiHandlers = true;
+            _suspendDarkModeUiHandlers = true;
             try
             {
                 LoadSettingsCore();
@@ -551,6 +559,7 @@ namespace BASpark
             {
                 _suspendLinkedEffectScaleUiHandlers = false;
                 _suspendLinkedAnimationUiHandlers = false;
+                _suspendDarkModeUiHandlers = false;
             }
         }
 
@@ -607,6 +616,7 @@ namespace BASpark
                 RadioScrollbarOnScroll.IsChecked = true;
             }
 
+            SelectDarkMode(ConfigManager.DarkMode);
             SelectNetworkRegion(ConfigManager.NetworkRegion);
             if (TxtSidebarBackgroundPath != null)
             {
@@ -828,8 +838,21 @@ namespace BASpark
 
             if (ListConfiguredProcesses != null)
             {
+                bool useDarkDisabledTemplate = !processFilterEnabled && ThemeManager.IsDarkModeEnabled();
+                if (useDarkDisabledTemplate &&
+                    TryFindResource("DarkDisabledListBoxTemplate") is ControlTemplate disabledTemplate)
+                {
+                    ListConfiguredProcesses.Template = disabledTemplate;
+                }
+                else
+                {
+                    ListConfiguredProcesses.ClearValue(System.Windows.Controls.Control.TemplateProperty);
+                }
+
                 ListConfiguredProcesses.IsEnabled = processFilterEnabled;
-                ListConfiguredProcesses.Opacity = processFilterEnabled ? 1.0 : 0.65;
+                ListConfiguredProcesses.Opacity = processFilterEnabled
+                    ? 1.0
+                    : useDarkDisabledTemplate ? 0.6 : 0.65;
             }
             ManualProcessInput.IsEnabled = processFilterEnabled;
         }
@@ -933,7 +956,16 @@ namespace BASpark
                         return;
                     }
 
-                    SidebarBackgroundHost.Background = (System.Windows.Media.Brush?)brush ?? System.Windows.Media.Brushes.White;
+                    if (brush == null)
+                    {
+                        SidebarBackgroundHost.SetResourceReference(
+                            System.Windows.Controls.Panel.BackgroundProperty,
+                            "ThemeSurfaceBackgroundBrush");
+                    }
+                    else
+                    {
+                        SidebarBackgroundHost.Background = brush;
+                    }
                 });
             }
             catch (Exception ex)
@@ -967,19 +999,22 @@ namespace BASpark
 
         private void PickColor_Click(object sender, RoutedEventArgs e)
         {
-            using var dialog = new System.Windows.Forms.ColorDialog();
-            dialog.FullOpen = true;
-            try
+            _ = sender;
+            _ = e;
+            if (!ColorPickerColorMath.TryParseRgb(
+                    ConfigManager.ParticleColor,
+                    out System.Windows.Media.Color initialColor))
             {
-                var parts = ConfigManager.ParticleColor.Split(',');
-                dialog.Color = System.Drawing.Color.FromArgb(
-                    byte.Parse(parts[0]), byte.Parse(parts[1]), byte.Parse(parts[2]));
+                initialColor = System.Windows.Media.Color.FromRgb(45, 175, 255);
             }
-            catch { /* ignore: fallback to default color */ }
 
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            var dialog = new ColorPickerWindow(initialColor)
             {
-                string newColor = $"{dialog.Color.R},{dialog.Color.G},{dialog.Color.B}";
+                Owner = this
+            };
+            if (dialog.ShowDialog() == true)
+            {
+                string newColor = ColorPickerColorMath.ToRgbString(dialog.SelectedColor);
                 ConfigManager.ParticleColor = newColor;
                 UpdateColorPreview(newColor);
             }
@@ -1354,6 +1389,8 @@ namespace BASpark
 
         private void SaveSettings_Click(object sender, RoutedEventArgs e)
         {
+            DarkModeOption previousDarkMode = ConfigManager.DarkMode;
+            DarkModeOption selectedDarkMode = GetSelectedDarkMode();
             string? selectedLanguage = GetSelectedLanguage();
             bool languageChanged = !string.IsNullOrWhiteSpace(selectedLanguage) &&
                 !string.Equals(selectedLanguage, _languageAtLoad, StringComparison.OrdinalIgnoreCase);
@@ -1444,6 +1481,7 @@ namespace BASpark
             ConfigManager.Save("ScrollbarVisibility", scrollbarVisibility);
             ApplyScrollbarSettings();
             ConfigManager.Save("NetworkRegion", selectedNetworkRegion);
+            ConfigManager.Save("DarkMode", selectedDarkMode);
             ConfigManager.Save("StartSilent", startSilentEnabled);
             ConfigManager.Save("EnableEnvironmentFilter", CheckEnvironmentFilter.IsChecked ?? false);
             ConfigManager.Save("HideInFullscreen", CheckHideInFullscreen.IsChecked ?? true);
@@ -1573,6 +1611,14 @@ namespace BASpark
             {
                 TelemetryHelper.SendStartupData();
             }
+
+            ApplyDarkMode();
+            if (selectedDarkMode != previousDarkMode)
+            {
+                ThemeManager.RefreshTitleBarAfterInput(this);
+            }
+
+            (System.Windows.Application.Current as App)?.RefreshTrayTheme();
 
         }
 
@@ -1713,6 +1759,15 @@ namespace BASpark
 
         private bool _skipSaveOnClosing = false;
 
+        private void ControlPanelWindow_Closed(object? sender, EventArgs e)
+        {
+            _ = sender;
+            _ = e;
+            SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
+            AppLogger.EntryAdded -= OnAppLogEntryAdded;
+            _scrollbarHideTimer?.Stop();
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             if (!_skipSaveOnClosing)
@@ -1797,6 +1852,82 @@ namespace BASpark
                 trailScale = Math.Round(SliderTrailScale.Value, 2);
                 clickScale = Math.Round(SliderClickScale.Value, 2);
             }
+        }
+
+        private void SelectDarkMode(DarkModeOption mode)
+        {
+            switch (mode)
+            {
+                case DarkModeOption.Off:
+                    RadioDarkModeOff.IsChecked = true;
+                    break;
+                case DarkModeOption.On:
+                    RadioDarkModeOn.IsChecked = true;
+                    break;
+                default:
+                    RadioDarkModeSystem.IsChecked = true;
+                    break;
+            }
+        }
+
+        private DarkModeOption GetSelectedDarkMode()
+        {
+            if (RadioDarkModeOff.IsChecked == true)
+            {
+                return DarkModeOption.Off;
+            }
+
+            if (RadioDarkModeOn.IsChecked == true)
+            {
+                return DarkModeOption.On;
+            }
+
+            return DarkModeOption.System;
+        }
+
+        private void ApplyDarkMode()
+        {
+            ThemeManager.ApplyControlPanel(this);
+            UpdateEnvironmentFilterInterlock();
+        }
+
+        private void DarkMode_Changed(object sender, RoutedEventArgs e)
+        {
+            _ = sender;
+            _ = e;
+            if (!IsLoaded || _suspendDarkModeUiHandlers)
+            {
+                return;
+            }
+
+            ConfigManager.Save("DarkMode", GetSelectedDarkMode());
+            ApplyDarkMode();
+            ThemeManager.RefreshTitleBarAfterInput(this);
+            (System.Windows.Application.Current as App)?.RefreshTrayTheme();
+        }
+
+        private void SystemEvents_UserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            _ = sender;
+            if (ConfigManager.DarkMode != DarkModeOption.System ||
+                (e.Category != UserPreferenceCategory.General &&
+                 e.Category != UserPreferenceCategory.VisualStyle &&
+                 e.Category != UserPreferenceCategory.Color) ||
+                Dispatcher.HasShutdownStarted ||
+                Dispatcher.HasShutdownFinished ||
+                Interlocked.Exchange(ref _themeRefreshPending, 1) != 0)
+            {
+                return;
+            }
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                Interlocked.Exchange(ref _themeRefreshPending, 0);
+                if (ConfigManager.DarkMode == DarkModeOption.System)
+                {
+                    ApplyDarkMode();
+                }
+            }), DispatcherPriority.Normal);
         }
 
         private void LinkedAnimationSpeed_Changed(object sender, RoutedEventArgs e)

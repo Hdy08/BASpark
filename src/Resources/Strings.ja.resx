@@ -132,6 +132,18 @@
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>マウスの常時トレイルを有効にする</value>
     </data>
+    <data name="Basic_DarkMode" xml:space="preserve">
+      <value>ダークモード</value>
+    </data>
+    <data name="Basic_DarkModeOff" xml:space="preserve">
+      <value>オフ</value>
+    </data>
+    <data name="Basic_DarkModeOn" xml:space="preserve">
+      <value>オン</value>
+    </data>
+    <data name="Basic_DarkModeSystem" xml:space="preserve">
+      <value>システムに合わせる</value>
+    </data>
     <data name="Basic_ScrollbarVisibility" xml:space="preserve">
       <value>スクロールバーの表示</value>
     </data>
@@ -576,6 +588,36 @@
     </data>
     <data name="Visual_Color" xml:space="preserve">
       <value>エフェクト色</value>
+    </data>
+    <data name="ColorPicker_Title" xml:space="preserve">
+      <value>エフェクト色を選択</value>
+    </data>
+    <data name="ColorPicker_HueSaturation" xml:space="preserve">
+      <value>色相と彩度</value>
+    </data>
+    <data name="ColorPicker_Brightness" xml:space="preserve">
+      <value>明るさ</value>
+    </data>
+    <data name="ColorPicker_Preview" xml:space="preserve">
+      <value>色のプレビュー</value>
+    </data>
+    <data name="ColorPicker_Red" xml:space="preserve">
+      <value>赤</value>
+    </data>
+    <data name="ColorPicker_Green" xml:space="preserve">
+      <value>緑</value>
+    </data>
+    <data name="ColorPicker_Blue" xml:space="preserve">
+      <value>青</value>
+    </data>
+    <data name="ColorPicker_Hex" xml:space="preserve">
+      <value>Hex</value>
+    </data>
+    <data name="ColorPicker_Confirm" xml:space="preserve">
+      <value>確定</value>
+    </data>
+    <data name="ColorPicker_Cancel" xml:space="preserve">
+      <value>キャンセル</value>
     </data>
     <data name="Visual_InputHint" xml:space="preserve">
       <value>ヒント: 数値をクリックして編集し Enter で適用</value>
