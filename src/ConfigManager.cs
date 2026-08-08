@@ -73,6 +73,9 @@ namespace BASpark
         public static bool StartSilent { get; set; } = false;
         public static bool RunAsAdmin { get; set; } = false;
         public static double EffectScale { get; set; } = 1.5;
+        public static bool UseLinkedEffectScale { get; set; } = true;
+        public static double TrailEffectScale { get; set; } = 1.5;
+        public static double ClickEffectScale { get; set; } = 1.5;
         public static double EffectOpacity { get; set; } = 1.0;
         public static double EffectSpeed { get; set; } = 1.0;
         public static bool UseLinkedAnimationSpeed { get; set; } = true;
@@ -135,6 +138,9 @@ namespace BASpark
                         StartSilent = Convert.ToBoolean(key.GetValue("StartSilent", false));
                         RunAsAdmin = Convert.ToBoolean(key.GetValue("RunAsAdmin", false));
                         EffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("EffectScale", 1.5), CultureInfo.InvariantCulture), 0.5, 3.0);
+                        UseLinkedEffectScale = Convert.ToBoolean(key.GetValue("UseLinkedEffectScale", true));
+                        TrailEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("TrailEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
+                        ClickEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("ClickEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
                         EffectOpacity = Math.Clamp(Convert.ToDouble(key.GetValue("EffectOpacity", 1.0), CultureInfo.InvariantCulture), 0.1, 1.0);
                         EffectSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("EffectSpeed", 1.0), CultureInfo.InvariantCulture), 0.2, 3.0);
                         UseLinkedAnimationSpeed = Convert.ToBoolean(key.GetValue("UseLinkedAnimationSpeed", true));
@@ -276,6 +282,20 @@ namespace BASpark
             }
         }
 
+        public static void GetEffectScalesForOverlay(out double trailScale, out double clickScale)
+        {
+            if (UseLinkedEffectScale)
+            {
+                trailScale = EffectScale;
+                clickScale = EffectScale;
+            }
+            else
+            {
+                trailScale = TrailEffectScale;
+                clickScale = ClickEffectScale;
+            }
+        }
+
         public static List<FilterProfile> GetProfiles()
         {
             lock (_syncLock) { return [.. _profiles]; }
@@ -315,6 +335,9 @@ namespace BASpark
             if (flags.HasFlag(VisualAppearanceResetFlags.EffectScale))
             {
                 Save("EffectScale", 1.5);
+                Save("UseLinkedEffectScale", true);
+                Save("TrailEffectScale", 1.5);
+                Save("ClickEffectScale", 1.5);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.EffectOpacity))
@@ -570,6 +593,9 @@ namespace BASpark
                     StartSilent = false;
                     RunAsAdmin = false;
                     EffectScale = 1.5;
+                    UseLinkedEffectScale = true;
+                    TrailEffectScale = 1.5;
+                    ClickEffectScale = 1.5;
                     EffectOpacity = 1.0;
                     EffectSpeed = 1.0;
                     UseLinkedAnimationSpeed = true;

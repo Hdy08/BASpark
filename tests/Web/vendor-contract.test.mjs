@@ -13,6 +13,145 @@ const vendorPath = new URL(
 );
 const adapterPath = new URL('../../src/Web/fx-adapter.js', import.meta.url);
 const templatePath = new URL('../../src/Web/index.html', import.meta.url);
+const legacyTemplatePath = new URL(
+  '../../src/Web/index.legacy.html',
+  import.meta.url,
+);
+
+function createLegacyHarness()
+{
+  function createContext()
+  {
+    return {
+      arcs: [],
+      beginPath()
+      {
+      },
+      clearRect()
+      {
+      },
+      createLinearGradient()
+      {
+        return {
+          addColorStop()
+          {
+          },
+        };
+      },
+      drawImage()
+      {
+      },
+      fill()
+      {
+      },
+      lineTo()
+      {
+      },
+      moveTo()
+      {
+      },
+      restore()
+      {
+      },
+      rotate()
+      {
+      },
+      save()
+      {
+      },
+      setTransform()
+      {
+      },
+      stroke()
+      {
+      },
+      translate()
+      {
+      },
+      arc(...args)
+      {
+        this.arcs.push(args);
+      },
+    };
+  }
+
+  const mainContext = createContext();
+  const bufferContext = createContext();
+  const mainCanvas =
+  {
+    height: 0,
+    width: 0,
+    getContext()
+    {
+      return mainContext;
+    },
+  };
+  const bufferCanvas =
+  {
+    height: 0,
+    width: 0,
+    getContext()
+    {
+      return bufferContext;
+    },
+  };
+  const windowMock =
+  {
+    addEventListener()
+    {
+    },
+    devicePixelRatio: 1,
+    innerHeight: 600,
+    innerWidth: 800,
+  };
+  const legacyHtml = readFileSync(legacyTemplatePath, 'utf8');
+  const script = legacyHtml.match(/<script>([\s\S]+)<\/script>/i)?.[1];
+
+  assert.ok(script, 'legacy renderer must contain an inline script');
+
+  vm.runInNewContext(
+    script,
+    {
+      console:
+      {
+        error()
+        {
+        },
+        warn()
+        {
+        },
+      },
+      document:
+      {
+        createElement()
+        {
+          return bufferCanvas;
+        },
+        getElementById()
+        {
+          return mainCanvas;
+        },
+      },
+      performance:
+      {
+        now()
+        {
+          return 0;
+        },
+      },
+      requestAnimationFrame()
+      {
+      },
+      window: windowMock,
+    },
+    { filename: 'index.legacy.html' },
+  );
+
+  return {
+    bufferContext,
+    window: windowMock,
+  };
+}
 
 test('vendored artifact matches the reviewed v1.2.23 build', () =>
 {
@@ -70,6 +209,8 @@ test('vendored IIFE exposes every host API required by BASpark', () =>
     'setPaused',
     'updateConfig',
     'setThemeColor',
+    'setFxParams',
+    'getFxConfig',
     'destroy',
   ])
   {
@@ -93,4 +234,55 @@ test('renderer template contains one deterministic injection marker', () =>
   const marker = '<!-- BASPARK_RENDERER_SCRIPTS -->';
 
   assert.equal(template.split(marker).length - 1, 1);
+});
+
+test('legacy renderer applies independent trail and click scales', () =>
+{
+  const harness = createLegacyHarness();
+  const { bufferContext, window } = harness;
+
+  window.updateEffectSettings(0.5, 3, 1, 1, 1);
+
+  const spark = window.spark;
+  spark.trail = [{ x: 10, y: 10, life: 1 }];
+  spark.lastPos = { x: 10.1, y: 10 };
+  spark._updateTrail(0);
+  assert.equal(bufferContext.arcs.at(-1)[2], 1.5);
+
+  spark.trail = [
+    { x: 10, y: 10, life: 1 },
+    { x: 20, y: 10, life: 1 },
+  ];
+  spark.lastPos = { x: 30, y: 10 };
+  spark._updateTrail(0);
+  assert.ok(Math.abs(bufferContext.lineWidth - 5 / 3) < 0.000001);
+  assert.equal(bufferContext.shadowBlur, 1);
+
+  const lineWidths = [];
+  spark._strokeRingSegment = (...args) =>
+  {
+    lineWidths.push(args[5]);
+  };
+  spark.waves =
+  [
+    {
+      x: 10,
+      y: 10,
+      r: 0,
+      life: 1,
+      ring:
+      {
+        ang: 0,
+        rs: 0,
+        segs:
+        [
+          { off: 0, len: 1, rRoundRate: 0 },
+          { off: 0, len: 1, rRoundRate: 0 },
+        ],
+      },
+    },
+  ];
+  spark._updateWaves(1);
+
+  assert.equal(lineWidths.at(0), 0.8);
 });

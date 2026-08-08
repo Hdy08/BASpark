@@ -485,12 +485,16 @@
                                                     </DockPanel>
                                                     <TextBlock x:Name="TxtVisualInputHint" Text="提示：可点击数字输入精确值后可按回车应用" FontSize="11" Foreground="#999" VerticalAlignment="Center" DockPanel.Dock="Right" Margin="0,0,0,8"/>
 
-                                                    <StackPanel Margin="0,0,0,15">
+                                                    <CheckBox Name="CheckLinkedEffectScale" Content="拖尾与点击使用同一缩放比例" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,4"
+                                                              Checked="LinkedEffectScale_Changed" Unchecked="LinkedEffectScale_Changed"/>
+                                                    <TextBlock x:Name="TxtLinkedScaleHint" Text="关闭此项后可分别调整拖尾和点击特效的大小。" FontSize="11" Foreground="#999" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+                                                    <StackPanel Name="PanelUnifiedEffectScale" Margin="0,0,0,15">
                                                         <DockPanel LastChildFill="False">
                                                             <TextBlock x:Name="TxtVisualScale" Text="缩放比例" Foreground="#555" FontSize="13" VerticalAlignment="Center"/>
                                                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                                                                 <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
-                                                                         TextAlignment="Right" VerticalAlignment="Center" 
+                                                                         TextAlignment="Right" VerticalAlignment="Center"
                                                                          BorderThickness="0,0,0,1" BorderBrush="#DDD" Background="Transparent"
                                                                          Text="{Binding ElementName=SliderScale, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
                                                                          PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
@@ -498,8 +502,43 @@
                                                                 <TextBlock Text=" X" Foreground="#999" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
                                                             </StackPanel>
                                                         </DockPanel>
-                                                        <Slider Name="SliderScale" Minimum="0.5" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True" 
+                                                        <Slider Name="SliderScale" Minimum="0.5" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
                                                                 ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Name="PanelSplitEffectScale" Margin="0,0,0,15" Visibility="Collapsed">
+                                                        <StackPanel Margin="0,0,0,12">
+                                                            <DockPanel LastChildFill="False">
+                                                                <TextBlock x:Name="TxtTrailScale" Text="拖尾缩放比例" Foreground="#555" FontSize="13" VerticalAlignment="Center"/>
+                                                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                                                    <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
+                                                                             TextAlignment="Right" VerticalAlignment="Center"
+                                                                             BorderThickness="0,0,0,1" BorderBrush="#DDD" Background="Transparent"
+                                                                             Text="{Binding ElementName=SliderTrailScale, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
+                                                                             PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
+                                                                             InputMethod.IsInputMethodEnabled="False"/>
+                                                                    <TextBlock Text=" X" Foreground="#999" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                </StackPanel>
+                                                            </DockPanel>
+                                                            <Slider Name="SliderTrailScale" Minimum="0.5" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                                                    ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
+                                                        </StackPanel>
+                                                        <StackPanel>
+                                                            <DockPanel LastChildFill="False">
+                                                                <TextBlock x:Name="TxtClickScale" Text="点击缩放比例" Foreground="#555" FontSize="13" VerticalAlignment="Center"/>
+                                                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                                                    <TextBox Width="40" Height="20" FontSize="12" Foreground="#45AFFF" FontWeight="Bold"
+                                                                             TextAlignment="Right" VerticalAlignment="Center"
+                                                                             BorderThickness="0,0,0,1" BorderBrush="#DDD" Background="Transparent"
+                                                                             Text="{Binding ElementName=SliderClickScale, Path=Value, StringFormat={}{0:F2}, UpdateSourceTrigger=LostFocus}"
+                                                                             PreviewTextInput="NumberValidationTextBox" KeyDown="TextBox_KeyDown"
+                                                                             InputMethod.IsInputMethodEnabled="False"/>
+                                                                    <TextBlock Text=" X" Foreground="#999" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                                                                </StackPanel>
+                                                            </DockPanel>
+                                                            <Slider Name="SliderClickScale" Minimum="0.5" Maximum="3.0" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                                                    ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
+                                                        </StackPanel>
                                                     </StackPanel>
 
                                                     <StackPanel Margin="0,0,0,15">
@@ -522,11 +561,6 @@
 
                                                     <CheckBox Name="CheckLinkedAnimationSpeed" Content="拖尾与点击使用同一动画速度" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,4"
                                                               Checked="LinkedAnimationSpeed_Changed" Unchecked="LinkedAnimationSpeed_Changed"/>
-                                                    <TextBlock x:Name="TxtLinkedSpeedHint" Text="关闭此项后可单独加快或减慢拖尾衰减与移动粒子，而不影响点击波纹与爆发粒子，与下方「拖尾刷新率」不同。" FontSize="11" Foreground="#999" Margin="0,0,0,10" TextWrapping="Wrap"/>
-
-                                                    <CheckBox Name="CheckApplyCurveDraw" Content="采用曲线拖尾" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,4"
-                                                              Checked="CurveDraw_Changed" Unchecked="CurveDraw_Changed"/>
-                                                    <TextBlock x:Name="TxtCurveDrawHint" Text="建议在60Hz及以上刷新率开启" FontSize="11" Foreground="#999" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
                                                     <StackPanel Name="PanelUnifiedAnimationSpeed" Margin="0,0,0,15">
                                                         <DockPanel LastChildFill="False">
@@ -579,6 +613,12 @@
                                                                     ValueChanged="EffectSlider_ValueChanged" Margin="0,5,0,0"/>
                                                         </StackPanel>
                                                     </StackPanel>
+
+                                                    <TextBlock x:Name="TxtLinkedSpeedHint" Text="关闭此项后可单独加快或减慢拖尾衰减与移动粒子，而不影响点击波纹与爆发粒子，与下方「拖尾刷新率」不同。" FontSize="11" Foreground="#999" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+                                                    <CheckBox Name="CheckApplyCurveDraw" Content="采用曲线拖尾" Style="{StaticResource ToggleSwitch}" Margin="0,0,0,4"
+                                                              Checked="CurveDraw_Changed" Unchecked="CurveDraw_Changed"/>
+                                                    <TextBlock x:Name="TxtCurveDrawHint" Text="建议在60Hz及以上刷新率开启" FontSize="11" Foreground="#999" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
                                                     <StackPanel Margin="0,0,0,15">
                                                         <DockPanel LastChildFill="False">
@@ -655,7 +695,7 @@
                                                     <ComboBox Name="ComboProcessFilterMode" Width="180" Margin="0,0,0,12" SelectionChanged="ProcessFilterMode_Changed" Height="28" VerticalContentAlignment="Center" HorizontalAlignment="Left">
                                                         <ComboBoxItem Content="🚫 关闭过滤" Tag="Disabled"/>
                                                         <ComboBoxItem Content="❌ 黑名单模式" Tag="Blacklist"/>
-                                                        <ComboBoxItem Content="✅ 白名单模式" Tag="Whitelist"/>
+                                                        <ComboBoxItem Content="✔️ 白名单模式" Tag="Whitelist"/>
                                                     </ComboBox>
 
                                                     <TextBlock x:Name="TxtProcessList" Text="已配置进程列表" FontWeight="SemiBold" Foreground="#333" Margin="0,0,0,10"/>

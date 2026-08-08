@@ -20,6 +20,7 @@ function createHarness(options = {})
     pointerDown: [],
     pointerMove: [],
     pointerUp: [],
+    setFxParams: [],
     setCompositingReference: [],
     setPaused: [],
     setThemeColor: [],
@@ -40,6 +41,7 @@ function createHarness(options = {})
       this.width = 800;
       this.height = 600;
       this.config = config;
+      this.shards = [];
       this.resolvedEffectBackend = 'pending';
       this.resolvedBloomBackend = 'pending';
       this.resolvedHostCompositing = 'pending';
@@ -79,6 +81,24 @@ function createHarness(options = {})
       };
     }
 
+    getFxConfig()
+    {
+      return {
+        trail: {
+          geometryWidth: 4,
+          width: 3,
+          minVertexDistance: 5,
+          outerGlowWidth: 7,
+        },
+        shards: {
+          trailRadius: 11,
+          trailSpeedMin: 13,
+          trailSpeedMax: 17,
+          trailSpacing: 19,
+        },
+      };
+    }
+
     pointerCancel(pointerId)
     {
       calls.pointerCancel.push(pointerId);
@@ -112,6 +132,12 @@ function createHarness(options = {})
     {
       calls.setCompositingReference.push({ source, referenceOptions });
       return true;
+    }
+
+    setFxParams(patch, options)
+    {
+      calls.setFxParams.push({ patch, options });
+      return { committed: true };
     }
 
     setThemeColor(color)
@@ -221,7 +247,7 @@ test('maps normalized host input and BASpark settings to BAClickFX', () =>
 {
   const harness = createHarness();
 
-  harness.window.updateEffectSettings(1.5, 0.75, 1.2, 0.8);
+  harness.window.updateEffectSettings(1.5, 1.5, 0.75, 1.2, 0.8);
   const settings = harness.calls.updateConfig.at(-1);
   assert.equal(settings.scale, 1);
   assert.equal(settings.opacity, 0.75);
@@ -252,6 +278,25 @@ test('maps normalized host input and BASpark settings to BAClickFX', () =>
   harness.window.externalCancel();
   assert.equal(harness.calls.pointerCancel.at(-1), 1);
   assert.equal(harness.calls.clearTrail, 2);
+});
+
+test('maps independent trail and click scales to the renderer', () =>
+{
+  const harness = createHarness();
+
+  harness.window.updateEffectSettings(0.75, 3, 0.75, 1.2, 0.8);
+  const settings = harness.calls.updateConfig.at(-1);
+  const patch = harness.calls.setFxParams.at(-1).patch;
+
+  assert.equal(settings.scale, 2);
+  assert.equal(patch['trail.geometryWidth'], 1);
+  assert.equal(patch['trail.width'], 0.75);
+  assert.equal(patch['trail.minVertexDistance'], 1.25);
+  assert.equal(patch['trail.outerGlowWidth'], 1.75);
+  assert.equal(patch['shards.trailRadius'], 2.75);
+  assert.equal(patch['shards.trailSpeedMin'], 3.25);
+  assert.equal(patch['shards.trailSpeedMax'], 4.25);
+  assert.equal(patch['shards.trailSpacing'], 4.75);
 });
 
 test('keeps the current color when host configuration is invalid', () =>

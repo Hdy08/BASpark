@@ -220,14 +220,15 @@ namespace BASpark
             ExecuteScript($"if(window.updateColor) window.updateColor({colorJson});");
         }
 
-        public void UpdateEffectSettings(double scale, double opacity, double trailSpeed, double clickSpeed)
+        public void UpdateEffectSettings(double trailScale, double clickScale, double opacity, double trailSpeed, double clickSpeed)
         {
-            string scaleStr = scale.ToString("F2", CultureInfo.InvariantCulture);
+            string trailScaleStr = trailScale.ToString("F2", CultureInfo.InvariantCulture);
+            string clickScaleStr = clickScale.ToString("F2", CultureInfo.InvariantCulture);
             string opacityStr = opacity.ToString("F2", CultureInfo.InvariantCulture);
             string trailStr = trailSpeed.ToString("F2", CultureInfo.InvariantCulture);
             string clickStr = clickSpeed.ToString("F2", CultureInfo.InvariantCulture);
 
-            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({scaleStr}, {opacityStr}, {trailStr}, {clickStr});");
+            ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({trailScaleStr}, {clickScaleStr}, {opacityStr}, {trailStr}, {clickStr});");
         }
 
         public void UpdateTrailRefreshRate(int hz)
@@ -582,8 +583,9 @@ namespace BASpark
             _lastReportedInputMode = null;
             _lastReportedAlwaysTrail = null;
             UpdateColor(ConfigManager.ParticleColor);
+            ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
-            UpdateEffectSettings(ConfigManager.EffectScale, ConfigManager.EffectOpacity, trailSp, clickSp);
+            UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSp, clickSp);
             SyncInputContext(InputModeMouse);
             if (_overlayRuntimePaused)
             {

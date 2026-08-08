@@ -10,11 +10,23 @@
             : '';
     const DEFAULT_SETTINGS = Object.freeze(
         {
-            scale: 1.5,
+            trailScale: 1.5,
+            clickScale: 1.5,
             opacity: 1,
             trailSpeed: 1,
             clickSpeed: 1,
         });
+    const TRAIL_SCALE_PARAM_PATHS = Object.freeze(
+        [
+            'trail.geometryWidth',
+            'trail.width',
+            'trail.minVertexDistance',
+            'trail.outerGlowWidth',
+            'shards.trailRadius',
+            'shards.trailSpeedMin',
+            'shards.trailSpeedMax',
+            'shards.trailSpacing',
+        ]);
     const DOM_CONTENT_LOADED_OPTIONS =
     {
         once: true,
@@ -33,6 +45,8 @@
         {
             ...DEFAULT_SETTINGS,
         },
+        trailScaleBaseline: null,
+        appliedTrailScaleRatio: 1,
         lastBoomX: -1,
         lastBoomY: -1,
         lastBoomTime: 0,
@@ -202,11 +216,13 @@
         state.fx.updateConfig(
             {
                 // 旧引擎以 1.5 为默认尺寸，新引擎以 1 为默认尺寸。
-                scale: Math.max(0.01, state.settings.scale / 1.5),
+                scale: Math.max(0.01, state.settings.clickScale / 1.5),
                 opacity: state.settings.opacity,
                 trailTimeScale: state.settings.trailSpeed,
                 clickTimeScale: state.settings.clickSpeed,
             });
+        applyTrailScale();
+        applyTrailShardScale();
     }
 
     function parseRgbColor(rgbString)
@@ -242,6 +258,137 @@
         }
 
         return clamp(numeric, 0.2, 3);
+    }
+
+    function normalizeScale(value, fallback)
+    {
+        const numeric = Number(value);
+
+        if (!Number.isFinite(numeric))
+        {
+            return fallback;
+        }
+
+        return clamp(numeric, 0.5, 3);
+    }
+
+    function readFxConfigNumber(config, path)
+    {
+        let value = config;
+
+        for (const segment of path.split('.'))
+        {
+            if (!value || typeof value !== 'object')
+            {
+                return null;
+            }
+
+            value = value[segment];
+        }
+
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    function captureTrailScaleBaseline()
+    {
+        if (!state.fx || typeof state.fx.getFxConfig !== 'function')
+        {
+            return;
+        }
+
+        const config = state.fx.getFxConfig();
+        const baseline = Object.create(null);
+
+        for (const path of TRAIL_SCALE_PARAM_PATHS)
+        {
+            const value = readFxConfigNumber(config, path);
+
+            if (!Number.isFinite(value))
+            {
+                return;
+            }
+
+            baseline[path] = value;
+        }
+
+        state.trailScaleBaseline = baseline;
+        state.appliedTrailScaleRatio = 1;
+    }
+
+    function getTrailScaleRatio()
+    {
+        return state.settings.trailScale / state.settings.clickScale;
+    }
+
+    function applyTrailScale()
+    {
+        if (
+            !state.fx ||
+            !state.trailScaleBaseline ||
+            typeof state.fx.setFxParams !== 'function'
+        )
+        {
+            return;
+        }
+
+        const ratio = getTrailScaleRatio();
+
+        if (
+            !Number.isFinite(ratio) ||
+            Math.abs(ratio - state.appliedTrailScaleRatio) < 0.000001
+        )
+        {
+            return;
+        }
+
+        const patch = Object.create(null);
+
+        for (const path of TRAIL_SCALE_PARAM_PATHS)
+        {
+            patch[path] = state.trailScaleBaseline[path] * ratio;
+        }
+
+        const result = state.fx.setFxParams(patch, { strict: true });
+
+        if (result?.committed === true)
+        {
+            state.appliedTrailScaleRatio = ratio;
+        }
+        else
+        {
+            console.warn('[BASpark FX] 拖尾缩放参数未能应用。');
+        }
+    }
+
+    function applyTrailShardScale()
+    {
+        if (!Array.isArray(state.fx?.shards))
+        {
+            return;
+        }
+
+        const ratio = getTrailScaleRatio();
+
+        if (!Number.isFinite(ratio))
+        {
+            return;
+        }
+
+        for (const shard of state.fx.shards)
+        {
+            if (shard?.kind !== 'trail' || !Number.isFinite(shard.size))
+            {
+                continue;
+            }
+
+            const baseSize = Number.isFinite(shard.__basparkTrailBaseSize)
+                ? shard.__basparkTrailBaseSize
+                : shard.size;
+
+            shard.__basparkTrailBaseSize = baseSize;
+            shard.size = baseSize * ratio;
+        }
     }
 
     window.externalBoom = function (percentX, percentY)
@@ -321,6 +468,11 @@
         return invokeFx('externalMove', function ()
         {
             const accepted = state.fx.pointerMove(point);
+
+            if (accepted)
+            {
+                applyTrailShardScale();
+            }
 
             if (
                 accepted &&
@@ -452,13 +604,13 @@
     };
 
     window.updateEffectSettings = function (
-        scale,
+        trailScale,
+        clickScale,
         opacity,
         trailSpeed,
         clickSpeed
     )
     {
-        const numericScale = Number(scale);
         const numericOpacity = Number(opacity);
         const safeTrailSpeed = normalizeSpeed(
             trailSpeed,
@@ -467,9 +619,14 @@
 
         state.settings =
         {
-            scale: Number.isFinite(numericScale) && numericScale > 0
-                ? numericScale
-                : DEFAULT_SETTINGS.scale,
+            trailScale: normalizeScale(
+                trailScale,
+                DEFAULT_SETTINGS.trailScale,
+            ),
+            clickScale: normalizeScale(
+                clickScale,
+                DEFAULT_SETTINGS.clickScale,
+            ),
             opacity: Number.isFinite(numericOpacity)
                 ? clamp(numericOpacity, 0.1, 1)
                 : DEFAULT_SETTINGS.opacity,
@@ -587,6 +744,7 @@
                     lightBackgroundContrastAlpha: 0,
                     maxDpr: 2,
                 });
+            captureTrailScaleBaseline();
 
             const bloomBackendEventName =
                 window.BAClickFX.BLOOM_BACKEND_CHANGE_EVENT ||

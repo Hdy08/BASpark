@@ -78,6 +78,7 @@ namespace BASpark
         private DispatcherTimer _noticeTimer;
         private DispatcherTimer? _scrollbarHideTimer;
         private bool _isCheckingUpdate = false;
+        private bool _suspendLinkedEffectScaleUiHandlers;
         private bool _suspendLinkedAnimationUiHandlers;
         private string _languageAtLoad = Localization.CultureZhCn;
         private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
@@ -540,6 +541,7 @@ namespace BASpark
 
         private void LoadSettings()
         {
+            _suspendLinkedEffectScaleUiHandlers = true;
             _suspendLinkedAnimationUiHandlers = true;
             try
             {
@@ -547,6 +549,7 @@ namespace BASpark
             }
             finally
             {
+                _suspendLinkedEffectScaleUiHandlers = false;
                 _suspendLinkedAnimationUiHandlers = false;
             }
         }
@@ -581,7 +584,10 @@ namespace BASpark
             UpdateClickEffectPanelVisibility();
             UpdateEnvironmentFilterInterlock();
 
+            CheckLinkedEffectScale.IsChecked = ConfigManager.UseLinkedEffectScale;
             SliderScale.Value = ConfigManager.EffectScale;
+            SliderTrailScale.Value = ConfigManager.TrailEffectScale;
+            SliderClickScale.Value = ConfigManager.ClickEffectScale;
             SliderOpacity.Value = ConfigManager.EffectOpacity * 100;
             CheckLinkedAnimationSpeed.IsChecked = ConfigManager.UseLinkedAnimationSpeed;
             CheckApplyCurveDraw.IsChecked = ConfigManager.ApplyCurveDraw;
@@ -589,6 +595,7 @@ namespace BASpark
             SliderTrailAnimSpeed.Value = ConfigManager.TrailAnimationSpeed;
             SliderClickAnimSpeed.Value = ConfigManager.ClickAnimationSpeed;
             SliderTrailRefresh.Value = ConfigManager.TrailRefreshRate;
+            UpdateEffectScalePanelVisibility();
             UpdateAnimationSpeedPanelVisibility();
 
             if (ConfigManager.ScrollbarVisibility == PanelScrollbarVisibility.Always)
@@ -1312,11 +1319,11 @@ namespace BASpark
             LoadSettings();
 
             int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
+            ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
-            double effectScale = Math.Round(SliderScale.Value, 2);
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
-            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, trailSp, clickSp);
+            App.Overlay?.UpdateEffectSettings(trailScale, clickScale, effectOpacity, trailSp, clickSp);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
             App.Overlay?.SetCurveDraw(CheckApplyCurveDraw.IsChecked ?? false);
 
@@ -1359,7 +1366,23 @@ namespace BASpark
                 Localization.ApplyCulture(selectedLanguage);
             }
 
-            double effectScale = Math.Round(SliderScale.Value, 2);
+            bool useLinkedEffectScale = CheckLinkedEffectScale.IsChecked == true;
+            double trailEffectScale;
+            double clickEffectScale;
+            double effectScaleForRegistry;
+            if (useLinkedEffectScale)
+            {
+                effectScaleForRegistry = Math.Round(SliderScale.Value, 2);
+                trailEffectScale = effectScaleForRegistry;
+                clickEffectScale = effectScaleForRegistry;
+            }
+            else
+            {
+                trailEffectScale = Math.Round(SliderTrailScale.Value, 2);
+                clickEffectScale = Math.Round(SliderClickScale.Value, 2);
+                effectScaleForRegistry = clickEffectScale;
+            }
+
             double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
             bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsChecked == true;
             double trailAnimSpeed;
@@ -1403,7 +1426,10 @@ namespace BASpark
             ConfigManager.Save("AutoStart", autoStartEnabled);
             ConfigManager.Save("EnableTelemetry", telemetryEnabled);
             ConfigManager.Save("ParticleColor", ConfigManager.ParticleColor);
-            ConfigManager.Save("EffectScale", effectScale);
+            ConfigManager.Save("EffectScale", effectScaleForRegistry);
+            ConfigManager.Save("UseLinkedEffectScale", useLinkedEffectScale);
+            ConfigManager.Save("TrailEffectScale", trailEffectScale);
+            ConfigManager.Save("ClickEffectScale", clickEffectScale);
             ConfigManager.Save("EffectOpacity", effectOpacity);
             ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
             ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
@@ -1481,8 +1507,9 @@ namespace BASpark
             ApplyAutoStartSettings();
 
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
+            GetUiEffectScales(out double overlayTrailScale, out double overlayClickScale);
             GetUiAnimationSpeeds(out double overlayTrail, out double overlayClick);
-            App.Overlay?.UpdateEffectSettings(effectScale, effectOpacity, overlayTrail, overlayClick);
+            App.Overlay?.UpdateEffectSettings(overlayTrailScale, overlayClickScale, effectOpacity, overlayTrail, overlayClick);
             App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate);
             App.Overlay?.RefreshEnvironmentFilterState();
             App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);
@@ -1725,6 +1752,51 @@ namespace BASpark
         private void CurveDraw_Changed(object sender, RoutedEventArgs e)
         {
             if (!IsLoaded) return;
+        }
+
+        private void LinkedEffectScale_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!IsLoaded || _suspendLinkedEffectScaleUiHandlers)
+            {
+                return;
+            }
+
+            bool linked = CheckLinkedEffectScale.IsChecked == true;
+            if (linked)
+            {
+                double avg = Math.Round((SliderTrailScale.Value + SliderClickScale.Value) / 2.0, 2);
+                SliderScale.Value = Math.Clamp(avg, 0.5, 3.0);
+            }
+            else
+            {
+                double value = Math.Clamp(Math.Round(SliderScale.Value, 2), 0.5, 3.0);
+                SliderTrailScale.Value = value;
+                SliderClickScale.Value = value;
+            }
+
+            UpdateEffectScalePanelVisibility();
+        }
+
+        private void UpdateEffectScalePanelVisibility()
+        {
+            bool linked = CheckLinkedEffectScale.IsChecked == true;
+            PanelUnifiedEffectScale.Visibility = linked ? Visibility.Visible : Visibility.Collapsed;
+            PanelSplitEffectScale.Visibility = linked ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void GetUiEffectScales(out double trailScale, out double clickScale)
+        {
+            if (CheckLinkedEffectScale.IsChecked == true)
+            {
+                double value = Math.Round(SliderScale.Value, 2);
+                trailScale = value;
+                clickScale = value;
+            }
+            else
+            {
+                trailScale = Math.Round(SliderTrailScale.Value, 2);
+                clickScale = Math.Round(SliderClickScale.Value, 2);
+            }
         }
 
         private void LinkedAnimationSpeed_Changed(object sender, RoutedEventArgs e)

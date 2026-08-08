@@ -82,7 +82,7 @@ Supports creating multiple independent sets of filtering rules for different sce
 Within your currently selected profile, you can switch between three modes:
 * 🚫 **Off**: Global activation. No list rules are applied.
 * ❌ **Blacklist Mode**: Effects will be hidden *only* in listed applications.
-* ✅ **Whitelist Mode**: Effects will be shown *only* in listed applications.
+* ✔️ **Whitelist Mode**: Effects will be shown *only* in listed applications.
 
 ### Ways to Add Processes
 Supports three flexible methods to input applications for filtering:
