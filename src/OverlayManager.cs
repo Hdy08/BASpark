@@ -598,6 +598,11 @@ namespace BASpark
             // 拖尾仅在点击特效开启或常驻拖尾开启时渲染
             if (!ConfigManager.IsTrailEffectActive)
             {
+                if (ConfigManager.EnableEnvironmentFilter)
+                {
+                    ShouldSuppressEffects();
+                }
+
                 SwitchAlwaysTrailOverlay(null);
                 _lastTrailThrottleOverlay = null;
                 return;
@@ -899,6 +904,12 @@ namespace BASpark
                 return _isSuppressedByEnvironment;
             }
 
+            if (IsCurrentProcessWindow(targetWindow))
+            {
+                UpdateSuppressionState(nowTicks, false);
+                return false;
+            }
+
             if (!TryGetForegroundProcessName(targetWindow, out string processName))
             {
                 if (!TryGetForegroundProcessName(GetForegroundWindow(), out processName))
@@ -923,6 +934,17 @@ namespace BASpark
         private bool IsOverlayWindow(IntPtr hwnd)
         {
             return _overlays.Values.Any(o => o.Handle == hwnd);
+        }
+
+        private static bool IsCurrentProcessWindow(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            GetWindowThreadProcessId(hwnd, out uint processId);
+            return processId == (uint)Environment.ProcessId;
         }
 
         private static bool IsSuppressedByProcessFilter(string processName)
