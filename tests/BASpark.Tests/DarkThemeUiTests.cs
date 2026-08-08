@@ -56,9 +56,9 @@ public class DarkThemeUiTests
         Assert.Null((string?)GetNamedElement(document, "RadioDarkModeOn").Attribute("Checked"));
 
         Assert.Equal("Segoe MDL2 Assets", (string?)GetNamedElement(document, "NoticeIcon").Attribute("FontFamily"));
-        Assert.Equal("{DynamicResource ThemeNoticeIconBrush}", (string?)GetNamedElement(document, "NoticeIcon").Attribute("Foreground"));
+        Assert.Equal("{DynamicResource ThemeNoticeTitleBrush}", (string?)GetNamedElement(document, "NoticeIcon").Attribute("Foreground"));
         Assert.Equal("Segoe MDL2 Assets", (string?)GetNamedElement(document, "SecurityWarningIcon").Attribute("FontFamily"));
-        Assert.Equal("{DynamicResource ThemeWarningIconBrush}", (string?)GetNamedElement(document, "SecurityWarningIcon").Attribute("Foreground"));
+        Assert.Equal("{DynamicResource ThemeDangerButtonForegroundBrush}", (string?)GetNamedElement(document, "SecurityWarningIcon").Attribute("Foreground"));
 
         const string dynamicControlTextBrush = "{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}";
         Assert.Equal(dynamicControlTextBrush, (string?)GetNamedElement(document, "TxtAboutTitle").Attribute("Foreground"));

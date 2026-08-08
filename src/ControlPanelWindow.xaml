@@ -549,7 +549,7 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="NoticeIcon" Text="&#xE789;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource ThemeNoticeIconBrush}" Margin="0,0,10,0" VerticalAlignment="Top"/>
+                            <TextBlock x:Name="NoticeIcon" Text="&#xE789;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource ThemeNoticeTitleBrush}" Margin="0,0,10,0" VerticalAlignment="Top"/>
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="NoticeTitle" Text="加载中..." FontWeight="Bold" Foreground="{DynamicResource ThemeNoticeTitleBrush}" FontSize="14"/>
                                 <TextBlock x:Name="NoticeContent" Text="..." Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource ThemeNoticeTextBrush}" FontSize="13" LineHeight="18"/>
@@ -593,7 +593,7 @@
 
                     <Border Background="{DynamicResource ThemeDangerButtonBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,0,20" BorderBrush="{DynamicResource ThemeDangerButtonBorderBrush}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="SecurityWarningIcon" Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource ThemeWarningIconBrush}" Margin="0,0,8,0" VerticalAlignment="Top"/>
+                            <TextBlock x:Name="SecurityWarningIcon" Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{DynamicResource ThemeDangerButtonForegroundBrush}" Margin="0,0,8,0" VerticalAlignment="Top"/>
                             <TextBlock x:Name="TxtSecurityWarning" Text="安全提示：请务必确保从官方渠道下载。第三方分发渠道的版本可能存在报毒风险或恶意篡改。" Foreground="{DynamicResource ThemeDangerButtonForegroundBrush}" FontSize="12" TextWrapping="Wrap" MaxWidth="380"/>
                         </StackPanel>
                     </Border>
