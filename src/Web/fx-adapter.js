@@ -882,14 +882,16 @@
             state.fx = new window.BAClickFX.BAClickFX(
                 {
                     inputSource: 'manual',
+                    // WebView2 无法读取窗口后的桌面背景；使用 source-over，
+                    // 再以浅色背景补偿和 Alpha 上限提高未知背景上的可见性。
                     effectBackend: 'webgl2',
                     bloomBackend: 'webgl2',
-                    outputCompositing: 'scene',
-                    overlayAlphaPolicy: 'coverage',
+                    outputCompositing: 'browser-overlay',
+                    overlayAlphaPolicy: 'visual-max',
                     overlayColorCompensation: 'none',
-                    overlayAlphaLimit: 250 / 255,
+                    overlayAlphaLimit: 0.85,
                     hostCompositing: 'source-over',
-                    hostCompositingSurface: 'dom-backdrop',
+                    hostCompositingSurface: 'transparent-window',
                     isolatedCompositing: false,
                     lightBackgroundContrastAlpha: 0,
                     maxDpr: 2,
