@@ -24,9 +24,6 @@
     <data name="About_ResetAll" xml:space="preserve">
       <value>すべての設定をリセットして終了</value>
     </data>
-    <data name="About_SecurityWarning" xml:space="preserve">
-      <value>必ず公式チャネルからダウンロードしてください。非公式版は危険な場合があります。</value>
-    </data>
     <data name="About_Title" xml:space="preserve">
       <value>情報</value>
     </data>
@@ -160,13 +157,13 @@
       <value>フィルターモード</value>
     </data>
     <data name="Filter_Mode_Blacklist" xml:space="preserve">
-      <value>❌ ブラックリスト</value>
+      <value>ブラックリスト</value>
     </data>
     <data name="Filter_Mode_Disabled" xml:space="preserve">
-      <value>🚫 オフ</value>
+      <value>オフ</value>
     </data>
     <data name="Filter_Mode_Whitelist" xml:space="preserve">
-      <value>✔️ ホワイトリスト</value>
+      <value>ホワイトリスト</value>
     </data>
     <data name="Filter_New" xml:space="preserve">
       <value>新規</value>
@@ -427,9 +424,6 @@
     </data>
     <data name="Settings_Apply" xml:space="preserve">
       <value>変更を適用</value>
-    </data>
-    <data name="Settings_ApplyHint" xml:space="preserve">
-      <value>*変更後は右の [変更を適用] をクリックしてください。</value>
     </data>
     <data name="Settings_Title" xml:space="preserve">
       <value>設定</value>

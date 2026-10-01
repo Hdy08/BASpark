@@ -288,12 +288,13 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Padding" Value="16,12" />
-        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="Margin" Value="0,0,0,6" />
         <Setter Property="MinHeight" Value="60" />
     </Style>
 
     <Style x:Key="BasSettingToggleStyle" TargetType="ToggleSwitch">
         <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Width" Value="40" />
         <Setter Property="HorizontalAlignment" Value="Right" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="OnContent" Value="" />
@@ -316,6 +317,25 @@
         <Setter Property="MaxWidth" Value="240" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="BasSegmentedRadioButtonsStyle" TargetType="RadioButtons" BasedOn="{StaticResource DefaultRadioButtonsStyle}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButtons">
+                    <Grid>
+                        <ItemsRepeater x:Name="InnerRepeater">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout Orientation="Horizontal" ItemsStretch="Fill"
+                                                   MinItemWidth="1" MinItemHeight="28"
+                                                   MinColumnSpacing="0" MinRowSpacing="0"
+                                                   MaximumRowsOrColumns="{Binding MaxColumns, RelativeSource={RelativeSource TemplatedParent}}" />
+                            </ItemsRepeater.Layout>
+                        </ItemsRepeater>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="BasSegmentedRadioStyle" TargetType="RadioButton">

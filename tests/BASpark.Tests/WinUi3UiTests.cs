@@ -81,7 +81,6 @@ public class WinUi3UiTests
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
         string[] nativeTypes =
         [
-            "InfoBar",
             "ToggleSwitch",
             "NumberBox",
             "Slider",
@@ -97,11 +96,6 @@ public class WinUi3UiTests
                 document.Descendants(),
                 element => element.Name.LocalName == nativeType);
         }
-
-        // 安全提示使用 InfoBar，而不是自绘 Border。
-        // （首页公告栏已按要求移除，这里只断言仍然存在的安全提示。）
-        Assert.Equal("Warning", (string?)GetNamedElement(document, "SecurityWarningBar").Attribute("Severity"));
-        Assert.Equal("InfoBar", GetNamedElement(document, "SecurityWarningBar").Name.LocalName);
 
         // 首页公告栏不得再出现。
         Assert.DoesNotContain("NoticeBar", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
@@ -686,9 +680,9 @@ public class WinUi3UiTests
         }
 
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
-        XElement page = GetNamedElement(panel, "PageSettings");
-        Assert.Equal("{ThemeResource BasSettingsPageBackgroundBrush}", (string?)page.Attribute("Background"));
-        Assert.Equal("6,0,0,0", (string?)page.Attribute("CornerRadius"));
+        XElement surface = GetNamedElement(panel, "ContentSurface");
+        Assert.Equal("{ThemeResource BasSettingsPageBackgroundBrush}", (string?)surface.Attribute("Background"));
+        Assert.Equal("6,0,0,0", (string?)surface.Attribute("CornerRadius"));
         Assert.Equal("{StaticResource BasSettingsPageTitleStyle}", (string?)GetNamedElement(panel, "TxtSettingsTitle").Attribute("Style"));
     }
 
@@ -721,6 +715,16 @@ public class WinUi3UiTests
             Assert.Equal("TextBlock", text.Elements().First().Name.LocalName);
             Assert.Contains(control, controls.Descendants());
             Assert.Equal("Center", (string?)controls.Attribute("VerticalAlignment"));
+            Assert.Equal("Stretch", (string?)controls.Attribute("HorizontalAlignment"));
+            Assert.Null(controls.Attribute("MaxWidth"));
+            XElement columns = Assert.Single(layout.Elements(), element => element.Name.LocalName == "Grid.ColumnDefinitions");
+            XElement controlColumn = columns.Elements().Last();
+            if (control.Name.LocalName != "ToggleSwitch")
+            {
+                Assert.Equal("*", (string?)controlColumn.Attribute("Width"));
+                Assert.Equal("240", (string?)controlColumn.Attribute("MaxWidth"));
+                Assert.Equal("140", (string?)controlColumn.Attribute("MinWidth"));
+            }
             if (control.Name.LocalName == "ToggleSwitch")
             {
                 Assert.Equal("{StaticResource BasSettingToggleStyle}", (string?)control.Attribute("Style"));
@@ -733,7 +737,7 @@ public class WinUi3UiTests
         var setters = cardStyle.Elements().ToDictionary(element => (string)element.Attribute("Property")!, element => (string?)element.Attribute("Value"));
         Assert.Equal("60", setters["MinHeight"]);
         Assert.Equal("16,12", setters["Padding"]);
-        Assert.Equal("0,0,0,4", setters["Margin"]);
+        Assert.Equal("0,0,0,6", setters["Margin"]);
     }
 
     [Theory]
@@ -755,12 +759,12 @@ public class WinUi3UiTests
     [InlineData("RadioDarkMode", 3)]
     [InlineData("RadioScrollbarVisibility", 2)]
     [InlineData("RadioClickType", 3)]
-    [InlineData("ComboProcessFilterMode", 3)]
     public void PresetChoices_UseNativeSegmentedRadioButtons(string name, int count)
     {
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement container = GetNamedElement(document, name);
         Assert.Equal("RadioButtons", container.Name.LocalName);
+        Assert.Equal("{StaticResource BasSegmentedRadioButtonsStyle}", (string?)container.Attribute("Style"));
         Assert.Equal(count.ToString(), (string?)container.Attribute("MaxColumns"));
         Assert.Equal("{StaticResource BasSegmentedSelectorStyle}", (string?)container.Parent?.Attribute("Style"));
         Assert.Equal(count, container.Elements().Count());
@@ -769,14 +773,6 @@ public class WinUi3UiTests
             Assert.Equal("RadioButton", item.Name.LocalName);
             Assert.Equal("{StaticResource BasSegmentedRadioStyle}", (string?)item.Attribute("Style"));
         });
-        if (name == "ComboProcessFilterMode")
-        {
-            Assert.Equal("ProcessFilterMode_Changed", (string?)container.Attribute("SelectionChanged"));
-            string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-            Assert.Contains("""SetRadioContent(ComboProcessFilterMode, 0, "Filter_Mode_Disabled")""", source, StringComparison.Ordinal);
-            Assert.Contains("""SetRadioContent(ComboProcessFilterMode, 1, "Filter_Mode_Blacklist")""", source, StringComparison.Ordinal);
-            Assert.Contains("""SetRadioContent(ComboProcessFilterMode, 2, "Filter_Mode_Whitelist")""", source, StringComparison.Ordinal);
-        }
     }
 
     [Fact]
@@ -814,6 +810,133 @@ public class WinUi3UiTests
         XElement segmentStyle = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioStyle");
         Assert.Contains(segmentStyle.Descendants(), element => (string?)element.Attribute("Target") == "SegmentSelection.Background");
         Assert.Contains(segmentStyle.Descendants(), element => (string?)element.Attribute("Target") == "SegmentHover.Opacity");
+    }
+
+    [Fact]
+    public void AllNavigationPages_UseTheFixedSurfaceAndConsistentTitles()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement surface = GetNamedElement(document, "ContentSurface");
+        Assert.Equal("Border", surface.Name.LocalName);
+        Assert.Equal("1", (string?)surface.Attribute("Grid.Column"));
+        Assert.Null(surface.Attribute("Margin"));
+        Assert.Equal("1", (string?)surface.Parent?.Attribute("Grid.Row"));
+        foreach ((string pageName, string titleName) in new[]
+                 {
+                     ("PageWelcome", "TxtWelcomeTitle"), ("PageSettings", "TxtSettingsTitle"),
+                     ("PageLog", "TxtLogTitle"), ("PageAbout", "TxtAboutTitle")
+                 })
+        {
+            XElement page = GetNamedElement(document, pageName);
+            Assert.Contains(surface, page.Ancestors());
+            Assert.Null(page.Attribute("Margin"));
+            Assert.Null(page.Attribute("Background"));
+            Assert.Equal("{StaticResource BasSettingsPageTitleStyle}", (string?)GetNamedElement(document, titleName).Attribute("Style"));
+            if (pageName != "PageSettings")
+            {
+                Assert.Equal("28,20,28,28", (string?)page.Attribute("Padding"));
+            }
+        }
+    }
+
+    [Fact]
+    public void SegmentedSelectors_FillEqualCellsWithoutHeaderOrColumnGaps()
+    {
+        XDocument document = LoadXaml("src", "DesignSystem.xaml");
+        XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioButtonsStyle");
+        Assert.Equal("{StaticResource DefaultRadioButtonsStyle}", (string?)style.Attribute("BasedOn"));
+        XElement repeater = Assert.Single(style.Descendants(), element => element.Name.LocalName == "ItemsRepeater");
+        Assert.Equal("InnerRepeater", (string?)repeater.Attribute(Xaml + "Name"));
+        XElement layout = Assert.Single(style.Descendants(), element => element.Name.LocalName == "UniformGridLayout");
+        Assert.Equal("Horizontal", (string?)layout.Attribute("Orientation"));
+        Assert.Equal("Fill", (string?)layout.Attribute("ItemsStretch"));
+        Assert.Equal("1", (string?)layout.Attribute("MinItemWidth"));
+        Assert.Equal("0", (string?)layout.Attribute("MinColumnSpacing"));
+        Assert.Equal("0", (string?)layout.Attribute("MinRowSpacing"));
+        Assert.Equal("{Binding MaxColumns, RelativeSource={RelativeSource TemplatedParent}}", (string?)layout.Attribute("MaximumRowsOrColumns"));
+        Assert.DoesNotContain(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "HeaderContentPresenter");
+    }
+
+    [Fact]
+    public void CompactSwitches_KeepTheirVisibleEdgeAtTheCardPadding()
+    {
+        XDocument document = LoadXaml("src", "DesignSystem.xaml");
+        XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingToggleStyle");
+        Assert.Contains(style.Elements(), element => (string?)element.Attribute("Property") == "Width" && (string?)element.Attribute("Value") == "40");
+        Assert.Contains(style.Elements(), element => (string?)element.Attribute("Property") == "HorizontalAlignment" && (string?)element.Attribute("Value") == "Right");
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string key in new[] { "ToggleSwitchTopHeaderMargin", "ToggleSwitchPreContentMargin", "ToggleSwitchPostContentMargin" })
+        {
+            XElement spacing = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
+            Assert.Equal("0", spacing.Value);
+        }
+    }
+
+    [Fact]
+    public void FilterDropdowns_PreserveTheModeOrderAndProcessDeletion()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement mode = GetNamedElement(document, "ComboProcessFilterMode");
+        Assert.Equal("ComboBox", mode.Name.LocalName);
+        Assert.Equal("ProcessFilterMode_Changed", (string?)mode.Attribute("SelectionChanged"));
+        Assert.Equal(3, mode.Elements().Count());
+        Assert.All(mode.Elements(), item => Assert.Equal("ComboBoxItem", item.Name.LocalName));
+        XElement processes = GetNamedElement(document, "ListConfiguredProcesses");
+        Assert.Equal("ComboBox", processes.Name.LocalName);
+        Assert.Equal("200", (string?)processes.Attribute("MaxDropDownHeight"));
+        Assert.Equal("{Binding Text, ElementName=TxtProcessList}", (string?)processes.Attribute("PlaceholderText"));
+        XElement remove = Assert.Single(processes.Descendants(), element => (string?)element.Attribute("Click") == "RemoveProcess_Click");
+        Assert.Equal("{Binding}", (string?)remove.Attribute("Tag"));
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses", source, StringComparison.Ordinal);
+        Assert.Contains("ListConfiguredProcesses.SelectedIndex = CurrentProfileProcesses.Count > 0 ? 0 : -1", source, StringComparison.Ordinal);
+        foreach ((int index, string key) in new[] { (0, "Filter_Mode_Disabled"), (1, "Filter_Mode_Blacklist"), (2, "Filter_Mode_Whitelist") })
+        {
+            Assert.Contains($"SetComboItemContent(ComboProcessFilterMode, {index}, \"{key}\")", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("Strings.resx")]
+    [InlineData("Strings.en.resx")]
+    [InlineData("Strings.ja.resx")]
+    public void FilterModeLabels_HaveNoSymbolsAndRemovedWarningsHaveNoUiReferences(string resourceName)
+    {
+        XDocument resources = XDocument.Parse(ReadSource("src", resourceName));
+        foreach (string key in new[] { "Filter_Mode_Disabled", "Filter_Mode_Blacklist", "Filter_Mode_Whitelist" })
+        {
+            XElement entry = Assert.Single(resources.Root!.Elements("data"), element => (string?)element.Attribute("name") == key);
+            string text = entry.Element("value")!.Value;
+            Assert.NotEmpty(text);
+            Assert.True(char.IsLetter(text[0]));
+        }
+        Assert.DoesNotContain(resources.Root!.Elements("data"), element => (string?)element.Attribute("name") is "Settings_ApplyHint" or "About_SecurityWarning");
+        string xaml = ReadSource("src", "ControlPanelWindow.xaml");
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        foreach (string name in new[] { "TxtSettingsHint", "SecurityWarningBar", "TxtSecurityWarning" })
+        {
+            Assert.DoesNotContain(name, xaml, StringComparison.Ordinal);
+            Assert.DoesNotContain(name, source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void HomeStatistics_UseFullWidthSettingCardsWithRightAlignedValues()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach ((string labelName, string valueName) in new[] { ("TxtStatusLabel", "StatusText"), ("TxtClicksLabel", "ClickCountText") })
+        {
+            XElement label = GetNamedElement(document, labelName);
+            XElement value = GetNamedElement(document, valueName);
+            XElement card = GetSettingCard(value);
+            Assert.Same(card, GetSettingCard(label));
+            Assert.Null(card.Attribute("Width"));
+            Assert.Null(card.Attribute("MinWidth"));
+            Assert.Null(card.Attribute("HorizontalAlignment"));
+            Assert.Equal("0", (string?)label.Attribute("Grid.Column"));
+            Assert.Equal("1", (string?)value.Attribute("Grid.Column"));
+            Assert.Equal("Right", (string?)value.Attribute("HorizontalAlignment"));
+        }
     }
 
     private static XElement GetSettingCard(XElement control) =>

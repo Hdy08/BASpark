@@ -732,7 +732,6 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtStatusLabel.Text = Localization.Get("Welcome_StatusLabel");
         TxtClicksLabel.Text = Localization.Get("Welcome_ClicksLabel");
         TxtSettingsTitle.Text = Localization.Get("Settings_Title");
-        TxtSettingsHint.Text = Localization.Get("Settings_ApplyHint");
         BtnApplySettings.Content = Localization.Get("Settings_Apply");
         TxtBasicTitle.Text = Localization.Get("Basic_Title");
         TxtBasicLanguage.Text = Localization.Get("Basic_Language");
@@ -800,7 +799,6 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtLogHint.Text = Localization.Get("Log_Hint");
         TxtAboutTitle.Text = Localization.Get("About_Title");
         TxtAboutDescription.Text = Localization.Get("About_Description");
-        TxtSecurityWarning.Text = Localization.Get("About_SecurityWarning");
         TxtDevOptions.Text = Localization.Get("About_DevOptions");
         BtnResetAll.Content = Localization.Get("About_ResetAll");
         TxtOverlayRunning.Text = Localization.Get("Overlay_RunningProcess");
@@ -826,9 +824,9 @@ public sealed partial class ControlPanelWindow : UserControl
         // 进程过滤模式的三个条目同理。
         if (ComboProcessFilterMode.Items.Count >= 3)
         {
-            SetRadioContent(ComboProcessFilterMode, 0, "Filter_Mode_Disabled");
-            SetRadioContent(ComboProcessFilterMode, 1, "Filter_Mode_Blacklist");
-            SetRadioContent(ComboProcessFilterMode, 2, "Filter_Mode_Whitelist");
+            SetComboItemContent(ComboProcessFilterMode, 0, "Filter_Mode_Disabled");
+            SetComboItemContent(ComboProcessFilterMode, 1, "Filter_Mode_Blacklist");
+            SetComboItemContent(ComboProcessFilterMode, 2, "Filter_Mode_Whitelist");
         }
     }
 
@@ -837,6 +835,14 @@ public sealed partial class ControlPanelWindow : UserControl
         if (container.Items[index] is RadioButton button)
         {
             button.Content = Localization.Get(key);
+        }
+    }
+
+    private static void SetComboItemContent(ComboBox combo, int index, string key)
+    {
+        if (combo.Items[index] is ComboBoxItem item)
+        {
+            item.Content = Localization.Get(key);
         }
     }
 
@@ -1485,6 +1491,8 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             CurrentProfileProcesses.Add(name);
         }
+
+        ListConfiguredProcesses.SelectedIndex = CurrentProfileProcesses.Count > 0 ? 0 : -1;
     }
 
     private static IEnumerable<string> NormalizeProcessNames(IEnumerable<string> processes) =>
@@ -2261,7 +2269,7 @@ public sealed partial class ControlPanelWindow : UserControl
             border.BorderThickness = new Thickness(1);
             border.CornerRadius = new CornerRadius(6);
             border.Padding = new Thickness(16, 12, 16, 12);
-            border.Margin = new Thickness(0, 0, 0, 4);
+            border.Margin = new Thickness(0, 0, 0, 6);
             border.MinHeight = 60;
         }
 

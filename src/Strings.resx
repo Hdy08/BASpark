@@ -24,9 +24,6 @@
     <data name="About_ResetAll" xml:space="preserve">
       <value>重置所有设置并退出</value>
     </data>
-    <data name="About_SecurityWarning" xml:space="preserve">
-      <value>安全提示：请务必确保从官方渠道下载。第三方分发渠道的版本可能存在报毒风险或恶意篡改。</value>
-    </data>
     <data name="About_Title" xml:space="preserve">
       <value>关于</value>
     </data>
@@ -160,13 +157,13 @@
       <value>过滤模式</value>
     </data>
     <data name="Filter_Mode_Blacklist" xml:space="preserve">
-      <value>❌ 黑名单模式</value>
+      <value>黑名单模式</value>
     </data>
     <data name="Filter_Mode_Disabled" xml:space="preserve">
-      <value>🚫 关闭过滤</value>
+      <value>关闭过滤</value>
     </data>
     <data name="Filter_Mode_Whitelist" xml:space="preserve">
-      <value>✔️ 白名单模式</value>
+      <value>白名单模式</value>
     </data>
     <data name="Filter_New" xml:space="preserve">
       <value>新建</value>
@@ -427,9 +424,6 @@
     </data>
     <data name="Settings_Apply" xml:space="preserve">
       <value>应用更改</value>
-    </data>
-    <data name="Settings_ApplyHint" xml:space="preserve">
-      <value>*修改设置后，请点击右侧 [应用更改] 按钮生效。</value>
     </data>
     <data name="Settings_Title" xml:space="preserve">
       <value>参数配置</value>
