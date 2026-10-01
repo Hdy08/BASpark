@@ -435,10 +435,19 @@ public class WinUi3UiTests
         string initBody = overlaySource[initIndex..initEnd];
         Assert.DoesNotContain("_host.Show()", initBody, StringComparison.Ordinal);
 
-        // 显示必须发生在导航完成之后。
+        // 显示必须通过 EnsureHostPresented 汇聚，并由多个就绪信号触发：
+        // 只依赖 NavigationCompleted 会让叠加层在该事件不到达时永久隐藏
+        // （宿主窗口创建后始终未 Show，实测窗口 visible=False、无特效）。
+        Assert.Contains("EnsureHostPresented", overlaySource, StringComparison.Ordinal);
+
         int navIndex = overlaySource.IndexOf("private void OnNavigationCompleted", StringComparison.Ordinal);
         Assert.True(navIndex > initIndex, "OnNavigationCompleted is missing.");
-        Assert.Contains("_host.Show()", overlaySource[navIndex..], StringComparison.Ordinal);
+        Assert.Contains("EnsureHostPresented()", overlaySource[navIndex..], StringComparison.Ordinal);
+
+        // 渲染器探测成功也必须把窗口显示出来。
+        int probeIndex = overlaySource.IndexOf("ProbeRendererBeforeFallbackAsync", StringComparison.Ordinal);
+        Assert.True(probeIndex > initIndex, "Renderer probe is missing.");
+        Assert.Contains("EnsureHostPresented()", overlaySource[probeIndex..], StringComparison.Ordinal);
     }
 
     private static XDocument LoadXaml(params string[] pathParts) =>

@@ -504,9 +504,7 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
-        _webViewReadyForTopmost = true;
-        _host.Show();
-        SafeEnsureTopmost();
+        EnsureHostPresented();
 
         // 导航会重建 JS 全局对象，因此每个页面都需要重新下发完整的宿主状态。
         _lastReportedInputMode = null;
@@ -730,6 +728,12 @@ internal sealed class OverlayWindow : IDisposable
             // 渲染器已注入宿主 API，视为就绪：停止回退，避免无谓降级。
             _rendererReady = true;
             _unresponsiveTracker.Reset();
+
+            // 探针成功同时证明页面已加载完成，是比 NavigationCompleted 更可靠的
+            // 「可以显示」信号；该事件在某些时序下不会到达，若只依赖它，叠加层
+            // 会一直保持隐藏（宿主窗口创建后始终未 Show）。
+            EnsureHostPresented();
+
             AppLogger.Info(
                 $"BA click renderer reports ready via probe on '{_screenDeviceName}' " +
                 $"(no ready message within {RendererReadyTimeout.TotalSeconds:F0}s).");
@@ -740,6 +744,22 @@ internal sealed class OverlayWindow : IDisposable
             $"BA click renderer ready timeout on '{_screenDeviceName}' " +
             $"(probe: {probeResult}); switching to legacy renderer.");
         FallbackToLegacyRenderer("ready timeout");
+    }
+
+    /// <summary>
+    /// 把宿主窗口显示出来并抬到最前。所有「已就绪」信号都汇聚到这里，
+    /// 保证叠加层不会因为某一个事件没到达而永久隐藏。
+    /// </summary>
+    private void EnsureHostPresented()
+    {
+        if (_isClosing || _hiddenForExternalScreenshotCapture)
+        {
+            return;
+        }
+
+        _webViewReadyForTopmost = true;
+        _host.Show();
+        SafeEnsureTopmost();
     }
 
     private void StopRendererReadyTimeout()
