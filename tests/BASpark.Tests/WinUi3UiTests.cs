@@ -86,6 +86,8 @@ public class WinUi3UiTests
             "Slider",
             "ComboBox",
             "RadioButtons",
+            "Expander",
+            "ColorPicker",
             "ListView",
             "ScrollViewer",
         ];
@@ -264,7 +266,7 @@ public class WinUi3UiTests
         // 空文案的具名元素必须在代码里被赋值，否则界面上会出现空白按钮。
         string[] mustBeFilledWithContent =
         [
-            "BtnApplySettings", "BtnPickColor", "BtnVisualReset", "BtnClearLog",
+            "BtnApplySettings", "BtnVisualReset", "BtnClearLog",
             "BtnResetAll", "BtnRefreshScreens", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile",
         ];
 
@@ -354,7 +356,9 @@ public class WinUi3UiTests
 
         string panelSource = ReadSource("src", "ControlPanelWindow.xaml.cs");
         string pickerSource = ReadSource("src", "ColorPickerWindow.xaml.cs");
-        Assert.Contains("new ColorPickerWindow(", panelSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("new ColorPickerWindow(", panelSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowColorPickerAsync", panelSource, StringComparison.Ordinal);
+        Assert.Contains("EffectColorPicker_ColorChanged", panelSource, StringComparison.Ordinal);
         Assert.DoesNotContain("System.Windows.Forms.ColorDialog", panelSource, StringComparison.Ordinal);
         Assert.DoesNotContain("using System.Windows", pickerSource, StringComparison.Ordinal);
         Assert.Contains("Windows.UI", pickerSource, StringComparison.Ordinal);
@@ -519,7 +523,8 @@ public class WinUi3UiTests
 
         // 不得改用原生 Expander 承载：逐帧实测它不做布局动画（下方导航项在一帧内
         // 整段位移 168px），而在它外面套高度动画会破坏它自己的内容定位与裁剪。
-        Assert.DoesNotContain("<Expander", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain(GetNamedElement(document, "SettingsSubNavHost").DescendantsAndSelf(),
+            element => element.Name.LocalName == "Expander");
         Assert.DoesNotContain("NavExpander", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("NavExpander", source, StringComparison.Ordinal);
         Assert.DoesNotContain("IsExpanded", source, StringComparison.Ordinal);
@@ -697,7 +702,7 @@ public class WinUi3UiTests
             "CheckAutoStart", "CheckStartSilent", "CheckRunAsAdmin", "CheckTouchscreenMode",
             "CheckLinkedEffectScale", "SliderScale", "SliderTrailScale", "SliderClickScale", "SliderOpacity",
             "SliderGlow", "CheckLinkedAnimationSpeed", "SliderSpeed", "SliderTrailAnimSpeed", "SliderClickAnimSpeed",
-            "CheckApplyCurveDraw", "CheckFollowDisplayRefreshRate", "SliderTrailRefresh", "BtnPickColor",
+            "CheckApplyCurveDraw", "CheckFollowDisplayRefreshRate", "SliderTrailRefresh",
             "CheckEnvironmentFilter", "CheckHideInFullscreen", "CheckShowEffectOnDesktop",
             "ComboProfiles", "ComboProcessFilterMode", "ListConfiguredProcesses", "ManualProcessInput"
         ];
@@ -937,6 +942,120 @@ public class WinUi3UiTests
             Assert.Equal("1", (string?)value.Attribute("Grid.Column"));
             Assert.Equal("Right", (string?)value.Attribute("HorizontalAlignment"));
         }
+    }
+
+    [Fact]
+    public void SettingsSubNavigation_AlignsTextAndRightEdgeWithItsParent()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement parent = GetNamedElement(panel, "TabSettings");
+        XElement parentContent = Assert.Single(parent.Elements());
+        XElement icon = Assert.Single(parentContent.Elements(), element => element.Name.LocalName == "FontIcon");
+        Assert.Equal("16", (string?)icon.Attribute("Width"));
+        Assert.Equal("12", (string?)parentContent.Attribute("Spacing"));
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement parentStyle = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasNavRadioStyle");
+        XElement childStyle = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSubNavRadioStyle");
+        Assert.Contains(parentStyle.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "2,0");
+        Assert.Contains(childStyle.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "30,0,2,0");
+        XElement parentPresenter = Assert.Single(parentStyle.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "ContentPresenter");
+        XElement childPresenter = Assert.Single(childStyle.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "ContentPresenter");
+        Assert.Equal("9,0,12,0", (string?)parentPresenter.Attribute("Margin"));
+        Assert.Equal("12,0,12,0", (string?)childPresenter.Attribute("Margin"));
+        XElement indicatorColumn = Assert.Single(parentStyle.Descendants(), element => element.Name.LocalName == "Grid.ColumnDefinitions").Elements().First();
+        Assert.Equal("3", (string?)indicatorColumn.Attribute("Width"));
+        Assert.Equal(2 + 3 + 9 + 16 + 12, 30 + 12);
+        XElement childNavigation = GetNamedElement(panel, "SettingsSubNav");
+        Assert.Equal(4, childNavigation.Elements().Count());
+        Assert.All(childNavigation.Elements(), element => Assert.Equal("{StaticResource BasSubNavRadioStyle}", (string?)element.Attribute("Style")));
+    }
+
+    [Fact]
+    public void SettingsSubNavigation_AnimatesItsAccentLikeTheParent()
+    {
+        XDocument document = LoadXaml("src", "DesignSystem.xaml");
+        foreach (string key in new[] { "BasNavRadioStyle", "BasSubNavRadioStyle" })
+        {
+            XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
+            XElement indicator = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "SelectionIndicator");
+            Assert.Equal("0.5,0.5", (string?)indicator.Attribute("RenderTransformOrigin"));
+            XElement scale = Assert.Single(indicator.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "IndicatorScale");
+            Assert.Equal("0.35", (string?)scale.Attribute("ScaleY"));
+            XElement selected = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "Checked");
+            XElement grow = Assert.Single(selected.Descendants(), element => element.Name.LocalName == "DoubleAnimation" && (string?)element.Attribute("Storyboard.TargetName") == "IndicatorScale");
+            Assert.Equal("ScaleY", (string?)grow.Attribute("Storyboard.TargetProperty"));
+            Assert.Equal("1", (string?)grow.Attribute("To"));
+            Assert.Equal("0:0:0.22", (string?)grow.Attribute("Duration"));
+            Assert.Contains(grow.Descendants(), element => element.Name.LocalName == "CubicEase");
+            XElement uncheckedState = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "Unchecked");
+            Assert.Contains(uncheckedState.Descendants(), element => (string?)element.Attribute("Storyboard.TargetName") == "IndicatorScale" && (string?)element.Attribute("To") == "0.35");
+            Assert.DoesNotContain(style.Descendants(), element => (string?)element.Attribute("EnableDependentAnimation") == "True");
+        }
+    }
+
+    [Fact]
+    public void ControlPanel_UsesTheSystemFontInsteadOfACustomLogFont()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        Assert.Equal("{ThemeResource ContentControlThemeFontFamily}", (string?)document.Root?.Attribute("FontFamily"));
+        Assert.Null(GetNamedElement(document, "TxtAppLog").Attribute("FontFamily"));
+        Assert.DoesNotContain("Cascadia Mono", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EffectColor_UsesANativeInlineExpanderAndPicker()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement expander = GetNamedElement(document, "EffectColorExpander");
+        Assert.Equal("Expander", expander.Name.LocalName);
+        Assert.Equal("{StaticResource BasSettingExpanderStyle}", (string?)expander.Attribute("Style"));
+        XElement card = GetSettingCard(expander);
+        Assert.Equal("0", (string?)card.Attribute("Padding"));
+        Assert.Contains(GetNamedElement(document, "SectionVisual"), card.Ancestors());
+        XElement picker = GetNamedElement(document, "EffectColorPicker");
+        Assert.Equal("ColorPicker", picker.Name.LocalName);
+        Assert.Contains(expander, picker.Ancestors());
+        Assert.Equal("Horizontal", (string?)picker.Attribute("Orientation"));
+        Assert.Equal("SaturationValue", (string?)picker.Attribute("ColorSpectrumComponents"));
+        Assert.Equal("False", (string?)picker.Attribute("IsAlphaEnabled"));
+        Assert.Equal("EffectColorPicker_ColorChanged", (string?)picker.Attribute("ColorChanged"));
+        XElement hex = GetNamedElement(document, "EffectColorHexInput");
+        Assert.Equal("9", (string?)hex.Attribute("MaxLength"));
+        Assert.Equal("EffectColorHexInput_LostFocus", (string?)hex.Attribute("LostFocus"));
+        Assert.Equal("EffectColorHexInput_KeyDown", (string?)hex.Attribute("KeyDown"));
+        Assert.Equal("Viewbox", picker.Parent?.Name.LocalName);
+        Assert.Equal("DownOnly", (string?)picker.Parent?.Attribute("StretchDirection"));
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.DoesNotContain("PickColor_Click", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.ParticleColor = ToRgbString(args.NewColor)", source, StringComparison.Ordinal);
+        Assert.Contains("_syncingColorControls", source, StringComparison.Ordinal);
+        Assert.Contains("UpdateColorPreview(ConfigManager.ParticleColor)", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetRow(ColorPickerDetails, horizontal ? 0 : 1)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EffectColorPresets_UseAccessibleNativeSwatchesWithValidRgbValues()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement presets = GetNamedElement(document, "EffectColorPresets");
+        Assert.Equal("RadioButtons", presets.Name.LocalName);
+        Assert.Equal("{StaticResource BasColorPresetsStyle}", (string?)presets.Attribute("Style"));
+        Assert.Equal(12, presets.Elements().Count());
+        Assert.All(presets.Elements(), swatch =>
+        {
+            Assert.Equal("RadioButton", swatch.Name.LocalName);
+            Assert.Equal("{StaticResource BasColorSwatchStyle}", (string?)swatch.Attribute("Style"));
+            string? hex = (string?)swatch.Attribute("Tag");
+            Assert.True(ColorPickerColorMath.TryParseHex(hex, out Color color));
+            Assert.Equal(hex, ColorPickerColorMath.ToHex(color));
+            Assert.Equal(hex, (string?)swatch.Attribute("Background"));
+            Assert.Equal(hex, (string?)swatch.Attribute("AutomationProperties.Name"));
+        });
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorPresetsStyle");
+        XElement layout = Assert.Single(style.Descendants(), element => element.Name.LocalName == "UniformGridLayout");
+        Assert.Equal("6", (string?)layout.Attribute("MaximumRowsOrColumns"));
+        Assert.Equal("6", (string?)layout.Attribute("MinRowSpacing"));
     }
 
     private static XElement GetSettingCard(XElement control) =>

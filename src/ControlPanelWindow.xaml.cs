@@ -336,6 +336,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
+    private bool _syncingColorControls;
     private readonly Dictionary<Slider, NumberBox> _sliderToBox = new();
     private readonly Dictionary<NumberBox, Slider> _boxToSlider = new();
 
@@ -776,7 +777,6 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtFollowDisplayRefreshRateHint.Text = Localization.Get("Visual_FollowDisplayRefreshRateHint");
         TxtTrailRefresh.Text = Localization.Get("Visual_TrailRefresh");
         TxtEffectColor.Text = Localization.Get("Visual_Color");
-        BtnPickColor.Content = Localization.Get("Visual_ChangeColor");
         TxtFilterTitle.Text = Localization.Get("Filter_Title");
         CheckEnvironmentFilter.Header = Localization.Get("Filter_Enable");
         CheckHideInFullscreen.Header = Localization.Get("Filter_Fullscreen");
@@ -902,46 +902,109 @@ public sealed partial class ControlPanelWindow : UserControl
     // 特效颜色
     // ==================================================================
 
-    private async void PickColor_Click(object sender, RoutedEventArgs e)
+    private void EffectColorPicker_ColorChanged(ColorPicker sender, ColorChangedEventArgs args)
     {
-        _ = sender;
-        _ = e;
-
-        if (!TryParseRgbString(ConfigManager.ParticleColor, out Color initialColor))
-        {
-            initialColor = Color.FromArgb(255, 76, 167, 255);
-        }
-
-        Color? picked = await ShowColorPickerAsync(initialColor);
-        if (picked == null)
+        if (!IsUiReady || _syncingColorControls)
         {
             return;
         }
 
-        string newColor = ToRgbString(picked.Value);
-        ConfigManager.ParticleColor = newColor;
-        UpdateColorPreview(newColor);
+        ConfigManager.ParticleColor = ToRgbString(args.NewColor);
+        UpdateColorPreview(ConfigManager.ParticleColor);
     }
 
-    /// <summary>取色器宿主适配点：ColorPickerWindow 是独立窗口，返回用户确认的颜色（取消为 null）。</summary>
-    private async Task<Color?> ShowColorPickerAsync(Color initialColor)
+    private void EffectColorPresets_SelectionChanged(object sender, SelectionChangedEventArgs args)
     {
-        XamlRoot? root = await EnsureXamlRootAsync();
-        if (root == null || _isClosed)
+        if (!IsUiReady || _syncingColorControls ||
+            EffectColorPresets.SelectedItem is not RadioButton { Tag: string hex } ||
+            !ColorPickerColorMath.TryParseHex(hex, out Color color))
         {
-            AppLogger.Warn("Cannot show color picker: XamlRoot unavailable.");
-            return null;
+            return;
         }
 
-        var dialog = new ColorPickerWindow(initialColor);
-        return await dialog.ShowDialogAsync(root);
+        ConfigManager.ParticleColor = ToRgbString(color);
+        UpdateColorPreview(ConfigManager.ParticleColor);
+    }
+
+    private void EffectColorHexInput_LostFocus(object sender, RoutedEventArgs args) => CommitEffectColorHex();
+
+    private void EffectColorHexInput_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
+    {
+        if (args.Key == Windows.System.VirtualKey.Enter)
+        {
+            CommitEffectColorHex();
+            args.Handled = true;
+        }
+        else if (args.Key == Windows.System.VirtualKey.Escape)
+        {
+            UpdateColorPreview(ConfigManager.ParticleColor);
+            args.Handled = true;
+        }
+    }
+
+    private void CommitEffectColorHex()
+    {
+        if (!IsUiReady || _syncingColorControls)
+        {
+            return;
+        }
+
+        string hex = EffectColorHexInput.Text.Trim().TrimStart('#');
+        if (hex.Length == 8 && hex.StartsWith("FF", StringComparison.OrdinalIgnoreCase))
+        {
+            hex = hex[2..];
+        }
+
+        if (ColorPickerColorMath.TryParseHex(hex, out Color color))
+        {
+            ConfigManager.ParticleColor = ToRgbString(color);
+        }
+
+        UpdateColorPreview(ConfigManager.ParticleColor);
+    }
+
+    private void ColorPickerBody_SizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        bool horizontal = args.NewSize.Width >= 516;
+        ColorPickerDetailsColumn.Width = new GridLength(horizontal ? 200 : 0);
+        Grid.SetColumn(ColorPickerDetails, horizontal ? 1 : 0);
+        Grid.SetRow(ColorPickerDetails, horizontal ? 0 : 1);
+        ColorPickerBody.ColumnSpacing = horizontal ? 16 : 0;
+        ColorPickerBody.RowSpacing = horizontal ? 0 : 12;
     }
 
     private void UpdateColorPreview(string rgbString)
     {
-        ColorPreview.Background = TryParseRgbString(rgbString, out Color color)
-            ? new SolidColorBrush(color)
-            : new SolidColorBrush(Colors.Gray);
+        Color color = TryParseRgbString(rgbString, out Color parsed) ? parsed : Colors.Gray;
+        var brush = new SolidColorBrush(color);
+        string hex = $"#FF{ColorPickerColorMath.ToHex(color)[1..]}";
+
+        _syncingColorControls = true;
+        try
+        {
+            ColorPreview.Background = brush;
+            ExpandedColorPreview.Background = brush;
+            EffectColorHexInput.Text = hex;
+            ExpandedColorHex.Text = hex;
+            EffectColorPicker.Color = color;
+
+            int selectedIndex = -1;
+            for (int index = 0; index < EffectColorPresets.Items.Count; index++)
+            {
+                if (EffectColorPresets.Items[index] is RadioButton { Tag: string preset } &&
+                    ColorPickerColorMath.TryParseHex(preset, out Color presetColor) && presetColor == color)
+                {
+                    selectedIndex = index;
+                    break;
+                }
+            }
+
+            EffectColorPresets.SelectedIndex = selectedIndex;
+        }
+        finally
+        {
+            _syncingColorControls = false;
+        }
     }
 
     private static bool TryParseRgbString(string? text, out Color color)

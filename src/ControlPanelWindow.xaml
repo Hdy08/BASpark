@@ -5,7 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+    mc:Ignorable="d"
+    FontFamily="{ThemeResource ContentControlThemeFontFamily}">
 
     <UserControl.Resources>
         <x:Double x:Key="RadioButtonsColumnSpacing">0</x:Double>
@@ -113,7 +114,7 @@
                                  Style="{StaticResource BasNavRadioStyle}"
                                  Click="Tab_Click">
                         <StackPanel Orientation="Horizontal" Spacing="12">
-                            <FontIcon Glyph="&#xE713;" FontSize="16" />
+                            <FontIcon Glyph="&#xE713;" FontSize="16" Width="16" />
                             <TextBlock x:Name="TabSettingsLabel" VerticalAlignment="Center" />
                         </StackPanel>
                     </RadioButton>
@@ -1062,34 +1063,109 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="TxtEffectColor"
-                                            Text=""
-                                            Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
-                                            <Border
-                                                x:Name="ColorPreview"
-                                                Width="48"
-                                                Height="32"
-                                                CornerRadius="{StaticResource BasControlCornerRadius}"
-                                                BorderThickness="1"
-                                                BorderBrush="{ThemeResource BasControlStrokeBrush}" />
-                                            <Button
-                                                x:Name="BtnPickColor"
-                                                Content=""
-                                                Click="PickColor_Click" />
+                            <Border Style="{StaticResource BasSettingCardStyle}" Padding="0">
+                                <Expander x:Name="EffectColorExpander" Style="{StaticResource BasSettingExpanderStyle}"
+                                          AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}">
+                                    <Expander.Resources>
+                                        <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="{ThemeResource BasSettingsCardColor}" />
+                                        <Thickness x:Key="ExpanderHeaderBorderThickness">0</Thickness>
+                                        <Thickness x:Key="ExpanderContentDownBorderThickness">0</Thickness>
+                                        <Thickness x:Key="ExpanderHeaderPadding">16,12</Thickness>
+                                    </Expander.Resources>
+                                    <Expander.Header>
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="TxtEffectColor" Text=""
+                                                       Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <TextBox x:Name="EffectColorHexInput" Width="104" MaxLength="9"
+                                                         Background="{ThemeResource BasSettingsControlBackgroundBrush}"
+                                                         BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
+                                                         AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}"
+                                                         LostFocus="EffectColorHexInput_LostFocus" KeyDown="EffectColorHexInput_KeyDown" />
+                                                <Border x:Name="ColorPreview" Width="32" Height="32" CornerRadius="4"
+                                                        BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Expander.Header>
+                                    <Grid x:Name="ColorPickerBody" SizeChanged="ColorPickerBody_SizeChanged" RowSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition x:Name="ColorPickerDetailsColumn" Width="0" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Viewbox MaxWidth="300" HorizontalAlignment="Left" Stretch="Uniform" StretchDirection="DownOnly">
+                                            <ColorPicker x:Name="EffectColorPicker" Width="300" Orientation="Horizontal"
+                                                         IsAlphaEnabled="False" IsAlphaSliderVisible="False"
+                                                         IsColorSpectrumVisible="True" IsColorSliderVisible="True"
+                                                         ColorSpectrumComponents="SaturationValue"
+                                                         IsColorPreviewVisible="False" IsColorChannelTextInputVisible="False"
+                                                         IsHexInputVisible="False" IsAlphaTextInputVisible="False"
+                                                         ColorChanged="EffectColorPicker_ColorChanged"
+                                                         AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}" />
+                                        </Viewbox>
+                                        <StackPanel x:Name="ColorPickerDetails" Grid.Row="1" Width="200" Spacing="10"
+                                                    HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border x:Name="ExpandedColorPreview" Width="64" Height="64" CornerRadius="6"
+                                                        BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}" />
+                                                <TextBlock x:Name="ExpandedColorHex" Grid.Column="1" FontWeight="SemiBold"
+                                                           Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <RadioButtons x:Name="EffectColorPresets" MaxColumns="6"
+                                                          Style="{StaticResource BasColorPresetsStyle}"
+                                                          SelectionChanged="EffectColorPresets_SelectionChanged"
+                                                          AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}">
+                                                        <RadioButton Tag="#000000" Background="#000000"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#000000" AutomationProperties.Name="#000000" />
+                                                        <RadioButton Tag="#1A1A1A" Background="#1A1A1A"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#1A1A1A" AutomationProperties.Name="#1A1A1A" />
+                                                        <RadioButton Tag="#444444" Background="#444444"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#444444" AutomationProperties.Name="#444444" />
+                                                        <RadioButton Tag="#888888" Background="#888888"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#888888" AutomationProperties.Name="#888888" />
+                                                        <RadioButton Tag="#CCCCCC" Background="#CCCCCC"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#CCCCCC" AutomationProperties.Name="#CCCCCC" />
+                                                        <RadioButton Tag="#FFFFFF" Background="#FFFFFF"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#FFFFFF" AutomationProperties.Name="#FFFFFF" />
+                                                        <RadioButton Tag="#ADACF0" Background="#ADACF0"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#ADACF0" AutomationProperties.Name="#ADACF0" />
+                                                        <RadioButton Tag="#203F56" Background="#203F56"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#203F56" AutomationProperties.Name="#203F56" />
+                                                        <RadioButton Tag="#AEDAEC" Background="#AEDAEC"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#AEDAEC" AutomationProperties.Name="#AEDAEC" />
+                                                        <RadioButton Tag="#65C958" Background="#65C958"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#65C958" AutomationProperties.Name="#65C958" />
+                                                        <RadioButton Tag="#FFEB00" Background="#FFEB00"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#FFEB00" AutomationProperties.Name="#FFEB00" />
+                                                        <RadioButton Tag="#FE99AF" Background="#FE99AF"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#FE99AF" AutomationProperties.Name="#FE99AF" />
+                                            </RadioButtons>
                                         </StackPanel>
                                     </Grid>
-                                </Grid>
+                                </Expander>
                             </Border>
                         </StackPanel>
 
@@ -1435,7 +1511,6 @@
                                  AcceptsReturn="True"
                                  BorderThickness="0"
                                  Background="Transparent"
-                                 FontFamily="Cascadia Mono, Consolas"
                                  FontSize="{StaticResource BasFontSizeCaption}"
                                  ScrollViewer.VerticalScrollBarVisibility="Disabled" />
                     </ScrollViewer>

@@ -34,6 +34,7 @@
             <SolidColorBrush x:Key="BasSidebarBackgroundBrush" Color="#F3F3F3" />
             <SolidColorBrush x:Key="BasSettingsPageBackgroundBrush" Color="#F9F9F9" />
             <SolidColorBrush x:Key="BasSettingsCardBackgroundBrush" Color="#FFFFFF" />
+            <Color x:Key="BasSettingsCardColor">#FFFFFF</Color>
             <SolidColorBrush x:Key="BasSettingsCardBorderBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="BasSettingsControlBackgroundBrush" Color="#F5F5F5" />
             <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="#D9D9D9" />
@@ -86,6 +87,7 @@
             <SolidColorBrush x:Key="BasSidebarBackgroundBrush" Color="#202020" />
             <SolidColorBrush x:Key="BasSettingsPageBackgroundBrush" Color="#272727" />
             <SolidColorBrush x:Key="BasSettingsCardBackgroundBrush" Color="#323232" />
+            <Color x:Key="BasSettingsCardColor">#323232</Color>
             <SolidColorBrush x:Key="BasSettingsCardBorderBrush" Color="#323232" />
             <SolidColorBrush x:Key="BasSettingsControlBackgroundBrush" Color="#3E3E3E" />
             <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="#505050" />
@@ -132,6 +134,7 @@
             <SolidColorBrush x:Key="BasSidebarBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="BasSettingsPageBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="BasSettingsCardBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <StaticResource x:Key="BasSettingsCardColor" ResourceKey="SystemColorWindowColor" />
             <SolidColorBrush x:Key="BasSettingsCardBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="BasSettingsControlBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
@@ -317,6 +320,80 @@
         <Setter Property="MaxWidth" Value="240" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="BasSettingExpanderStyle" TargetType="Expander" BasedOn="{StaticResource DefaultExpanderStyle}">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="58" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="{ThemeResource BasSettingsCardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource BasSettingsCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="16,0,16,16" />
+    </Style>
+
+    <Style x:Key="BasColorPresetsStyle" TargetType="RadioButtons" BasedOn="{StaticResource DefaultRadioButtonsStyle}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButtons">
+                    <ItemsRepeater x:Name="InnerRepeater">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout Orientation="Horizontal" ItemsStretch="Fill"
+                                               MinItemWidth="28" MinItemHeight="28"
+                                               MinColumnSpacing="6" MinRowSpacing="6"
+                                               MaximumRowsOrColumns="6" />
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="BasColorSwatchStyle" TargetType="RadioButton" BasedOn="{StaticResource DefaultRadioButtonStyle}">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="SwatchRoot" Background="{TemplateBinding Background}" CornerRadius="5"
+                            BorderThickness="2" BorderBrush="Transparent">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="SwatchRoot.Opacity" Value="0.85" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="SwatchRoot.Opacity" Value="0.65" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="SwatchRoot.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="CheckStates">
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="SwatchRoot.BorderBrush" Value="{ThemeResource BasSettingsAccentBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Indeterminate" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="BasSegmentedRadioButtonsStyle" TargetType="RadioButtons" BasedOn="{StaticResource DefaultRadioButtonsStyle}">
@@ -525,6 +602,7 @@
     <!-- 设置子导航：更紧凑、次级文字色 -->
     <Style x:Key="BasSubNavRadioStyle" TargetType="RadioButton">
         <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Margin" Value="30,0,2,0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -536,9 +614,14 @@
                     <Grid x:Name="LayoutRoot" Background="Transparent" CornerRadius="4">
                         <Border x:Name="SelectionBackground" Background="Transparent" CornerRadius="4" />
                         <Border x:Name="SelectionIndicator" Width="3" Height="16" CornerRadius="2"
-                                HorizontalAlignment="Left" Background="{ThemeResource BasSettingsAccentBrush}" Opacity="0" />
+                                HorizontalAlignment="Left" Background="{ThemeResource BasSettingsAccentBrush}" Opacity="0"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="IndicatorScale" ScaleX="1" ScaleY="0.35" />
+                            </Border.RenderTransform>
+                        </Border>
                         <ContentPresenter x:Name="ContentPresenter"
-                                          Margin="13,0,12,0"
+                                          Margin="12,0,12,0"
                                           Content="{TemplateBinding Content}"
                                           ContentTemplate="{TemplateBinding ContentTemplate}"
                                           VerticalAlignment="Center" />
@@ -572,10 +655,16 @@
                                                                        Storyboard.TargetProperty="Background">
                                             <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource BasNavigationSelectedBrush}" />
                                         </ObjectAnimationUsingKeyFrames>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SelectionIndicator"
-                                                                       Storyboard.TargetProperty="Opacity">
-                                            <DiscreteObjectKeyFrame KeyTime="0" Value="1" />
-                                        </ObjectAnimationUsingKeyFrames>
+                                        <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1" Duration="0:0:0.15" />
+                                        <DoubleAnimation Storyboard.TargetName="IndicatorScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         To="1" Duration="0:0:0.22">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
                                                                        Storyboard.TargetProperty="Foreground">
                                             <DiscreteObjectKeyFrame KeyTime="0"
@@ -583,7 +672,16 @@
                                         </ObjectAnimationUsingKeyFrames>
                                     </Storyboard>
                                 </VisualState>
-                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Unchecked">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="IndicatorScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         To="0.35" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </VisualState>
                                 <VisualState x:Name="Indeterminate" />
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
