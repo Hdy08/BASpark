@@ -63,8 +63,17 @@ internal sealed class AppBackdrop : SystemBackdrop
             return;
         }
 
-        bool dark = _theme == ElementTheme.Dark;
-        _brush = _compositor.CreateColorBrush(dark ? DarkColor : LightColor);
-        target.SystemBackdrop = _brush;
+        // 设置系统背景可能被宿主拒绝（例如 XAML 岛不接受系统合成器画刷，返回“拒绝访问”）：
+        // 这种情况只应降级为无背景，绝不能把异常抛到主题变化等回调里。
+        try
+        {
+            bool dark = _theme == ElementTheme.Dark;
+            _brush = _compositor.CreateColorBrush(dark ? DarkColor : LightColor);
+            target.SystemBackdrop = _brush;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug($"System backdrop rejected by the host: {ex.Message}");
+        }
     }
 }

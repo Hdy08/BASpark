@@ -257,6 +257,21 @@ internal sealed class DcompPanelHost
                         Marshal.StructureToPtr(window, lParam, fDeleteOld: false);
                     }
                 }
+                else if (IsZoomed(hwnd) && GetWindowRect(hwnd, out RECT zoomed))
+                {
+                    // 最大化时窗口矩形比工作区各方向大一圈（约 9px 的不可见边框），
+                    // 客户区若照搬窗口矩形，内容会顶出工作区被裁掉。这里改用监视器工作区。
+                    IntPtr monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+                    var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                    if (monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref info))
+                    {
+                        Marshal.StructureToPtr(info.rcWork, lParam, fDeleteOld: false);
+                    }
+                    else
+                    {
+                        Marshal.StructureToPtr(zoomed, lParam, fDeleteOld: false);
+                    }
+                }
 
                 return IntPtr.Zero;
 
@@ -287,7 +302,7 @@ internal sealed class DcompPanelHost
 
             case WmClose:
                 // 关闭按钮 = 隐藏面板（应用继续驻留托盘）。
-                InstanceOf(hwnd)?.OnCloseRequested();
+                InstanceOf(hwnd)?.RequestClose();
                 return IntPtr.Zero;
 
             case WmDestroy:
@@ -322,11 +337,48 @@ internal sealed class DcompPanelHost
 
     private void OnWindowSizeChanged()
     {
+        UpdateXamlIslandBounds();
         UpdateNonClientRegions();
         SizeChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnCloseRequested() => CloseRequested?.Invoke(this, EventArgs.Empty);
+    /// <summary>
+    /// 让 XAML 岛跟随窗口客户区。
+    ///
+    /// <see cref="DesktopWindowXamlSource"/> 只在初始化时量一次尺寸，窗口后续的缩放
+    /// （居中、拖边、最大化）不会自动同步；不补这一步，界面会停在创建时的大小，
+    /// 右/下多出来的部分因为没有重定向表面而变成透明区（透出后面的窗口）。
+    /// </summary>
+    private void UpdateXamlIslandBounds()
+    {
+        if (_hwnd == IntPtr.Zero || !GetClientRect(_hwnd, out RECT client))
+        {
+            return;
+        }
+
+        int width = client.Right - client.Left;
+        int height = client.Bottom - client.Top;
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _xamlSource.SiteBridge.MoveAndResize(new RectInt32(0, 0, width, height));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"Failed to resize the XAML island: {ex.Message}");
+        }
+    }
+
+    /// <summary>关闭面板：隐藏窗口并通知调用方（应用继续驻留托盘，不销毁窗口）。</summary>
+    public void RequestClose()
+    {
+        Hide();
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     // ------------------------------------------------------------------
     // Win32 互操作
@@ -336,6 +388,9 @@ internal sealed class DcompPanelHost
     private const int SW_SHOW = 5;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
+
+    /// <summary>MONITOR_DEFAULTTONEAREST。</summary>
+    private const uint MonitorDefaultToNearest = 2;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
@@ -383,7 +438,8 @@ internal sealed class DcompPanelHost
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern ushort RegisterClassEx(ref WNDCLASSEX wc);
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    // 显式指定 W 版本入口点：中文标题经默认封送会被截成单个字符。
+    [DllImport("user32.dll", EntryPoint = "CreateWindowExW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateWindowEx(
         int exStyle, string className, string windowName, int style,
         int x, int y, int width, int height,
@@ -398,11 +454,32 @@ internal sealed class DcompPanelHost
     [DllImport("user32.dll")]
     private static extern IntPtr SetForegroundWindow(IntPtr hwnd);
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [DllImport("user32.dll", EntryPoint = "SetWindowTextW", CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string text);
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool IsZoomed(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetClientRect(IntPtr hwnd, out RECT rect);
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
