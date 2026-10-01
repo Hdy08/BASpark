@@ -423,15 +423,8 @@ public sealed partial class ControlPanelWindow : Window
     {
         Title = Localization.Get("App_Title_ControlPanel");
 
-        try
-        {
-            SystemBackdrop = new MicaBackdrop();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug($"Mica backdrop unavailable: {ex.Message}");
-        }
         RootGrid.RequestedTheme = App.ResolveElementTheme();
+        ApplySystemBackdrop();
 
         // 侧栏子导航的展开/收起：布局只改一次，「日志 / 关于」由独立平移动画让位，
         // 内容露出用合成器裁剪，整体按屏幕刷新率更新（不逐帧跑布局）。
@@ -493,6 +486,45 @@ public sealed partial class ControlPanelWindow : Window
         catch (Exception ex)
         {
             AppLogger.Warn($"Failed to size/center control panel: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 设置窗口背景：Windows 11 用原生 Mica；不支持时（如 Windows 10）用与页面底色
+    /// 一致的纯色 <see cref="AppBackdrop"/>。
+    ///
+    /// 纯色回退不只是观感问题：WinUI 3 的窗口内容在子窗口里，顶层窗口自身的表面是
+    /// 空的，而 DWM 做最小化/还原动画时合成的正是那一层 —— 没有背景时整窗是**纯黑**
+    /// （用户录屏确认：参照程序动画期间仍能看到界面，本程序是黑块）。挂上纯色背景后，
+    /// 动画期间显示的是应用底色，边框一带也不再透出桌面。
+    /// </summary>
+    private void ApplySystemBackdrop()
+    {
+        try
+        {
+            if (Microsoft.UI.Composition.SystemBackdrops.MicaController.IsSupported())
+            {
+                SystemBackdrop = new MicaBackdrop();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug($"Mica backdrop unavailable: {ex.Message}");
+        }
+
+        try
+        {
+            var backdrop = new AppBackdrop();
+            backdrop.SetTheme(RootGrid.ActualTheme);
+            SystemBackdrop = backdrop;
+
+            // 深浅色切换后同步底色。
+            RootGrid.ActualThemeChanged += (_, _) => backdrop.SetTheme(RootGrid.ActualTheme);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"Failed to apply the solid backdrop: {ex.Message}");
         }
     }
 
