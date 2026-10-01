@@ -228,24 +228,37 @@ internal sealed class OverlayWindow : IDisposable
 
             _host.Show();
 
-            _controller = await env.CreateCoreWebView2ControllerAsync(
-                CoreWebView2ControllerWindowReference.CreateFromWindowHandle((ulong)_host.Handle));
+            // 控制器创建是整个叠加层最脆弱的一步：用户数据目录里的损坏 profile
+            // 会让它以 E_INVALIDARG 失败，并且换环境对象也没用，必须换一个干净的
+            // 用户数据目录。这里做两级恢复，避免一次失败就永久没有特效。
+            if (!await TryAttachControllerAsync(env))
+            {
+                if (_isClosing)
+                {
+                    return;
+                }
+
+                AppLogger.Warn(
+                    $"WebView2 controller creation failed on '{_screenDeviceName}'; " +
+                    "retrying with a fresh user data folder.");
+                env = await WebView2EnvironmentHolder.ResetWithFreshUserDataFolderAsync();
+
+                if (_isClosing || !await TryAttachControllerAsync(env))
+                {
+                    if (!_isClosing)
+                    {
+                        throw new InvalidOperationException(
+                            "WebView2 控制器创建失败：使用全新用户数据目录重试后仍然失败。");
+                    }
+
+                    return;
+                }
+            }
 
             if (_isClosing)
             {
                 return;
             }
-
-            _controllerInitialized = true;
-
-            // 关键：默认背景透明，叠加层才能真正“透出”桌面。
-            _controller.DefaultBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
-            _controller.ShouldDetectMonitorScaleChanges = false;
-            _controller.RasterizationScale = _host.DpiScale;
-
-            NativeMethods.RECT bounds = GetScreenBounds();
-            _controller.Bounds = new Windows.Foundation.Rect(0, 0, bounds.Width, bounds.Height);
-            _controller.IsVisible = true;
 
             _host.TryGetWindowRect(out NativeMethods.RECT hostRect);
             AppLogger.Debug(
@@ -254,39 +267,106 @@ internal sealed class OverlayWindow : IDisposable
                 $"dpiScale={_host.DpiScale.ToString("F3", CultureInfo.InvariantCulture)}, " +
                 $"runtime={env.BrowserVersionString})");
 
-            CoreWebView2? coreWebView = _controller.CoreWebView2;
-            if (coreWebView == null)
-            {
-                throw new InvalidOperationException("WebView2 控制器未提供 CoreWebView2 实例。");
-            }
-
-            DetachCoreWebViewEvents();
-            _coreWebView = coreWebView;
-            coreWebView.Settings.IsZoomControlEnabled = false;
-            coreWebView.Settings.AreDefaultContextMenusEnabled = false;
-            coreWebView.Settings.IsStatusBarEnabled = false;
-
-            _processFailedHandler = OnWebViewProcessFailed;
-            _navigationStartingHandler = OnNavigationStarting;
-            _navigationCompletedHandler = OnNavigationCompleted;
-            _webMessageReceivedHandler = OnWebMessageReceived;
-            coreWebView.ProcessFailed += _processFailedHandler;
-            coreWebView.NavigationStarting += _navigationStartingHandler;
-            coreWebView.NavigationCompleted += _navigationCompletedHandler;
-            coreWebView.WebMessageReceived += _webMessageReceivedHandler;
-
-            _host.ApplyCaptureExclusion(_screenshotCompatibilityMode);
-
-            NavigateCurrentRenderer(coreWebView);
+            ConfigureController(env);
         }
         catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
         {
         }
         catch (Exception ex)
         {
-            AppLogger.Error($"显示器 '{_screenDeviceName}' 上的叠加层初始化失败。", ex);
+            AppLogger.Error(
+                $"显示器 '{_screenDeviceName}' 上的叠加层初始化失败。" +
+                $" (hwnd=0x{_host.Handle.ToInt64():X}, " +
+                $"hwndValid={NativeMethods.IsWindow(_host.Handle)}, " +
+                $"userData={WebView2EnvironmentHolder.UserDataFolder}, " +
+                $"hresult=0x{ex.HResult:X8})",
+                ex);
             App.ReportFatalWebViewFailure(Localization.Format("WebView2_InitFailed", ex.Message));
         }
+    }
+
+    /// <summary>
+    /// 尝试在宿主窗口上挂载 WebView2 控制器。失败时记录完整上下文并返回 false，
+    /// 由调用方决定是否换用户数据目录重试。
+    /// </summary>
+    private async Task<bool> TryAttachControllerAsync(CoreWebView2Environment env)
+    {
+        try
+        {
+            CoreWebView2Controller controller = await env.CreateCoreWebView2ControllerAsync(
+                CoreWebView2ControllerWindowReference.CreateFromWindowHandle((ulong)_host.Handle));
+
+            if (_isClosing)
+            {
+                try
+                {
+                    controller.Close();
+                }
+                catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+                {
+                }
+
+                return false;
+            }
+
+            _controller = controller;
+            _controllerInitialized = true;
+            return true;
+        }
+        catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn(
+                $"CreateCoreWebView2ControllerAsync failed on '{_screenDeviceName}': " +
+                $"{ex.GetType().Name}: {ex.Message} (hresult=0x{ex.HResult:X8}, " +
+                $"hwnd=0x{_host.Handle.ToInt64():X}, hwndValid={NativeMethods.IsWindow(_host.Handle)}, " +
+                $"hostVisible={_host.IsVisible}, dpiScale={_host.DpiScale.ToString("F3", CultureInfo.InvariantCulture)}, " +
+                $"userData={WebView2EnvironmentHolder.UserDataFolder})");
+            return false;
+        }
+    }
+
+    /// <summary>控制器挂载成功后的外观与事件装配。</summary>
+    private void ConfigureController(CoreWebView2Environment env)
+    {
+        _ = env;
+
+        // 关键：默认背景透明，叠加层才能真正“透出”桌面。
+        _controller!.DefaultBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+        _controller.ShouldDetectMonitorScaleChanges = false;
+        _controller.RasterizationScale = _host.DpiScale;
+
+        NativeMethods.RECT bounds = GetScreenBounds();
+        _controller.Bounds = new Windows.Foundation.Rect(0, 0, bounds.Width, bounds.Height);
+        _controller.IsVisible = true;
+
+        CoreWebView2? coreWebView = _controller.CoreWebView2;
+        if (coreWebView == null)
+        {
+            throw new InvalidOperationException("WebView2 控制器未提供 CoreWebView2 实例。");
+        }
+
+        DetachCoreWebViewEvents();
+        _coreWebView = coreWebView;
+        coreWebView.Settings.IsZoomControlEnabled = false;
+        coreWebView.Settings.AreDefaultContextMenusEnabled = false;
+        coreWebView.Settings.IsStatusBarEnabled = false;
+
+        _processFailedHandler = OnWebViewProcessFailed;
+        _navigationStartingHandler = OnNavigationStarting;
+        _navigationCompletedHandler = OnNavigationCompleted;
+        _webMessageReceivedHandler = OnWebMessageReceived;
+        coreWebView.ProcessFailed += _processFailedHandler;
+        coreWebView.NavigationStarting += _navigationStartingHandler;
+        coreWebView.NavigationCompleted += _navigationCompletedHandler;
+        coreWebView.WebMessageReceived += _webMessageReceivedHandler;
+
+        _host.ApplyCaptureExclusion(_screenshotCompatibilityMode);
+
+        NavigateCurrentRenderer(coreWebView);
     }
 
     private void NavigateCurrentRenderer(CoreWebView2 coreWebView)

@@ -376,6 +376,26 @@ public class WinUi3UiTests
         Assert.DoesNotContain("FromSeconds(2)", timeoutLine, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Overlay_RecoversFromControllerCreationFailure()
+    {
+        string overlaySource = ReadSource("src", "OverlayWindow.cs");
+        string holderSource = ReadSource("src", "WebView2EnvironmentHolder.cs");
+
+        // CreateCoreWebView2ControllerAsync 是叠加层最脆弱的一步：用户数据目录里的
+        // 损坏 profile 会让它以 E_INVALIDARG 失败，且重建环境对象无效，必须换用
+        // 干净的用户数据目录。缺少恢复路径时一次失败就永久没有特效。
+        Assert.Contains("TryAttachControllerAsync", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("ResetWithFreshUserDataFolderAsync", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("ResetWithFreshUserDataFolderAsync", holderSource, StringComparison.Ordinal);
+
+        // 失败时必须留下足以定位的上下文（句柄、句柄有效性、HRESULT、用户数据目录）。
+        Assert.Contains("hresult=", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("hwndValid=", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("userData=", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("NativeMethods.IsWindow(_host.Handle)", overlaySource, StringComparison.Ordinal);
+    }
+
     private static XDocument LoadXaml(params string[] pathParts) =>
         XDocument.Parse(ReadSource(pathParts), LoadOptions.SetLineInfo);
 
