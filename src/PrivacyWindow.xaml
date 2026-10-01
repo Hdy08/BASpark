@@ -13,11 +13,20 @@
     <Grid x:Name="RootGrid" Background="{ThemeResource BasPageBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
+        <!-- 使用 WinUI 原生 TitleBar 控件；窗口已 ExtendsContentIntoTitleBar，系统标题栏不再绘制。 -->
+        <TitleBar x:Name="AppTitleBar"
+                  Grid.Row="0"
+                  Title=""
+                  Subtitle=""
+                  IsBackButtonVisible="False"
+                  IsPaneToggleButtonVisible="False" />
+
+        <Border Grid.Row="1"
                 Background="{ThemeResource AccentFillColorDefaultBrush}"
                 Padding="24,22">
             <StackPanel Spacing="6">
@@ -47,7 +56,7 @@
             </StackPanel>
         </Border>
 
-        <ScrollViewer Grid.Row="1"
+        <ScrollViewer Grid.Row="2"
                       Margin="24,20,24,0"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="16" Margin="0,0,0,20">
@@ -88,7 +97,7 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 BorderBrush="{ThemeResource BasDividerBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="24,16">

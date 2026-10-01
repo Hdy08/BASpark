@@ -58,6 +58,10 @@
 
             <!-- 日志等只读代码区 -->
             <SolidColorBrush x:Key="BasCodeBackgroundBrush" Color="#FFF9F9F9" />
+
+            <!-- 模态遮罩：必须是明确的暗化层，不能依赖 SystemControl* 系统画刷
+                 （其深色取值接近不透明黑，会让遮罩后的主界面整片全黑）。 -->
+            <SolidColorBrush x:Key="BasModalScrimBrush" Color="#8C000000" />
         </ResourceDictionary>
 
         <!-- ============================ 深色 ============================ -->
@@ -90,6 +94,9 @@
             <SolidColorBrush x:Key="BasCautionBrush" Color="#FCE100" />
 
             <SolidColorBrush x:Key="BasCodeBackgroundBrush" Color="#FF1F1F1F" />
+
+            <!-- 模态遮罩：深色主题下同样使用半透明暗化，而非不透明黑。 -->
+            <SolidColorBrush x:Key="BasModalScrimBrush" Color="#B3000000" />
         </ResourceDictionary>
 
         <!-- ========================= 高对比度 ========================== -->
@@ -122,6 +129,9 @@
             <SolidColorBrush x:Key="BasCautionBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
 
             <SolidColorBrush x:Key="BasCodeBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+
+            <!-- 高对比度下不使用半透明遮罩。 -->
+            <SolidColorBrush x:Key="BasModalScrimBrush" Color="{ThemeResource SystemColorWindowColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -187,6 +197,19 @@
         <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
         <Setter Property="Padding" Value="{StaticResource BasCardPadding}" />
         <Setter Property="Margin" Value="{StaticResource BasCardMargin}" />
+    </Style>
+
+    <!--
+        模态卡片：必须不透明。页面里的分组卡片用的是带 alpha 的画刷（在 Mica 上
+        层次更细腻），但浮在内容之上的对话框若透出底下的文字会完全不可读。
+    -->
+    <Style x:Key="BasModalCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource BasLayerBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource BasControlStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
+        <Setter Property="Padding" Value="{StaticResource BasCardPadding}" />
+        <Setter Property="Margin" Value="0" />
     </Style>
 
     <!-- 设置区块之间的细分隔线 -->

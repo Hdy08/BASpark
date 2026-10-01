@@ -17,11 +17,20 @@
           Background="{ThemeResource BasPageBackgroundBrush}"
           KeyDown="RootGrid_KeyDown">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="18,16,18,14">
+        <!-- 使用 WinUI 原生 TitleBar 控件；窗口已 ExtendsContentIntoTitleBar，系统标题栏不再绘制。 -->
+        <TitleBar x:Name="AppTitleBar"
+                  Grid.Row="0"
+                  Title=""
+                  Subtitle=""
+                  IsBackButtonVisible="False"
+                  IsPaneToggleButtonVisible="False" />
+
+        <Grid Grid.Row="1" Margin="18,16,18,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -184,7 +193,7 @@
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="1"
+        <Border Grid.Row="2"
                 Background="{ThemeResource BasLayerBrush}"
                 BorderBrush="{ThemeResource BasDividerBrush}"
                 BorderThickness="0,1,0,0">

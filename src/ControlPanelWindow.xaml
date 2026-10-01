@@ -8,6 +8,22 @@
     mc:Ignorable="d">
 
     <Grid x:Name="RootGrid" Background="{ThemeResource BasPageBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== 原生标题栏 ==================== -->
+        <!-- 使用 WinUI 原生 TitleBar 控件；窗口已 ExtendsContentIntoTitleBar，
+             系统标题栏不再绘制。 -->
+        <TitleBar x:Name="AppTitleBar"
+                  Grid.Row="0"
+                  Title=""
+                  Subtitle=""
+                  IsBackButtonVisible="False"
+                  IsPaneToggleButtonVisible="False" />
+
+        <Grid Grid.Row="1">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="212" />
             <ColumnDefinition Width="*" />
@@ -16,80 +32,103 @@
         <!-- ==================== 侧边栏 ==================== -->
         <Grid x:Name="Sidebar" Grid.Column="0" Background="{ThemeResource BasSidebarBackgroundBrush}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- 自定义背景图铺在最底层 -->
-            <Border x:Name="SidebarBackgroundHost" Grid.RowSpan="3" />
+            <Border x:Name="SidebarBackgroundHost" Grid.RowSpan="2" />
 
-            <StackPanel Grid.Row="0" Margin="12,20,12,8" Spacing="16">
-                <TextBlock Text="✨ BASpark"
-                           FontSize="{StaticResource BasFontSizeSubtitle}"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Center"
-                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-
+            <!--
+                所有主标签放在同一个 StackPanel 内，子导航作为「设置」的直接后继。
+                这样折叠时不会在「设置」与「日志」之间留下跨容器的固定间距。
+            -->
+            <ScrollViewer Grid.Row="0"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="8,12,8,8">
                 <StackPanel Spacing="2">
                     <RadioButton x:Name="TabWelcome"
-                                 Content=""
                                  GroupName="MainNav"
                                  IsChecked="True"
                                  Style="{StaticResource BasNavRadioStyle}"
-                                 Click="Tab_Click" />
+                                 Click="Tab_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <FontIcon Glyph="&#xE80F;" FontSize="16" />
+                            <TextBlock x:Name="TabWelcomeLabel" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+
                     <RadioButton x:Name="TabSettings"
-                                 Content=""
                                  GroupName="MainNav"
                                  Style="{StaticResource BasNavRadioStyle}"
-                                 Click="Tab_Click" />
-                </StackPanel>
+                                 Click="Tab_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <FontIcon Glyph="&#xE713;" FontSize="16" />
+                            <TextBlock x:Name="TabSettingsLabel" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
 
-                <!-- 设置子导航 -->
-                <StackPanel x:Name="SettingsSubNav" Margin="16,0,0,0" Spacing="2">
-                    <RadioButton x:Name="SubTabBasic"
-                                 Content=""
-                                 GroupName="SettingsNav"
-                                 IsChecked="True"
-                                 Style="{StaticResource BasSubNavRadioStyle}"
-                                 Click="SubTab_Click" />
-                    <RadioButton x:Name="SubTabVisual"
-                                 Content=""
-                                 GroupName="SettingsNav"
-                                 Style="{StaticResource BasSubNavRadioStyle}"
-                                 Click="SubTab_Click" />
-                    <RadioButton x:Name="SubTabFilter"
-                                 Content=""
-                                 GroupName="SettingsNav"
-                                 Style="{StaticResource BasSubNavRadioStyle}"
-                                 Click="SubTab_Click" />
-                    <RadioButton x:Name="SubTabMultiScreen"
-                                 Content=""
-                                 GroupName="SettingsNav"
-                                 Style="{StaticResource BasSubNavRadioStyle}"
-                                 Click="SubTab_Click" />
-                    <RadioButton x:Name="SubTabMore"
-                                 Content=""
-                                 GroupName="SettingsNav"
-                                 Style="{StaticResource BasSubNavRadioStyle}"
-                                 Click="SubTab_Click" />
-                </StackPanel>
+                    <!--
+                        设置子导航：展开/收起用原生 ExpandDirection 过渡
+                        （EntranceThemeTransition / ExitThemeTransition）+ 位移，
+                        由 code-behind 的 AnimatedSubNav 驱动。
+                    -->
+                    <Border x:Name="SettingsSubNavHost"
+                            Margin="0,2,0,2"
+                            VerticalAlignment="Top"
+                            IsHitTestVisible="False">
+                        <StackPanel x:Name="SettingsSubNav" Spacing="2">
+                            <RadioButton x:Name="SubTabBasic"
+                                         GroupName="SettingsNav"
+                                         IsChecked="True"
+                                         Style="{StaticResource BasSubNavRadioStyle}"
+                                         Click="SubTab_Click">
+                                <TextBlock x:Name="SubTabBasicLabel" />
+                            </RadioButton>
+                            <RadioButton x:Name="SubTabVisual"
+                                         GroupName="SettingsNav"
+                                         Style="{StaticResource BasSubNavRadioStyle}"
+                                         Click="SubTab_Click">
+                                <TextBlock x:Name="SubTabVisualLabel" />
+                            </RadioButton>
+                            <RadioButton x:Name="SubTabFilter"
+                                         GroupName="SettingsNav"
+                                         Style="{StaticResource BasSubNavRadioStyle}"
+                                         Click="SubTab_Click">
+                                <TextBlock x:Name="SubTabFilterLabel" />
+                            </RadioButton>
+                            <RadioButton x:Name="SubTabMultiScreen"
+                                         GroupName="SettingsNav"
+                                         Style="{StaticResource BasSubNavRadioStyle}"
+                                         Click="SubTab_Click">
+                                <TextBlock x:Name="SubTabMultiScreenLabel" />
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
 
-                <StackPanel Spacing="2">
                     <RadioButton x:Name="TabLog"
-                                 Content=""
                                  GroupName="MainNav"
                                  Style="{StaticResource BasNavRadioStyle}"
-                                 Click="Tab_Click" />
-                    <RadioButton x:Name="TabAbout"
-                                 Content=""
-                                 GroupName="MainNav"
-                                 Style="{StaticResource BasNavRadioStyle}"
-                                 Click="Tab_Click" />
-                </StackPanel>
-            </StackPanel>
+                                 Click="Tab_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <FontIcon Glyph="&#xE9D9;" FontSize="16" />
+                            <TextBlock x:Name="TabLogLabel" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
 
-            <StackPanel Grid.Row="2" Margin="12,8,12,14" Spacing="2">
+                    <RadioButton x:Name="TabAbout"
+                                 GroupName="MainNav"
+                                 Style="{StaticResource BasNavRadioStyle}"
+                                 Click="Tab_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <FontIcon Glyph="&#xE946;" FontSize="16" />
+                            <TextBlock x:Name="TabAboutLabel" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="1" Margin="12,8,12,14" Spacing="2">
                 <TextBlock x:Name="TxtSidebarVersion"
                            Text="BASpark"
                            FontSize="{StaticResource BasFontSizeCaption}"
@@ -759,37 +798,7 @@
                             </Border>
                         </StackPanel>
 
-                        <!-- ===== 更多设置 ===== -->
-                        <StackPanel x:Name="SectionMore" Visibility="Collapsed">
-                            <Border Style="{StaticResource BasCardStyle}">
-                                <StackPanel>
-                                    <TextBlock x:Name="TxtMoreTitle"
-                                               Text=""
-                                               Style="{StaticResource BasSectionTitleStyle}" />
-
-                                    <TextBlock x:Name="TxtSidebarBackground"
-                                               Text=""
-                                               Margin="0,16,0,6"
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <TextBlock x:Name="TxtSidebarBackgroundPath"
-                                               Text="—"
-                                               TextTrimming="CharacterEllipsis"
-                                               Foreground="{ThemeResource BasTextSecondaryBrush}" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
-                                        <Button x:Name="BtnBrowseSidebarBackground"
-                                                Content=""
-                                                Click="BrowseSidebarBackground_Click" />
-                                        <Button x:Name="BtnClearSidebarBackground"
-                                                Content=""
-                                                Click="ClearSidebarBackground_Click" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="TxtSidebarBackgroundHint"
-                                               Text=""
-                                               Margin="0,10,0,0"
-                                               Style="{StaticResource BasCaptionStyle}" />
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                        <!-- 「更多设置」已移除：仅有的侧边栏背景图功能不再提供。 -->
 
                     </StackPanel>
                 </ScrollViewer>
@@ -935,8 +944,8 @@
         <Grid x:Name="RunningProcessOverlay"
               Grid.ColumnSpan="2"
               Visibility="Collapsed"
-              Background="{ThemeResource SystemControlBackgroundAltHighBrush}">
-            <Border Style="{StaticResource BasCardStyle}"
+              Background="{ThemeResource BasModalScrimBrush}">
+            <Border Style="{StaticResource BasModalCardStyle}"
                     Width="420"
                     MaxHeight="520"
                     Margin="0"
@@ -980,8 +989,8 @@
         <Grid x:Name="VisualResetOverlay"
               Grid.ColumnSpan="2"
               Visibility="Collapsed"
-              Background="{ThemeResource SystemControlBackgroundAltHighBrush}">
-            <Border Style="{StaticResource BasCardStyle}"
+              Background="{ThemeResource BasModalScrimBrush}">
+            <Border Style="{StaticResource BasModalCardStyle}"
                     Width="420"
                     MaxHeight="560"
                     Margin="0"
@@ -1024,8 +1033,8 @@
         <Grid x:Name="RenameProfileOverlay"
               Grid.ColumnSpan="2"
               Visibility="Collapsed"
-              Background="{ThemeResource SystemControlBackgroundAltHighBrush}">
-            <Border Style="{StaticResource BasCardStyle}"
+              Background="{ThemeResource BasModalScrimBrush}">
+            <Border Style="{StaticResource BasModalCardStyle}"
                     Width="380"
                     Margin="0"
                     HorizontalAlignment="Center"
@@ -1052,5 +1061,6 @@
             </Border>
         </Grid>
 
+        </Grid>
     </Grid>
 </Window>

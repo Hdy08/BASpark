@@ -20,7 +20,7 @@ public partial class ColorPickerWindow : Window
 {
     /// <summary>设计尺寸（有效像素），实际尺寸按目标显示器 DPI 缩放。</summary>
     private const int DesignWidth = 420;
-    private const int DesignHeight = 520;
+    private const int DesignHeight = 568;
 
     private readonly TaskCompletionSource<Color?> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -32,12 +32,16 @@ public partial class ColorPickerWindow : Window
     private bool _confirmFocusTransition;
     private bool _updatingControls;
     private bool _closed;
+    private bool _titleBarApplied;
 
     public Color SelectedColor { get; private set; }
 
     public ColorPickerWindow(Color initialColor)
     {
         InitializeComponent();
+
+        // 去掉系统标题栏、改用原生 TitleBar 控件；必须在视觉树加载后执行。
+        RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
 
         SelectedColor = Color.FromArgb(255, initialColor.R, initialColor.G, initialColor.B);
         _hsv = ColorPickerColorMath.RgbToHsv(SelectedColor);
@@ -92,6 +96,7 @@ public partial class ColorPickerWindow : Window
     private void ApplyLocalizedText()
     {
         Title = Localization.Get("ColorPicker_Title");
+        AppTitleBar.Title = Localization.Get("ColorPicker_Title");
         LblHueSaturation.Text = Localization.Get("ColorPicker_HueSaturation");
         LblBrightness.Text = Localization.Get("ColorPicker_Brightness");
         LblPreview.Text = Localization.Get("ColorPicker_Preview");
@@ -115,6 +120,37 @@ public partial class ColorPickerWindow : Window
         // 方法组直接当 WinRT 委托传会在 CsWinRT 封送时抛 InvalidCastException，
         // 因此统一用 lambda 包装。
         App.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => UpdateColorFieldMarker());
+    }
+
+    /// <summary>
+    /// 去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
+    ///
+    /// 两个必须遵守的约束（已在 ControlPanelWindow 上实测）：
+    ///   1. 只设置 <c>ExtendsContentIntoTitleBar</c>，**不要**再调用
+    ///      <c>SetTitleBar(AppTitleBar)</c>。SetTitleBar 只适用于普通 UIElement
+    ///      拖拽区域；对 TitleBar 控件调用会抛 E_BOUNDS（0x800f1000），异常在
+    ///      Microsoft.UI.Xaml.dll 内未被捕获，进程直接崩溃。
+    ///   2. 必须在视觉树加载后调用；构造函数里执行会抛 E_INVALIDARG 并导致
+    ///      窗口构造失败、界面完全不出现。
+    /// </summary>
+    private void ApplyCustomTitleBar()
+    {
+        if (_titleBarApplied)
+        {
+            return;
+        }
+
+        _titleBarApplied = true;
+
+        try
+        {
+            ExtendsContentIntoTitleBar = true;
+        }
+        catch (Exception ex)
+        {
+            // 失败时回退到系统标题栏，功能不受影响。
+            AppLogger.Warn($"Failed to extend content into the title bar: {ex.Message}");
+        }
     }
 
     /// <summary>

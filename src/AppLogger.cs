@@ -103,6 +103,7 @@ namespace BASpark
                 }
 
                 System.Diagnostics.Debug.WriteLine(line);
+                WriteToFile(line);
                 EntryAdded?.Invoke(line);
             }
             finally
@@ -111,8 +112,56 @@ namespace BASpark
             }
         }
 
-        private static string Sanitize(string value)
+        /// <summary>
+        /// 把日志落到磁盘。仅内存日志在排查启动失败时毫无用处——窗口起不来时
+        /// 用户看不到日志页，进程一退日志就没了。
+        /// 写入失败必须静默，日志本身不能再引发崩溃。
+        /// </summary>
+        private static void WriteToFile(string line)
         {
+            try
+            {
+                string path = LogFilePath;
+                lock (FileLock)
+                {
+                    // 超过 1 MB 时截断，避免长期运行无限增长。
+                    var info = new FileInfo(path);
+                    if (info.Exists && info.Length > 1024 * 1024)
+                    {
+                        File.Delete(path);
+                    }
+
+                    File.AppendAllText(path, line + Environment.NewLine, Encoding.UTF8);
+                }
+            }
+            catch
+            {
+                // 日志写入失败不影响程序运行。
+            }
+        }
+
+        private static readonly object FileLock = new();
+
+        private static string? _logFilePath;
+
+        public static string LogFilePath
+        {
+            get
+            {
+                if (_logFilePath == null)
+                {
+                    string directory = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "BASpark");
+                    Directory.CreateDirectory(directory);
+                    _logFilePath = Path.Combine(directory, "baspark.log");
+                }
+
+                return _logFilePath;
+            }
+        }
+
+        private static string Sanitize(string value)        {
             if (string.IsNullOrWhiteSpace(value))
             {
                 return string.Empty;

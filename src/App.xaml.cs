@@ -70,6 +70,11 @@ public partial class App : Application
         ConfigManager.Load();
         AppLogger.Initialize();
 
+        // 控制面板是判断「界面是否可用」的主要信号，构建失败必须留下记录。
+        AppLogger.Info(
+            $"BASpark starting (pid={Environment.ProcessId}, " +
+            $"startSilent={ConfigManager.StartSilent}, darkMode={ConfigManager.DarkMode}).");
+
         if (string.IsNullOrWhiteSpace(ConfigManager.UiLanguage))
         {
             if (!ConfigManager.AgreedToPrivacy)
@@ -153,15 +158,28 @@ public partial class App : Application
         {
             if (_controlPanel == null)
             {
-                _controlPanel = new ControlPanelWindow();
-                _controlPanel.Closed += (_, _) => _controlPanel = null;
-                WindowChrome.ApplyAppIcon(_controlPanel);
-                _controlPanel.Activate();
+                try
+                {
+                    _controlPanel = new ControlPanelWindow();
+                    _controlPanel.Closed += (_, _) => _controlPanel = null;
+                    WindowChrome.ApplyAppIcon(_controlPanel);
+                    _controlPanel.Activate();
 
-                // 标题栏主题需要在窗口建立后才可设置（Win10 走 DWM 回退路径）。
-                WindowChrome.ApplyTitleBarTheme(
-                    _controlPanel,
-                    IsEffectiveDarkMode());
+                    // 标题栏主题需要在窗口建立后才可设置（Win10 走 DWM 回退路径）。
+                    WindowChrome.ApplyTitleBarTheme(
+                        _controlPanel,
+                        IsEffectiveDarkMode());
+                }
+                catch (Exception ex)
+                {
+                    // 控制面板构造/显示失败时不能让异常逃逸（会静默吞掉且界面缺失）。
+                    AppLogger.Error("控制面板创建失败。", ex);
+                    _controlPanel = null;
+                    NativeMessageBox.Show(
+                        Localization.Format("WebView2_InitFailed", ex.Message),
+                        Localization.Get("Msg_Error"),
+                        isError: true);
+                }
             }
             else
             {

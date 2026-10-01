@@ -13,11 +13,20 @@
     <Grid x:Name="RootGrid" Background="{ThemeResource BasPageBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
+        <!-- 使用 WinUI 原生 TitleBar 控件；窗口已 ExtendsContentIntoTitleBar，系统标题栏不再绘制。 -->
+        <TitleBar x:Name="AppTitleBar"
+                  Grid.Row="0"
+                  Title=""
+                  Subtitle=""
+                  IsBackButtonVisible="False"
+                  IsPaneToggleButtonVisible="False" />
+
+        <Border Grid.Row="1"
                 Background="{ThemeResource AccentFillColorDefaultBrush}"
                 Padding="24,22">
             <StackPanel Spacing="8">
@@ -33,7 +42,7 @@
             </StackPanel>
         </Border>
 
-        <StackPanel Grid.Row="1" Margin="32,20,32,0" Spacing="6">
+        <StackPanel Grid.Row="2" Margin="32,20,32,0" Spacing="6">
             <RadioButton x:Name="RadioChinese"
                          GroupName="Lang"
                          Tag="zh-CN"
@@ -54,7 +63,7 @@
                          Checked="LangOption_Checked" />
         </StackPanel>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 BorderBrush="{ThemeResource BasDividerBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="24,14">

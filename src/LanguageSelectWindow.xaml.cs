@@ -11,7 +11,7 @@ namespace BASpark;
 public partial class LanguageSelectWindow : Window
 {
     private const int DesignWidth = 460;
-    private const int DesignHeight = 420;
+    private const int DesignHeight = 468;
 
     private readonly TaskCompletionSource<string?> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -19,6 +19,7 @@ public partial class LanguageSelectWindow : Window
     private readonly string _displayCulture;
 
     private bool _closed;
+    private bool _titleBarApplied;
 
     /// <summary>构造期间（默认选中项）不切换全局语言，只有用户勾选才预览。</summary>
     private bool _initializing = true;
@@ -31,7 +32,11 @@ public partial class LanguageSelectWindow : Window
         _displayCulture = Localization.DetectCultureFromSystem();
         InitializeComponent();
 
+        // 去掉系统标题栏、改用原生 TitleBar 控件；必须在视觉树加载后执行。
+        RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
+
         Title = Localization.Get("LangSelect_Title", _displayCulture);
+        AppTitleBar.Title = Localization.Get("LangSelect_Title", _displayCulture);
         ApplyLanguageText(_displayCulture);
 
         if (Content is FrameworkElement root)
@@ -79,6 +84,7 @@ public partial class LanguageSelectWindow : Window
     private void ApplyLanguageText(string cultureName)
     {
         Title = Localization.Get("LangSelect_Title", cultureName);
+        AppTitleBar.Title = Localization.Get("LangSelect_Title", cultureName);
         TxtTitle.Text = Localization.Get("LangSelect_Title", cultureName);
         TxtSubtitle.Text = Localization.Get("LangSelect_Subtitle", cultureName);
         RadioChinese.Content = Localization.Get("LangSelect_Chinese", cultureName);
@@ -162,6 +168,37 @@ public partial class LanguageSelectWindow : Window
         _ = args;
         _closed = true;
         _completion.TrySetResult(null);
+    }
+
+    /// <summary>
+    /// 去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
+    ///
+    /// 两个必须遵守的约束（已在 ControlPanelWindow 上实测）：
+    ///   1. 只设置 <c>ExtendsContentIntoTitleBar</c>，**不要**再调用
+    ///      <c>SetTitleBar(AppTitleBar)</c>。SetTitleBar 只适用于普通 UIElement
+    ///      拖拽区域；对 TitleBar 控件调用会抛 E_BOUNDS（0x800f1000），异常在
+    ///      Microsoft.UI.Xaml.dll 内未被捕获，进程直接崩溃。
+    ///   2. 必须在视觉树加载后调用；构造函数里执行会抛 E_INVALIDARG 并导致
+    ///      窗口构造失败、界面完全不出现。
+    /// </summary>
+    private void ApplyCustomTitleBar()
+    {
+        if (_titleBarApplied)
+        {
+            return;
+        }
+
+        _titleBarApplied = true;
+
+        try
+        {
+            ExtendsContentIntoTitleBar = true;
+        }
+        catch (Exception ex)
+        {
+            // 失败时回退到系统标题栏，功能不受影响。
+            AppLogger.Warn($"Failed to extend content into the title bar: {ex.Message}");
+        }
     }
 
     /// <summary>

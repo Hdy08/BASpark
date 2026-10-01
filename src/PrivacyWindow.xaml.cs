@@ -11,12 +11,13 @@ namespace BASpark;
 public partial class PrivacyWindow : Window
 {
     private const int DesignWidth = 500;
-    private const int DesignHeight = 660;
+    private const int DesignHeight = 708;
 
     private readonly TaskCompletionSource<bool> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private bool _closed;
+    private bool _titleBarApplied;
 
     /// <summary>用户点“同意”后为 true；拒绝或直接关闭为 false。</summary>
     public bool Agreed { get; private set; }
@@ -24,6 +25,9 @@ public partial class PrivacyWindow : Window
     public PrivacyWindow()
     {
         InitializeComponent();
+
+        // 去掉系统标题栏、改用原生 TitleBar 控件；必须在视觉树加载后执行。
+        RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
 
         ApplyLocalizedText();
 
@@ -71,6 +75,7 @@ public partial class PrivacyWindow : Window
     private void ApplyLocalizedText()
     {
         Title = Localization.Get("Privacy_Title");
+        AppTitleBar.Title = Localization.Get("Privacy_Title");
         TxtTagline.Text = Localization.Get("Privacy_Tagline");
         TxtIntro.Text = Localization.Get("Privacy_Intro");
         TxtOpenSourceTitle.Text = Localization.Get("Privacy_OpenSource_Title");
@@ -153,6 +158,37 @@ public partial class PrivacyWindow : Window
         _ = args;
         _closed = true;
         _completion.TrySetResult(false);
+    }
+
+    /// <summary>
+    /// 去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
+    ///
+    /// 两个必须遵守的约束（已在 ControlPanelWindow 上实测）：
+    ///   1. 只设置 <c>ExtendsContentIntoTitleBar</c>，**不要**再调用
+    ///      <c>SetTitleBar(AppTitleBar)</c>。SetTitleBar 只适用于普通 UIElement
+    ///      拖拽区域；对 TitleBar 控件调用会抛 E_BOUNDS（0x800f1000），异常在
+    ///      Microsoft.UI.Xaml.dll 内未被捕获，进程直接崩溃。
+    ///   2. 必须在视觉树加载后调用；构造函数里执行会抛 E_INVALIDARG 并导致
+    ///      窗口构造失败、界面完全不出现。
+    /// </summary>
+    private void ApplyCustomTitleBar()
+    {
+        if (_titleBarApplied)
+        {
+            return;
+        }
+
+        _titleBarApplied = true;
+
+        try
+        {
+            ExtendsContentIntoTitleBar = true;
+        }
+        catch (Exception ex)
+        {
+            // 失败时回退到系统标题栏，功能不受影响。
+            AppLogger.Warn($"Failed to extend content into the title bar: {ex.Message}");
+        }
     }
 
     /// <summary>

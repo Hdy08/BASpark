@@ -269,19 +269,33 @@ public class WinUi3UiTests
         Assert.Contains("void ApplyLocalizedText()", source, StringComparison.Ordinal);
 
         // 空文案的具名元素必须在代码里被赋值，否则界面上会出现空白按钮。
-        string[] mustBeFilled =
+        string[] mustBeFilledWithContent =
         [
-            "TabWelcome", "TabSettings", "TabLog", "TabAbout",
-            "SubTabBasic", "SubTabVisual", "SubTabFilter", "SubTabMultiScreen", "SubTabMore",
             "BtnApplySettings", "BtnPickColor", "BtnVisualReset", "BtnClearLog", "BtnCheckUpdate",
             "BtnOfficialSite", "BtnGithub", "BtnBilibili", "BtnQQ", "BtnDiscord", "BtnSponsor",
             "BtnResetAll", "BtnRefreshScreens", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile",
         ];
 
-        foreach (string name in mustBeFilled)
+        foreach (string name in mustBeFilledWithContent)
         {
             Assert.Contains(name + ".Content", source, StringComparison.Ordinal);
         }
+
+        // 侧边栏导航项带原生图标，文案写在内部 TextBlock 上（不再是 RadioButton.Content），
+        // 因此断言的是对应的 Label 元素被赋值。
+        string[] navLabels =
+        [
+            "TabWelcomeLabel", "TabSettingsLabel", "TabLogLabel", "TabAboutLabel",
+            "SubTabBasicLabel", "SubTabVisualLabel", "SubTabFilterLabel", "SubTabMultiScreenLabel",
+        ];
+
+        foreach (string name in navLabels)
+        {
+            Assert.Contains(name + ".Text", source, StringComparison.Ordinal);
+        }
+
+        // 导航项必须真的有图标，否则「加图标」这项需求会静默退化。
+        Assert.Contains("<FontIcon", xaml, StringComparison.Ordinal);
     }
 
     [Fact]

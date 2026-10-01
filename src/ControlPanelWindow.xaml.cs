@@ -16,6 +16,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Text;
 using Microsoft.Win32;
 using Windows.Storage;
@@ -80,10 +81,116 @@ public class ScreenOptionItem
 public sealed partial class ControlPanelWindow : Window
 {
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BASparkClient/1.0";
-    private const string PathPlaceholder = "\u2014"; // "—"，与 XAML 里的占位文本一致
-
     private const uint MonitorDefaultToNearest = 2;
     private const int MdtEffectiveDpi = 0;
+
+    /// <summary>
+    /// 侧边栏设置子导航的展开/收起动画。
+    /// 用 WinUI 原生 EntranceThemeTransition / ExitThemeTransition 驱动高度，
+    /// 配合位移与淡入淡出，无需自绘。
+    /// </summary>
+    private sealed class AnimatedSubNav
+    {
+        private readonly Border _host;
+        private readonly StackPanel _panel;
+        private readonly TranslateTransform _shift;
+        private readonly DoubleAnimation _expandAnimation;
+        private readonly DoubleAnimation _collapseAnimation;
+        private readonly DoubleAnimation _shiftExpandAnimation;
+        private readonly DoubleAnimation _shiftCollapseAnimation;
+
+        private readonly Duration _duration = new(TimeSpan.FromMilliseconds(200));
+
+        public AnimatedSubNav(Border host, StackPanel panel, TranslateTransform shift)
+        {
+            _host = host;
+            _panel = panel;
+            _shift = shift;
+
+            var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+            // 高度从 0 动画到元素自然高度。注意不能给 Border.Height 直接赋 0/NaN
+            // （会抛 E_INVALIDARG），初始收起只靠 Visibility 实现。
+            _expandAnimation = new DoubleAnimation
+            {
+                From = 0,
+                Duration = _duration,
+                EasingFunction = easing
+            };
+            Storyboard.SetTarget(_expandAnimation, _host);
+            Storyboard.SetTargetProperty(_expandAnimation, "Height");
+
+            _collapseAnimation = new DoubleAnimation
+            {
+                To = 0,
+                Duration = _duration,
+                EasingFunction = easing
+            };
+            Storyboard.SetTarget(_collapseAnimation, _host);
+            Storyboard.SetTargetProperty(_collapseAnimation, "Height");
+
+            _shiftExpandAnimation = new DoubleAnimation
+            {
+                From = -8,
+                To = 0,
+                Duration = _duration,
+                EasingFunction = easing
+            };
+            Storyboard.SetTarget(_shiftExpandAnimation, _shift);
+            Storyboard.SetTargetProperty(_shiftExpandAnimation, "Y");
+
+            _shiftCollapseAnimation = new DoubleAnimation
+            {
+                From = 0,
+                To = -8,
+                Duration = _duration,
+                EasingFunction = easing
+            };
+            Storyboard.SetTarget(_shiftCollapseAnimation, _shift);
+            Storyboard.SetTargetProperty(_shiftCollapseAnimation, "Y");
+
+            // 初始为收起状态。
+            _panel.Opacity = 0;
+            _host.Visibility = Visibility.Collapsed;
+            _host.IsHitTestVisible = false;
+        }
+
+        public void SetExpanded(bool expanded)
+        {
+            if (_expanded == expanded)
+            {
+                return;
+            }
+
+            _expanded = expanded;
+            _host.Visibility = Visibility.Visible;
+            _host.IsHitTestVisible = expanded;
+
+            var storyboard = new Storyboard();
+            storyboard.Children.Add(expanded ? _expandAnimation : _collapseAnimation);
+            storyboard.Children.Add(expanded ? _shiftExpandAnimation : _shiftCollapseAnimation);
+            storyboard.Completed += (_, _) =>
+            {
+                // 收起完成后彻底移出布局，避免残留占位。
+                _panel.Opacity = expanded ? 1 : 0;
+                if (!expanded)
+                {
+                    _host.Height = double.NaN;
+                    _host.Visibility = Visibility.Collapsed;
+                }
+            };
+            storyboard.Begin();
+
+            if (expanded)
+            {
+                _panel.Opacity = 1;
+            }
+        }
+
+        private bool _expanded;
+    }
+
+    private AnimatedSubNav? _subNav;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -164,7 +271,6 @@ public sealed partial class ControlPanelWindow : Window
         Closed += ControlPanelWindow_Closed;
         RootGrid.Loaded += RootGrid_Loaded;
 
-        _ = ApplySidebarBackgroundAsync(ConfigManager.SidebarBackgroundImagePath);
         _ = LoadRemoteNoticeAsync(isManual: false);
         _ = CheckForUpdates(isManual: false);
 
@@ -200,8 +306,25 @@ public sealed partial class ControlPanelWindow : Window
         {
             AppLogger.Debug($"Mica backdrop unavailable: {ex.Message}");
         }
-
         RootGrid.RequestedTheme = App.ResolveElementTheme();
+
+        // 侧边栏子导航的展开/收起动画（原生主题过渡驱动）。
+        // TranslateTransform 在代码里创建：XAML 里把 x:Name 放在 RenderTransform
+        // 内部的 TranslateTransform 上，WinUI 不会为该实例生成字段。
+        var subNavShift = new TranslateTransform();
+        SettingsSubNav.RenderTransform = subNavShift;
+        _subNav = new AnimatedSubNav(SettingsSubNavHost, SettingsSubNav, subNavShift);
+
+        // 页面切换动画需要在不透明变换上做位移。
+        foreach (FrameworkElement page in new FrameworkElement[] { PageWelcome, PageSettings, PageLog, PageAbout })
+        {
+            page.RenderTransform = new TranslateTransform();
+        }
+
+        // 去掉系统标题栏、改用原生 TitleBar 控件。
+        // 注意：SetTitleBar 必须在视觉树加载完成后调用，否则会抛 E_INVALIDARG
+        // （Value does not fall within the expected range），导致整个窗口构造失败。
+        RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
 
         AppWindow? appWindow = AppWindow;
         if (appWindow == null)
@@ -232,6 +355,39 @@ public sealed partial class ControlPanelWindow : Window
             AppLogger.Warn($"Failed to size/center control panel: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// 去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
+    ///
+    /// 两个必须遵守的约束：
+    ///   1. 只设置 <c>ExtendsContentIntoTitleBar</c>，**不要**再调用
+    ///      <c>SetTitleBar(AppTitleBar)</c>。SetTitleBar 只适用于普通 UIElement
+    ///      拖拽区域；对 TitleBar 控件调用会抛 E_BOUNDS（0x800f1000），异常在
+    ///      Microsoft.UI.Xaml.dll 内未被捕获，进程直接崩溃退出。
+    ///   2. 必须在视觉树加载后调用；构造函数里执行会抛 E_INVALIDARG 并导致
+    ///      窗口构造失败、界面完全不出现。
+    /// </summary>
+    private void ApplyCustomTitleBar()
+    {
+        if (_titleBarApplied)
+        {
+            return;
+        }
+
+        _titleBarApplied = true;
+
+        try
+        {
+            ExtendsContentIntoTitleBar = true;
+        }
+        catch (Exception ex)
+        {
+            // 失败时回退到系统标题栏，功能不受影响。
+            AppLogger.Warn($"Failed to extend content into the title bar: {ex.Message}");
+        }
+    }
+
+    private bool _titleBarApplied;
 
     private double GetWindowDpiScale()
     {
@@ -461,15 +617,16 @@ public sealed partial class ControlPanelWindow : Window
     /// </summary>
     private void ApplyLocalizedText()
     {
-        TabWelcome.Content = Localization.Get("Nav_Home");
-        TabSettings.Content = Localization.Get("Nav_Settings");
-        SubTabBasic.Content = Localization.Get("Nav_Basic");
-        SubTabVisual.Content = Localization.Get("Nav_Visual");
-        SubTabFilter.Content = Localization.Get("Nav_Filter");
-        SubTabMultiScreen.Content = Localization.Get("Nav_MultiScreen");
-        SubTabMore.Content = Localization.Get("Nav_More");
-        TabLog.Content = Localization.Get("Nav_Log");
-        TabAbout.Content = Localization.Get("Nav_About");
+        // 导航项带图标，因此文案写在内部 TextBlock 上（不再是 RadioButton.Content）。
+        TabWelcomeLabel.Text = Localization.Get("Nav_Home");
+        TabSettingsLabel.Text = Localization.Get("Nav_Settings");
+        SubTabBasicLabel.Text = Localization.Get("Nav_Basic");
+        SubTabVisualLabel.Text = Localization.Get("Nav_Visual");
+        SubTabFilterLabel.Text = Localization.Get("Nav_Filter");
+        SubTabMultiScreenLabel.Text = Localization.Get("Nav_MultiScreen");
+        TabLogLabel.Text = Localization.Get("Nav_Log");
+        TabAboutLabel.Text = Localization.Get("Nav_About");
+        AppTitleBar.Title = Localization.Get("App_Title_ControlPanel");
         TxtSidebarCopyright.Text = Localization.Get("Sidebar_Copyright");
         NoticeTitle.Text = Localization.Get("Welcome_NoticeLoading");
         TxtWelcomeTitle.Text = Localization.Get("Welcome_Title");
@@ -547,11 +704,6 @@ public sealed partial class ControlPanelWindow : Window
         TxtMultiScreenTitle.Text = Localization.Get("MultiScreen_Title");
         BtnRefreshScreens.Content = Localization.Get("MultiScreen_Refresh");
         TxtMultiScreenHint.Text = Localization.Get("MultiScreen_Hint");
-        TxtMoreTitle.Text = Localization.Get("More_Title");
-        TxtSidebarBackground.Text = Localization.Get("More_SidebarBackground");
-        BtnBrowseSidebarBackground.Content = Localization.Get("More_Browse");
-        BtnClearSidebarBackground.Content = Localization.Get("More_Clear");
-        TxtSidebarBackgroundHint.Text = Localization.Get("More_SidebarBackgroundHint");
         TxtLogTitle.Text = Localization.Get("Log_Title");
         BtnClearLog.Content = Localization.Get("Log_Clear");
         TxtLogHint.Text = Localization.Get("Log_Hint");
@@ -663,69 +815,6 @@ public sealed partial class ControlPanelWindow : Window
         TxtAppLog.Text = string.Empty;
         AppLogger.Clear();
         AppLogger.Info("Log view cleared by user.");
-    }
-
-    // ==================================================================
-    // 侧边栏背景
-    // ==================================================================
-
-    private async Task ApplySidebarBackgroundAsync(string? path)
-    {
-        try
-        {
-            SidebarBackgroundHelper.ClearCache();
-            ImageBrush? brush = await SidebarBackgroundHelper.LoadBrushAsync(path);
-
-            await RunOnUiThreadAsync(() =>
-            {
-                // 没有自定义图片时置空即可：父级 Sidebar 已经画了 BasSidebarBackgroundBrush。
-                SidebarBackgroundHost.Background = brush;
-                return Task.CompletedTask;
-            });
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("Failed to apply sidebar background.", ex);
-        }
-    }
-
-    private async void BrowseSidebarBackground_Click(object sender, RoutedEventArgs e)
-    {
-        _ = sender;
-        _ = e;
-
-        try
-        {
-            var picker = new FileOpenPicker
-            {
-                SuggestedStartLocation = PickerLocationId.PicturesLibrary,
-                ViewMode = PickerViewMode.Thumbnail
-            };
-
-            foreach (string extension in new[] { ".png", ".jpg", ".jpeg", ".bmp", ".webp" })
-            {
-                picker.FileTypeFilter.Add(extension);
-            }
-
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-
-            StorageFile? file = await picker.PickSingleFileAsync();
-            if (file != null)
-            {
-                TxtSidebarBackgroundPath.Text = file.Path;
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn($"Failed to pick sidebar background: {ex.Message}");
-        }
-    }
-
-    private void ClearSidebarBackground_Click(object sender, RoutedEventArgs e)
-    {
-        _ = sender;
-        _ = e;
-        TxtSidebarBackgroundPath.Text = string.Empty;
     }
 
     // ==================================================================
@@ -918,18 +1007,6 @@ public sealed partial class ControlPanelWindow : Window
             return;
         }
 
-        // 主标签分处两个 StackPanel，这里显式保证互斥，避免同时出现两个选中态。
-        if (sender is RadioButton clicked)
-        {
-            foreach (RadioButton tab in new[] { TabWelcome, TabSettings, TabLog, TabAbout })
-            {
-                if (!ReferenceEquals(tab, clicked))
-                {
-                    tab.IsChecked = false;
-                }
-            }
-        }
-
         UpdatePageVisibility();
     }
 
@@ -940,20 +1017,13 @@ public sealed partial class ControlPanelWindow : Window
             return;
         }
 
-        if (sender is RadioButton clicked)
-        {
-            foreach (RadioButton tab in new[] { SubTabBasic, SubTabVisual, SubTabFilter, SubTabMultiScreen, SubTabMore })
-            {
-                if (!ReferenceEquals(tab, clicked))
-                {
-                    tab.IsChecked = false;
-                }
-            }
-        }
-
+        // 子标签本身同组互斥；这里只需保证「设置」处于选中态。
         TabSettings.IsChecked = true;
         UpdatePageVisibility();
     }
+
+    /// <summary>页面切换动画：进入的页面淡入 + 轻微上移。</summary>
+    private static readonly TimeSpan PageTransitionDuration = TimeSpan.FromMilliseconds(180);
 
     private void UpdatePageVisibility()
     {
@@ -962,11 +1032,23 @@ public sealed partial class ControlPanelWindow : Window
         bool log = TabLog.IsChecked == true;
         bool about = TabAbout.IsChecked == true;
 
-        PageWelcome.Visibility = welcome ? Visibility.Visible : Visibility.Collapsed;
-        PageSettings.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
-        PageLog.Visibility = log ? Visibility.Visible : Visibility.Collapsed;
-        PageAbout.Visibility = about ? Visibility.Visible : Visibility.Collapsed;
-        SettingsSubNav.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
+        FrameworkElement? incoming = settings
+            ? PageSettings
+            : log
+                ? PageLog
+                : about
+                    ? PageAbout
+                    : welcome
+                        ? (FrameworkElement)PageWelcome
+                        : null;
+
+        SetPageVisible(PageWelcome, welcome, incoming);
+        SetPageVisible(PageSettings, settings, incoming);
+        SetPageVisible(PageLog, log, incoming);
+        SetPageVisible(PageAbout, about, incoming);
+
+        // 子导航展开/收起使用原生主题过渡动画。
+        _subNav?.SetExpanded(settings);
 
         if (settings)
         {
@@ -979,13 +1061,61 @@ public sealed partial class ControlPanelWindow : Window
         }
     }
 
+    /// <summary>显示/隐藏页面，并对「新进入」的页面播放过渡动画。</summary>
+    private void SetPageVisible(FrameworkElement page, bool visible, FrameworkElement? incoming)
+    {
+        if (visible)
+        {
+            bool wasCollapsed = page.Visibility != Visibility.Visible;
+            page.Visibility = Visibility.Visible;
+            if (wasCollapsed && ReferenceEquals(page, incoming))
+            {
+                PlayEntranceTransition(page);
+            }
+        }
+        else
+        {
+            page.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void PlayEntranceTransition(FrameworkElement page)
+    {
+        var storyboard = new Storyboard();
+        var duration = new Duration(PageTransitionDuration);
+        var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        var fade = new DoubleAnimation
+        {
+            From = 0,
+            To = 1,
+            Duration = duration,
+            EasingFunction = easing
+        };
+        Storyboard.SetTarget(fade, page);
+        Storyboard.SetTargetProperty(fade, "Opacity");
+        storyboard.Children.Add(fade);
+
+        var slide = new DoubleAnimation
+        {
+            From = 12,
+            To = 0,
+            Duration = duration,
+            EasingFunction = easing
+        };
+        Storyboard.SetTarget(slide, page);
+        Storyboard.SetTargetProperty(slide, "(UIElement.RenderTransform).(TranslateTransform.Y)");
+        storyboard.Children.Add(slide);
+
+        storyboard.Begin();
+    }
+
     private void UpdateSettingsSectionVisibility()
     {
         SectionBasic.Visibility = SubTabBasic.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         SectionVisual.Visibility = SubTabVisual.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         SectionFilter.Visibility = SubTabFilter.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         SectionMultiScreen.Visibility = SubTabMultiScreen.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        SectionMore.Visibility = SubTabMore.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // ==================================================================
@@ -1091,9 +1221,6 @@ public sealed partial class ControlPanelWindow : Window
 
         SelectDarkMode(ConfigManager.DarkMode);
         SelectNetworkRegion(ConfigManager.NetworkRegion);
-        TxtSidebarBackgroundPath.Text = string.IsNullOrWhiteSpace(ConfigManager.SidebarBackgroundImagePath)
-            ? PathPlaceholder
-            : ConfigManager.SidebarBackgroundImagePath;
     }
 
     private void CheckAdminStatus()
@@ -2324,31 +2451,6 @@ public sealed partial class ControlPanelWindow : Window
         ConfigManager.Save("EnableMiddleClickTrigger", middleClickEnabled);
         ConfigManager.Save("ScreenshotCompatibilityMode", screenshotCompatibilityEnabled);
         ConfigManager.Save("ApplyCurveDraw", CheckApplyCurveDraw.IsOn);
-
-        string sidebarBackgroundPath = TxtSidebarBackgroundPath?.Text?.Trim() ?? string.Empty;
-        if (string.Equals(sidebarBackgroundPath, PathPlaceholder, StringComparison.Ordinal))
-        {
-            sidebarBackgroundPath = string.Empty;
-        }
-
-        if (!string.IsNullOrWhiteSpace(sidebarBackgroundPath))
-        {
-            if (!SidebarBackgroundHelper.IsSupportedImage(sidebarBackgroundPath) || !File.Exists(sidebarBackgroundPath))
-            {
-                NativeMessageBox.ShowWarning(Localization.Get("Msg_InvalidSidebarBackground"), Localization.Get("More_Title"));
-                return;
-            }
-        }
-
-        bool sidebarBackgroundChanged = !string.Equals(
-            sidebarBackgroundPath,
-            ConfigManager.SidebarBackgroundImagePath,
-            StringComparison.OrdinalIgnoreCase);
-        ConfigManager.Save("SidebarBackgroundImagePath", sidebarBackgroundPath);
-        if (sidebarBackgroundChanged)
-        {
-            _ = ApplySidebarBackgroundAsync(sidebarBackgroundPath);
-        }
 
         HashSet<string> previousEnabledScreenIds = ConfigManager.ResolveEnabledScreenDeviceNames(
             ScreenOptions.Select(CreateScreenIdentityInfo));
