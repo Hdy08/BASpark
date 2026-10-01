@@ -18,7 +18,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Text;
@@ -96,12 +95,6 @@ public sealed partial class ControlPanelWindow : Window
     // 开始被压扁，再窄会出现控件显示不全。
     private const int MinDesignWidth = 560;
     private const int MinDesignHeight = 560;
-
-    /// <summary>无边框窗口四条缩放边的抓取宽度（逻辑像素，按 DPI 换算）。</summary>
-    private const double ResizeGripDesignWidth = 6;
-
-    /// <summary>标题栏右侧留给最小化/最大化/关闭三个系统按钮的宽度（逻辑像素）。</summary>
-    private const double CaptionButtonsDesignWidth = 160;
 
     /// <summary>
     /// 侧栏设置子导航的展开/收起。
@@ -491,22 +484,6 @@ public sealed partial class ControlPanelWindow : Window
                 presenter.PreferredMinimumWidth = minWidth;
                 presenter.PreferredMinimumHeight = minHeight;
             }
-
-            // 去掉 DWM 留下的 9px 玻璃边框（Windows 10 上表现为窗口最底部一条黑边），
-            // 并用非客户区命中区域把「标题栏拖拽移动 + 四条边缩放」补回来。
-            // 这些区域的几何随窗口尺寸变化，尺寸变化后必须重算。
-            WindowChrome.ApplyBorderlessChrome(
-                this, AppTitleBar, ResizeGripDesignWidth, CaptionButtonsDesignWidth);
-            appWindow.Changed += (_, args) =>
-            {
-                if (args.DidSizeChange)
-                {
-                    WindowChrome.UpdateNonClientRegions(
-                        this, AppTitleBar, ResizeGripDesignWidth, CaptionButtonsDesignWidth);
-                }
-            };
-            AppTitleBar.SizeChanged += (_, _) => WindowChrome.UpdateNonClientRegions(
-                this, AppTitleBar, ResizeGripDesignWidth, CaptionButtonsDesignWidth);
         }
         catch (Exception ex)
         {
@@ -514,7 +491,8 @@ public sealed partial class ControlPanelWindow : Window
         }
     }
 
-    /// <summary>去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
+    /// <summary>
+    /// 去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
     ///
     /// 两个必须遵守的约束：
     ///   1. 只设置 <c>ExtendsContentIntoTitleBar</c>，**不要**再调用
@@ -541,95 +519,6 @@ public sealed partial class ControlPanelWindow : Window
         {
             // 失败时回退到系统标题栏，功能不受影响。
             AppLogger.Warn($"Failed to extend content into the title bar: {ex.Message}");
-        }
-
-        UpdateCaptionMaximizeGlyph();
-    }
-
-    // ==================================================================
-    // 标题栏按钮
-    // ==================================================================
-
-    private void CaptionMinimize_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            if (AppWindow?.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.Minimize();
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn($"Failed to minimize the control panel: {ex.Message}");
-        }
-    }
-
-    private void CaptionMaximize_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            if (AppWindow?.Presenter is not OverlappedPresenter presenter)
-            {
-                return;
-            }
-
-            if (presenter.State == OverlappedPresenterState.Maximized)
-            {
-                presenter.Restore();
-            }
-            else
-            {
-                presenter.Maximize();
-            }
-
-            UpdateCaptionMaximizeGlyph();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn($"Failed to toggle the control panel state: {ex.Message}");
-        }
-    }
-
-    private void CaptionClose_Click(object sender, RoutedEventArgs e) => Close();
-
-    private void CaptionClose_PointerEntered(object sender, PointerRoutedEventArgs e) =>
-        ApplyCaptionCloseHover(isHovered: true);
-
-    private void CaptionClose_PointerExited(object sender, PointerRoutedEventArgs e) =>
-        ApplyCaptionCloseHover(isHovered: false);
-
-    /// <summary>关闭按钮悬停时使用系统标题栏的红色底（配色与系统一致，深浅色相同）。</summary>
-    private void ApplyCaptionCloseHover(bool isHovered)
-    {
-        if (!isHovered)
-        {
-            // 交还给样式里定义的值。
-            BtnCaptionClose.ClearValue(Control.BackgroundProperty);
-            BtnCaptionClose.ClearValue(Control.ForegroundProperty);
-            return;
-        }
-
-        if (Application.Current.Resources["BasCaptionCloseHoverBrush"] is Brush background &&
-            Application.Current.Resources["BasCaptionCloseHoverForegroundBrush"] is Brush foreground)
-        {
-            BtnCaptionClose.Background = background;
-            BtnCaptionClose.Foreground = foreground;
-        }
-    }
-
-    /// <summary>最大化状态下把图标换成「还原」。</summary>
-    private void UpdateCaptionMaximizeGlyph()
-    {
-        try
-        {
-            bool maximized =
-                (AppWindow?.Presenter as OverlappedPresenter)?.State == OverlappedPresenterState.Maximized;
-            CaptionMaximizeGlyph.Glyph = maximized ? "\uE923" : "\uE922";
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug($"Failed to update the maximize glyph: {ex.Message}");
         }
     }
 

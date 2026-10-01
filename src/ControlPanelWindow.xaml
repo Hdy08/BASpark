@@ -23,38 +23,6 @@
                   IsBackButtonVisible="False"
                   IsPaneToggleButtonVisible="False" />
 
-        <!--
-            标题栏按钮：窗口为去掉 Windows 10 上那圈 9px 玻璃边框（表现为窗口最底部
-            一条黑边）清掉了 WS_CAPTION，而标题栏按钮原本由系统按 WS_CAPTION 绘制，
-            因此这里用原生 Button 模板补回三个按钮（最小化 / 最大化-还原 / 关闭）。
-            按钮所在区域在 NonClientRegionKind.Caption 命中区域之外，点击不会被
-            当成拖拽标题栏。
-        -->
-        <StackPanel x:Name="CaptionButtons"
-                    Grid.Row="0"
-                    Height="48"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top">
-            <Button x:Name="BtnCaptionMinimize"
-                    Style="{StaticResource BasCaptionButtonStyle}"
-                    Click="CaptionMinimize_Click">
-                <FontIcon Glyph="&#xE921;" FontSize="10" />
-            </Button>
-            <Button x:Name="BtnCaptionMaximize"
-                    Style="{StaticResource BasCaptionButtonStyle}"
-                    Click="CaptionMaximize_Click">
-                <FontIcon x:Name="CaptionMaximizeGlyph" Glyph="&#xE922;" FontSize="10" />
-            </Button>
-            <Button x:Name="BtnCaptionClose"
-                    Style="{StaticResource BasCaptionButtonStyle}"
-                    Click="CaptionClose_Click"
-                    PointerEntered="CaptionClose_PointerEntered"
-                    PointerExited="CaptionClose_PointerExited">
-                <FontIcon Glyph="&#xE8BB;" FontSize="10" />
-            </Button>
-        </StackPanel>
-
         <Grid Grid.Row="1">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="212" />

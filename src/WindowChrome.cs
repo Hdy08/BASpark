@@ -1,8 +1,5 @@
 using System.Runtime.InteropServices;
-using Microsoft.UI.Input;
-using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
-using Windows.Graphics;
 
 namespace BASpark;
 
@@ -53,117 +50,6 @@ internal static class WindowChrome
         catch (Exception ex)
         {
             AppLogger.Debug($"Failed to apply the window icon: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 去掉窗口边框，并把「拖拽移动 + 四条边缩放」用非客户区命中区域补回来。
-    ///
-    /// 背景：Windows 10 上 <c>WS_CAPTION</c>（含 <c>WS_DLGFRAME</c>）会给窗口留出
-    /// 9px（125% 缩放）的非客户区边框，而 WinUI 3 启用 <c>ExtendsContentIntoTitleBar</c>
-    /// 后这圈边框是**玻璃（透明）**的，XAML 内容又只铺满客户区，于是窗口四周会透出
-    /// 桌面背景 —— 深色壁纸下就表现为窗口最底部一条黑边，显示/最小化动画里整个窗口
-    /// 被缩放时最明显。实测：
-    ///   * <c>DWMWA_BORDER_COLOR</c> 在 Windows 10 19045 上不被支持（E_INVALIDARG）；
-    ///   * 只调 <c>SetBorderAndTitleBar(false, false)</c> 不改样式，边框依旧 9px；
-    ///   * 只清 <c>WS_THICKFRAME</c> 边框仍是 9px（由 <c>WS_CAPTION</c> 决定）；
-    ///   * 同时清掉 <c>WS_CAPTION</c> 后客户区与窗口矩形完全重合（边框 0px）—— 但
-    ///     系统随之不再把标题栏当作标题栏，拖拽移动失效。
-    /// 因此这里清掉这两个样式，再用 <see cref="InputNonClientPointerSource"/>：
-    ///   * <c>Caption</c> 区域 = 标题栏控件所在的那一条（右侧给三个按钮留出宽度），
-    ///     系统据此继续支持拖拽移动与拖到屏幕边缘贴靠；
-    ///   * 四条 <c>*Border</c> 区域 = 四边 6 逻辑像素的缩放抓取带。
-    /// <c>DwmExtendFrameIntoClientArea(1,1,1,1)</c> 用来保住无边框窗口的 DWM 阴影。
-    /// </summary>
-    public static void ApplyBorderlessChrome(
-        Window window,
-        FrameworkElement dragRegion,
-        double gripDesignPixels,
-        double captionButtonsDesignWidth)
-    {
-        try
-        {
-            IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            long style = GetWindowLongPtr(hwnd, GwlStyle).ToInt64();
-            style &= ~(WsCaption | WsThickFrame);
-            _ = SetWindowLongPtr(hwnd, GwlStyle, new IntPtr(style));
-
-            var margins = new Margins { Left = 1, Top = 1, Right = 1, Bottom = 1 };
-            _ = DwmExtendFrameIntoClientArea(hwnd, ref margins);
-
-            _ = SetWindowPos(
-                hwnd, IntPtr.Zero, 0, 0, 0, 0,
-                SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
-
-            UpdateNonClientRegions(window, dragRegion, gripDesignPixels, captionButtonsDesignWidth);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn($"Failed to apply borderless chrome: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 重算拖拽移动与四条缩放边的命中区域。标题栏宽度、窗口右/下边都会随尺寸变化，
-    /// 所以每次尺寸变化都要重算。
-    /// </summary>
-    public static void UpdateNonClientRegions(
-        Window window,
-        FrameworkElement dragRegion,
-        double gripDesignPixels,
-        double captionButtonsDesignWidth)
-    {
-        try
-        {
-            if (window.AppWindow == null)
-            {
-                return;
-            }
-
-            SizeInt32 size = window.AppWindow.Size;
-            if (size.Width <= 0 || size.Height <= 0)
-            {
-                return;
-            }
-
-            IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-            double scale = hwnd != IntPtr.Zero ? GetDpiForWindow(hwnd) / 96.0 : 1.0;
-            int grip = Math.Max(4, (int)Math.Round(gripDesignPixels * scale));
-            grip = Math.Min(grip, Math.Min(size.Width, size.Height) / 3);
-
-            InputNonClientPointerSource source =
-                InputNonClientPointerSource.GetForWindowId(window.AppWindow.Id);
-
-            // 标题栏拖拽带：宽度取标题栏控件自身宽度，右侧留出三个系统按钮的位置。
-            double dragWidth = dragRegion.ActualWidth - captionButtonsDesignWidth;
-            int captionWidth = (int)Math.Round(Math.Max(0, dragWidth) * scale);
-            int captionHeight = (int)Math.Round(
-                (dragRegion.ActualHeight > 0 ? dragRegion.ActualHeight : 48) * scale);
-            source.SetRegionRects(
-                NonClientRegionKind.Caption,
-                new[] { new RectInt32(0, 0, Math.Min(captionWidth, size.Width), Math.Min(captionHeight, size.Height)) });
-
-            source.SetRegionRects(
-                NonClientRegionKind.TopBorder,
-                new[] { new RectInt32(0, 0, size.Width, grip) });
-            source.SetRegionRects(
-                NonClientRegionKind.BottomBorder,
-                new[] { new RectInt32(0, size.Height - grip, size.Width, grip) });
-            source.SetRegionRects(
-                NonClientRegionKind.LeftBorder,
-                new[] { new RectInt32(0, 0, grip, size.Height) });
-            source.SetRegionRects(
-                NonClientRegionKind.RightBorder,
-                new[] { new RectInt32(size.Width - grip, 0, grip, size.Height) });
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn($"Failed to update non-client regions: {ex.Message}");
         }
     }
 
@@ -244,32 +130,11 @@ internal static class WindowChrome
 
     private const int DwmwaUseImmersiveDarkMode = 20;
     private const int DwmwaUseImmersiveDarkModeLegacy = 19;
-    private const int GwlStyle = -16;
-    private const long WsCaption = 0x00C00000L;
-    private const long WsThickFrame = 0x00040000L;
     private const uint SwpNoSize = 0x0001;
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpFrameChanged = 0x0020;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct Margins
-    {
-        public int Left;
-        public int Right;
-        public int Top;
-        public int Bottom;
-    }
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
-
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
-    private static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
-
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
-    private static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(
