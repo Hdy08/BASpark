@@ -112,7 +112,10 @@ public sealed partial class ControlPanelWindow : Window
     /// </summary>
     private sealed class AnimatedSubNav
     {
-        private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(220);
+        // 展开略慢于收起：展开需要被看清，收起只需干净利落。
+        // 220ms 在实测中偏快，观感上接近「瞬间弹开」。
+        private static readonly TimeSpan ExpandDuration = TimeSpan.FromMilliseconds(340);
+        private static readonly TimeSpan CollapseDuration = TimeSpan.FromMilliseconds(220);
 
         private readonly Border _host;
         private readonly StackPanel _panel;
@@ -211,25 +214,34 @@ public sealed partial class ControlPanelWindow : Window
 
             UpdateClip(targetHeight);
 
-            var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var duration = new Duration(Duration);
+            var duration = new Duration(expanded ? ExpandDuration : CollapseDuration);
+
+            // 展开用 EaseOut：起步快、末段收得慢，视觉上更「跟手」。
+            // 收起用 EaseIn：起步慢、末段快，收得干净。
+            var heightEasing = new CubicEase
+            {
+                EasingMode = expanded ? EasingMode.EaseOut : EasingMode.EaseIn
+            };
 
             var height = new DoubleAnimation
             {
                 From = expanded ? 0 : _host.ActualHeight,
                 To = targetHeight,
                 Duration = duration,
-                EasingFunction = easing
+                EasingFunction = heightEasing
             };
             Storyboard.SetTarget(height, _host);
             Storyboard.SetTargetProperty(height, "Height");
 
+            // 子项整体从左下方滑入，给展开动作一个可见的方向感
+            // （只有高度变化时观感会显得「只是被撑开」）。
+            var slideEasing = new CubicEase { EasingMode = EasingMode.EaseOut };
             var slide = new DoubleAnimation
             {
-                From = expanded ? -8 : 0,
-                To = expanded ? 0 : -8,
+                From = expanded ? -10 : 0,
+                To = expanded ? 0 : -10,
                 Duration = duration,
-                EasingFunction = easing
+                EasingFunction = slideEasing
             };
             Storyboard.SetTarget(slide, _shift);
             Storyboard.SetTargetProperty(slide, "Y");
