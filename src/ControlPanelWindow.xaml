@@ -7,6 +7,27 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
+    <UserControl.Resources>
+        <x:Double x:Key="RadioButtonsColumnSpacing">0</x:Double>
+        <x:Double x:Key="RadioButtonsRowSpacing">0</x:Double>
+        <Thickness x:Key="ToggleSwitchHeaderMargin">0</Thickness>
+        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="{ThemeResource BasSettingsAccentTextColor}" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="{ThemeResource BasSettingsAccentTextColor}" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="{ThemeResource BasSettingsAccentTextColor}" />
+        <SolidColorBrush x:Key="SliderTrackValueFill" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="AccentButtonBackground" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="{ThemeResource BasSettingsAccentColor}" />
+        <SolidColorBrush x:Key="AccentButtonForeground" Color="{ThemeResource BasSettingsAccentTextColor}" />
+        <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{ThemeResource BasSettingsAccentTextColor}" />
+        <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{ThemeResource BasSettingsAccentTextColor}" />
+    </UserControl.Resources>
+
     <Grid x:Name="RootGrid" Background="{ThemeResource BasPageBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -176,11 +197,6 @@
             </StackPanel>
         </Grid>
 
-        <Border Grid.Column="0"
-                Width="1"
-                HorizontalAlignment="Right"
-                Background="{ThemeResource BasSidebarBorderBrush}" />
-
         <!-- ==================== 内容区 ==================== -->
         <Grid Grid.Column="1">
 
@@ -232,14 +248,16 @@
             </ScrollViewer>
 
             <!-- ===== 设置 ===== -->
-            <Grid x:Name="PageSettings" Visibility="Collapsed">
+            <Grid x:Name="PageSettings" Visibility="Collapsed"
+                  Margin="0,48,0,0" CornerRadius="6,0,0,0"
+                  Background="{ThemeResource BasSettingsPageBackgroundBrush}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
                 <!-- 页头：标题 + 应用按钮 -->
-                <Grid Grid.Row="0" Padding="28,24,28,12" ColumnSpacing="16">
+                <Grid Grid.Row="0" Padding="28,20,28,12" ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -248,7 +266,7 @@
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtSettingsTitle"
                                    Text=""
-                                   Style="{StaticResource BasPageTitleStyle}" />
+                                   Style="{StaticResource BasSettingsPageTitleStyle}" />
                         <TextBlock x:Name="TxtSettingsHint"
                                    Text=""
                                    Margin="0,4,0,0"
@@ -265,530 +283,1099 @@
                             VerticalAlignment="Center" />
                 </Grid>
 
-                <Border Grid.Row="0"
-                        Height="1"
-                        VerticalAlignment="Bottom"
-                        Background="{ThemeResource BasDividerBrush}" />
-
                 <ScrollViewer x:Name="SettingsContentScrollViewer"
                               Grid.Row="1"
-                              Padding="28,16,28,28"
+                              Padding="28,0,28,28"
                               VerticalScrollBarVisibility="Auto">
                     <StackPanel>
 
                         <!-- ===== 基础设置 ===== -->
                         <StackPanel x:Name="SectionBasic">
-                            <Border Style="{StaticResource BasCardStyle}">
-                                <StackPanel>
-                                    <TextBlock x:Name="TxtBasicTitle"
-                                               Text=""
-                                               Style="{StaticResource BasSectionTitleStyle}" />
-
-                                    <TextBlock x:Name="TxtBasicLanguage"
-                                               Text=""
-                                               Margin="0,16,0,6"
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <ComboBox x:Name="ComboLanguage"
-                                              MinWidth="240"
-                                              HorizontalAlignment="Left"
-                                              SelectionChanged="ComboLanguage_SelectionChanged" />
-
-                                    <TextBlock x:Name="TxtDarkMode"
-                                               Text=""
-                                               Margin="0,20,0,6"
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <RadioButtons x:Name="RadioDarkMode" MaxColumns="3">
-                                        <RadioButton x:Name="RadioDarkModeOff" Content="" />
-                                        <RadioButton x:Name="RadioDarkModeOn" Content="" />
-                                        <RadioButton x:Name="RadioDarkModeSystem" Content="" IsChecked="True" />
-                                    </RadioButtons>
-
-
-                                    <TextBlock x:Name="TxtScrollbarVisibility"
-                                               Text=""
-                                               Margin="0,20,0,6"
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <RadioButtons x:Name="RadioScrollbarVisibility" MaxColumns="2">
-                                        <RadioButton x:Name="RadioScrollbarAlways" Content="" />
-                                        <RadioButton x:Name="RadioScrollbarOnScroll" Content="" IsChecked="True" />
-                                    </RadioButtons>
-                                    <TextBlock x:Name="TxtScrollbarHint"
-                                               Text=""
-                                               Margin="0,8,0,0"
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                    <Border Style="{StaticResource BasDividerStyle}" Margin="0,20,0,12" />
-
-                                    <ToggleSwitch x:Name="CheckAlwaysTrailEffectSwitch"
-                                                  Header=""
-                                                  Margin="0,0,0,8" />
-                                    <ToggleSwitch x:Name="CheckMasterSwitch"
-                                                  Header=""
-                                                  Margin="0,0,0,8"
-                                                  Toggled="CheckMasterSwitch_Changed" />
-
-                                    <StackPanel x:Name="PanelClickEffectOptions" Margin="0,8,0,8">
-                                        <TextBlock x:Name="TxtClickType"
-                                                   Text=""
-                                                   Style="{StaticResource BasFieldLabelStyle}" />
-                                        <RadioButtons x:Name="RadioClickType" MaxColumns="3">
-                                            <RadioButton Name="RadioLeftClick" Content="" IsChecked="True" />
-                                            <RadioButton Name="RadioRightClick" Content="" />
-                                            <RadioButton Name="RadioBothClick" Content="" />
-                                        </RadioButtons>
-                                        <ToggleSwitch x:Name="CheckMiddleClickTrigger"
-                                                      Header=""
-                                                      Margin="0,12,0,0" />
+                            <TextBlock
+                                x:Name="TxtBasicTitle"
+                                Text=""
+                                Style="{StaticResource BasSettingsSectionTitleStyle}"
+                                Margin="0,8,0,8" />
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtBasicLanguage"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
                                     </StackPanel>
-
-                                    <ToggleSwitch x:Name="CheckScreenshotCompatibilityMode"
-                                                  Header=""
-                                                  Margin="0,0,0,4" />
-                                    <TextBlock x:Name="TxtScreenshotHint"
-                                               Text=""
-                                               Margin="0,0,0,12"
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                    <ToggleSwitch x:Name="CheckAutoStart"
-                                                  Header=""
-                                                  Margin="0,0,0,8" />
-                                    <ToggleSwitch x:Name="CheckStartSilent"
-                                                  Header=""
-                                                  Margin="0,0,0,8" />
-                                    <ToggleSwitch x:Name="CheckRunAsAdmin"
-                                                  Header=""
-                                                  Margin="0,0,0,4"
-                                                  Toggled="CheckRunAsAdmin_Changed" />
-                                    <TextBlock x:Name="TxtRunAsAdminHint"
-                                               Text=""
-                                               Margin="0,0,0,12"
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                    <ToggleSwitch x:Name="CheckTouchscreenMode"
-                                                  Header=""
-                                                  Margin="0,0,0,4" />
-                                    <TextBlock x:Name="TxtTouchscreenHint"
-                                               Text=""
-                                               Margin="0,0,0,12"
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ComboBox
+                                            x:Name="ComboLanguage"
+                                            MinWidth="0"
+                                            HorizontalAlignment="Stretch"
+                                            SelectionChanged="ComboLanguage_SelectionChanged"
+                                            Background="{ThemeResource BasSettingsControlBackgroundBrush}"
+                                            BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
+                                            AutomationProperties.Name="{Binding Text, ElementName=TxtBasicLanguage}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtDarkMode"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <Border Style="{StaticResource BasSegmentedSelectorStyle}">
+                                            <RadioButtons
+                                                x:Name="RadioDarkMode"
+                                                MaxColumns="3"
+                                                HorizontalAlignment="Stretch"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtDarkMode}" >
+                                                <RadioButton x:Name="RadioDarkModeOff" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                                <RadioButton x:Name="RadioDarkModeOn" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                                <RadioButton x:Name="RadioDarkModeSystem" Content="" IsChecked="True" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                            </RadioButtons>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtScrollbarVisibility"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock
+                                            x:Name="TxtScrollbarHint"
+                                            Text=""
+                                            Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <Border Style="{StaticResource BasSegmentedSelectorStyle}">
+                                            <RadioButtons
+                                                x:Name="RadioScrollbarVisibility"
+                                                MaxColumns="2"
+                                                HorizontalAlignment="Stretch"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtScrollbarVisibility}" >
+                                                <RadioButton x:Name="RadioScrollbarAlways" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                                <RadioButton x:Name="RadioScrollbarOnScroll" Content="" IsChecked="True" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                            </RadioButtons>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckAlwaysTrailEffectSwitch}" Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckAlwaysTrailEffectSwitch"
+                                            Header=""
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckAlwaysTrailEffectSwitch}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckMasterSwitch}" Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckMasterSwitch"
+                                            Header=""
+                                            Toggled="CheckMasterSwitch_Changed"
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckMasterSwitch}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <StackPanel x:Name="PanelClickEffectOptions">
+                                <Border Style="{StaticResource BasSettingCardStyle}">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.15*" />
+                                            <ColumnDefinition Width="*" MinWidth="140" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock
+                                                x:Name="TxtClickType"
+                                                Text=""
+                                                Style="{StaticResource BasSettingTitleStyle}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <Border Style="{StaticResource BasSegmentedSelectorStyle}">
+                                                <RadioButtons
+                                                    x:Name="RadioClickType"
+                                                    MaxColumns="3"
+                                                    HorizontalAlignment="Stretch"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtClickType}" >
+                                                    <RadioButton Name="RadioLeftClick" Content="" IsChecked="True" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                                    <RadioButton Name="RadioRightClick" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                                    <RadioButton Name="RadioBothClick" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                                </RadioButtons>
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource BasSettingCardStyle}">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.15*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Header, ElementName=CheckMiddleClickTrigger}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <ToggleSwitch
+                                                x:Name="CheckMiddleClickTrigger"
+                                                Header=""
+                                                Style="{StaticResource BasSettingToggleStyle}"
+                                                AutomationProperties.Name="{Binding Header, ElementName=CheckMiddleClickTrigger}" />
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckScreenshotCompatibilityMode}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock
+                                            x:Name="TxtScreenshotHint"
+                                            Text=""
+                                            Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckScreenshotCompatibilityMode"
+                                            Header=""
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckScreenshotCompatibilityMode}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckAutoStart}" Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckAutoStart"
+                                            Header=""
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckAutoStart}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckStartSilent}" Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckStartSilent"
+                                            Header=""
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckStartSilent}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckRunAsAdmin}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock
+                                            x:Name="TxtRunAsAdminHint"
+                                            Text=""
+                                            Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckRunAsAdmin"
+                                            Header=""
+                                            Toggled="CheckRunAsAdmin_Changed"
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckRunAsAdmin}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckTouchscreenMode}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock
+                                            x:Name="TxtTouchscreenHint"
+                                            Text=""
+                                            Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckTouchscreenMode"
+                                            Header=""
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckTouchscreenMode}" />
+                                    </Grid>
+                                </Grid>
                             </Border>
                         </StackPanel>
 
                         <!-- ===== 视觉表现 ===== -->
                         <StackPanel x:Name="SectionVisual" Visibility="Collapsed">
-                            <Border Style="{StaticResource BasCardStyle}">
-                                <StackPanel>
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="TxtVisualTitle"
-                                                   Grid.Column="0"
-                                                   Text=""
-                                                   Style="{StaticResource BasSectionTitleStyle}"
-                                                   VerticalAlignment="Center" />
-                                        <Button x:Name="BtnVisualReset"
-                                                Grid.Column="1"
-                                                Content=""
-                                                Click="OpenVisualResetOverlay_Click" />
+                            <Grid ColumnSpacing="12" Margin="0,8,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    x:Name="TxtVisualTitle"
+                                    Grid.Column="0"
+                                    Text=""
+                                    Style="{StaticResource BasSettingsSectionTitleStyle}"
+                                    VerticalAlignment="Center"
+                                    Margin="0" />
+                                <Button
+                                    x:Name="BtnVisualReset"
+                                    Grid.Column="1"
+                                    Content=""
+                                    Click="OpenVisualResetOverlay_Click" />
+                            </Grid>
+                            <TextBlock
+                                x:Name="TxtVisualInputHint"
+                                Text=""
+                                Margin="0,0,0,12"
+                                Style="{StaticResource BasCaptionStyle}" />
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckLinkedEffectScale}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock
+                                            x:Name="TxtLinkedScaleHint"
+                                            Text=""
+                                            Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckLinkedEffectScale"
+                                            Header=""
+                                            Toggled="LinkedEffectScale_Changed"
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckLinkedEffectScale}" />
                                     </Grid>
-
-                                    <TextBlock x:Name="TxtVisualInputHint"
-                                               Text=""
-                                               Margin="0,8,0,0"
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                    <ToggleSwitch x:Name="CheckLinkedEffectScale"
-                                                  Header=""
-                                                  Margin="0,16,0,0"
-                                                  Toggled="LinkedEffectScale_Changed" />
-                                    <TextBlock x:Name="TxtLinkedScaleHint"
-                                               Text=""
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                    <StackPanel x:Name="PanelUnifiedEffectScale" Margin="0,16,0,0">
-                                        <TextBlock x:Name="TxtVisualScale"
-                                                   Text=""
-                                                   Style="{StaticResource BasFieldLabelStyle}" />
-                                        <Grid ColumnSpacing="12">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Slider x:Name="SliderScale"
-                                                    Grid.Column="0"
-                                                    Minimum="0.5" Maximum="3.0"
-                                                    StepFrequency="0.1"
-                                                    ValueChanged="EffectSlider_ValueChanged" />
-                                            <NumberBox x:Name="TxtScaleValue"
-                                                       Grid.Column="1"
-                                                       Minimum="0.5" Maximum="3.0"
-                                                       SmallChange="0.1"
-                                                       SpinButtonPlacementMode="Compact"
-                                                       Width="120"
-                                                       ValueChanged="EffectNumberBox_ValueChanged" />
-                                        </Grid>
-                                    </StackPanel>
-
-                                    <StackPanel x:Name="PanelSplitEffectScale" Margin="0,16,0,0" Visibility="Collapsed">
-                                        <TextBlock x:Name="TxtTrailScale"
-                                                   Text=""
-                                                   Style="{StaticResource BasFieldLabelStyle}" />
-                                        <Grid ColumnSpacing="12" Margin="0,0,0,16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Slider x:Name="SliderTrailScale"
-                                                    Grid.Column="0"
-                                                    Minimum="0.5" Maximum="3.0"
-                                                    StepFrequency="0.1"
-                                                    ValueChanged="EffectSlider_ValueChanged" />
-                                            <NumberBox x:Name="TxtTrailScaleValue"
-                                                       Grid.Column="1"
-                                                       Minimum="0.5" Maximum="3.0"
-                                                       SmallChange="0.1"
-                                                       SpinButtonPlacementMode="Compact"
-                                                       Width="120"
-                                                       ValueChanged="EffectNumberBox_ValueChanged" />
-                                        </Grid>
-
-                                        <TextBlock x:Name="TxtClickScale"
-                                                   Text=""
-                                                   Style="{StaticResource BasFieldLabelStyle}" />
-                                        <Grid ColumnSpacing="12">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Slider x:Name="SliderClickScale"
-                                                    Grid.Column="0"
-                                                    Minimum="0.5" Maximum="3.0"
-                                                    StepFrequency="0.1"
-                                                    ValueChanged="EffectSlider_ValueChanged" />
-                                            <NumberBox x:Name="TxtClickScaleValue"
-                                                       Grid.Column="1"
-                                                       Minimum="0.5" Maximum="3.0"
-                                                       SmallChange="0.1"
-                                                       SpinButtonPlacementMode="Compact"
-                                                       Width="120"
-                                                       ValueChanged="EffectNumberBox_ValueChanged" />
-                                        </Grid>
-                                    </StackPanel>
-
-                                    <TextBlock x:Name="TxtVisualOpacity"
-                                               Text=""
-                                               Margin="0,20,0,0"
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <Grid ColumnSpacing="12">
+                                </Grid>
+                            </Border>
+                            <StackPanel x:Name="PanelUnifiedEffectScale">
+                                <Border Style="{StaticResource BasSettingCardStyle}">
+                                    <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="1.15*" />
+                                            <ColumnDefinition Width="*" MinWidth="140" />
                                         </Grid.ColumnDefinitions>
-                                        <Slider x:Name="SliderOpacity"
+                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock
+                                                x:Name="TxtVisualScale"
+                                                Text=""
+                                                Style="{StaticResource BasSettingTitleStyle}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider
+                                                    x:Name="SliderScale"
+                                                    Grid.Column="0"
+                                                    Minimum="0.5"
+                                                    Maximum="3.0"
+                                                    StepFrequency="0.1"
+                                                    ValueChanged="EffectSlider_ValueChanged"
+                                                    MinWidth="40"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtVisualScale}" />
+                                                <NumberBox
+                                                    x:Name="TxtScaleValue"
+                                                    Grid.Column="1"
+                                                    Minimum="0.5"
+                                                    Maximum="3.0"
+                                                    SmallChange="0.1"
+                                                    SpinButtonPlacementMode="Compact"
+                                                    Width="84"
+                                                    ValueChanged="EffectNumberBox_ValueChanged"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtVisualScale}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel x:Name="PanelSplitEffectScale" Visibility="Collapsed">
+                                <Border Style="{StaticResource BasSettingCardStyle}">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.15*" />
+                                            <ColumnDefinition Width="*" MinWidth="140" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock
+                                                x:Name="TxtTrailScale"
+                                                Text=""
+                                                Style="{StaticResource BasSettingTitleStyle}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider
+                                                    x:Name="SliderTrailScale"
+                                                    Grid.Column="0"
+                                                    Minimum="0.5"
+                                                    Maximum="3.0"
+                                                    StepFrequency="0.1"
+                                                    ValueChanged="EffectSlider_ValueChanged"
+                                                    MinWidth="40"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtTrailScale}" />
+                                                <NumberBox
+                                                    x:Name="TxtTrailScaleValue"
+                                                    Grid.Column="1"
+                                                    Minimum="0.5"
+                                                    Maximum="3.0"
+                                                    SmallChange="0.1"
+                                                    SpinButtonPlacementMode="Compact"
+                                                    Width="84"
+                                                    ValueChanged="EffectNumberBox_ValueChanged"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtTrailScale}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource BasSettingCardStyle}">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.15*" />
+                                            <ColumnDefinition Width="*" MinWidth="140" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock
+                                                x:Name="TxtClickScale"
+                                                Text=""
+                                                Style="{StaticResource BasSettingTitleStyle}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider
+                                                    x:Name="SliderClickScale"
+                                                    Grid.Column="0"
+                                                    Minimum="0.5"
+                                                    Maximum="3.0"
+                                                    StepFrequency="0.1"
+                                                    ValueChanged="EffectSlider_ValueChanged"
+                                                    MinWidth="40"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtClickScale}" />
+                                                <NumberBox
+                                                    x:Name="TxtClickScaleValue"
+                                                    Grid.Column="1"
+                                                    Minimum="0.5"
+                                                    Maximum="3.0"
+                                                    SmallChange="0.1"
+                                                    SpinButtonPlacementMode="Compact"
+                                                    Width="84"
+                                                    ValueChanged="EffectNumberBox_ValueChanged"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtClickScale}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtVisualOpacity"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Slider
+                                                x:Name="SliderOpacity"
                                                 Grid.Column="0"
-                                                Minimum="10" Maximum="100"
+                                                Minimum="10"
+                                                Maximum="100"
                                                 StepFrequency="5"
-                                                ValueChanged="EffectSlider_ValueChanged" />
-                                        <NumberBox x:Name="TxtOpacityValue"
-                                                   Grid.Column="1"
-                                                   Minimum="10" Maximum="100"
-                                                   SmallChange="5"
-                                                   SpinButtonPlacementMode="Compact"
-                                                   Width="120"
-                                                   ValueChanged="EffectNumberBox_ValueChanged" />
+                                                ValueChanged="EffectSlider_ValueChanged"
+                                                MinWidth="40"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtVisualOpacity}" />
+                                            <NumberBox
+                                                x:Name="TxtOpacityValue"
+                                                Grid.Column="1"
+                                                Minimum="10"
+                                                Maximum="100"
+                                                SmallChange="5"
+                                                SpinButtonPlacementMode="Compact"
+                                                Width="84"
+                                                ValueChanged="EffectNumberBox_ValueChanged"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtVisualOpacity}" />
+                                        </Grid>
                                     </Grid>
-
-                                    <TextBlock x:Name="TxtGlowIntensity"
-                                               Text=""
-                                               Margin="0,20,0,0"
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Slider x:Name="SliderGlow"
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtGlowIntensity"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Slider
+                                                x:Name="SliderGlow"
                                                 Grid.Column="0"
-                                                Minimum="0" Maximum="3"
+                                                Minimum="0"
+                                                Maximum="3"
                                                 StepFrequency="0.1"
-                                                ValueChanged="EffectSlider_ValueChanged" />
-                                        <NumberBox x:Name="TxtGlowValue"
-                                                   Grid.Column="1"
-                                                   Minimum="0" Maximum="3"
-                                                   SmallChange="0.1"
-                                                   SpinButtonPlacementMode="Compact"
-                                                   Width="120"
-                                                   ValueChanged="EffectNumberBox_ValueChanged" />
+                                                ValueChanged="EffectSlider_ValueChanged"
+                                                MinWidth="40"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtGlowIntensity}" />
+                                            <NumberBox
+                                                x:Name="TxtGlowValue"
+                                                Grid.Column="1"
+                                                Minimum="0"
+                                                Maximum="3"
+                                                SmallChange="0.1"
+                                                SpinButtonPlacementMode="Compact"
+                                                Width="84"
+                                                ValueChanged="EffectNumberBox_ValueChanged"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtGlowIntensity}" />
+                                        </Grid>
                                     </Grid>
-
-                                    <Border Style="{StaticResource BasDividerStyle}" Margin="0,20,0,12" />
-
-                                    <ToggleSwitch x:Name="CheckLinkedAnimationSpeed"
-                                                  Header=""
-                                                  Toggled="LinkedAnimationSpeed_Changed" />
-                                    <TextBlock x:Name="TxtLinkedSpeedHint"
-                                               Text=""
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                    <StackPanel x:Name="PanelUnifiedAnimationSpeed" Margin="0,16,0,0">
-                                        <TextBlock x:Name="TxtAnimSpeed"
-                                                   Text=""
-                                                   Style="{StaticResource BasFieldLabelStyle}" />
-                                        <Grid ColumnSpacing="12">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Slider x:Name="SliderSpeed"
-                                                    Grid.Column="0"
-                                                    Minimum="0.2" Maximum="3.0"
-                                                    StepFrequency="0.1"
-                                                    ValueChanged="EffectSlider_ValueChanged" />
-                                            <NumberBox x:Name="TxtSpeedValue"
-                                                       Grid.Column="1"
-                                                       Minimum="0.2" Maximum="3.0"
-                                                       SmallChange="0.1"
-                                                       SpinButtonPlacementMode="Compact"
-                                                       Width="120"
-                                                       ValueChanged="EffectNumberBox_ValueChanged" />
-                                        </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckLinkedAnimationSpeed}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock
+                                            x:Name="TxtLinkedSpeedHint"
+                                            Text=""
+                                            Style="{StaticResource BasCaptionStyle}" />
                                     </StackPanel>
-
-                                    <StackPanel x:Name="PanelSplitAnimationSpeed" Margin="0,16,0,0" Visibility="Collapsed">
-                                        <TextBlock x:Name="TxtTrailAnimSpeed"
-                                                   Text=""
-                                                   Style="{StaticResource BasFieldLabelStyle}" />
-                                        <Grid ColumnSpacing="12" Margin="0,0,0,16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Slider x:Name="SliderTrailAnimSpeed"
-                                                    Grid.Column="0"
-                                                    Minimum="0.2" Maximum="3.0"
-                                                    StepFrequency="0.1"
-                                                    ValueChanged="EffectSlider_ValueChanged" />
-                                            <NumberBox x:Name="TxtTrailSpeedValue"
-                                                       Grid.Column="1"
-                                                       Minimum="0.2" Maximum="3.0"
-                                                       SmallChange="0.1"
-                                                       SpinButtonPlacementMode="Compact"
-                                                       Width="120"
-                                                       ValueChanged="EffectNumberBox_ValueChanged" />
-                                        </Grid>
-
-                                        <TextBlock x:Name="TxtClickAnimSpeed"
-                                                   Text=""
-                                                   Style="{StaticResource BasFieldLabelStyle}" />
-                                        <Grid ColumnSpacing="12">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Slider x:Name="SliderClickAnimSpeed"
-                                                    Grid.Column="0"
-                                                    Minimum="0.2" Maximum="3.0"
-                                                    StepFrequency="0.1"
-                                                    ValueChanged="EffectSlider_ValueChanged" />
-                                            <NumberBox x:Name="TxtClickSpeedValue"
-                                                       Grid.Column="1"
-                                                       Minimum="0.2" Maximum="3.0"
-                                                       SmallChange="0.1"
-                                                       SpinButtonPlacementMode="Compact"
-                                                       Width="120"
-                                                       ValueChanged="EffectNumberBox_ValueChanged" />
-                                        </Grid>
-                                    </StackPanel>
-
-                                    <Border Style="{StaticResource BasDividerStyle}" Margin="0,20,0,12" />
-
-                                    <ToggleSwitch x:Name="CheckApplyCurveDraw"
-                                                  Header=""
-                                                  Toggled="CurveDraw_Changed" />
-                                    <TextBlock x:Name="TxtCurveDrawHint"
-                                               Text=""
-                                               Margin="0,0,0,12"
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                    <ToggleSwitch x:Name="CheckFollowDisplayRefreshRate"
-                                                  Header="" />
-                                    <TextBlock x:Name="TxtFollowDisplayRefreshRateHint"
-                                               Text=""
-                                               Margin="0,0,0,12"
-                                               Style="{StaticResource BasCaptionStyle}" />
-
-                                    <TextBlock x:Name="TxtTrailRefresh"
-                                               Text=""
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <Grid ColumnSpacing="12">
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckLinkedAnimationSpeed"
+                                            Header=""
+                                            Toggled="LinkedAnimationSpeed_Changed"
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckLinkedAnimationSpeed}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <StackPanel x:Name="PanelUnifiedAnimationSpeed">
+                                <Border Style="{StaticResource BasSettingCardStyle}">
+                                    <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="1.15*" />
+                                            <ColumnDefinition Width="*" MinWidth="140" />
                                         </Grid.ColumnDefinitions>
-                                        <Slider x:Name="SliderTrailRefresh"
-                                                Grid.Column="0"
-                                                Minimum="30" Maximum="360"
-                                                StepFrequency="1" />
-                                        <NumberBox x:Name="TxtTrailRefreshValue"
-                                                   Grid.Column="1"
-                                                   Minimum="30" Maximum="360"
-                                                   SmallChange="1"
-                                                   SpinButtonPlacementMode="Compact"
-                                                   Width="120" />
+                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock
+                                                x:Name="TxtAnimSpeed"
+                                                Text=""
+                                                Style="{StaticResource BasSettingTitleStyle}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider
+                                                    x:Name="SliderSpeed"
+                                                    Grid.Column="0"
+                                                    Minimum="0.2"
+                                                    Maximum="3.0"
+                                                    StepFrequency="0.1"
+                                                    ValueChanged="EffectSlider_ValueChanged"
+                                                    MinWidth="40"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtAnimSpeed}" />
+                                                <NumberBox
+                                                    x:Name="TxtSpeedValue"
+                                                    Grid.Column="1"
+                                                    Minimum="0.2"
+                                                    Maximum="3.0"
+                                                    SmallChange="0.1"
+                                                    SpinButtonPlacementMode="Compact"
+                                                    Width="84"
+                                                    ValueChanged="EffectNumberBox_ValueChanged"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtAnimSpeed}" />
+                                            </Grid>
+                                        </Grid>
                                     </Grid>
-
-                                    <Border Style="{StaticResource BasDividerStyle}" Margin="0,20,0,12" />
-
-                                    <TextBlock x:Name="TxtEffectColor"
-                                               Text=""
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <StackPanel Orientation="Horizontal" Spacing="12">
-                                        <Border x:Name="ColorPreview"
-                                                Width="48" Height="32"
+                                </Border>
+                            </StackPanel>
+                            <StackPanel x:Name="PanelSplitAnimationSpeed" Visibility="Collapsed">
+                                <Border Style="{StaticResource BasSettingCardStyle}">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.15*" />
+                                            <ColumnDefinition Width="*" MinWidth="140" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock
+                                                x:Name="TxtTrailAnimSpeed"
+                                                Text=""
+                                                Style="{StaticResource BasSettingTitleStyle}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider
+                                                    x:Name="SliderTrailAnimSpeed"
+                                                    Grid.Column="0"
+                                                    Minimum="0.2"
+                                                    Maximum="3.0"
+                                                    StepFrequency="0.1"
+                                                    ValueChanged="EffectSlider_ValueChanged"
+                                                    MinWidth="40"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtTrailAnimSpeed}" />
+                                                <NumberBox
+                                                    x:Name="TxtTrailSpeedValue"
+                                                    Grid.Column="1"
+                                                    Minimum="0.2"
+                                                    Maximum="3.0"
+                                                    SmallChange="0.1"
+                                                    SpinButtonPlacementMode="Compact"
+                                                    Width="84"
+                                                    ValueChanged="EffectNumberBox_ValueChanged"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtTrailAnimSpeed}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource BasSettingCardStyle}">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.15*" />
+                                            <ColumnDefinition Width="*" MinWidth="140" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock
+                                                x:Name="TxtClickAnimSpeed"
+                                                Text=""
+                                                Style="{StaticResource BasSettingTitleStyle}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider
+                                                    x:Name="SliderClickAnimSpeed"
+                                                    Grid.Column="0"
+                                                    Minimum="0.2"
+                                                    Maximum="3.0"
+                                                    StepFrequency="0.1"
+                                                    ValueChanged="EffectSlider_ValueChanged"
+                                                    MinWidth="40"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtClickAnimSpeed}" />
+                                                <NumberBox
+                                                    x:Name="TxtClickSpeedValue"
+                                                    Grid.Column="1"
+                                                    Minimum="0.2"
+                                                    Maximum="3.0"
+                                                    SmallChange="0.1"
+                                                    SpinButtonPlacementMode="Compact"
+                                                    Width="84"
+                                                    ValueChanged="EffectNumberBox_ValueChanged"
+                                                    AutomationProperties.Name="{Binding Text, ElementName=TxtClickAnimSpeed}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckApplyCurveDraw}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock
+                                            x:Name="TxtCurveDrawHint"
+                                            Text=""
+                                            Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckApplyCurveDraw"
+                                            Header=""
+                                            Toggled="CurveDraw_Changed"
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckApplyCurveDraw}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckFollowDisplayRefreshRate}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock
+                                            x:Name="TxtFollowDisplayRefreshRateHint"
+                                            Text=""
+                                            Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckFollowDisplayRefreshRate"
+                                            Header=""
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckFollowDisplayRefreshRate}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtTrailRefresh"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Slider
+                                                x:Name="SliderTrailRefresh"
+                                                Grid.Column="0"
+                                                Minimum="30"
+                                                Maximum="360"
+                                                StepFrequency="1"
+                                                MinWidth="40"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtTrailRefresh}" />
+                                            <NumberBox
+                                                x:Name="TxtTrailRefreshValue"
+                                                Grid.Column="1"
+                                                Minimum="30"
+                                                Maximum="360"
+                                                SmallChange="1"
+                                                SpinButtonPlacementMode="Compact"
+                                                Width="84"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtTrailRefresh}" />
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtEffectColor"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                                            <Border
+                                                x:Name="ColorPreview"
+                                                Width="48"
+                                                Height="32"
                                                 CornerRadius="{StaticResource BasControlCornerRadius}"
                                                 BorderThickness="1"
                                                 BorderBrush="{ThemeResource BasControlStrokeBrush}" />
-                                        <Button x:Name="BtnPickColor"
+                                            <Button
+                                                x:Name="BtnPickColor"
                                                 Content=""
                                                 Click="PickColor_Click" />
-                                    </StackPanel>
-                                </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
                             </Border>
                         </StackPanel>
 
                         <!-- ===== 环境过滤 ===== -->
                         <StackPanel x:Name="SectionFilter" Visibility="Collapsed">
-                            <Border Style="{StaticResource BasCardStyle}">
-                                <StackPanel>
-                                    <TextBlock x:Name="TxtFilterTitle"
-                                               Text=""
-                                               Style="{StaticResource BasSectionTitleStyle}" />
-
-                                    <ToggleSwitch x:Name="CheckEnvironmentFilter"
-                                                  Header=""
-                                                  Margin="0,16,0,0"
-                                                  Toggled="EnvironmentFilterSetting_Changed" />
-                                    <ToggleSwitch x:Name="CheckHideInFullscreen"
-                                                  Header=""
-                                                  Margin="0,0,0,8" />
-                                    <ToggleSwitch x:Name="CheckShowEffectOnDesktop"
-                                                  Header="" />
-
-                                    <Border Style="{StaticResource BasDividerStyle}" Margin="0,20,0,12" />
-
-                                    <!-- 配置组 -->
-                                    <TextBlock x:Name="TxtFilterProfiles"
-                                               Text=""
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-                                        <ComboBox x:Name="ComboProfiles"
-                                                  MinWidth="220"
-                                                  SelectionChanged="ComboProfiles_SelectionChanged" />
-                                        <Button x:Name="BtnAddProfile"
-                                                Content=""
-                                                Click="AddProfile_Click" />
-                                        <Button x:Name="BtnRenameProfile"
-                                                Content=""
-                                                Click="RenameProfile_Click" />
-                                        <Button x:Name="BtnDeleteProfile"
-                                                Content=""
-                                                Style="{StaticResource BasDangerButtonStyle}"
-                                                Click="DeleteProfile_Click" />
+                            <TextBlock
+                                x:Name="TxtFilterTitle"
+                                Text=""
+                                Style="{StaticResource BasSettingsSectionTitleStyle}"
+                                Margin="0,8,0,8" />
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckEnvironmentFilter}" Style="{StaticResource BasSettingTitleStyle}" />
                                     </StackPanel>
-
-                                    <TextBlock x:Name="TxtFilterMode"
-                                               Text=""
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <ComboBox x:Name="ComboProcessFilterMode"
-                                              MinWidth="220"
-                                              HorizontalAlignment="Left"
-                                              Margin="0,0,0,16"
-                                              SelectionChanged="ProcessFilterMode_Changed">
-                                        <ComboBoxItem Content="" />
-                                        <ComboBoxItem Content="" />
-                                        <ComboBoxItem Content="" />
-                                    </ComboBox>
-
-                                    <TextBlock x:Name="TxtProcessList"
-                                               Text=""
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <ListView x:Name="ListConfiguredProcesses"
-                                              MaxHeight="200"
-                                              SelectionMode="None"
-                                              Margin="0,0,0,12">
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid ColumnSpacing="12" Padding="0,4">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding}"
-                                                               VerticalAlignment="Center"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                    <Button Grid.Column="1"
-                                                            Click="RemoveProcess_Click"
-                                                            Tag="{Binding}"
-                                                            Padding="8,2">
-                                                        <FontIcon Glyph="&#xE711;" FontSize="12" />
-                                                    </Button>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-
-                                    <TextBlock x:Name="TxtAddProcess"
-                                               Text=""
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBox x:Name="ManualProcessInput"
-                                                 MinWidth="240"
-                                                 PlaceholderText="notepad.exe" />
-                                        <Button x:Name="BtnAddProcess"
-                                                Content=""
-                                                Click="AddManualProcess_Click" />
-                                        <Button x:Name="BtnBrowseProcess"
-                                                Content=""
-                                                Click="BrowseProcess_Click" />
-                                        <Button x:Name="BtnSelectRunningProcess"
-                                                Content=""
-                                                Click="SelectRunningProcess_Click" />
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckEnvironmentFilter"
+                                            Header=""
+                                            Toggled="EnvironmentFilterSetting_Changed"
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckEnvironmentFilter}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckHideInFullscreen}" Style="{StaticResource BasSettingTitleStyle}" />
                                     </StackPanel>
-                                </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckHideInFullscreen"
+                                            Header=""
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckHideInFullscreen}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckShowEffectOnDesktop}" Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckShowEffectOnDesktop"
+                                            Header=""
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckShowEffectOnDesktop}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtFilterProfiles"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <StackPanel Spacing="8">
+                                            <ComboBox
+                                                x:Name="ComboProfiles"
+                                                MinWidth="0"
+                                                SelectionChanged="ComboProfiles_SelectionChanged"
+                                                HorizontalAlignment="Stretch"
+                                                Background="{ThemeResource BasSettingsControlBackgroundBrush}"
+                                                BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtFilterProfiles}" />
+                                            <Grid ColumnSpacing="4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button
+                                                    x:Name="BtnAddProfile"
+                                                    Content=""
+                                                    Click="AddProfile_Click"
+                                                    Grid.Column="0"
+                                                    Grid.Row="0"
+                                                    MinWidth="0"
+                                                    Padding="6,4"
+                                                    FontSize="12"
+                                                    HorizontalAlignment="Stretch" />
+                                                <Button
+                                                    x:Name="BtnRenameProfile"
+                                                    Content=""
+                                                    Click="RenameProfile_Click"
+                                                    Grid.Column="1"
+                                                    Grid.Row="0"
+                                                    MinWidth="0"
+                                                    Padding="6,4"
+                                                    FontSize="12"
+                                                    HorizontalAlignment="Stretch" />
+                                                <Button
+                                                    x:Name="BtnDeleteProfile"
+                                                    Content=""
+                                                    Style="{StaticResource BasDangerButtonStyle}"
+                                                    Click="DeleteProfile_Click"
+                                                    Grid.Column="2"
+                                                    Grid.Row="0"
+                                                    MinWidth="0"
+                                                    Padding="6,4"
+                                                    FontSize="12"
+                                                    HorizontalAlignment="Stretch" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtFilterMode"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <Border Style="{StaticResource BasSegmentedSelectorStyle}">
+                                            <RadioButtons x:Name="ComboProcessFilterMode" MaxColumns="3" HorizontalAlignment="Stretch"
+                                                          AutomationProperties.Name="{Binding Text, ElementName=TxtFilterMode}"
+                                                          SelectionChanged="ProcessFilterMode_Changed">
+                                                <RadioButton Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                                <RadioButton Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                                <RadioButton Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                            </RadioButtons>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtProcessList"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ListView
+                                            x:Name="ListConfiguredProcesses"
+                                            MaxHeight="200"
+                                            SelectionMode="None"
+                                            AutomationProperties.Name="{Binding Text, ElementName=TxtProcessList}" >
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid ColumnSpacing="12" Padding="0,4">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="1"
+                                                                Click="RemoveProcess_Click"
+                                                                Tag="{Binding}"
+                                                                Padding="8,2">
+                                                            <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                                        </Button>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtAddProcess"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" MaxWidth="240" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <StackPanel Spacing="8">
+                                            <TextBox
+                                                x:Name="ManualProcessInput"
+                                                MinWidth="0"
+                                                PlaceholderText="notepad.exe"
+                                                HorizontalAlignment="Stretch"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtAddProcess}" />
+                                            <Grid ColumnSpacing="4" RowSpacing="4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <Button
+                                                    x:Name="BtnAddProcess"
+                                                    Content=""
+                                                    Click="AddManualProcess_Click"
+                                                    Grid.Column="0"
+                                                    Grid.Row="0"
+                                                    MinWidth="0"
+                                                    Padding="6,4"
+                                                    FontSize="12"
+                                                    HorizontalAlignment="Stretch" />
+                                                <Button
+                                                    x:Name="BtnBrowseProcess"
+                                                    Content=""
+                                                    Click="BrowseProcess_Click"
+                                                    Grid.Column="1"
+                                                    Grid.Row="0"
+                                                    MinWidth="0"
+                                                    Padding="6,4"
+                                                    FontSize="12"
+                                                    HorizontalAlignment="Stretch" />
+                                                <Button
+                                                    x:Name="BtnSelectRunningProcess"
+                                                    Content=""
+                                                    Click="SelectRunningProcess_Click"
+                                                    Grid.Column="0"
+                                                    Grid.Row="1"
+                                                    Grid.ColumnSpan="2"
+                                                    MinWidth="0"
+                                                    Padding="6,4"
+                                                    FontSize="12"
+                                                    HorizontalAlignment="Stretch" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
                             </Border>
                         </StackPanel>
 
                         <!-- ===== 多屏管理 ===== -->
                         <StackPanel x:Name="SectionMultiScreen" Visibility="Collapsed">
-                            <Border Style="{StaticResource BasCardStyle}">
-                                <StackPanel>
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="TxtMultiScreenTitle"
-                                                   Grid.Column="0"
-                                                   Text=""
-                                                   Style="{StaticResource BasSectionTitleStyle}"
-                                                   VerticalAlignment="Center" />
-                                        <Button x:Name="BtnRefreshScreens"
-                                                Grid.Column="1"
-                                                Content=""
-                                                Click="RefreshScreenOptions_Click" />
-                                    </Grid>
-                                    <TextBlock x:Name="TxtMultiScreenHint"
-                                               Text=""
-                                               Margin="0,8,0,12"
-                                               Style="{StaticResource BasCaptionStyle}" />
-                                    <StackPanel x:Name="PanelScreenOptions" Spacing="4" />
-                                </StackPanel>
-                            </Border>
+                            <Grid ColumnSpacing="12" Margin="0,8,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    x:Name="TxtMultiScreenTitle"
+                                    Grid.Column="0"
+                                    Text=""
+                                    Style="{StaticResource BasSettingsSectionTitleStyle}"
+                                    VerticalAlignment="Center"
+                                    Margin="0" />
+                                <Button
+                                    x:Name="BtnRefreshScreens"
+                                    Grid.Column="1"
+                                    Content=""
+                                    Click="RefreshScreenOptions_Click" />
+                            </Grid>
+                            <TextBlock
+                                x:Name="TxtMultiScreenHint"
+                                Text=""
+                                Margin="0,0,0,12"
+                                Style="{StaticResource BasCaptionStyle}" />
+                            <StackPanel
+                                x:Name="PanelScreenOptions"
+                                Spacing="0" />
                         </StackPanel>
 
                         <!-- 「更多设置」已移除：仅有的侧边栏背景图功能不再提供。 -->

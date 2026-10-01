@@ -826,9 +826,9 @@ public sealed partial class ControlPanelWindow : UserControl
         // 进程过滤模式的三个条目同理。
         if (ComboProcessFilterMode.Items.Count >= 3)
         {
-            SetComboItemContent(ComboProcessFilterMode, 0, "Filter_Mode_Disabled");
-            SetComboItemContent(ComboProcessFilterMode, 1, "Filter_Mode_Blacklist");
-            SetComboItemContent(ComboProcessFilterMode, 2, "Filter_Mode_Whitelist");
+            SetRadioContent(ComboProcessFilterMode, 0, "Filter_Mode_Disabled");
+            SetRadioContent(ComboProcessFilterMode, 1, "Filter_Mode_Blacklist");
+            SetRadioContent(ComboProcessFilterMode, 2, "Filter_Mode_Whitelist");
         }
     }
 
@@ -837,14 +837,6 @@ public sealed partial class ControlPanelWindow : UserControl
         if (container.Items[index] is RadioButton button)
         {
             button.Content = Localization.Get(key);
-        }
-    }
-
-    private static void SetComboItemContent(ComboBox combo, int index, string key)
-    {
-        if (combo.Items[index] is ComboBoxItem item)
-        {
-            item.Content = Localization.Get(key);
         }
     }
 
@@ -2219,41 +2211,34 @@ public sealed partial class ControlPanelWindow : UserControl
     /// <summary>每个显示器一行：名称 / 分辨率 / 位置与缩放 + 启用开关。</summary>
     private FrameworkElement CreateScreenRow(ScreenOptionItem item)
     {
-        var text = new StackPanel();
+        var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(new TextBlock
         {
             Text = item.Title,
-            FontWeight = FontWeights.SemiBold,
-            TextWrapping = TextWrapping.Wrap
+            Style = TryGetAppResource<Style>("BasSettingTitleStyle")
         });
         text.Children.Add(new TextBlock
         {
             Text = item.ResolutionText,
-            Opacity = 0.8,
-            FontSize = 12,
-            Margin = new Thickness(0, 4, 0, 0)
+            Style = TryGetAppResource<Style>("BasCaptionStyle")
         });
         text.Children.Add(new TextBlock
         {
             Text = item.DetailText,
-            Opacity = 0.6,
-            FontSize = 11,
-            Margin = new Thickness(0, 2, 0, 0),
-            TextWrapping = TextWrapping.Wrap
+            Style = TryGetAppResource<Style>("BasCaptionStyle")
         });
 
         var toggle = new ToggleSwitch
         {
             IsOn = item.IsEnabled,
-            OnContent = item.EnableLabel,
+            OnContent = string.Empty,
             OffContent = string.Empty,
-            MinWidth = 0,
-            Margin = new Thickness(16, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center
+            Style = TryGetAppResource<Style>("BasSettingToggleStyle")
         };
+        AutomationProperties.SetName(toggle, $"{item.Title} - {item.EnableLabel}");
         toggle.Toggled += (_, _) => item.IsEnabled = toggle.IsOn;
 
-        var row = new Grid();
+        var row = new Grid { ColumnSpacing = 16 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Grid.SetColumn(text, 0);
@@ -2263,12 +2248,10 @@ public sealed partial class ControlPanelWindow : UserControl
 
         var border = new Border
         {
-            Padding = new Thickness(12),
-            Margin = new Thickness(0, 0, 0, 8),
             Child = row
         };
 
-        Style? cardStyle = TryGetAppResource<Style>("BasCardStyle");
+        Style? cardStyle = TryGetAppResource<Style>("BasSettingCardStyle");
         if (cardStyle != null)
         {
             border.Style = cardStyle;
@@ -2276,7 +2259,10 @@ public sealed partial class ControlPanelWindow : UserControl
         else
         {
             border.BorderThickness = new Thickness(1);
-            border.CornerRadius = new CornerRadius(8);
+            border.CornerRadius = new CornerRadius(6);
+            border.Padding = new Thickness(16, 12, 16, 12);
+            border.Margin = new Thickness(0, 0, 0, 4);
+            border.MinHeight = 60;
         }
 
         _screenToggles[item] = toggle;
@@ -2316,7 +2302,7 @@ public sealed partial class ControlPanelWindow : UserControl
             item.EnableLabel = label;
             if (_screenToggles.TryGetValue(item, out ToggleSwitch? toggle))
             {
-                toggle.OnContent = label;
+                AutomationProperties.SetName(toggle, $"{item.Title} - {label}");
             }
         }
     }

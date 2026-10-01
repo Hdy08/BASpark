@@ -31,7 +31,18 @@
             <SolidColorBrush x:Key="BasCardSecondaryBrush" Color="#80F9F9F9" />
 
             <!-- 侧边栏 -->
-            <SolidColorBrush x:Key="BasSidebarBackgroundBrush" Color="#80F9F9F9" />
+            <SolidColorBrush x:Key="BasSidebarBackgroundBrush" Color="#F3F3F3" />
+            <SolidColorBrush x:Key="BasSettingsPageBackgroundBrush" Color="#F9F9F9" />
+            <SolidColorBrush x:Key="BasSettingsCardBackgroundBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="BasSettingsCardBorderBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="BasSettingsControlBackgroundBrush" Color="#F5F5F5" />
+            <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="#D9D9D9" />
+            <SolidColorBrush x:Key="BasNavigationSelectedBrush" Color="#E6E6E6" />
+            <SolidColorBrush x:Key="BasNavigationSelectedTextBrush" Color="#111111" />
+            <Color x:Key="BasSettingsAccentColor">#5D5AB4</Color>
+            <Color x:Key="BasSettingsAccentTextColor">#FFFFFF</Color>
+            <SolidColorBrush x:Key="BasSettingsAccentBrush" Color="{ThemeResource BasSettingsAccentColor}" />
+            <SolidColorBrush x:Key="BasSettingsAccentTextBrush" Color="{ThemeResource BasSettingsAccentTextColor}" />
             <SolidColorBrush x:Key="BasSidebarBorderBrush" Color="#0F000000" />
 
             <!-- 文字层级（对齐 WinUI TextFillColor*） -->
@@ -72,7 +83,18 @@
             <SolidColorBrush x:Key="BasCardStrokeBrush" Color="#12FFFFFF" />
             <SolidColorBrush x:Key="BasCardSecondaryBrush" Color="#0AFFFFFF" />
 
-            <SolidColorBrush x:Key="BasSidebarBackgroundBrush" Color="#0DFFFFFF" />
+            <SolidColorBrush x:Key="BasSidebarBackgroundBrush" Color="#202020" />
+            <SolidColorBrush x:Key="BasSettingsPageBackgroundBrush" Color="#272727" />
+            <SolidColorBrush x:Key="BasSettingsCardBackgroundBrush" Color="#323232" />
+            <SolidColorBrush x:Key="BasSettingsCardBorderBrush" Color="#323232" />
+            <SolidColorBrush x:Key="BasSettingsControlBackgroundBrush" Color="#3E3E3E" />
+            <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="#505050" />
+            <SolidColorBrush x:Key="BasNavigationSelectedBrush" Color="#2D2D2D" />
+            <SolidColorBrush x:Key="BasNavigationSelectedTextBrush" Color="#FFFFFF" />
+            <Color x:Key="BasSettingsAccentColor">#ADACF0</Color>
+            <Color x:Key="BasSettingsAccentTextColor">#111111</Color>
+            <SolidColorBrush x:Key="BasSettingsAccentBrush" Color="{ThemeResource BasSettingsAccentColor}" />
+            <SolidColorBrush x:Key="BasSettingsAccentTextBrush" Color="{ThemeResource BasSettingsAccentTextColor}" />
             <SolidColorBrush x:Key="BasSidebarBorderBrush" Color="#12FFFFFF" />
 
             <SolidColorBrush x:Key="BasTextPrimaryBrush" Color="#FFFFFFFF" />
@@ -108,6 +130,17 @@
             <SolidColorBrush x:Key="BasCardSecondaryBrush" Color="{ThemeResource SystemColorWindowColor}" />
 
             <SolidColorBrush x:Key="BasSidebarBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="BasSettingsPageBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="BasSettingsCardBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="BasSettingsCardBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="BasSettingsControlBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="BasNavigationSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="BasNavigationSelectedTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <StaticResource x:Key="BasSettingsAccentColor" ResourceKey="SystemColorHighlightColor" />
+            <StaticResource x:Key="BasSettingsAccentTextColor" ResourceKey="SystemColorHighlightTextColor" />
+            <SolidColorBrush x:Key="BasSettingsAccentBrush" Color="{ThemeResource BasSettingsAccentColor}" />
+            <SolidColorBrush x:Key="BasSettingsAccentTextBrush" Color="{ThemeResource BasSettingsAccentTextColor}" />
             <SolidColorBrush x:Key="BasSidebarBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
 
             <SolidColorBrush x:Key="BasTextPrimaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
@@ -237,6 +270,117 @@
 
     <!-- ==================== 侧边栏导航项 ==================== -->
 
+    <Style x:Key="BasSettingsPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasPageTitleStyle}">
+        <Setter Property="FontSize" Value="24" />
+    </Style>
+
+    <Style x:Key="BasSettingsSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasSectionTitleStyle}">
+        <Setter Property="Margin" Value="0,20,0,8" />
+    </Style>
+
+    <Style x:Key="BasSettingTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasFieldLabelStyle}">
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <Style x:Key="BasSettingCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource BasSettingsCardBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource BasSettingsCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="MinHeight" Value="60" />
+    </Style>
+
+    <Style x:Key="BasSettingToggleStyle" TargetType="ToggleSwitch">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="OnContent" Value="" />
+        <Setter Property="OffContent" Value="" />
+        <Setter Property="HeaderTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <Grid Visibility="Collapsed" />
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="BasSegmentedSelectorStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource BasSettingsControlBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource BasSettingsControlBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="2" />
+        <Setter Property="MaxWidth" Value="240" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="BasSegmentedRadioStyle" TargetType="RadioButton">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
+        <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis"
+                               ToolTipService.ToolTip="{Binding}" />
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid x:Name="SegmentRoot" Background="Transparent" CornerRadius="3">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="SegmentHover.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="SegmentRoot.Opacity" Value="0.8" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="SegmentRoot.Opacity" Value="0.4" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="CheckStates">
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="SegmentSelection.Background" Value="{ThemeResource BasSettingsAccentBrush}" />
+                                        <Setter Target="SegmentContent.Foreground" Value="{ThemeResource BasSettingsAccentTextBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Indeterminate" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="SegmentSelection" Background="Transparent" CornerRadius="3" />
+                        <Border x:Name="SegmentHover" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                CornerRadius="3" Opacity="0" />
+                        <ContentPresenter x:Name="SegmentContent" Content="{TemplateBinding Content}"
+                                          Margin="{TemplateBinding Padding}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!--
         导航使用 RadioButton 以复用 WinUI 的单选分组与键盘导航语义。
         模板去掉单选圆点，改为一整行可点击区域；选中态使用系统强调色底纹
@@ -244,7 +388,8 @@
         左侧 3px 强调色指示条与 WinUI NavigationView 的选中标记一致。
     -->
     <Style x:Key="BasNavRadioStyle" TargetType="RadioButton">
-        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Margin" Value="2,0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -258,12 +403,13 @@
                             <ColumnDefinition Width="3" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
+                        <Border x:Name="SelectionBackground" Grid.ColumnSpan="2" Background="Transparent" CornerRadius="4" />
                         <Border x:Name="SelectionIndicator"
                                 Grid.Column="0"
                                 Width="3"
-                                Height="16"
+                                Height="20"
                                 CornerRadius="2"
-                                Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                Background="{ThemeResource BasSettingsAccentBrush}"
                                 Opacity="0"
                                 RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
@@ -272,7 +418,7 @@
                         </Border>
                         <ContentPresenter x:Name="ContentPresenter"
                                           Grid.Column="1"
-                                          Margin="13,0,12,0"
+                                          Margin="9,0,12,0"
                                           Content="{TemplateBinding Content}"
                                           ContentTemplate="{TemplateBinding ContentTemplate}"
                                           VerticalAlignment="Center" />
@@ -310,6 +456,10 @@
                             <VisualStateGroup x:Name="CheckStates">
                                 <VisualState x:Name="Checked">
                                     <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SelectionBackground"
+                                                                       Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource BasNavigationSelectedBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
                                         <!-- 左侧强调色小条以原生动画「长出来」：
                                              透明度淡入 + 纵向缩放，而不是瞬间显隐。 -->
                                         <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
@@ -327,7 +477,7 @@
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
                                                                        Storyboard.TargetProperty="Foreground">
                                             <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                                                    Value="{ThemeResource BasNavigationSelectedTextBrush}" />
                                         </ObjectAnimationUsingKeyFrames>
                                     </Storyboard>
                                 </VisualState>
@@ -364,6 +514,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid x:Name="LayoutRoot" Background="Transparent" CornerRadius="4">
+                        <Border x:Name="SelectionBackground" Background="Transparent" CornerRadius="4" />
+                        <Border x:Name="SelectionIndicator" Width="3" Height="16" CornerRadius="2"
+                                HorizontalAlignment="Left" Background="{ThemeResource BasSettingsAccentBrush}" Opacity="0" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Margin="13,0,12,0"
                                           Content="{TemplateBinding Content}"
@@ -395,10 +548,18 @@
                             <VisualStateGroup x:Name="CheckStates">
                                 <VisualState x:Name="Checked">
                                     <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SelectionBackground"
+                                                                       Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource BasNavigationSelectedBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SelectionIndicator"
+                                                                       Storyboard.TargetProperty="Opacity">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="1" />
+                                        </ObjectAnimationUsingKeyFrames>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
                                                                        Storyboard.TargetProperty="Foreground">
                                             <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                                                    Value="{ThemeResource BasNavigationSelectedTextBrush}" />
                                         </ObjectAnimationUsingKeyFrames>
                                     </Storyboard>
                                 </VisualState>

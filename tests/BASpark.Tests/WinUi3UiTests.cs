@@ -43,7 +43,7 @@ public class WinUi3UiTests
 
         // 侧边栏与卡片同样走主题资源。
         Assert.Contains("BasSidebarBackgroundBrush", (string?)GetNamedElement(document, "Sidebar").Attribute("Background"));
-        Assert.Contains("BasCardStyle", (string?)GetNamedElement(document, "ColorPreview").Parent?.Parent?.Attribute("Style") ?? "BasCardStyle");
+        Assert.Equal("{StaticResource BasSettingCardStyle}", (string?)GetSettingCard(GetNamedElement(document, "ColorPreview")).Attribute("Style"));
 
         // 深色模式三态：使用 WinUI 的 RadioButtons 容器，SelectedIndex 即状态；
         // 文案由代码填充（见 StaticText_IsFilledFromCodeBecauseWinUi3RejectsMarkupExtensions）。
@@ -160,13 +160,12 @@ public class WinUi3UiTests
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement toggle = GetNamedElement(document, "CheckLinkedAnimationSpeed");
         XElement hint = GetNamedElement(document, "TxtLinkedSpeedHint");
-        XElement parent = Assert.IsType<XElement>(toggle.Parent);
-        List<XElement> children = parent.Elements().ToList();
+        XElement card = GetSettingCard(toggle);
+        List<XElement> children = GetNamedElement(document, "SectionVisual").Elements().ToList();
 
-        Assert.Same(parent, hint.Parent);
-        Assert.Equal(children.IndexOf(toggle) + 1, children.IndexOf(hint));
-        Assert.True(children.IndexOf(hint) < children.IndexOf(GetNamedElement(document, "PanelUnifiedAnimationSpeed")));
-        Assert.True(children.IndexOf(hint) < children.IndexOf(GetNamedElement(document, "PanelSplitAnimationSpeed")));
+        AssertSettingHint(toggle, hint);
+        Assert.True(children.IndexOf(card) < children.IndexOf(GetNamedElement(document, "PanelUnifiedAnimationSpeed")));
+        Assert.True(children.IndexOf(card) < children.IndexOf(GetNamedElement(document, "PanelSplitAnimationSpeed")));
     }
 
     [Fact]
@@ -177,9 +176,7 @@ public class WinUi3UiTests
         XElement hint = GetNamedElement(document, "TxtFollowDisplayRefreshRateHint");
         XElement slider = GetNamedElement(document, "SliderTrailRefresh");
         XElement numberBox = GetNamedElement(document, "TxtTrailRefreshValue");
-        List<XElement> children = Assert.IsType<XElement>(toggle.Parent).Elements().ToList();
-
-        Assert.Equal(children.IndexOf(toggle) + 1, children.IndexOf(hint));
+        AssertSettingHint(toggle, hint);
         Assert.Equal("30", (string?)slider.Attribute("Minimum"));
         Assert.Equal("360", (string?)slider.Attribute("Maximum"));
         Assert.Equal("30", (string?)numberBox.Attribute("Minimum"));
@@ -226,9 +223,7 @@ public class WinUi3UiTests
         XElement numberBox = GetNamedElement(document, "TxtGlowValue");
         XElement trailRefreshText = GetNamedElement(document, "TxtTrailRefresh");
         XElement effectColor = GetNamedElement(document, "TxtEffectColor");
-        List<XElement> children = Assert.IsType<XElement>(slider.Parent?.Parent).Elements().ToList();
-
-        // 辉光亮度位于拖尾刷新率之后、特效颜色之前。
+        List<XElement> children = GetNamedElement(document, "SectionVisual").Descendants().ToList();
         Assert.True(children.IndexOf(trailRefreshText) < children.IndexOf(effectColor));
         Assert.Equal("0", (string?)slider.Attribute("Minimum"));
         Assert.Equal("3", (string?)slider.Attribute("Maximum"));
@@ -663,6 +658,177 @@ public class WinUi3UiTests
         Assert.Contains("_xamlSource.TakeFocusRequested +=", hostSource, StringComparison.Ordinal);
         Assert.Contains("XamlSourceFocusNavigationReason.First or XamlSourceFocusNavigationReason.Last", hostSource, StringComparison.Ordinal);
         Assert.Contains("XamlSourceFocusNavigationReason.Restore", hostSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SettingsPalette_MatchesTheReferenceAndKeepsTheSidebarWithTheTitleBar()
+    {
+        XDocument document = LoadXaml("src", "DesignSystem.xaml");
+        XElement themes = Assert.Single(document.Descendants(), element => element.Name.LocalName == "ResourceDictionary.ThemeDictionaries");
+        foreach (XElement theme in themes.Elements())
+        {
+            var colors = theme.Elements().ToDictionary(element => (string)element.Attribute(Xaml + "Key")!, element => (string?)element.Attribute("Color"));
+            Assert.Equal(colors["BasPageBackgroundBrush"], colors["BasSidebarBackgroundBrush"]);
+            if ((string?)theme.Attribute(Xaml + "Key") == "Dark")
+            {
+                Assert.Equal("#202020", colors["BasSidebarBackgroundBrush"]);
+                Assert.Equal("#272727", colors["BasSettingsPageBackgroundBrush"]);
+                Assert.Equal("#323232", colors["BasSettingsCardBackgroundBrush"]);
+                Assert.Equal("#2D2D2D", colors["BasNavigationSelectedBrush"]);
+                XElement accent = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentColor");
+                Assert.Equal("#ADACF0", accent.Value);
+            }
+            if ((string?)theme.Attribute(Xaml + "Key") == "HighContrast")
+            {
+                Assert.Equal("{ThemeResource SystemColorWindowTextColor}", colors["BasSettingsCardBorderBrush"]);
+                Assert.Equal("{ThemeResource SystemColorHighlightTextColor}", colors["BasNavigationSelectedTextBrush"]);
+            }
+        }
+
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement page = GetNamedElement(panel, "PageSettings");
+        Assert.Equal("{ThemeResource BasSettingsPageBackgroundBrush}", (string?)page.Attribute("Background"));
+        Assert.Equal("6,0,0,0", (string?)page.Attribute("CornerRadius"));
+        Assert.Equal("{StaticResource BasSettingsPageTitleStyle}", (string?)GetNamedElement(panel, "TxtSettingsTitle").Attribute("Style"));
+    }
+
+    [Fact]
+    public void Settings_KeepIndependentCardsWithTextOnTheLeftAndControlsOnTheRight()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        string[] controlNames =
+        [
+            "ComboLanguage", "RadioDarkMode", "RadioScrollbarVisibility", "CheckAlwaysTrailEffectSwitch",
+            "CheckMasterSwitch", "RadioClickType", "CheckMiddleClickTrigger", "CheckScreenshotCompatibilityMode",
+            "CheckAutoStart", "CheckStartSilent", "CheckRunAsAdmin", "CheckTouchscreenMode",
+            "CheckLinkedEffectScale", "SliderScale", "SliderTrailScale", "SliderClickScale", "SliderOpacity",
+            "SliderGlow", "CheckLinkedAnimationSpeed", "SliderSpeed", "SliderTrailAnimSpeed", "SliderClickAnimSpeed",
+            "CheckApplyCurveDraw", "CheckFollowDisplayRefreshRate", "SliderTrailRefresh", "BtnPickColor",
+            "CheckEnvironmentFilter", "CheckHideInFullscreen", "CheckShowEffectOnDesktop",
+            "ComboProfiles", "ComboProcessFilterMode", "ListConfiguredProcesses", "ManualProcessInput"
+        ];
+        var cards = new HashSet<XElement>();
+        foreach (string name in controlNames)
+        {
+            XElement control = GetNamedElement(document, name);
+            XElement card = GetSettingCard(control);
+            Assert.True(cards.Add(card), $"{name} must have its own setting card.");
+            XElement layout = Assert.Single(card.Elements());
+            Assert.Equal("Grid", layout.Name.LocalName);
+            XElement text = Assert.Single(layout.Elements(), element => (string?)element.Attribute("Grid.Column") == "0");
+            XElement controls = Assert.Single(layout.Elements(), element => (string?)element.Attribute("Grid.Column") == "1");
+            Assert.Equal("StackPanel", text.Name.LocalName);
+            Assert.Equal("TextBlock", text.Elements().First().Name.LocalName);
+            Assert.Contains(control, controls.Descendants());
+            Assert.Equal("Center", (string?)controls.Attribute("VerticalAlignment"));
+            if (control.Name.LocalName == "ToggleSwitch")
+            {
+                Assert.Equal("{StaticResource BasSettingToggleStyle}", (string?)control.Attribute("Style"));
+                Assert.Equal("{Binding Header, ElementName=" + name + "}", (string?)text.Elements().First().Attribute("Text"));
+            }
+        }
+
+        XElement styles = Assert.IsType<XElement>(LoadXaml("src", "DesignSystem.xaml").Root);
+        XElement cardStyle = Assert.Single(styles.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingCardStyle");
+        var setters = cardStyle.Elements().ToDictionary(element => (string)element.Attribute("Property")!, element => (string?)element.Attribute("Value"));
+        Assert.Equal("60", setters["MinHeight"]);
+        Assert.Equal("16,12", setters["Padding"]);
+        Assert.Equal("0,0,0,4", setters["Margin"]);
+    }
+
+    [Theory]
+    [InlineData("RadioScrollbarVisibility", "TxtScrollbarHint")]
+    [InlineData("CheckScreenshotCompatibilityMode", "TxtScreenshotHint")]
+    [InlineData("CheckRunAsAdmin", "TxtRunAsAdminHint")]
+    [InlineData("CheckTouchscreenMode", "TxtTouchscreenHint")]
+    [InlineData("CheckLinkedEffectScale", "TxtLinkedScaleHint")]
+    [InlineData("CheckLinkedAnimationSpeed", "TxtLinkedSpeedHint")]
+    [InlineData("CheckApplyCurveDraw", "TxtCurveDrawHint")]
+    [InlineData("CheckFollowDisplayRefreshRate", "TxtFollowDisplayRefreshRateHint")]
+    public void SettingHints_RemainUnderTheTitleInTheSameCard(string controlName, string hintName)
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        AssertSettingHint(GetNamedElement(document, controlName), GetNamedElement(document, hintName));
+    }
+
+    [Theory]
+    [InlineData("RadioDarkMode", 3)]
+    [InlineData("RadioScrollbarVisibility", 2)]
+    [InlineData("RadioClickType", 3)]
+    [InlineData("ComboProcessFilterMode", 3)]
+    public void PresetChoices_UseNativeSegmentedRadioButtons(string name, int count)
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement container = GetNamedElement(document, name);
+        Assert.Equal("RadioButtons", container.Name.LocalName);
+        Assert.Equal(count.ToString(), (string?)container.Attribute("MaxColumns"));
+        Assert.Equal("{StaticResource BasSegmentedSelectorStyle}", (string?)container.Parent?.Attribute("Style"));
+        Assert.Equal(count, container.Elements().Count());
+        Assert.All(container.Elements(), item =>
+        {
+            Assert.Equal("RadioButton", item.Name.LocalName);
+            Assert.Equal("{StaticResource BasSegmentedRadioStyle}", (string?)item.Attribute("Style"));
+        });
+        if (name == "ComboProcessFilterMode")
+        {
+            Assert.Equal("ProcessFilterMode_Changed", (string?)container.Attribute("SelectionChanged"));
+            string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+            Assert.Contains("""SetRadioContent(ComboProcessFilterMode, 0, "Filter_Mode_Disabled")""", source, StringComparison.Ordinal);
+            Assert.Contains("""SetRadioContent(ComboProcessFilterMode, 1, "Filter_Mode_Blacklist")""", source, StringComparison.Ordinal);
+            Assert.Contains("""SetRadioContent(ComboProcessFilterMode, 2, "Filter_Mode_Whitelist")""", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void SettingCards_PreserveConditionalGroupsAndDynamicScreenRows()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        string[] groupNames = ["PanelClickEffectOptions", "PanelUnifiedEffectScale", "PanelSplitEffectScale", "PanelUnifiedAnimationSpeed", "PanelSplitAnimationSpeed"];
+        foreach (string name in groupNames)
+        {
+            XElement group = GetNamedElement(document, name);
+            Assert.Equal("StackPanel", group.Name.LocalName);
+            Assert.Contains(group.Elements(), element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}");
+            if (name.StartsWith("PanelSplit", StringComparison.Ordinal))
+            {
+                Assert.Equal("Collapsed", (string?)group.Attribute("Visibility"));
+            }
+        }
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("""TryGetAppResource<Style>("BasSettingCardStyle")""", source, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetName(toggle,", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SelectedNavigationAndSegments_KeepTheirFillWhileHovering()
+    {
+        XDocument document = LoadXaml("src", "DesignSystem.xaml");
+        foreach (string key in new[] { "BasNavRadioStyle", "BasSubNavRadioStyle" })
+        {
+            XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
+            XElement selected = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "Checked");
+            Assert.Contains(selected.Descendants(), element => (string?)element.Attribute("Storyboard.TargetName") == "SelectionBackground");
+            XElement common = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "CommonStates");
+            Assert.DoesNotContain(common.Descendants(), element => (string?)element.Attribute("Storyboard.TargetName") == "SelectionBackground");
+        }
+        XElement segmentStyle = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioStyle");
+        Assert.Contains(segmentStyle.Descendants(), element => (string?)element.Attribute("Target") == "SegmentSelection.Background");
+        Assert.Contains(segmentStyle.Descendants(), element => (string?)element.Attribute("Target") == "SegmentHover.Opacity");
+    }
+
+    private static XElement GetSettingCard(XElement control) =>
+        Assert.Single(control.Ancestors(), element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}");
+
+    private static void AssertSettingHint(XElement control, XElement hint)
+    {
+        XElement card = GetSettingCard(control);
+        Assert.Same(card, GetSettingCard(hint));
+        XElement layout = Assert.Single(card.Elements());
+        XElement text = Assert.Single(layout.Elements(), element => (string?)element.Attribute("Grid.Column") == "0");
+        Assert.Same(text, hint.Parent);
+        Assert.Equal("4", (string?)text.Attribute("Spacing"));
+        Assert.Equal(2, text.Elements().Count());
+        Assert.Same(hint, text.Elements().Last());
     }
 
     private static XDocument LoadXaml(params string[] pathParts) =>
