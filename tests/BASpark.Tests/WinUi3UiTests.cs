@@ -479,46 +479,50 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void AnimatedSubNav_AvoidsCrashProneAnimationPatterns()
+    public void SettingsSubNav_AnimatesContainerHeightWithDependentAnimation()
     {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        string xaml = ReadSource("src", "ControlPanelWindow.xaml");
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
 
-        int classIndex = source.IndexOf("private sealed class AnimatedSubNav", StringComparison.Ordinal);
-        Assert.True(classIndex >= 0, "AnimatedSubNav is missing.");
+        // 子导航容器必须存在，且由导航选中状态驱动。
+        Assert.NotNull(GetNamedElement(document, "SettingsSubNavHost"));
+        Assert.NotNull(GetNamedElement(document, "SettingsSubNav"));
+        Assert.Contains("new SubNavAnimator(SettingsSubNavHost, SettingsSubNav, subNavShift)", source, StringComparison.Ordinal);
+        Assert.Contains("_subNav?.SetExpanded(settings);", source, StringComparison.Ordinal);
 
-        int classEnd = source.IndexOf("private AnimatedSubNav? _subNav;", classIndex, StringComparison.Ordinal);
-        Assert.True(classEnd > classIndex, "AnimatedSubNav structure changed unexpectedly.");
-        string body = source[classIndex..classEnd];
+        int animatorIndex = source.IndexOf("private sealed class SubNavAnimator", StringComparison.Ordinal);
+        Assert.True(animatorIndex >= 0, "SubNavAnimator is missing.");
+        int animatorEnd = source.IndexOf("private SubNavAnimator? _subNav;", animatorIndex, StringComparison.Ordinal);
+        Assert.True(animatorEnd > animatorIndex, "SubNavAnimator structure changed unexpectedly.");
+        string animator = source[animatorIndex..animatorEnd];
 
-        // 1. 收起态用「容器高度 0 + 裁剪」实现，不靠 Visibility 切换（那会让过渡
-        //    动画失去可见的起止状态）；绝不给 Border.Height 赋 NaN 作为「收起」值。
-        Assert.Contains("_host.Height = 0;", body, StringComparison.Ordinal);
-        Assert.Contains("RectangleGeometry", body, StringComparison.Ordinal);
-        Assert.Contains("UpdateClip", body, StringComparison.Ordinal);
+        // 关键回归点：Height 是布局属性，动画必须显式开启依赖动画。
+        // 缺这个标志时 WinUI 静默丢弃整段动画，只有 Completed 回调把高度瞬间设到
+        // 终值 —— 实测表现就是「只有很短的位移（内容自身的独立动画照常播放），
+        // 然后瞬间展开/收回」。
+        Assert.Contains("Storyboard.SetTargetProperty(height, \"Height\")", animator, StringComparison.Ordinal);
+        Assert.Contains("EnableDependentAnimation = true", animator, StringComparison.Ordinal);
 
-        // 2. Storyboard.Completed 是异步回调，不在 try/catch 栈上；其中的异常会
-        //    直接终结进程。必须有代次号来忽略过期回调，否则快速点击会让旧回调
-        //    覆盖新状态。
-        Assert.Contains("_generation", body, StringComparison.Ordinal);
-        Assert.Contains("generation != _generation", body, StringComparison.Ordinal);
+        // 收起态用「容器高度 0 + 裁剪」，绝不给 Height 赋 NaN 作为收起值。
+        Assert.Contains("_host.Height = 0;", animator, StringComparison.Ordinal);
+        Assert.Contains("RectangleGeometry", animator, StringComparison.Ordinal);
+        Assert.Contains("UpdateClip", animator, StringComparison.Ordinal);
 
-        // 3. 动画对象不得跨 Storyboard 复用（快速切换时会产生竞态）：
-        //    动画必须是局部变量、每次新建。
-        Assert.Contains("var height = new DoubleAnimation", body, StringComparison.Ordinal);
-        Assert.Contains("var slide = new DoubleAnimation", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("private readonly DoubleAnimation", body, StringComparison.Ordinal);
+        // Completed 是异步回调，必须有代次号忽略过期回调。
+        Assert.Contains("generation != _generation", animator, StringComparison.Ordinal);
 
-        // 4. SetExpanded 必须包在 try/catch 中，动画失败不能拖垮界面。
-        int setIndex = body.IndexOf("public void SetExpanded(bool expanded)", StringComparison.Ordinal);
-        Assert.True(setIndex >= 0, "SetExpanded is missing.");
-        Assert.Contains("catch (Exception", body[setIndex..], StringComparison.Ordinal);
+        // 动画对象每次新建，不得跨 Storyboard 复用。
+        Assert.Contains("var height = new DoubleAnimation", animator, StringComparison.Ordinal);
+        Assert.DoesNotContain("private readonly DoubleAnimation", animator, StringComparison.Ordinal);
 
-        // 5. 展开前必须先量出内容自然高度：容器被压到 0 时 ActualHeight 也是 0。
-        Assert.Contains("MeasureNaturalHeight", body, StringComparison.Ordinal);
-
-        // 6. 展开过程必须逐帧改变容器高度，下面的「日志 / 关于」才会被连续推开，
-        //    而不是等动画结束才瞬移 —— 因此必须有 Height 的 DoubleAnimation。
-        Assert.Contains("Storyboard.SetTargetProperty(height, \"Height\")", body, StringComparison.Ordinal);
+        // 不得改用原生 Expander 承载：逐帧实测它不做布局动画（下方导航项在一帧内
+        // 整段位移 168px），而在它外面套高度动画会破坏它自己的内容定位与裁剪，
+        // 动画中途子项会跳到错误的行甚至整段消失。
+        Assert.DoesNotContain("<Expander", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("NavExpander", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("NavExpander", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsExpanded", source, StringComparison.Ordinal);
     }
 
     private static XDocument LoadXaml(params string[] pathParts) =>

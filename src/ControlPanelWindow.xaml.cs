@@ -94,47 +94,57 @@ public sealed partial class ControlPanelWindow : Window
     private const int MinDesignHeight = 560;
 
     /// <summary>
-    /// <summary>
-    /// 侧边栏设置子导航的展开/收起动画：容器高度逐帧变化 + 裁剪超出部分，
-    /// 下面的「日志 / 关于」因此被连续推开，而不是等动画结束才跳位。
+    /// 侧栏设置子导航的展开/收起：容器高度逐帧变化 + 裁剪超出部分，
+    /// 下面的「日志 / 关于」贴着展开边缘被连续推开，而不是等动画结束才跳位。
     ///
-    /// 必须遵守的约束（都是实测踩出来的）：
-    ///   1. **绝不**用 <c>double.NaN</c> 表示「收起」。NaN 在 WinUI 里表示自动
-    ///      高度（会被内容撑开），收起必须写 0。
+    /// 为什么不用原生 <c>Expander</c>（逐帧实测结论）：
+    ///   1. 原生 Expander **不做布局动画**——对比下方「关于」导航项的位置，展开时它
+    ///      在一帧（16ms）内整段位移 168px，收起时先播约 200ms popin-out 再整段跳回，
+    ///      中间没有任何过渡帧。
+    ///   2. 在它外面套一层高度动画也不行：容器高度一旦小于内容自然高度，原生
+    ///      Expander 自己的内容定位与裁剪就算错了，动画中途子项会跳到错误的行、
+    ///      甚至整段消失，等动画结束才「啪」地出现。
+    ///
+    /// 关键约束：<c>Height</c> 是布局属性，对它做 <c>DoubleAnimation</c> 属于**依赖动画**，
+    /// 必须显式设置 <c>EnableDependentAnimation = true</c>。否则 WinUI 会静默忽略整段
+    /// 动画，直到 <c>Completed</c> 回调才把高度瞬间设到终值——表现就是
+    /// 「只有很短的位移（内容自身的独立动画照常播放），然后瞬间展开/收回」。
+    ///
+    /// 其余约束（都是实测踩出来的）：
+    ///   1. **绝不**用 <c>double.NaN</c> 表示「收起」。NaN 在 WinUI 里表示自动高度
+    ///      （会被内容撑开），收起必须写 0。
     ///   2. **不要**复用 <c>DoubleAnimation</c> 实例：同一动画对象先后挂到多个
     ///      Storyboard 上，在快速切换时会产生竞态。
     ///   3. Storyboard 的 <c>Completed</c> 是异步回调，**不在**调用方 try/catch 的
     ///      栈上；其中抛出的异常会直接终结进程。因此回调里只做无异常风险的赋值，
     ///      并且必须用代次号忽略过期回调（否则快速点击时旧回调会覆盖新状态）。
-    ///   4. 裁剪高度必须跟随 **实际** 高度（<see cref="FrameworkElement.SizeChanged"/>）。
-    ///      用 <c>Measure</c> 的估算值收尾时，估算与真实渲染高度一旦有差异，
-    ///      动画末帧就会明显跳一下 —— 表现为「展开/收回动画不完整」。
+    ///   4. 裁剪高度必须跟随 **实际** 高度（<see cref="FrameworkElement.SizeChanged"/>）：
+    ///      动画结束后容器交还给布局（NaN），ActualHeight 与内容自然高度要一致，否则末帧会跳。
     /// </summary>
-    private sealed class AnimatedSubNav
+    private sealed class SubNavAnimator
     {
         // 展开略慢于收起：展开需要被看清，收起只需干净利落。
-        // 220ms 在实测中偏快，观感上接近「瞬间弹开」。
-        private static readonly TimeSpan ExpandDuration = TimeSpan.FromMilliseconds(340);
-        private static readonly TimeSpan CollapseDuration = TimeSpan.FromMilliseconds(220);
+        private static readonly TimeSpan ExpandDuration = TimeSpan.FromMilliseconds(280);
+        private static readonly TimeSpan CollapseDuration = TimeSpan.FromMilliseconds(200);
 
         private readonly Border _host;
-        private readonly StackPanel _panel;
+        private readonly FrameworkElement _content;
         private readonly TranslateTransform _shift;
+        private readonly RectangleGeometry _clip = new();
 
         private bool _expanded;
         private int _generation;
 
-        public AnimatedSubNav(Border host, StackPanel panel, TranslateTransform shift)
+        public SubNavAnimator(Border host, FrameworkElement content, TranslateTransform shift)
         {
             _host = host;
-            _panel = panel;
+            _content = content;
             _shift = shift;
 
-            _host.Clip = new RectangleGeometry();
-
-            // 内容高度变化时同步裁剪，保证可见范围始终与内容一致
-            // （窗口缩放、字体或语言切换导致文案换行都会改变高度）。
-            _panel.SizeChanged += (_, e) => UpdateClip(e.NewSize.Height);
+            // 动画期间容器高度小于内容自然高度，必须裁掉溢出部分，
+            // 否则子项会画到下面的「日志 / 关于」上。
+            _host.Clip = _clip;
+            _host.SizeChanged += (_, e) => UpdateClip(e.NewSize.Height);
 
             // 初始为收起状态。
             _host.Height = 0;
@@ -153,7 +163,6 @@ public sealed partial class ControlPanelWindow : Window
 
             try
             {
-                _host.IsHitTestVisible = expanded;
                 Animate(expanded, _generation);
             }
             catch (Exception ex)
@@ -164,84 +173,47 @@ public sealed partial class ControlPanelWindow : Window
             }
         }
 
-        /// <summary>
-        /// 量出内容的自然高度。用 <see cref="UIElement.Measure"/> 而非
-        /// <c>ActualHeight</c>：容器被压到 0 高度时 ActualHeight 也是 0。
-        ///
-        /// 注意：<c>Measure</c> 会在布局中递归进入测量，若在窗口尚未完成首次布局时
-        /// 调用会让 XAML 陷入自我递归并停掉 UI 线程。因此只在宽度可用时才测量，
-        /// 否则返回 0 由调用方走「不做动画、直接到位」的兜底。
-        /// </summary>
-        private double MeasureNaturalHeight()
-        {
-            double availableWidth = ResolveContentWidth();
-            if (availableWidth <= 0)
-            {
-                return 0;
-            }
-
-            _panel.Measure(new Windows.Foundation.Size(
-                availableWidth,
-                double.PositiveInfinity));
-
-            return _panel.DesiredSize.Height;
-        }
-
-        /// <summary>
-        /// 内容可用宽度。首次布局前两者都可能为 0，此时返回 0 由调用方跳过动画
-        /// （直接落到目标状态），避免用非法宽度测量。
-        /// </summary>
-        private double ResolveContentWidth()
-        {
-            if (_panel.ActualWidth > 0)
-            {
-                return _panel.ActualWidth;
-            }
-
-            return _host.ActualWidth > 0 ? _host.ActualWidth : 0;
-        }
-
         private void Animate(bool expanded, int generation)
         {
-            double targetHeight = expanded ? MeasureNaturalHeight() : _host.ActualHeight;
+            // 起点是容器当前高度，终点是内容自然高度（展开）或 0（收起）。
+            // 收起时终点必须是 0：早先误把「当前高度」当作收起终点，导致
+            // From == To、整段动画是空操作，直到 Completed 回调才瞬间收掉。
+            double from = _host.ActualHeight;
+            double target = expanded ? MeasureNaturalHeight() : 0;
 
-            if (targetHeight <= 0)
+            if (expanded ? target <= 0 : from <= 0)
             {
                 // 尚未布局出可用尺寸：直接到位，下次交互再动画。
                 ApplyFinalState(expanded);
                 return;
             }
 
-            UpdateClip(targetHeight);
-
             var duration = new Duration(expanded ? ExpandDuration : CollapseDuration);
 
             // 展开用 EaseOut：起步快、末段收得慢，视觉上更「跟手」。
             // 收起用 EaseIn：起步慢、末段快，收得干净。
-            var heightEasing = new CubicEase
-            {
-                EasingMode = expanded ? EasingMode.EaseOut : EasingMode.EaseIn
-            };
-
             var height = new DoubleAnimation
             {
-                From = expanded ? 0 : _host.ActualHeight,
-                To = targetHeight,
+                From = from,
+                To = target,
                 Duration = duration,
-                EasingFunction = heightEasing
+                EasingFunction = new CubicEase
+                {
+                    EasingMode = expanded ? EasingMode.EaseOut : EasingMode.EaseIn
+                },
+                // 布局属性动画必须显式开启依赖动画，否则整段动画不会播放。
+                EnableDependentAnimation = true
             };
             Storyboard.SetTarget(height, _host);
             Storyboard.SetTargetProperty(height, "Height");
 
-            // 子项整体从左下方滑入，给展开动作一个可见的方向感
-            // （只有高度变化时观感会显得「只是被撑开」）。
-            var slideEasing = new CubicEase { EasingMode = EasingMode.EaseOut };
+            // 子项整体轻微上移滑入，给展开动作一个可见的方向感。
             var slide = new DoubleAnimation
             {
-                From = expanded ? -10 : 0,
-                To = expanded ? 0 : -10,
+                From = expanded ? 8 : 0,
+                To = expanded ? 0 : 8,
                 Duration = duration,
-                EasingFunction = slideEasing
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
             Storyboard.SetTarget(slide, _shift);
             Storyboard.SetTargetProperty(slide, "Y");
@@ -263,22 +235,54 @@ public sealed partial class ControlPanelWindow : Window
         }
 
         /// <summary>
-        /// 设置裁剪矩形。动画中只有容器高度在变，裁剪始终覆盖完整内容高度。
+        /// 量出内容的自然高度。用 <see cref="UIElement.Measure"/> 而非
+        /// <c>ActualHeight</c>：容器被压到 0 高度时 ActualHeight 也是 0。
+        ///
+        /// 注意：<c>Measure</c> 会在布局中递归进入测量，若在窗口尚未完成首次布局时
+        /// 调用会让 XAML 陷入自我递归并停掉 UI 线程。因此只在宽度可用时才测量，
+        /// 否则返回 0 由调用方走「不做动画、直接到位」的兜底。
+        /// </summary>
+        private double MeasureNaturalHeight()
+        {
+            double width = ResolveContentWidth();
+            if (width <= 0)
+            {
+                return 0;
+            }
+
+            _content.Measure(new Windows.Foundation.Size(width, double.PositiveInfinity));
+            return _content.DesiredSize.Height;
+        }
+
+        /// <summary>
+        /// 内容可用宽度。首次布局前两者都可能为 0，此时返回 0 由调用方跳过动画
+        /// （直接落到目标状态），避免用非法宽度测量。
+        /// </summary>
+        private double ResolveContentWidth()
+        {
+            if (_content.ActualWidth > 0)
+            {
+                return _content.ActualWidth;
+            }
+
+            return _host.ActualWidth > 0 ? _host.ActualWidth : 0;
+        }
+
+        /// <summary>
+        /// 设置裁剪矩形。动画中只有容器高度在变，裁剪宽度始终覆盖完整内容宽度，
+        /// 高度跟随容器实际高度，超出部分被裁掉。
         /// 宽度为 0 时 WinUI 会把裁剪视为空（内容整个消失），因此必须给正值。
         /// </summary>
-        private void UpdateClip(double contentHeight)
+        private void UpdateClip(double height)
         {
-            var clip = (RectangleGeometry)_host.Clip;
-
             double width = ResolveContentWidth();
             if (width <= 0)
             {
                 // 尚未布局：先用足够大的有限宽度，等首次布局后的调用再收紧。
-                clip.Rect = new Windows.Foundation.Rect(0, 0, 100000, Math.Max(0, contentHeight));
-                return;
+                width = 100000;
             }
 
-            clip.Rect = new Windows.Foundation.Rect(0, 0, width, Math.Max(0, contentHeight));
+            _clip.Rect = new Windows.Foundation.Rect(0, 0, width, Math.Max(0, height));
         }
 
         /// <summary>直接落到目标状态。只做无异常风险的赋值。</summary>
@@ -286,22 +290,22 @@ public sealed partial class ControlPanelWindow : Window
         {
             if (expanded)
             {
+                _host.IsHitTestVisible = true;
                 // 优先按真实内容高度裁剪，再解除高度约束交还给布局：两者一致，
                 // 因此不会出现动画结束时的跳变。
-                UpdateClip(_panel.ActualHeight > 0
-                    ? _panel.ActualHeight
-                    : MeasureNaturalHeight());
+                UpdateClip(_content.ActualHeight > 0 ? _content.ActualHeight : MeasureNaturalHeight());
                 _host.Height = double.NaN;
             }
             else
             {
+                _host.IsHitTestVisible = false;
                 _host.Height = 0;
                 UpdateClip(0);
             }
         }
     }
 
-    private AnimatedSubNav? _subNav;
+    private SubNavAnimator? _subNav;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -410,12 +414,12 @@ public sealed partial class ControlPanelWindow : Window
         }
         RootGrid.RequestedTheme = App.ResolveElementTheme();
 
-        // 侧边栏子导航的展开/收起动画（原生主题过渡驱动）。
+        // 侧栏子导航的展开/收起动画：容器高度做依赖动画 + 裁剪。
         // TranslateTransform 在代码里创建：XAML 里把 x:Name 放在 RenderTransform
         // 内部的 TranslateTransform 上，WinUI 不会为该实例生成字段。
         var subNavShift = new TranslateTransform();
         SettingsSubNav.RenderTransform = subNavShift;
-        _subNav = new AnimatedSubNav(SettingsSubNavHost, SettingsSubNav, subNavShift);
+        _subNav = new SubNavAnimator(SettingsSubNavHost, SettingsSubNav, subNavShift);
 
         // 页面切换动画需要在不透明变换上做位移。
         foreach (FrameworkElement page in new FrameworkElement[]
@@ -1166,7 +1170,8 @@ public sealed partial class ControlPanelWindow : Window
         SetPageVisible(PageLog, log, incoming);
         SetPageVisible(PageAbout, about, incoming);
 
-        // 子导航展开/收起使用原生主题过渡动画。
+        // 子导航展开/收起：原生 Expander 的内容动画 + 容器高度依赖动画，
+        // 下面的「日志 / 关于」因此被连续推开，而不是等动画结束才瞬移。
         _subNav?.SetExpanded(settings);
 
         if (settings)
