@@ -278,19 +278,6 @@
                                         <RadioButton x:Name="RadioDarkModeSystem" Content="" IsChecked="True" />
                                     </RadioButtons>
 
-                                    <TextBlock x:Name="TxtBasicNetworkRegion"
-                                               Text=""
-                                               Margin="0,20,0,6"
-                                               Style="{StaticResource BasFieldLabelStyle}" />
-                                    <RadioButtons x:Name="RadioNetworkRegion" MaxColumns="3">
-                                        <RadioButton x:Name="RadioNetworkRegionAuto" Content="" IsChecked="True" />
-                                        <RadioButton x:Name="RadioNetworkRegionChina" Content="" />
-                                        <RadioButton x:Name="RadioNetworkRegionGlobal" Content="" />
-                                    </RadioButtons>
-                                    <TextBlock x:Name="TxtNetworkRegionHint"
-                                               Text=""
-                                               Margin="0,8,0,0"
-                                               Style="{StaticResource BasCaptionStyle}" />
 
                                     <TextBlock x:Name="TxtScrollbarVisibility"
                                                Text=""
@@ -849,9 +836,6 @@
                                    Text="—"
                                    VerticalAlignment="Center"
                                    Foreground="{ThemeResource BasTextSecondaryBrush}" />
-                        <Button x:Name="BtnCheckUpdate"
-                                Content=""
-                                Click="CheckUpdate_Click" />
                     </StackPanel>
 
                     <TextBlock x:Name="TxtAboutDescription"
@@ -872,37 +856,7 @@
                         </InfoBar.Content>
                     </InfoBar>
 
-                    <TextBlock x:Name="TxtAboutSupport"
-                               Text=""
-                               Margin="0,16,0,0"
-                               TextWrapping="Wrap"
-                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
 
-                    <StackPanel x:Name="PanelLinks" Margin="0,16,0,0" Spacing="8" MaxWidth="280" HorizontalAlignment="Left">
-                        <Button x:Name="BtnOfficialSite"
-                                Tag="https://www.baspark.top"
-                                Click="OpenLink_Click"
-                                Style="{StaticResource BasLinkButtonStyle}" />
-                        <Button x:Name="BtnGithub"
-                                Tag="https://github.com/DoomVoss/BASpark"
-                                Click="OpenLink_Click"
-                                Style="{StaticResource BasLinkButtonStyle}" />
-                        <Button x:Name="BtnBilibili"
-                                Tag="https://space.bilibili.com/3493116084488813"
-                                Click="OpenLink_Click"
-                                Style="{StaticResource BasLinkButtonStyle}" />
-                        <Button x:Name="BtnQQ"
-                                Tag="https://qm.qq.com/q/lgvVto3yPm"
-                                Click="OpenLink_Click"
-                                Style="{StaticResource BasLinkButtonStyle}" />
-                        <Button x:Name="BtnDiscord"
-                                Click="OpenLink_Click"
-                                Style="{StaticResource BasLinkButtonStyle}" />
-                        <Button x:Name="BtnSponsor"
-                                Tag="https://afdian.com/a/doomvoss"
-                                Click="OpenLink_Click"
-                                Style="{StaticResource BasLinkButtonStyle}" />
-                    </StackPanel>
 
                     <Border Style="{StaticResource BasDividerStyle}" Margin="0,24,0,12" />
 

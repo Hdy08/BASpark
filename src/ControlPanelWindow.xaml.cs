@@ -339,24 +339,20 @@ public sealed partial class ControlPanelWindow : Window
 
     private readonly DispatcherQueueTimer? _refreshTimer;
 
-    private readonly object _networkPromptLock = new();
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private readonly Dictionary<Slider, NumberBox> _sliderToBox = new();
     private readonly Dictionary<NumberBox, Slider> _boxToSlider = new();
 
-    private bool _isCheckingUpdate;
     private bool _isLoading;
     private bool _isClosed;
     private bool _skipSaveOnClosing;
     private bool _suppressValueSync;
-    private bool _autoNetworkFailurePromptShown;
     private bool _logViewInitialized;
     private int _themeRefreshPending;
     private string _languageAtLoad = Localization.CultureZhCn;
     private string? _pendingLanguage;
-    private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
 
     // 纯色回退背景（Win10 上通常走 Desktop Acrylic，只有都不支持时才用它）。
     private AppBackdrop? _solidBackdrop;
@@ -378,7 +374,6 @@ public sealed partial class ControlPanelWindow : Window
         _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
             ? Localization.CurrentCultureName
             : ConfigManager.UiLanguage;
-        _networkRegionAtLoad = ConfigManager.NetworkRegion;
 
         ApplyWindowChrome();
         BindCollections();
@@ -390,7 +385,6 @@ public sealed partial class ControlPanelWindow : Window
 
         // 版本号 / 外链 / 公告 / 状态等动态文案在代码里补上；静态文案见 ApplyLocalizedText。
         ApplyLocalizedText();
-        ApplyAboutLinkVisibility();
         PopulateLanguageCombo();
         LoadVersion();
         LoadSettings();
@@ -406,7 +400,6 @@ public sealed partial class ControlPanelWindow : Window
         Closed += ControlPanelWindow_Closed;
         RootGrid.Loaded += RootGrid_Loaded;
 
-        _ = CheckForUpdates(isManual: false);
 
         _refreshTimer = App.DispatcherQueue.CreateTimer();
         _refreshTimer.Interval = TimeSpan.FromMilliseconds(500);
@@ -833,11 +826,6 @@ public sealed partial class ControlPanelWindow : Window
         RadioDarkModeOff.Content = Localization.Get("Basic_DarkModeOff");
         RadioDarkModeOn.Content = Localization.Get("Basic_DarkModeOn");
         RadioDarkModeSystem.Content = Localization.Get("Basic_DarkModeSystem");
-        TxtBasicNetworkRegion.Text = Localization.Get("Basic_NetworkRegion");
-        RadioNetworkRegionAuto.Content = Localization.Get("Basic_NetworkRegionAuto");
-        RadioNetworkRegionChina.Content = Localization.Get("Basic_NetworkRegionChina");
-        RadioNetworkRegionGlobal.Content = Localization.Get("Basic_NetworkRegionGlobal");
-        TxtNetworkRegionHint.Text = Localization.Get("Basic_NetworkRegionHint");
         TxtScrollbarVisibility.Text = Localization.Get("Basic_ScrollbarVisibility");
         RadioScrollbarAlways.Content = Localization.Get("Basic_ScrollbarAlways");
         RadioScrollbarOnScroll.Content = Localization.Get("Basic_ScrollbarOnScroll");
@@ -897,16 +885,8 @@ public sealed partial class ControlPanelWindow : Window
         BtnClearLog.Content = Localization.Get("Log_Clear");
         TxtLogHint.Text = Localization.Get("Log_Hint");
         TxtAboutTitle.Text = Localization.Get("About_Title");
-        BtnCheckUpdate.Content = Localization.Get("About_CheckUpdate");
         TxtAboutDescription.Text = Localization.Get("About_Description");
         TxtSecurityWarning.Text = Localization.Get("About_SecurityWarning");
-        TxtAboutSupport.Text = Localization.Get("About_Support");
-        BtnOfficialSite.Content = Localization.Get("About_OfficialSite");
-        BtnGithub.Content = Localization.Get("About_Github");
-        BtnBilibili.Content = Localization.Get("About_Bilibili");
-        BtnQQ.Content = Localization.Get("About_QQ");
-        BtnDiscord.Content = Localization.Get("About_Discord");
-        BtnSponsor.Content = Localization.Get("About_Sponsor");
         TxtDevOptions.Text = Localization.Get("About_DevOptions");
         BtnResetAll.Content = Localization.Get("About_ResetAll");
         TxtOverlayRunning.Text = Localization.Get("Overlay_RunningProcess");
@@ -1079,53 +1059,6 @@ public sealed partial class ControlPanelWindow : Window
     // ==================================================================
     // 外链 / 版本 / 语言
     // ==================================================================
-
-    private void OpenLink_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button button)
-        {
-            return;
-        }
-
-        string? url = button.Tag as string;
-        if (button == BtnOfficialSite)
-        {
-            url = Localization.GetOfficialWebsiteUrl();
-        }
-        else if (button == BtnDiscord)
-        {
-            url = Localization.GetDiscordUrl();
-        }
-
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            return;
-        }
-
-        try
-        {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            NativeMessageBox.Show(Localization.Format("Msg_OpenLinkFailed", ex.Message));
-        }
-    }
-
-    public void ApplyAboutLinkVisibility()
-    {
-        BtnOfficialSite.Tag = Localization.GetOfficialWebsiteUrl();
-
-        bool isChinese = Localization.IsChineseLocale;
-        BtnBilibili.Visibility = isChinese ? Visibility.Visible : Visibility.Collapsed;
-        BtnQQ.Visibility = isChinese ? Visibility.Visible : Visibility.Collapsed;
-        BtnSponsor.Visibility = isChinese ? Visibility.Visible : Visibility.Collapsed;
-        BtnDiscord.Visibility = isChinese ? Visibility.Collapsed : Visibility.Visible;
-
-        string? discordUrl = Localization.GetDiscordUrl();
-        BtnDiscord.IsEnabled = !string.IsNullOrWhiteSpace(discordUrl);
-        BtnDiscord.Tag = discordUrl ?? string.Empty;
-    }
 
     private void LoadVersion()
     {
@@ -1424,7 +1357,6 @@ public sealed partial class ControlPanelWindow : Window
         RadioScrollbarVisibility.SelectedIndex = ConfigManager.ScrollbarVisibility == PanelScrollbarVisibility.Always ? 0 : 1;
 
         SelectDarkMode(ConfigManager.DarkMode);
-        SelectNetworkRegion(ConfigManager.NetworkRegion);
     }
 
     private void CheckAdminStatus()
@@ -1466,43 +1398,6 @@ public sealed partial class ControlPanelWindow : Window
             0 => DarkModeOption.Off,
             1 => DarkModeOption.On,
             _ => DarkModeOption.System
-        };
-    }
-
-    private void SelectNetworkRegion(NetworkRegionOption region)
-    {
-        // RadioNetworkRegion 顺序：Auto / China / Global
-        RadioNetworkRegion.SelectedIndex = region switch
-        {
-            NetworkRegionOption.China => 1,
-            NetworkRegionOption.Global => 2,
-            _ => 0
-        };
-    }
-
-    private NetworkRegionOption GetSelectedNetworkRegion()
-    {
-        int index = RadioNetworkRegion.SelectedIndex;
-        if (index < 0)
-        {
-            if (RadioNetworkRegionChina.IsChecked == true)
-            {
-                return NetworkRegionOption.China;
-            }
-
-            if (RadioNetworkRegionGlobal.IsChecked == true)
-            {
-                return NetworkRegionOption.Global;
-            }
-
-            return NetworkRegionOption.Auto;
-        }
-
-        return index switch
-        {
-            1 => NetworkRegionOption.China,
-            2 => NetworkRegionOption.Global,
-            _ => NetworkRegionOption.Auto
         };
     }
 
@@ -2560,8 +2455,6 @@ public sealed partial class ControlPanelWindow : Window
         string? selectedLanguage = GetSelectedLanguage() ?? _pendingLanguage;
         bool languageChanged = !string.IsNullOrWhiteSpace(selectedLanguage) &&
             !string.Equals(selectedLanguage, _languageAtLoad, StringComparison.OrdinalIgnoreCase);
-        NetworkRegionOption selectedNetworkRegion = GetSelectedNetworkRegion();
-        bool networkRegionChanged = selectedNetworkRegion != _networkRegionAtLoad;
 
         if (!string.IsNullOrWhiteSpace(selectedLanguage))
         {
@@ -2642,7 +2535,6 @@ public sealed partial class ControlPanelWindow : Window
         ConfigManager.Save("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch.IsOn);
         ConfigManager.Save("ScrollbarVisibility", GetSelectedScrollbarVisibility());
         ApplyScrollbarSettings();
-        ConfigManager.Save("NetworkRegion", selectedNetworkRegion);
         ConfigManager.Save("DarkMode", selectedDarkMode);
         ConfigManager.Save("StartSilent", startSilentEnabled);
         ConfigManager.Save("EnableEnvironmentFilter", CheckEnvironmentFilter.IsOn);
@@ -2713,7 +2605,6 @@ public sealed partial class ControlPanelWindow : Window
         {
             // 与迁移前一致：先整体重刷文案（旧版是 UiLocalizer.ApplyControlPanel），再询问是否重启。
             ApplyLocalizedText();
-            ApplyAboutLinkVisibility();
             LoadScreenOptions();
             _languageAtLoad = selectedLanguage!;
 
@@ -2727,12 +2618,6 @@ public sealed partial class ControlPanelWindow : Window
                 (Application.Current as App)?.RestartApplicationFromPanel();
                 return;
             }
-        }
-        else if (networkRegionChanged)
-        {
-            ApplyLocalizedText();
-            ApplyAboutLinkVisibility();
-            _networkRegionAtLoad = selectedNetworkRegion;
         }
 
 
@@ -2845,160 +2730,7 @@ public sealed partial class ControlPanelWindow : Window
     }
 
     // ==================================================================
-    // 更新检查 / 公告
     // ==================================================================
-
-    private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
-    {
-        _ = e;
-        if (_isCheckingUpdate)
-        {
-            return;
-        }
-
-        Button? button = BtnCheckUpdate ?? sender as Button;
-        try
-        {
-            _isCheckingUpdate = true;
-            if (button != null)
-            {
-                button.IsEnabled = false;
-                button.Content = Localization.Get("About_CheckingUpdate");
-            }
-
-            await CheckForUpdates(isManual: true);
-        }
-        finally
-        {
-            _isCheckingUpdate = false;
-            if (button != null)
-            {
-                button.IsEnabled = true;
-                button.Content = Localization.Get("About_CheckUpdate");
-            }
-        }
-    }
-
-    private async Task CheckForUpdates(bool isManual)
-    {
-        string updateUrl = Localization.GetRemoteUpdateUrl();
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            client.DefaultRequestHeaders.Add("User-Agent", UserAgent);
-
-            string json = await client.GetStringAsync(updateUrl);
-            using JsonDocument doc = JsonDocument.Parse(json);
-            JsonElement root = doc.RootElement;
-
-            string latestVersionStr = root.GetProperty("version").GetString() ?? "0.0.0.0";
-            string downloadUrl = root.GetProperty("url").GetString() ?? string.Empty;
-            string updateNotes = root.GetProperty("notes").GetString() ?? Localization.Get("Msg_NoUpdateNotes");
-
-            Version latestVersion = new(latestVersionStr);
-            Version? currentVersion = Assembly.GetExecutingAssembly().GetName().Version;
-
-            if (currentVersion != null && latestVersion > currentVersion)
-            {
-                await RunOnUiThreadAsync(async () =>
-                {
-                    bool download = await ConfirmAsync(
-                        Localization.Format("Msg_UpdateAvailable", latestVersionStr, updateNotes),
-                        Localization.Get("Msg_UpdateAvailable_Title"));
-
-                    if (download && !string.IsNullOrEmpty(downloadUrl))
-                    {
-                        Process.Start(new ProcessStartInfo(downloadUrl) { UseShellExecute = true });
-                    }
-                });
-            }
-            else if (isManual)
-            {
-                await RunOnUiThreadAsync(() =>
-                {
-                    NativeMessageBox.Show(Localization.Get("Msg_UpToDate"), Localization.Get("Msg_CheckUpdate_Title"));
-                    return Task.CompletedTask;
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn($"Update check failed: {ex.Message}");
-            HandleNetworkFetchFailure(isManual, ex.Message);
-        }
-    }
-
-
-    private void HandleNetworkFetchFailure(bool isManual, string errorMessage)
-    {
-        lock (_networkPromptLock)
-        {
-            if (!isManual && _autoNetworkFailurePromptShown)
-            {
-                return;
-            }
-
-            if (!isManual)
-            {
-                _autoNetworkFailurePromptShown = true;
-            }
-        }
-
-        _ = RunOnUiThreadAsync(() => PromptSwitchNetworkSourceAsync(isManual, errorMessage));
-    }
-
-    private async Task PromptSwitchNetworkSourceAsync(bool isManual, string errorMessage)
-    {
-        NetworkRegionOption alternateRegion = GetAlternateNetworkRegion();
-        string currentLabel = GetNetworkRegionLabel(ConfigManager.NetworkRegion);
-        string alternateLabel = GetNetworkRegionLabel(alternateRegion);
-        string message = isManual
-            ? Localization.Format("Msg_SwitchNetworkSourcePromptManual", errorMessage, currentLabel, alternateLabel)
-            : Localization.Format("Msg_SwitchNetworkSourcePromptAuto", alternateLabel);
-
-        bool switchSource = await ConfirmAsync(message, Localization.Get("Msg_SwitchNetworkSource_Title"));
-        if (!switchSource)
-        {
-            return;
-        }
-
-        ConfigManager.Save("NetworkRegion", alternateRegion);
-        _networkRegionAtLoad = alternateRegion;
-        SelectNetworkRegion(alternateRegion);
-        ApplyLocalizedText();
-        ApplyAboutLinkVisibility();
-        AppLogger.Info($"Network source switched to {alternateRegion}.");
-
-        if (isManual)
-        {
-            _ = CheckForUpdates(isManual: true);
-        }
-    }
-
-    private static NetworkRegionOption GetAlternateNetworkRegion() =>
-        Localization.UseChinaNetworkEndpoint()
-            ? NetworkRegionOption.Global
-            : NetworkRegionOption.China;
-
-    private static string GetNetworkRegionLabel(NetworkRegionOption region) =>
-        region switch
-        {
-            NetworkRegionOption.China => Localization.Get("Basic_NetworkRegionChina"),
-            NetworkRegionOption.Global => Localization.Get("Basic_NetworkRegionGlobal"),
-            _ => Localization.Get("Basic_NetworkRegionAuto")
-        };
-
-    private static void ShowWindowsNotification(string title, string content)
-    {
-        try
-        {
-            new ToastContentBuilder().AddText(title).AddText(content).Show();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine("通知推送失败: " + ex.Message);
-        }
-    }
 
     // ==================================================================
     // 对话框 / UI 线程

@@ -75,41 +75,5 @@ namespace BASpark
 
         public static string DetectCultureFromSystem() =>
             NormalizeCulture(CultureInfo.CurrentUICulture.Name);
-
-        public static string GetRemoteUpdateUrl() => GetRemoteJsonUrl("update");
-
-        public static string GetRemoteNoticeUrl() => GetRemoteJsonUrl("notice");
-
-        public static string GetRemoteJsonUrl(string baseName)
-        {
-            string fileName = IsChineseLocale
-                ? $"{baseName}.json"
-                : $"{GetRemoteFileLanguagePrefix()}_{baseName}.json";
-
-            string host = UseChinaNetworkEndpoint()
-                ? "https://api.catbotstudio.cn"
-                : "https://api.catbotstudio.top";
-
-            return $"{host}/baspark/{fileName}";
-        }
-
-        private static string GetRemoteFileLanguagePrefix() =>
-            CurrentCultureName == CultureJa ? "jp" : "en";
-
-        public static bool UseChinaNetworkEndpoint() =>
-            ConfigManager.NetworkRegion switch
-            {
-                NetworkRegionOption.China => true,
-                NetworkRegionOption.Global => false,
-                _ => IsChineseLocale
-            };
-
-        public static string GetOfficialWebsiteUrl() =>
-            UseChinaNetworkEndpoint()
-                ? "https://basp.catbotstudio.cn"
-                : "https://basp.catbotstudio.top";
-
-        public static string? GetDiscordUrl() =>
-            string.IsNullOrWhiteSpace(Get("Link_Discord_Url")) ? null : Get("Link_Discord_Url");
     }
 }

@@ -12,12 +12,6 @@
     <resheader name="writer">
       <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
     </resheader>
-    <data name="About_Bilibili" xml:space="preserve">
-      <value>📺 关注 B 站官号</value>
-    </data>
-    <data name="About_CheckUpdate" xml:space="preserve">
-      <value>检查更新</value>
-    </data>
     <data name="About_CheckingUpdate" xml:space="preserve">
       <value>正在检查...</value>
     </data>
@@ -27,29 +21,11 @@
     <data name="About_DevOptions" xml:space="preserve">
       <value>开发者选项</value>
     </data>
-    <data name="About_Discord" xml:space="preserve">
-      <value>💬 加入 Discord 社区</value>
-    </data>
-    <data name="About_Github" xml:space="preserve">
-      <value>🌐 访问 GitHub 官方仓库</value>
-    </data>
-    <data name="About_OfficialSite" xml:space="preserve">
-      <value>🌐 访问官方网站</value>
-    </data>
-    <data name="About_QQ" xml:space="preserve">
-      <value>💬 加入 QQ 交流群</value>
-    </data>
     <data name="About_ResetAll" xml:space="preserve">
       <value>重置所有设置并退出</value>
     </data>
     <data name="About_SecurityWarning" xml:space="preserve">
       <value>安全提示：请务必确保从官方渠道下载。第三方分发渠道的版本可能存在报毒风险或恶意篡改。</value>
-    </data>
-    <data name="About_Sponsor" xml:space="preserve">
-      <value>☕ 赞助支持作者</value>
-    </data>
-    <data name="About_Support" xml:space="preserve">
-      <value>如果你喜欢本应用，欢迎支持开发者持续维护 ☕</value>
     </data>
     <data name="About_Title" xml:space="preserve">
       <value>关于</value>
@@ -74,21 +50,6 @@
     </data>
     <data name="Basic_Language" xml:space="preserve">
       <value>界面语言</value>
-    </data>
-    <data name="Basic_NetworkRegion" xml:space="preserve">
-      <value>网络源</value>
-    </data>
-    <data name="Basic_NetworkRegionAuto" xml:space="preserve">
-      <value>跟随语言</value>
-    </data>
-    <data name="Basic_NetworkRegionChina" xml:space="preserve">
-      <value>中国大陆</value>
-    </data>
-    <data name="Basic_NetworkRegionGlobal" xml:space="preserve">
-      <value>全球</value>
-    </data>
-    <data name="Basic_NetworkRegionHint" xml:space="preserve">
-      <value>* 用于获取公告与检查更新；默认跟随界面语言自动选择（.cn / .top）。</value>
     </data>
     <data name="Basic_LeftClick" xml:space="preserve">
       <value>仅左键</value>
@@ -234,9 +195,6 @@
     <data name="LangSelect_Title" xml:space="preserve">
       <value>选择语言</value>
     </data>
-    <data name="Link_Discord_Url" xml:space="preserve">
-      <value>https://discord.gg/sgZMdqhfZu</value>
-    </data>
     <data name="Msg_AdminRestart" xml:space="preserve">
       <value>需要以管理员权限重启应用以应用设置，是否立即重启？</value>
     </data>
@@ -246,9 +204,6 @@
     <data name="Msg_CheckUpdateFailed" xml:space="preserve">
       <value>检查更新失败: 
 {0}</value>
-    </data>
-    <data name="Msg_CheckUpdate_Title" xml:space="preserve">
-      <value>检查更新</value>
     </data>
     <data name="Msg_ConfirmDeleteProfile" xml:space="preserve">
       <value>确定要删除 '{0}' 吗？</value>
@@ -289,26 +244,8 @@
     <data name="Msg_MultiScreen_Title" xml:space="preserve">
       <value>多屏控制</value>
     </data>
-    <data name="Msg_NetworkError" xml:space="preserve">
-      <value>网络错误</value>
-    </data>
-    <data name="Msg_SwitchNetworkSource_Title" xml:space="preserve">
-      <value>网络连接失败</value>
-    </data>
-    <data name="Msg_SwitchNetworkSourcePromptAuto" xml:space="preserve">
-      <value>获取公告或更新失败，可能是当前网络源不可用。是否切换到「{0}」并重试？</value>
-    </data>
-    <data name="Msg_SwitchNetworkSourcePromptManual" xml:space="preserve">
-      <value>请求失败：{0}
-
-当前网络源：{1}
-是否切换到「{2}」并重试？</value>
-    </data>
     <data name="Msg_InvalidSidebarBackground" xml:space="preserve">
       <value>无效的背景图片路径，请选择 PNG/JPG/BMP/WebP 格式的图片文件。</value>
-    </data>
-    <data name="Msg_NoUpdateNotes" xml:space="preserve">
-      <value>无更新说明</value>
     </data>
     <data name="Msg_OpenLinkFailed" xml:space="preserve">
       <value>无法打开链接: {0}</value>
@@ -322,20 +259,6 @@
     </data>
     <data name="Msg_SettingsApplied" xml:space="preserve">
       <value>配置已成功应用！</value>
-    </data>
-    <data name="Msg_UpToDate" xml:space="preserve">
-      <value>当前已是最新版本，无需更新！</value>
-    </data>
-    <data name="Msg_UpdateAvailable" xml:space="preserve">
-      <value>发现新版本: V{0}
-
-更新内容:
-{1}
-
-是否立即前往下载？</value>
-    </data>
-    <data name="Msg_UpdateAvailable_Title" xml:space="preserve">
-      <value>发现新版本</value>
     </data>
     <data name="Msg_VisualResetDone" xml:space="preserve">
       <value>所选视觉表现项已恢复为默认值并已保存。</value>

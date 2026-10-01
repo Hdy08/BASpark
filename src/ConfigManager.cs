@@ -37,13 +37,6 @@ namespace BASpark
         OnScroll
     }
 
-    public enum NetworkRegionOption
-    {
-        Auto,
-        China,
-        Global
-    }
-
     public enum DarkModeOption
     {
         Off,
@@ -106,7 +99,6 @@ namespace BASpark
         public static string EnabledScreenIds { get; set; } = "";
         public static string ScreenSelections { get; set; } = "";
         public static string UiLanguage { get; set; } = "";
-        public static NetworkRegionOption NetworkRegion { get; set; } = NetworkRegionOption.Auto;
         public static DarkModeOption DarkMode { get; set; } = DarkModeOption.System;
         public static PanelScrollbarVisibility ScrollbarVisibility { get; set; } = PanelScrollbarVisibility.OnScroll;
         public static string SidebarBackgroundImagePath { get; set; } = "";
@@ -169,7 +161,6 @@ namespace BASpark
                         EnabledScreenIds = key.GetValue("EnabledScreenIds", "")?.ToString() ?? "";
                         ScreenSelections = key.GetValue("ScreenSelections", "")?.ToString() ?? "";
                         UiLanguage = key.GetValue("UiLanguage", "")?.ToString() ?? "";
-                        NetworkRegion = ParseNetworkRegion(key.GetValue("NetworkRegion", "Auto")?.ToString());
                         DarkMode = ParseDarkMode(key.GetValue("DarkMode", "System")?.ToString());
                         ScrollbarVisibility = ParseScrollbarVisibility(key.GetValue("ScrollbarVisibility", "OnScroll")?.ToString());
                         SidebarBackgroundImagePath = key.GetValue("SidebarBackgroundImagePath", "")?.ToString() ?? "";
@@ -261,21 +252,6 @@ namespace BASpark
             }
 
             return PanelScrollbarVisibility.OnScroll;
-        }
-
-        public static NetworkRegionOption ParseNetworkRegion(string? raw)
-        {
-            if (string.Equals(raw, "China", StringComparison.OrdinalIgnoreCase))
-            {
-                return NetworkRegionOption.China;
-            }
-
-            if (string.Equals(raw, "Global", StringComparison.OrdinalIgnoreCase))
-            {
-                return NetworkRegionOption.Global;
-            }
-
-            return NetworkRegionOption.Auto;
         }
 
         public static DarkModeOption ParseDarkMode(string? raw)
@@ -659,7 +635,6 @@ namespace BASpark
                     EnabledScreenIds = "";
                     ScreenSelections = "";
                     UiLanguage = "";
-                    NetworkRegion = NetworkRegionOption.Auto;
                     DarkMode = DarkModeOption.System;
                     SidebarBackgroundImagePath = "";
                                 }

@@ -12,12 +12,6 @@
     <resheader name="writer">
       <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
     </resheader>
-    <data name="About_Bilibili" xml:space="preserve">
-      <value>📺 Bilibili</value>
-    </data>
-    <data name="About_CheckUpdate" xml:space="preserve">
-      <value>Check for updates</value>
-    </data>
     <data name="About_CheckingUpdate" xml:space="preserve">
       <value>Checking...</value>
     </data>
@@ -27,29 +21,11 @@
     <data name="About_DevOptions" xml:space="preserve">
       <value>Developer options</value>
     </data>
-    <data name="About_Discord" xml:space="preserve">
-      <value>💬 Join Discord</value>
-    </data>
-    <data name="About_Github" xml:space="preserve">
-      <value>🌐 GitHub repository</value>
-    </data>
-    <data name="About_OfficialSite" xml:space="preserve">
-      <value>🌐 Official website</value>
-    </data>
-    <data name="About_QQ" xml:space="preserve">
-      <value>💬 QQ group</value>
-    </data>
     <data name="About_ResetAll" xml:space="preserve">
       <value>Reset all settings and exit</value>
     </data>
     <data name="About_SecurityWarning" xml:space="preserve">
       <value>Download only from official sources. Unofficial builds may be unsafe or tampered with.</value>
-    </data>
-    <data name="About_Sponsor" xml:space="preserve">
-      <value>☕ Sponsor the author</value>
-    </data>
-    <data name="About_Support" xml:space="preserve">
-      <value>If you enjoy BASpark, consider supporting development ☕</value>
     </data>
     <data name="About_Title" xml:space="preserve">
       <value>About</value>
@@ -74,21 +50,6 @@
     </data>
     <data name="Basic_Language" xml:space="preserve">
       <value>Display language</value>
-    </data>
-    <data name="Basic_NetworkRegion" xml:space="preserve">
-      <value>Network source</value>
-    </data>
-    <data name="Basic_NetworkRegionAuto" xml:space="preserve">
-      <value>Follow language</value>
-    </data>
-    <data name="Basic_NetworkRegionChina" xml:space="preserve">
-      <value>Mainland China</value>
-    </data>
-    <data name="Basic_NetworkRegionGlobal" xml:space="preserve">
-      <value>Global</value>
-    </data>
-    <data name="Basic_NetworkRegionHint" xml:space="preserve">
-      <value>* Used for notices and update checks. By default, follows UI language (.cn / .top).</value>
     </data>
     <data name="Basic_LeftClick" xml:space="preserve">
       <value>Left only</value>
@@ -234,9 +195,6 @@
     <data name="LangSelect_Title" xml:space="preserve">
       <value>Choose Language</value>
     </data>
-    <data name="Link_Discord_Url" xml:space="preserve">
-      <value>https://discord.gg/sgZMdqhfZu</value>
-    </data>
     <data name="Msg_AdminRestart" xml:space="preserve">
       <value>Restart as administrator to apply this setting?</value>
     </data>
@@ -246,9 +204,6 @@
     <data name="Msg_CheckUpdateFailed" xml:space="preserve">
       <value>Update check failed:
 {0}</value>
-    </data>
-    <data name="Msg_CheckUpdate_Title" xml:space="preserve">
-      <value>Check for updates</value>
     </data>
     <data name="Msg_ConfirmDeleteProfile" xml:space="preserve">
       <value>Delete '{0}'?</value>
@@ -289,26 +244,8 @@
     <data name="Msg_MultiScreen_Title" xml:space="preserve">
       <value>Multi-display</value>
     </data>
-    <data name="Msg_NetworkError" xml:space="preserve">
-      <value>Network error</value>
-    </data>
-    <data name="Msg_SwitchNetworkSource_Title" xml:space="preserve">
-      <value>Network connection failed</value>
-    </data>
-    <data name="Msg_SwitchNetworkSourcePromptAuto" xml:space="preserve">
-      <value>Failed to fetch notice or updates. The current network source may be unavailable. Switch to "{0}" and retry?</value>
-    </data>
-    <data name="Msg_SwitchNetworkSourcePromptManual" xml:space="preserve">
-      <value>Request failed: {0}
-
-Current source: {1}
-Switch to "{2}" and retry?</value>
-    </data>
     <data name="Msg_InvalidSidebarBackground" xml:space="preserve">
       <value>Invalid background image path. Please choose a PNG/JPG/BMP/WebP file.</value>
-    </data>
-    <data name="Msg_NoUpdateNotes" xml:space="preserve">
-      <value>No release notes</value>
     </data>
     <data name="Msg_OpenLinkFailed" xml:space="preserve">
       <value>Could not open link: {0}</value>
@@ -322,20 +259,6 @@ Switch to "{2}" and retry?</value>
     </data>
     <data name="Msg_SettingsApplied" xml:space="preserve">
       <value>Settings applied successfully!</value>
-    </data>
-    <data name="Msg_UpToDate" xml:space="preserve">
-      <value>You are on the latest version.</value>
-    </data>
-    <data name="Msg_UpdateAvailable" xml:space="preserve">
-      <value>New version V{0}
-
-Changes:
-{1}
-
-Download now?</value>
-    </data>
-    <data name="Msg_UpdateAvailable_Title" xml:space="preserve">
-      <value>Update available</value>
     </data>
     <data name="Msg_VisualResetDone" xml:space="preserve">
       <value>Selected visual settings were restored and saved.</value>

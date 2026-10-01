@@ -275,8 +275,7 @@ public class WinUi3UiTests
         // 空文案的具名元素必须在代码里被赋值，否则界面上会出现空白按钮。
         string[] mustBeFilledWithContent =
         [
-            "BtnApplySettings", "BtnPickColor", "BtnVisualReset", "BtnClearLog", "BtnCheckUpdate",
-            "BtnOfficialSite", "BtnGithub", "BtnBilibili", "BtnQQ", "BtnDiscord", "BtnSponsor",
+            "BtnApplySettings", "BtnPickColor", "BtnVisualReset", "BtnClearLog",
             "BtnResetAll", "BtnRefreshScreens", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile",
         ];
 
