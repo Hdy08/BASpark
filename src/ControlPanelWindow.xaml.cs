@@ -157,9 +157,12 @@ public sealed partial class ControlPanelWindow : Window
         }
 
         /// <summary>
-        /// 量出内容的自然高度。用 <see cref="UIElement.Measure"/> 而不是
-        /// <c>ActualHeight</c>：容器被压到 0 高度时 ActualHeight 也是 0，
-        /// 会让展开动画变成 0→0。
+        /// 量出内容的自然高度。
+        ///
+        /// 注意：这里用 <c>Measure</c> 会在布局过程中递归进入测量。若在窗口尚未
+        /// 完成首次布局时调用，XAML 会陷入自我递归并停掉 UI 线程（CPU 不再增长、
+        /// 消息循环停摆）。因此只在元素已经完成过布局（ActualWidth &gt; 0）时才测量，
+        /// 否则直接返回 0 由调用方走「不做动画、直接到位」的兜底路径。
         /// </summary>
         private double MeasureNaturalHeight()
         {
@@ -324,7 +327,6 @@ public sealed partial class ControlPanelWindow : Window
     public ObservableCollection<ProcessItem> RunningProcessList { get; set; } = new();
     public ObservableCollection<VisualResetItem> VisualResetItems { get; set; } = new();
     public ObservableCollection<ScreenOptionItem> ScreenOptions { get; set; } = new();
-
     public ControlPanelWindow()
     {
         InitializeComponent();
@@ -438,6 +440,10 @@ public sealed partial class ControlPanelWindow : Window
 
             // 限制最小尺寸：侧边栏固定 212px，设置页的滑块/数字框并排布局在更窄的
             // 宽度下会被压到无法使用。这里按同样的 DPI 比例换算，保证逻辑尺寸下限。
+            //
+            // 只用 OverlappedPresenter 的原生属性，不做窗口子类化：comctl32 的
+            // SetWindowSubclass 会接管窗口过程链，与 XAML 框架自身的消息处理叠加后
+            // 极易造成 UI 线程死锁（实测表现为打开控制面板立即卡死、CPU 归零）。
             int minWidth = (int)Math.Round(MinDesignWidth * scale);
             int minHeight = (int)Math.Round(MinDesignHeight * scale);
             if (appWindow.Presenter is OverlappedPresenter presenter)
@@ -445,81 +451,12 @@ public sealed partial class ControlPanelWindow : Window
                 presenter.PreferredMinimumWidth = minWidth;
                 presenter.PreferredMinimumHeight = minHeight;
             }
-
-            ApplyMinimumWindowSize(WindowNative.GetWindowHandle(this), minWidth, minHeight);
         }
         catch (Exception ex)
         {
             AppLogger.Warn($"Failed to size/center control panel: {ex.Message}");
         }
     }
-
-    /// <summary>
-    /// 通过 <c>WM_GETMINMAXINFO</c> 限制窗口最小尺寸。
-    /// <see cref="OverlappedPresenter.PreferredMinimumWidth"/> 只约束程序化调整，
-    /// 拖拽边框缩放会绕过它，因此这里同时拦截窗口消息。
-    /// </summary>
-    private void ApplyMinimumWindowSize(IntPtr hwnd, int minWidth, int minHeight)
-    {
-        if (hwnd == IntPtr.Zero || _minSizeHookApplied)
-        {
-            return;
-        }
-
-        _minSizeHookApplied = true;
-        _minWindowWidth = minWidth;
-        _minWindowHeight = minHeight;
-
-        if (SetWindowSubclass(hwnd, MinSizeSubclassProc, UIntPtr.Zero, UIntPtr.Zero))
-        {
-            return;
-        }
-
-        // 子类化失败时退化为显示后钳制一次，至少不会一打开就过窄。
-        AppLogger.Warn("Failed to subclass the control panel window for minimum sizing.");
-    }
-
-    private int _minWindowWidth;
-    private int _minWindowHeight;
-    private bool _minSizeHookApplied;
-
-    private IntPtr MinSizeSubclassProc(
-        IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
-    {
-        _ = uIdSubclass;
-        _ = dwRefData;
-
-        const uint WmGetMinMaxInfo = 0x0024;
-
-        if (uMsg == WmGetMinMaxInfo && lParam != IntPtr.Zero)
-        {
-            var info = Marshal.PtrToStructure<MinMaxInfo>(lParam);
-            info.ptMinTrackSize.X = Math.Max(info.ptMinTrackSize.X, _minWindowWidth);
-            info.ptMinTrackSize.Y = Math.Max(info.ptMinTrackSize.Y, _minWindowHeight);
-            Marshal.StructureToPtr(info, lParam, fDeleteOld: false);
-        }
-
-        return DefSubclassProc(hWnd, uMsg, wParam, lParam);
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MinMaxInfo
-    {
-        public Windows.Foundation.Point ptReserved;
-        public Windows.Foundation.Point ptMaxSize;
-        public Windows.Foundation.Point ptMaxPosition;
-        public Windows.Foundation.Point ptMinTrackSize;
-        public Windows.Foundation.Point ptMaxTrackSize;
-    }
-
-    private delegate IntPtr SubclassProc(
-        IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData);
-
-    [DllImport("comctl32.dll", SetLastError = true)]
-    private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, UIntPtr dwRefData);
-
-    [DllImport("comctl32.dll")]
-    private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 
     /// <summary>
     /// 去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
