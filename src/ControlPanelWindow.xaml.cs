@@ -358,6 +358,9 @@ public sealed partial class ControlPanelWindow : Window
     private string? _pendingLanguage;
     private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
 
+    // 纯色回退背景（Win10 上通常走 Desktop Acrylic，只有都不支持时才用它）。
+    private AppBackdrop? _solidBackdrop;
+
     // 首页「当前状态」的三种配色，复用实例（见 RefreshTimer_Tick 的说明）。
     private readonly SolidColorBrush _statusPausedBrush = new(Colors.Gray);
     private readonly SolidColorBrush _statusFilteredBrush = new(Color.FromArgb(255, 0xD9, 0x77, 0x06));
@@ -426,6 +429,9 @@ public sealed partial class ControlPanelWindow : Window
         RootGrid.RequestedTheme = App.ResolveElementTheme();
         ApplySystemBackdrop();
 
+        // 深浅色切换后同步纯色回退背景（系统背景只挂一次处理器，避免重复订阅）。
+        RootGrid.ActualThemeChanged += (_, _) => _solidBackdrop?.SetTheme(RootGrid.ActualTheme);
+
         // 侧栏子导航的展开/收起：布局只改一次，「日志 / 关于」由独立平移动画让位，
         // 内容露出用合成器裁剪，整体按屏幕刷新率更新（不逐帧跑布局）。
         _subNav = new SubNavAnimator(SettingsSubNavHost, SettingsSubNav, NavAfterSettings);
@@ -482,6 +488,17 @@ public sealed partial class ControlPanelWindow : Window
                 presenter.PreferredMinimumWidth = minWidth;
                 presenter.PreferredMinimumHeight = minHeight;
             }
+
+            // WinUI 在最大化/还原（presenter 变化）后会丢掉 SystemBackdrop：
+            // 现象是「最大化过一次之后，再最小化-显示时动画期间又变成整块黑」。
+            // 状态变化后重新挂一次背景即可（应用新实例才会触发内部重新连接）。
+            appWindow.Changed += (_, args) =>
+            {
+                if (args.DidPresenterChange)
+                {
+                    ApplySystemBackdrop();
+                }
+            };
         }
         catch (Exception ex)
         {
@@ -500,6 +517,7 @@ public sealed partial class ControlPanelWindow : Window
     /// </summary>
     private void ApplySystemBackdrop()
     {
+        // Windows 11：原生 Mica。
         try
         {
             if (Microsoft.UI.Composition.SystemBackdrops.MicaController.IsSupported())
@@ -513,14 +531,15 @@ public sealed partial class ControlPanelWindow : Window
             AppLogger.Debug($"Mica backdrop unavailable: {ex.Message}");
         }
 
+        // Windows 10 上 Mica 不受支持。这里刻意**不用** Desktop Acrylic：它内部是
+        // 控制器对象，窗口最小化/最大化后会被断开，实测「最大化过一次之后再最小化-显示
+        // 动画又变回整块黑」；而纯色背景只是给窗口挂一个合成器画刷，最小化/还原动画
+        // 期间一直有效。
         try
         {
-            var backdrop = new AppBackdrop();
-            backdrop.SetTheme(RootGrid.ActualTheme);
-            SystemBackdrop = backdrop;
-
-            // 深浅色切换后同步底色。
-            RootGrid.ActualThemeChanged += (_, _) => backdrop.SetTheme(RootGrid.ActualTheme);
+            _solidBackdrop = new AppBackdrop();
+            _solidBackdrop.SetTheme(RootGrid.ActualTheme);
+            SystemBackdrop = _solidBackdrop;
         }
         catch (Exception ex)
         {
