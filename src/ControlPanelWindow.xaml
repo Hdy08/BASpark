@@ -108,25 +108,32 @@
                         </StackPanel>
                     </Border>
 
-                    <RadioButton x:Name="TabLog"
-                                 GroupName="MainNav"
-                                 Style="{StaticResource BasNavRadioStyle}"
-                                 Click="Tab_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <FontIcon Glyph="&#xE9D9;" FontSize="16" />
-                            <TextBlock x:Name="TabLogLabel" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </RadioButton>
+                    <!--
+                        「日志 / 关于」单独成组：设置子导航展开/收起时，这一组靠独立的
+                        平移动画（合成器线程插值，按屏幕刷新率更新）被连续推开，
+                        容器自身的布局高度只在切换的那一刻改一次，因此不会掉帧。
+                    -->
+                    <StackPanel x:Name="NavAfterSettings" Spacing="2">
+                        <RadioButton x:Name="TabLog"
+                                     GroupName="MainNav"
+                                     Style="{StaticResource BasNavRadioStyle}"
+                                     Click="Tab_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE9D9;" FontSize="16" />
+                                <TextBlock x:Name="TabLogLabel" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
 
-                    <RadioButton x:Name="TabAbout"
-                                 GroupName="MainNav"
-                                 Style="{StaticResource BasNavRadioStyle}"
-                                 Click="Tab_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <FontIcon Glyph="&#xE946;" FontSize="16" />
-                            <TextBlock x:Name="TabAboutLabel" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </RadioButton>
+                        <RadioButton x:Name="TabAbout"
+                                     GroupName="MainNav"
+                                     Style="{StaticResource BasNavRadioStyle}"
+                                     Click="Tab_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE946;" FontSize="16" />
+                                <TextBlock x:Name="TabAboutLabel" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
