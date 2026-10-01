@@ -86,20 +86,27 @@ public sealed partial class ControlPanelWindow : Window
 
     /// <summary>
     /// 侧边栏设置子导航的展开/收起动画。
-    /// 用 WinUI 原生 EntranceThemeTransition / ExitThemeTransition 驱动高度，
-    /// 配合位移与淡入淡出，无需自绘。
+    /// 由原生 <see cref="DoubleAnimation"/> 驱动高度与位移。
+    ///
+    /// 三条必须遵守的约束（都是实测踩出来的）：
+    ///   1. **绝不**给 <c>Border.Height</c> 赋 0 或 <c>double.NaN</c> —— 会抛
+    ///      E_INVALIDARG。收起后保持高度为 0 并令内容高度为 0 即可。
+    ///   2. **不要**复用 <c>DoubleAnimation</c> 实例：同一动画对象被先后挂到多个
+    ///      Storyboard 上，在快速切换时会产生竞态。
+    ///   3. Storyboard 的 <c>Completed</c> 是异步回调，**不在**调用方 try/catch 的
+    ///      栈上；其中抛出的异常会直接终结进程。因此回调里只做无异常风险的赋值，
+    ///      并且必须用代次号忽略过期回调（否则快速点击时旧回调会覆盖新状态）。
     /// </summary>
     private sealed class AnimatedSubNav
     {
+        private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(200);
+
         private readonly Border _host;
         private readonly StackPanel _panel;
         private readonly TranslateTransform _shift;
-        private readonly DoubleAnimation _expandAnimation;
-        private readonly DoubleAnimation _collapseAnimation;
-        private readonly DoubleAnimation _shiftExpandAnimation;
-        private readonly DoubleAnimation _shiftCollapseAnimation;
 
-        private readonly Duration _duration = new(TimeSpan.FromMilliseconds(200));
+        private bool _expanded;
+        private int _generation;
 
         public AnimatedSubNav(Border host, StackPanel panel, TranslateTransform shift)
         {
@@ -107,51 +114,11 @@ public sealed partial class ControlPanelWindow : Window
             _panel = panel;
             _shift = shift;
 
-            var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
-
-            // 高度从 0 动画到元素自然高度。注意不能给 Border.Height 直接赋 0/NaN
-            // （会抛 E_INVALIDARG），初始收起只靠 Visibility 实现。
-            _expandAnimation = new DoubleAnimation
-            {
-                From = 0,
-                Duration = _duration,
-                EasingFunction = easing
-            };
-            Storyboard.SetTarget(_expandAnimation, _host);
-            Storyboard.SetTargetProperty(_expandAnimation, "Height");
-
-            _collapseAnimation = new DoubleAnimation
-            {
-                To = 0,
-                Duration = _duration,
-                EasingFunction = easing
-            };
-            Storyboard.SetTarget(_collapseAnimation, _host);
-            Storyboard.SetTargetProperty(_collapseAnimation, "Height");
-
-            _shiftExpandAnimation = new DoubleAnimation
-            {
-                From = -8,
-                To = 0,
-                Duration = _duration,
-                EasingFunction = easing
-            };
-            Storyboard.SetTarget(_shiftExpandAnimation, _shift);
-            Storyboard.SetTargetProperty(_shiftExpandAnimation, "Y");
-
-            _shiftCollapseAnimation = new DoubleAnimation
-            {
-                From = 0,
-                To = -8,
-                Duration = _duration,
-                EasingFunction = easing
-            };
-            Storyboard.SetTarget(_shiftCollapseAnimation, _shift);
-            Storyboard.SetTargetProperty(_shiftCollapseAnimation, "Y");
-
-            // 初始为收起状态。
+            // 初始为收起状态。收起态靠「容器高度 0 + 内容高度 0」实现，
+            // 不改 Visibility —— Visibility 切换会让过渡动画失去可见的起止状态。
             _panel.Opacity = 0;
-            _host.Visibility = Visibility.Collapsed;
+            _panel.Height = 0;
+            _host.Height = 0;
             _host.IsHitTestVisible = false;
         }
 
@@ -163,31 +130,118 @@ public sealed partial class ControlPanelWindow : Window
             }
 
             _expanded = expanded;
-            _host.Visibility = Visibility.Visible;
-            _host.IsHitTestVisible = expanded;
+            _generation++;
 
-            var storyboard = new Storyboard();
-            storyboard.Children.Add(expanded ? _expandAnimation : _collapseAnimation);
-            storyboard.Children.Add(expanded ? _shiftExpandAnimation : _shiftCollapseAnimation);
-            storyboard.Completed += (_, _) =>
+            try
             {
-                // 收起完成后彻底移出布局，避免残留占位。
-                _panel.Opacity = expanded ? 1 : 0;
-                if (!expanded)
-                {
-                    _host.Height = double.NaN;
-                    _host.Visibility = Visibility.Collapsed;
-                }
-            };
-            storyboard.Begin();
-
-            if (expanded)
+                _host.IsHitTestVisible = expanded;
+                Animate(expanded, _generation);
+            }
+            catch (Exception ex)
             {
-                _panel.Opacity = 1;
+                // 动画失败不能拖垮界面：直接落到目标状态。
+                AppLogger.Warn($"Sub-nav animation failed: {ex.Message}");
+                ApplyFinalState(expanded);
             }
         }
 
-        private bool _expanded;
+        private void Animate(bool expanded, int generation)
+        {
+            // 收起时可直接用当前高度；展开时必须先量出自然高度 —— 容器被压到 0
+            // 高度时 ActualHeight 也是 0，直接用它会让展开动画变成 0→0。
+            double naturalHeight = expanded ? MeasureNaturalHeight() : _panel.ActualHeight;
+            if (naturalHeight <= 0)
+            {
+                // 仍未量出高度：直接到位，避免出现 0 高度的死状态。
+                ApplyFinalState(expanded);
+                return;
+            }
+
+            var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var duration = new Duration(Duration);
+
+            var height = new DoubleAnimation
+            {
+                From = expanded ? 0 : naturalHeight,
+                To = expanded ? naturalHeight : 0,
+                Duration = duration,
+                EasingFunction = easing
+            };
+            Storyboard.SetTarget(height, _host);
+            Storyboard.SetTargetProperty(height, "Height");
+
+            var opacity = new DoubleAnimation
+            {
+                From = expanded ? 0 : 1,
+                To = expanded ? 1 : 0,
+                Duration = duration,
+                EasingFunction = easing
+            };
+            Storyboard.SetTarget(opacity, _panel);
+            Storyboard.SetTargetProperty(opacity, "Opacity");
+
+            var slide = new DoubleAnimation
+            {
+                From = expanded ? -8 : 0,
+                To = expanded ? 0 : -8,
+                Duration = duration,
+                EasingFunction = easing
+            };
+            Storyboard.SetTarget(slide, _shift);
+            Storyboard.SetTargetProperty(slide, "Y");
+
+            var storyboard = new Storyboard();
+            storyboard.Children.Add(height);
+            storyboard.Children.Add(opacity);
+            storyboard.Children.Add(slide);
+            storyboard.Completed += (_, _) =>
+            {
+                // 过期回调直接忽略，否则快速点击时旧状态会覆盖新状态。
+                if (generation != _generation)
+                {
+                    return;
+                }
+
+                ApplyFinalState(expanded);
+            };
+            storyboard.Begin();
+        }
+
+        /// <summary>
+        /// 临时解除高度约束、强制一次布局，量出内容的自然高度。
+        /// 量完立即按需恢复，不会留下可见的跳动。
+        /// </summary>
+        private double MeasureNaturalHeight()
+        {
+            _panel.Height = double.NaN;
+            _host.Height = double.NaN;
+            _panel.UpdateLayout();
+
+            double measured = _panel.ActualHeight;
+
+            // 回到收起态基线，让随后的展开动画从 0 开始。
+            _host.Height = 0;
+            return measured;
+        }
+
+        /// <summary>
+        /// 直接落到目标状态。这里只做无异常风险的赋值：不给 Height 赋 NaN。
+        /// </summary>
+        private void ApplyFinalState(bool expanded)
+        {
+            if (expanded)
+            {
+                _panel.Opacity = 1;
+                _panel.Height = double.NaN;
+                _host.Height = double.NaN;
+            }
+            else
+            {
+                _panel.Opacity = 0;
+                _panel.Height = 0;
+                _host.Height = 0;
+            }
+        }
     }
 
     private AnimatedSubNav? _subNav;

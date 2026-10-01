@@ -474,6 +474,45 @@ public class WinUi3UiTests
         Assert.Contains("EnsureHostPresented()", overlaySource[probeIndex..], StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AnimatedSubNav_AvoidsCrashProneAnimationPatterns()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+
+        int classIndex = source.IndexOf("private sealed class AnimatedSubNav", StringComparison.Ordinal);
+        Assert.True(classIndex >= 0, "AnimatedSubNav is missing.");
+
+        int classEnd = source.IndexOf("private AnimatedSubNav? _subNav;", classIndex, StringComparison.Ordinal);
+        Assert.True(classEnd > classIndex, "AnimatedSubNav structure changed unexpectedly.");
+        string body = source[classIndex..classEnd];
+
+        // 1. 收起态不能用 Visibility 切换来实现：那会让过渡动画失去可见的起止
+        //    状态；且绝不给 Border.Height 赋 NaN 作为「收起」值（会抛 E_INVALIDARG）。
+        Assert.Contains("_host.Height = 0;", body, StringComparison.Ordinal);
+        Assert.Contains("_panel.Height = 0;", body, StringComparison.Ordinal);
+
+        // 2. Storyboard.Completed 是异步回调，不在 try/catch 栈上；其中的异常会
+        //    直接终结进程。必须有代次号来忽略过期回调，否则快速点击会让旧回调
+        //    覆盖新状态。
+        Assert.Contains("_generation", body, StringComparison.Ordinal);
+        Assert.Contains("generation != _generation", body, StringComparison.Ordinal);
+
+        // 3. 动画对象不得跨 Storyboard 复用（快速切换时会产生竞态）：
+        //    动画必须是局部变量、每次新建。
+        Assert.Contains("var height = new DoubleAnimation", body, StringComparison.Ordinal);
+        Assert.Contains("var opacity = new DoubleAnimation", body, StringComparison.Ordinal);
+        Assert.Contains("var slide = new DoubleAnimation", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("private readonly DoubleAnimation", body, StringComparison.Ordinal);
+
+        // 4. SetExpanded 必须包在 try/catch 中，动画失败不能拖垮界面。
+        int setIndex = body.IndexOf("public void SetExpanded(bool expanded)", StringComparison.Ordinal);
+        Assert.True(setIndex >= 0, "SetExpanded is missing.");
+        Assert.Contains("catch (Exception", body[setIndex..], StringComparison.Ordinal);
+
+        // 5. 展开前必须先量出自然高度：容器被压到 0 时 ActualHeight 也是 0。
+        Assert.Contains("MeasureNaturalHeight", body, StringComparison.Ordinal);
+    }
+
     private static XDocument LoadXaml(params string[] pathParts) =>
         XDocument.Parse(ReadSource(pathParts), LoadOptions.SetLineInfo);
 
