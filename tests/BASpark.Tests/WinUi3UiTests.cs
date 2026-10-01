@@ -359,14 +359,24 @@ public class WinUi3UiTests
     {
         string overlaySource = ReadSource("src", "OverlayWindow.cs");
 
-        // 主渲染器需要等 DOMContentLoaded 后再初始化 WebGL/WebGPU，低端机上会
-        // 明显超过 2 秒。若超时即回退到 legacy，会把「还在初始化」误判为
-        // 「渲染器损坏」，用户会直接看不到特效。
-        Assert.Contains("ProbeRendererBeforeFallbackAsync", overlaySource, StringComparison.Ordinal);
+        // 主渲染器需要等 DOMContentLoaded 后再初始化 WebGL/WebGPU。原先「固定等待
+        // 满 12 秒才探测一次」会让启动整整慢 12 秒；现改为轮询，就绪即显示，
+        // 12 秒仅作为渲染器确实起不来时的兜底。
+        Assert.Contains("PollRendererReadyAsync", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("RendererProbeInterval", overlaySource, StringComparison.Ordinal);
         Assert.Contains("RendererProbeScript", overlaySource, StringComparison.Ordinal);
         Assert.Contains("window.externalBoom", overlaySource, StringComparison.Ordinal);
 
-        // 探测判定的间隔必须远大于原来的 2 秒。
+        // 轮询间隔必须远小于兜底超时，否则又退化成干等。
+        int intervalIndex = overlaySource.IndexOf(
+            "RendererProbeInterval = TimeSpan.FromMilliseconds(",
+            StringComparison.Ordinal);
+        Assert.True(intervalIndex >= 0, "Renderer probe interval constant is missing.");
+
+        string intervalLine = overlaySource[intervalIndex..overlaySource.IndexOf(';', intervalIndex)];
+        Assert.Contains("FromMilliseconds(200)", intervalLine, StringComparison.Ordinal);
+
+        // 兜底超时仍须保留，供渲染器确实起不来时回退。
         int timeoutIndex = overlaySource.IndexOf(
             "RendererReadyTimeout = TimeSpan.FromSeconds(",
             StringComparison.Ordinal);
@@ -445,7 +455,7 @@ public class WinUi3UiTests
         Assert.Contains("EnsureHostPresented()", overlaySource[navIndex..], StringComparison.Ordinal);
 
         // 渲染器探测成功也必须把窗口显示出来。
-        int probeIndex = overlaySource.IndexOf("ProbeRendererBeforeFallbackAsync", StringComparison.Ordinal);
+        int probeIndex = overlaySource.IndexOf("PollRendererReadyAsync", StringComparison.Ordinal);
         Assert.True(probeIndex > initIndex, "Renderer probe is missing.");
         Assert.Contains("EnsureHostPresented()", overlaySource[probeIndex..], StringComparison.Ordinal);
     }

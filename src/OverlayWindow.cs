@@ -442,6 +442,7 @@ internal sealed class OverlayWindow : IDisposable
         // 无法上报就绪的渲染器不能让叠加层长期处于不可见状态。
         if (!_rendererReady)
         {
+            _rendererStartedAtTicks = DateTime.UtcNow.Ticks;
             StartRendererReadyTimeout();
         }
     }
@@ -505,6 +506,13 @@ internal sealed class OverlayWindow : IDisposable
         }
 
         EnsureHostPresented();
+
+        // 页面已加载完成，立即探测一次：渲染器若已就绪，叠加层不必等到下一个
+        // 轮询周期才显示。
+        if (!_rendererReady && !_usingLegacyRenderer)
+        {
+            _ = PollRendererReadyAsync();
+        }
 
         // 导航会重建 JS 全局对象，因此每个页面都需要重新下发完整的宿主状态。
         _lastReportedInputMode = null;
@@ -652,11 +660,15 @@ internal sealed class OverlayWindow : IDisposable
     // ------------------------------------------------------------------
 
     // 主渲染器需要先等 DOMContentLoaded，再解析 vendor 包并初始化 WebGL/WebGPU，
-    // 低端机或首次创建用户数据目录时明显超过 2 秒。首轮给足时间，避免把「还在初始化」
-    // 误判为「渲染器损坏」而白白丢掉主渲染器。
+    // 渲染器就绪的兜底上限。正常情况下轮询会在几百毫秒内确认就绪，这里只是
+    // 防止渲染器确实起不来时无限等待。
     private static readonly TimeSpan RendererReadyTimeout = TimeSpan.FromSeconds(12);
 
-    // 超时后不直接判定失败：先向页面确认宿主 API 是否已经注入。
+    // 轮询间隔：探测宿主 API 是否已注入。渲染器通常在一秒内就绪，远快于原先
+    // 「固定等待满超时才探测」的做法（后者让启动足足慢 12 秒）。
+    private static readonly TimeSpan RendererProbeInterval = TimeSpan.FromMilliseconds(200);
+
+    // 探测页面：宿主 API 是否已经注入。就绪判定与失败判定都基于此。
     private const string RendererProbeScript =
         "(function(){" +
         "  try {" +
@@ -665,11 +677,16 @@ internal sealed class OverlayWindow : IDisposable
         "  } catch (e) { return 'pending'; }" +
         "})()";
 
+    private bool _rendererProbeInFlight;
+
+    /// <summary>本轮渲染器开始等待就绪的时刻，用于统计实际启动耗时。</summary>
+    private long _rendererStartedAtTicks;
+
     private void StartRendererReadyTimeout()
     {
         StopRendererReadyTimeout();
         _rendererReadyTimeoutTimer = App.DispatcherQueue.CreateTimer();
-        _rendererReadyTimeoutTimer.Interval = RendererReadyTimeout;
+        _rendererReadyTimeoutTimer.Interval = RendererProbeInterval;
         _rendererReadyTimeoutTimer.Tick += OnRendererReadyTimeout;
         _rendererReadyTimeoutTimer.Start();
     }
@@ -681,18 +698,38 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
-        StopRendererReadyTimeout();
         if (_isClosing || _rendererReady || _usingLegacyRenderer)
         {
+            StopRendererReadyTimeout();
             return;
         }
 
-        // ready 消息可能因时序原因丢失，但渲染器本身已经可用。此时回退到 legacy
-        // 只会让特效质量下降，因此先探测宿主 API 再决定。
-        _ = ProbeRendererBeforeFallbackAsync();
+        if (_rendererStartedAtTicks == 0)
+        {
+            _rendererStartedAtTicks = DateTime.UtcNow.Ticks;
+        }
+
+        // 先探测：渲染器就绪即刻显示叠加层，不再干等满超时。
+        if (!_rendererProbeInFlight)
+        {
+            _ = PollRendererReadyAsync();
+        }
+
+        if (DateTime.UtcNow.Ticks - _rendererStartedAtTicks >= RendererReadyTimeout.Ticks)
+        {
+            StopRendererReadyTimeout();
+            AppLogger.Warn(
+                $"BA click renderer ready timeout on '{_screenDeviceName}' " +
+                $"({RendererReadyTimeout.TotalSeconds:F0}s); switching to legacy renderer.");
+            FallbackToLegacyRenderer("ready timeout");
+        }
     }
 
-    private async Task ProbeRendererBeforeFallbackAsync()
+    /// <summary>
+    /// 轮询确认渲染器是否已注入宿主 API。就绪即结束等待并显示叠加层；
+    /// 未就绪则等下一次 Tick 再探。
+    /// </summary>
+    private async Task PollRendererReadyAsync()
     {
         CoreWebView2? coreWebView = _coreWebView;
         if (coreWebView == null || _isClosing || _rendererReady || _usingLegacyRenderer)
@@ -700,6 +737,7 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
+        _rendererProbeInFlight = true;
         string probeResult = string.Empty;
         try
         {
@@ -717,33 +755,37 @@ internal sealed class OverlayWindow : IDisposable
             AppLogger.Warn(
                 $"Renderer probe failed on '{_screenDeviceName}': {ex.Message}");
         }
+        finally
+        {
+            _rendererProbeInFlight = false;
+        }
 
         if (_isClosing || _rendererReady || _usingLegacyRenderer)
         {
             return;
         }
 
-        if (string.Equals(probeResult, "ready", StringComparison.Ordinal))
+        if (!string.Equals(probeResult, "ready", StringComparison.Ordinal))
         {
-            // 渲染器已注入宿主 API，视为就绪：停止回退，避免无谓降级。
-            _rendererReady = true;
-            _unresponsiveTracker.Reset();
-
-            // 探针成功同时证明页面已加载完成，是比 NavigationCompleted 更可靠的
-            // 「可以显示」信号；该事件在某些时序下不会到达，若只依赖它，叠加层
-            // 会一直保持隐藏（宿主窗口创建后始终未 Show）。
-            EnsureHostPresented();
-
-            AppLogger.Info(
-                $"BA click renderer reports ready via probe on '{_screenDeviceName}' " +
-                $"(no ready message within {RendererReadyTimeout.TotalSeconds:F0}s).");
+            // 仍在初始化，交给下一次 Tick。
             return;
         }
 
-        AppLogger.Warn(
-            $"BA click renderer ready timeout on '{_screenDeviceName}' " +
-            $"(probe: {probeResult}); switching to legacy renderer.");
-        FallbackToLegacyRenderer("ready timeout");
+        StopRendererReadyTimeout();
+        _rendererReady = true;
+        _unresponsiveTracker.Reset();
+
+        // 探针成功同时证明页面已加载完成，是比 NavigationCompleted 更可靠的
+        // 「可以显示」信号；该事件在某些时序下不会到达，若只依赖它，叠加层
+        // 会一直保持隐藏。
+        EnsureHostPresented();
+
+        double elapsedMs = _rendererStartedAtTicks == 0
+            ? 0
+            : (DateTime.UtcNow.Ticks - _rendererStartedAtTicks) / (double)TimeSpan.TicksPerMillisecond;
+        AppLogger.Info(
+            $"BA click renderer ready on '{_screenDeviceName}' " +
+            $"(via readiness probe after {elapsedMs:F0}ms; no ready message received).");
     }
 
     /// <summary>
@@ -1116,6 +1158,12 @@ internal sealed class OverlayWindow : IDisposable
             }
             catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
             {
+            }
+
+            // 恢复后渲染器可能已就绪，立即探测一次而不必等下一个轮询周期。
+            if (!_rendererReady && !_usingLegacyRenderer)
+            {
+                _ = PollRendererReadyAsync();
             }
         }
 
