@@ -854,7 +854,6 @@ public sealed partial class ControlPanelWindow : Window
         TxtRunAsAdminHint.Text = Localization.Get("Basic_RunAsAdminHint");
         CheckTouchscreenMode.Header = Localization.Get("Basic_Touchscreen");
         TxtTouchscreenHint.Text = Localization.Get("Basic_TouchscreenHint");
-        CheckTelemetry.Header = Localization.Get("Basic_Telemetry");
         TxtVisualTitle.Text = Localization.Get("Visual_Title");
         BtnVisualReset.Content = Localization.Get("Visual_ResetDefaults");
         TxtVisualInputHint.Text = Localization.Get("Visual_InputHint");
@@ -1379,7 +1378,6 @@ public sealed partial class ControlPanelWindow : Window
         CheckMasterSwitch.IsOn = ConfigManager.IsEffectEnabled;
         CheckAutoStart.IsOn = ConfigManager.AutoStart;
         CheckStartSilent.IsOn = ConfigManager.StartSilent;
-        CheckTelemetry.IsOn = ConfigManager.EnableTelemetry;
         CheckAlwaysTrailEffectSwitch.IsOn = ConfigManager.EnableAlwaysTrailEffect;
         CheckEnvironmentFilter.IsOn = ConfigManager.EnableEnvironmentFilter;
         CheckHideInFullscreen.IsOn = ConfigManager.HideInFullscreen;
@@ -2618,8 +2616,6 @@ public sealed partial class ControlPanelWindow : Window
         bool screenshotCompatibilityEnabled = CheckScreenshotCompatibilityMode.IsOn;
         int clickType = GetSelectedClickTrigger();
 
-        bool telemetryEnabled = CheckTelemetry.IsOn;
-        bool telemetryWasEnabled = ConfigManager.EnableTelemetry;
 
         // 保存配置组
         string activeId = (ComboProfiles.SelectedItem as FilterProfile)?.Id ?? string.Empty;
@@ -2629,7 +2625,6 @@ public sealed partial class ControlPanelWindow : Window
         ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
         ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsOn);
         ConfigManager.Save("AutoStart", autoStartEnabled);
-        ConfigManager.Save("EnableTelemetry", telemetryEnabled);
         ConfigManager.Save("ParticleColor", ConfigManager.ParticleColor);
         ConfigManager.Save("EffectScale", effectScaleForRegistry);
         ConfigManager.Save("UseLinkedEffectScale", useLinkedEffectScale);
@@ -2740,10 +2735,6 @@ public sealed partial class ControlPanelWindow : Window
             _networkRegionAtLoad = selectedNetworkRegion;
         }
 
-        if (telemetryEnabled && (!telemetryWasEnabled || networkRegionChanged))
-        {
-            TelemetryHelper.SendStartupData();
-        }
 
         ApplyDarkMode();
     }

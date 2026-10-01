@@ -84,7 +84,6 @@ public partial class PrivacyWindow : Window
         TxtSecurityBody.Text = Localization.Get("Privacy_Security_Body");
         TxtPrivacyTitle.Text = Localization.Get("Privacy_Privacy_Title");
         TxtPrivacyBody.Text = Localization.Get("Privacy_Privacy_Body");
-        CheckTelemetry.Content = Localization.Get("Privacy_Telemetry");
         BtnRefuse.Content = Localization.Get("Privacy_Refuse");
         BtnAgree.Content = Localization.Get("Privacy_Agree");
     }
@@ -116,7 +115,6 @@ public partial class PrivacyWindow : Window
         _ = e;
 
         ConfigManager.Save("AgreedToPrivacy", true);
-        ConfigManager.Save("EnableTelemetry", CheckTelemetry.IsChecked ?? false);
 
         Agreed = true;
         Complete(true);

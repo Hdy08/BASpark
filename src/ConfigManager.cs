@@ -76,7 +76,6 @@ namespace BASpark
         public static bool IsEffectEnabled { get; set; } = true;
         public static bool AutoStart { get; set; } = false;
         public static bool AgreedToPrivacy { get; set; } = false;
-        public static bool EnableTelemetry { get; set; } = false;
         public static int TotalClicks { get; set; } = 0;
         public static string LastNoticeContent { get; set; } = "";
         public static bool EnableAlwaysTrailEffect { get; set; } = false;
@@ -111,8 +110,6 @@ namespace BASpark
         public static DarkModeOption DarkMode { get; set; } = DarkModeOption.System;
         public static PanelScrollbarVisibility ScrollbarVisibility { get; set; } = PanelScrollbarVisibility.OnScroll;
         public static string SidebarBackgroundImagePath { get; set; } = "";
-        public static string TelemetryClientId { get; set; } = "";
-        public static string LastTelemetrySentUtc { get; set; } = "";
 
         /// 点击特效是否处于激活状态（点击特效开关）
         public static bool IsClickEffectActive => IsEffectEnabled;
@@ -144,8 +141,7 @@ namespace BASpark
                         IsEffectEnabled = Convert.ToBoolean(key.GetValue("IsEffectEnabled", true));
                         AutoStart = Convert.ToBoolean(key.GetValue("AutoStart", false));
                         AgreedToPrivacy = Convert.ToBoolean(key.GetValue("AgreedToPrivacy", false));
-                        EnableTelemetry = Convert.ToBoolean(key.GetValue("EnableTelemetry", false));
-                        TotalClicks = Convert.ToInt32(key.GetValue("TotalClicks", 0), CultureInfo.InvariantCulture);
+                                    TotalClicks = Convert.ToInt32(key.GetValue("TotalClicks", 0), CultureInfo.InvariantCulture);
                         LastNoticeContent = key.GetValue("LastNoticeContent", "")?.ToString() ?? "";
                         EnableAlwaysTrailEffect = Convert.ToBoolean(key.GetValue("EnableAlwaysTrailEffect", false));
                         StartSilent = Convert.ToBoolean(key.GetValue("StartSilent", false));
@@ -177,9 +173,7 @@ namespace BASpark
                         DarkMode = ParseDarkMode(key.GetValue("DarkMode", "System")?.ToString());
                         ScrollbarVisibility = ParseScrollbarVisibility(key.GetValue("ScrollbarVisibility", "OnScroll")?.ToString());
                         SidebarBackgroundImagePath = key.GetValue("SidebarBackgroundImagePath", "")?.ToString() ?? "";
-                        TelemetryClientId = key.GetValue("TelemetryClientId", "")?.ToString() ?? "";
-                        LastTelemetrySentUtc = key.GetValue("LastTelemetrySentUtc", "")?.ToString() ?? "";
-
+                        
                         if (!string.IsNullOrWhiteSpace(UiLanguage))
                         {
                             Localization.ApplyCulture(UiLanguage);
@@ -633,8 +627,7 @@ namespace BASpark
                     IsEffectEnabled = true;
                     AutoStart = false;
                     AgreedToPrivacy = false;
-                    EnableTelemetry = false;
-                    TotalClicks = 0;
+                            TotalClicks = 0;
                     LastNoticeContent = "";
                     EnableAlwaysTrailEffect = false;
                     StartSilent = false;
@@ -669,9 +662,7 @@ namespace BASpark
                     NetworkRegion = NetworkRegionOption.Auto;
                     DarkMode = DarkModeOption.System;
                     SidebarBackgroundImagePath = "";
-                    TelemetryClientId = "";
-                    LastTelemetrySentUtc = "";
-                }
+                                }
             }
             catch (Exception ex)
             {

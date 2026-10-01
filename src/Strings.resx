@@ -117,9 +117,6 @@
     <data name="Basic_StartSilent" xml:space="preserve">
       <value>静默启动 (最小化到托盘)</value>
     </data>
-    <data name="Basic_Telemetry" xml:space="preserve">
-      <value>允许发送匿名运行数据以改进软件</value>
-    </data>
     <data name="Basic_Title" xml:space="preserve">
       <value>基础设置</value>
     </data>
@@ -477,9 +474,6 @@
     </data>
     <data name="Privacy_Tagline" xml:space="preserve">
       <value>Sensei, welcome back to Schale.</value>
-    </data>
-    <data name="Privacy_Telemetry" xml:space="preserve">
-      <value>同意加入用户体验改进计划 (匿名统计)</value>
     </data>
     <data name="Privacy_Title" xml:space="preserve">
       <value>欢迎使用 BASpark</value>

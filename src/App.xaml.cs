@@ -122,7 +122,6 @@ public partial class App : Application
             }
         }
 
-        TelemetryHelper.SendStartupData();
 
         Tray = new TrayIconController();
         Tray.Initialize(

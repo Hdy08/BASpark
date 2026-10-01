@@ -92,8 +92,6 @@
                                Style="{StaticResource BasPageSubtitleStyle}" />
                 </StackPanel>
 
-                <CheckBox x:Name="CheckTelemetry"
-                          IsChecked="True" />
             </StackPanel>
         </ScrollViewer>
 
