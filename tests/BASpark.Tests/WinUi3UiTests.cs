@@ -537,6 +537,50 @@ public class WinUi3UiTests
         Assert.DoesNotContain("IsExpanded", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WindowChrome_RemovesCaptionBorderAndRestoresTitleBarCapabilities()
+    {
+        string chromeSource = ReadSource("src", "WindowChrome.cs");
+        string xaml = ReadSource("src", "ControlPanelWindow.xaml");
+        string panelSource = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string designSystem = ReadSource("src", "DesignSystem.xaml");
+        string hostSource = ReadSource("src", "LayeredWindowHost.cs");
+
+        // Windows 10 上 WS_CAPTION 会给窗口留出约 9px 玻璃边框（表现为窗口最底部
+        // 一条黑边），DWMWA_BORDER_COLOR 在 19045 上不被支持，因此只能清样式。
+        Assert.Contains("WsCaption", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("WsThickFrame", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("DwmExtendFrameIntoClientArea", chromeSource, StringComparison.Ordinal);
+
+        // 清掉样式后系统不再提供拖拽移动与缩放，必须用非客户区命中区域补回来。
+        Assert.Contains("InputNonClientPointerSource.GetForWindowId", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("NonClientRegionKind.Caption", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("NonClientRegionKind.TopBorder", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("NonClientRegionKind.BottomBorder", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("NonClientRegionKind.LeftBorder", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("NonClientRegionKind.RightBorder", chromeSource, StringComparison.Ordinal);
+
+        // 窗口尺寸变化后区域几何必须重算（右/下边与标题栏宽度都会变）。
+        Assert.Contains("WindowChrome.ApplyBorderlessChrome(", panelSource, StringComparison.Ordinal);
+        Assert.Contains("WindowChrome.UpdateNonClientRegions(", panelSource, StringComparison.Ordinal);
+        Assert.Contains("args.DidSizeChange", panelSource, StringComparison.Ordinal);
+
+        // 标题栏按钮由系统按 WS_CAPTION 绘制，清掉样式后会消失，因此自绘三个按钮。
+        Assert.Contains("BtnCaptionMinimize", xaml, StringComparison.Ordinal);
+        Assert.Contains("BtnCaptionMaximize", xaml, StringComparison.Ordinal);
+        Assert.Contains("BtnCaptionClose", xaml, StringComparison.Ordinal);
+        Assert.Contains("CaptionMinimize_Click", panelSource, StringComparison.Ordinal);
+        Assert.Contains("CaptionMaximize_Click", panelSource, StringComparison.Ordinal);
+        Assert.Contains("CaptionClose_Click", panelSource, StringComparison.Ordinal);
+        Assert.Contains("BasCaptionButtonStyle", designSystem, StringComparison.Ordinal);
+
+        // 叠加层每 5 秒重新断言置顶时，位置没变就不该重复 SetWindowPos ——
+        // 全屏分层窗口的重复定位会连带整屏重新合成，拖动别的窗口时正好撞上会卡一下。
+        int boundsIndex = hostSource.IndexOf("public void SetBounds", StringComparison.Ordinal);
+        Assert.True(boundsIndex >= 0, "SetBounds is missing.");
+        Assert.Contains("_boundsApplied", hostSource[boundsIndex..], StringComparison.Ordinal);
+    }
+
     private static XDocument LoadXaml(params string[] pathParts) =>
         XDocument.Parse(ReadSource(pathParts), LoadOptions.SetLineInfo);
 

@@ -25,6 +25,15 @@ internal sealed class LayeredWindowHost : IDisposable
     private bool _layeredStyleApplied;
     private bool _disposed;
 
+    // 上一次实际下发的窗口矩形。叠加层每 5 秒会重新断言一次置顶，若每次都对全屏
+    // 分层窗口做一次 SetWindowPos，就会顺带触发整屏重新合成 —— 拖动别的窗口时正好
+    // 撞上就会卡一下。位置尺寸没变时只刷新 DPI，不再重复下发。
+    private bool _boundsApplied;
+    private int _boundsLeft;
+    private int _boundsTop;
+    private int _boundsWidth;
+    private int _boundsHeight;
+
     public IntPtr Handle => _hwnd;
 
     public double DpiScale { get; private set; } = 1.0;
@@ -100,9 +109,24 @@ internal sealed class LayeredWindowHost : IDisposable
             return;
         }
 
+        // 尺寸位置没变就不做 SetWindowPos：全屏分层窗口的重复定位会连带整屏重新合成。
+        if (_boundsApplied
+            && _boundsLeft == left && _boundsTop == top
+            && _boundsWidth == width && _boundsHeight == height)
+        {
+            DpiScale = ReadDpiScale();
+            return;
+        }
+
         NativeMethods.SetWindowPos(
             _hwnd, IntPtr.Zero, left, top, width, height,
             NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_NOZORDER);
+
+        _boundsApplied = true;
+        _boundsLeft = left;
+        _boundsTop = top;
+        _boundsWidth = width;
+        _boundsHeight = height;
 
         DpiScale = ReadDpiScale();
     }
