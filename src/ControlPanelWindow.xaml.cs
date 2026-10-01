@@ -358,6 +358,11 @@ public sealed partial class ControlPanelWindow : Window
     private string? _pendingLanguage;
     private NetworkRegionOption _networkRegionAtLoad = NetworkRegionOption.Auto;
 
+    // 首页「当前状态」的三种配色，复用实例（见 RefreshTimer_Tick 的说明）。
+    private readonly SolidColorBrush _statusPausedBrush = new(Colors.Gray);
+    private readonly SolidColorBrush _statusFilteredBrush = new(Color.FromArgb(255, 0xD9, 0x77, 0x06));
+    private readonly SolidColorBrush _statusActiveBrush = new(Colors.Green);
+
     public ObservableCollection<FilterProfile> Profiles { get; set; } = new();
     public ObservableCollection<string> CurrentProfileProcesses { get; set; } = new();
     public ObservableCollection<ProcessItem> RunningProcessList { get; set; } = new();
@@ -1281,20 +1286,23 @@ public sealed partial class ControlPanelWindow : Window
         bool suppressedByEnvironment = ConfigManager.IsEffectEnabled &&
             App.Overlay?.IsEffectSuppressedByEnvironment() == true;
 
+        // 状态画刷复用实例：每 500ms 新建一个 SolidColorBrush 并重新赋给
+        // Foreground，会让该文本块每次都被判定为「变了」而重绘，长期挂机时白白
+        // 制造 GC 压力与无谓的重绘（拖动窗口时正好撞上就是一次卡顿）。
         if (!ConfigManager.IsEffectEnabled)
         {
             StatusText.Text = Localization.Get("Status_Paused");
-            StatusText.Foreground = new SolidColorBrush(Colors.Gray);
+            StatusText.Foreground = _statusPausedBrush;
         }
         else if (suppressedByEnvironment)
         {
             StatusText.Text = Localization.Get("Status_Filtered");
-            StatusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 0xD9, 0x77, 0x06));
+            StatusText.Foreground = _statusFilteredBrush;
         }
         else
         {
             StatusText.Text = Localization.Get("Status_Active");
-            StatusText.Foreground = new SolidColorBrush(Colors.Green);
+            StatusText.Foreground = _statusActiveBrush;
         }
     }
 

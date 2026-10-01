@@ -48,6 +48,10 @@ internal sealed class OverlayWindow : IDisposable
     private long _lastEnsureTopmostTicks;
     private bool _isClosing;
 
+    // 连续的鼠标移动脚本是否仍在执行中（0 = 空闲，1 = 未完成）。
+    // 见 EmitMove 的说明：用于在 WebView2 跟不上时合并移动事件，避免调用积压。
+    private int _moveScriptPending;
+
     // WebView2 在窗口尚未置顶时完成初始化更稳定；导航成功后才把叠加层抬到最前。
     private bool _webViewReadyForTopmost;
     private bool _screenshotCompatibilityMode = ConfigManager.ScreenshotCompatibilityMode;
@@ -1241,10 +1245,23 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
+        // 连续移动是唯一的高频事件（鼠标每秒可产生数百条）。原先每条都直接
+        // ExecuteScriptAsync 且不跟踪完成情况，WebView2 侧一旦跟不上，调用就会越积
+        // 越多 —— 实测拖动窗口时控制面板 UI 线程的响应 P95 由 0.06ms 涨到 4.2ms
+        // （同样条件下参照程序是 0.06ms），表现为「拖久了、拖快了明显延迟」。
+        // 这里只合并这一类事件：上一条脚本还没执行完就丢掉这一条，几毫秒后的下一次
+        // 移动会带上最新坐标，轨迹形状不变，但不会再有积压。
+        // 按下 / 抬起 / 点击 / 拖尾开始都是离散事件，仍是每条都发。
+        if (Interlocked.Exchange(ref _moveScriptPending, 1) == 1)
+        {
+            return;
+        }
+
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
         ExecuteWithInputContext(
             inputMode,
-            $"if(window.externalMove) window.externalMove({FormatCoordinate(clientPoint.X)}, {FormatCoordinate(clientPoint.Y)});");
+            $"if(window.externalMove) window.externalMove({FormatCoordinate(clientPoint.X)}, {FormatCoordinate(clientPoint.Y)});",
+            onCompleted: () => Interlocked.Exchange(ref _moveScriptPending, 0));
     }
 
     public void EmitUp(bool touchLike)
@@ -1329,31 +1346,56 @@ internal sealed class OverlayWindow : IDisposable
         ExecuteScript($"if(window.setEnvironmentInputSuppressed) window.setEnvironmentInputSuppressed({suppressed});");
     }
 
-    private void ExecuteWithInputContext(string inputMode, string actionScript)
+    private void ExecuteWithInputContext(string inputMode, string actionScript, Action? onCompleted = null)
     {
-        ExecuteScript(BuildInputContextScript(inputMode) + actionScript);
+        ExecuteScript(BuildInputContextScript(inputMode) + actionScript, onCompleted);
     }
 
     /// <summary>统一 JS 脚本执行入口。</summary>
-    private void ExecuteScript(string script)
+    private void ExecuteScript(string script, Action? onCompleted = null)
     {
         if (string.IsNullOrEmpty(script))
         {
+            onCompleted?.Invoke();
             return;
         }
 
         CoreWebView2? coreWebView = _coreWebView;
         if (coreWebView == null)
         {
+            onCompleted?.Invoke();
             return;
         }
 
         try
         {
-            _ = coreWebView.ExecuteScriptAsync(script);
+            if (onCompleted == null)
+            {
+                _ = coreWebView.ExecuteScriptAsync(script);
+                return;
+            }
+
+            RunScriptAndSignalAsync(coreWebView, script, onCompleted);
         }
         catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
         {
+            onCompleted?.Invoke();
+        }
+    }
+
+    /// <summary>执行脚本并在结束后回调（用于高频事件的「上一条是否还在跑」判断）。</summary>
+    private async void RunScriptAndSignalAsync(CoreWebView2 coreWebView, string script, Action onCompleted)
+    {
+        try
+        {
+            await coreWebView.ExecuteScriptAsync(script);
+        }
+        catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+        {
+        }
+        finally
+        {
+            onCompleted();
         }
     }
 
