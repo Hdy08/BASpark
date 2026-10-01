@@ -216,6 +216,11 @@ internal sealed class OverlayWindow : IDisposable
     // 渲染器初始化
     // ------------------------------------------------------------------
 
+    // 多显示器会并发初始化多个叠加层。控制器创建失败时需要重建环境，但重建是
+    // 进程级的：另一个叠加层可能刚好也在重建。因此这里除了换目录再试，还要在
+    // 环境被他人替换后重新取用新环境，否则会拿着已作废的环境反复失败。
+    private const int ControllerAttachAttempts = 3;
+
     private async Task InitWebViewAsync()
     {
         try
@@ -228,31 +233,62 @@ internal sealed class OverlayWindow : IDisposable
 
             _host.Show();
 
-            // 控制器创建是整个叠加层最脆弱的一步：用户数据目录里的损坏 profile
-            // 会让它以 E_INVALIDARG 失败，并且换环境对象也没用，必须换一个干净的
-            // 用户数据目录。这里做两级恢复，避免一次失败就永久没有特效。
-            if (!await TryAttachControllerAsync(env))
+            bool attached = false;
+            bool resetRequested = false;
+
+            for (int attempt = 1; attempt <= ControllerAttachAttempts && !attached; attempt++)
+            {
+                if (attempt > 1)
+                {
+                    // 等待并发重建结束，并取用当前有效环境（可能已被另一个叠加层替换）。
+                    env = await WebView2EnvironmentHolder.GetOrCreateAsync().ConfigureAwait(true);
+                    if (_isClosing)
+                    {
+                        return;
+                    }
+                }
+
+                attached = await TryAttachControllerAsync(env).ConfigureAwait(true);
+                if (attached || _isClosing)
+                {
+                    break;
+                }
+
+                if (resetRequested)
+                {
+                    continue;
+                }
+
+                // 只在首次失败时重建环境，避免多屏之间反复互踩。
+                resetRequested = true;
+                AppLogger.Warn(
+                    $"WebView2 controller creation failed on '{_screenDeviceName}'; " +
+                    "recreating the shared environment with a fresh user data folder.");
+
+                try
+                {
+                    env = await WebView2EnvironmentHolder
+                        .ResetWithFreshUserDataFolderAsync()
+                        .ConfigureAwait(true);
+                }
+                catch (Exception ex) when (!IsExpectedWebViewShutdownException(ex))
+                {
+                    AppLogger.Warn(
+                        $"Recreating the WebView2 environment failed on '{_screenDeviceName}': " +
+                        $"{ex.GetType().Name}: {ex.Message}");
+                    break;
+                }
+            }
+
+            if (!attached)
             {
                 if (_isClosing)
                 {
                     return;
                 }
 
-                AppLogger.Warn(
-                    $"WebView2 controller creation failed on '{_screenDeviceName}'; " +
-                    "retrying with a fresh user data folder.");
-                env = await WebView2EnvironmentHolder.ResetWithFreshUserDataFolderAsync();
-
-                if (_isClosing || !await TryAttachControllerAsync(env))
-                {
-                    if (!_isClosing)
-                    {
-                        throw new InvalidOperationException(
-                            "WebView2 控制器创建失败：使用全新用户数据目录重试后仍然失败。");
-                    }
-
-                    return;
-                }
+                throw new InvalidOperationException(
+                    $"WebView2 控制器创建失败：已尝试 {ControllerAttachAttempts} 次（含重建用户数据目录）。");
             }
 
             if (_isClosing)

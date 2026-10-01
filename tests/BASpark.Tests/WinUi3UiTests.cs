@@ -396,6 +396,28 @@ public class WinUi3UiTests
         Assert.Contains("NativeMethods.IsWindow(_host.Handle)", overlaySource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WebView2Environment_IsSharedAndSessionUnique()
+    {
+        string holderSource = ReadSource("src", "WebView2EnvironmentHolder.cs");
+        string overlaySource = ReadSource("src", "OverlayWindow.cs");
+
+        // 同一个用户数据目录同时只能有一个 WebView2 环境。多显示器会并发初始化
+        // 多个叠加层，若各自建环境并指向同一目录，只有先到者成功，其余以
+        // E_INVALIDARG 失败 —— 实测双屏环境下必然复现。
+        Assert.Contains("一个环境 + 多个控制器", holderSource, StringComparison.Ordinal);
+
+        // 环境按会话唯一，避免与其它实例或历史残留争用。
+        Assert.Contains("Environment.ProcessId", holderSource, StringComparison.Ordinal);
+        Assert.Contains("Guid.NewGuid()", holderSource, StringComparison.Ordinal);
+
+        // 恢复目录名必须唯一：秒级时间戳会让同秒并发恢复撞名。
+        Assert.DoesNotContain("yyyyMMddHHmmss", holderSource, StringComparison.Ordinal);
+
+        // 控制器挂载要能在并发重建后重试并取用新环境。
+        Assert.Contains("ControllerAttachAttempts", overlaySource, StringComparison.Ordinal);
+    }
+
     private static XDocument LoadXaml(params string[] pathParts) =>
         XDocument.Parse(ReadSource(pathParts), LoadOptions.SetLineInfo);
 
