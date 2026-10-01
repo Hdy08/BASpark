@@ -8,7 +8,7 @@ namespace BASpark;
 
 /// <summary>
 /// 应用入口。迁移到 WinUI 3 后进程模型保持单进程：
-///   * 控制面板 / 取色器 / 对话框 = 真正的 WinUI 3 窗口
+///   * 控制面板 = Win32 直合成宿主 + XAML 岛；取色器 / 对话框 = WinUI 3 窗口
 ///   * 特效叠加层 = 自建 Win32 分层窗口 + WebView2（见 <see cref="LayeredWindowHost"/>）
 ///   * 托盘图标 = 独立 STA 线程上的 WinForms NotifyIcon
 ///     （WinUI 3 没有托盘 API；菜单交回系统原生渲染，不再自绘配色）
@@ -161,12 +161,12 @@ public partial class App : Application
                 {
                     _controlPanel = new ControlPanelWindow();
                     _controlPanel.Closed += (_, _) => _controlPanel = null;
-                    WindowChrome.ApplyAppIcon(_controlPanel);
+                    WindowChrome.ApplyAppIcon(_controlPanel.Handle);
                     _controlPanel.Activate();
 
                     // 标题栏主题需要在窗口建立后才可设置（Win10 走 DWM 回退路径）。
                     WindowChrome.ApplyTitleBarTheme(
-                        _controlPanel,
+                        _controlPanel.Handle,
                         IsEffectiveDarkMode());
                 }
                 catch (Exception ex)

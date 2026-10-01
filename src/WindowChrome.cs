@@ -19,9 +19,13 @@ internal static class WindowChrome
 
     public static void ApplyAppIcon(Window window)
     {
+        ApplyAppIcon(WinRT.Interop.WindowNative.GetWindowHandle(window));
+    }
+
+    public static void ApplyAppIcon(IntPtr hwnd)
+    {
         try
         {
-            IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
             if (hwnd == IntPtr.Zero)
             {
                 return;
@@ -100,9 +104,13 @@ internal static class WindowChrome
     /// </summary>
     public static void ApplyTitleBarTheme(Window window, bool isDark)
     {
+        ApplyTitleBarTheme(WinRT.Interop.WindowNative.GetWindowHandle(window), isDark);
+    }
+
+    public static void ApplyTitleBarTheme(IntPtr hwnd, bool isDark)
+    {
         try
         {
-            IntPtr hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
             if (hwnd == IntPtr.Zero)
             {
                 return;

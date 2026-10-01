@@ -39,6 +39,18 @@
     <data name="App_Title_ControlPanel" xml:space="preserve">
       <value>BASpark - Control Panel</value>
     </data>
+    <data name="Window_Minimize" xml:space="preserve">
+      <value>Minimize</value>
+    </data>
+    <data name="Window_Maximize" xml:space="preserve">
+      <value>Maximize</value>
+    </data>
+    <data name="Window_Restore" xml:space="preserve">
+      <value>Restore</value>
+    </data>
+    <data name="Window_Close" xml:space="preserve">
+      <value>Close</value>
+    </data>
     <data name="Basic_AutoStart" xml:space="preserve">
       <value>Start with Windows</value>
     </data>

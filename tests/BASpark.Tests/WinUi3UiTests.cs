@@ -554,20 +554,85 @@ public class WinUi3UiTests
     public void WindowChrome_KeepsCaptionStylesBecauseTheyOwnWindowAnimations()
     {
         string chromeSource = ReadSource("src", "WindowChrome.cs");
-        string panelSource = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        string xaml = ReadSource("src", "ControlPanelWindow.xaml");
+        string hostSource = ReadSource("src", "DcompPanelHost.cs");
 
-        // 结论（实测，勿回退）：Windows 10 上 WS_CAPTION 既带来约 9px 的玻璃边框
-        // （表现为窗口四周透出桌面、底部像黑边），也带来两样不能丢的东西：
-        //   1. 系统绘制的标题栏按钮；
-        //   2. DWM 的最小化/还原窗口动画（清掉 WS_CAPTION 后最小化变成瞬间消失）。
-        // 实测对照：两者都保留时最小化有 ~5 帧的缩放动画；只清 WS_CAPTION（或同时清
-        // WS_THICKFRAME）后动画消失。因此这里保持系统边框不动，不再做样式手术。
         Assert.DoesNotContain("SetWindowLong", chromeSource, StringComparison.Ordinal);
         Assert.DoesNotContain("DwmExtendFrameIntoClientArea", chromeSource, StringComparison.Ordinal);
         Assert.DoesNotContain("InputNonClientPointerSource", chromeSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("ApplyBorderlessChrome", panelSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("BtnCaptionMinimize", xaml, StringComparison.Ordinal);
+        Assert.Contains("int style = WsCaption | WsThickFrame | WsSysMenu | WsMinimizeBox | WsMaximizeBox", hostSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ControlPanel_AttachesXamlToTheDirectCompositionHost()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string hostSource = ReadSource("src", "DcompPanelHost.cs");
+
+        Assert.Equal("UserControl", document.Root?.Name.LocalName);
+        Assert.Contains("ControlPanelWindow : UserControl", source, StringComparison.Ordinal);
+        Assert.Contains("_host = new DcompPanelHost()", source, StringComparison.Ordinal);
+        Assert.Contains("_host.SetContent(this)", source, StringComparison.Ordinal);
+        Assert.Contains("WsExNoRedirectionBitmap = 0x00200000", hostSource, StringComparison.Ordinal);
+        Assert.Contains("_xamlSource.SiteBridge.MoveAndResize", hostSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("WsVisible", hostSource, StringComparison.Ordinal);
+        Assert.Contains("InitializeWithWindow.Initialize(picker, Handle)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ControlPanel_CaptionButtonsRemainInteractiveAndTrackMaximization()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string hostSource = ReadSource("src", "DcompPanelHost.cs");
+
+        Assert.Equal("CaptionMinimize_Click", (string?)GetNamedElement(document, "BtnCaptionMinimize").Attribute("Click"));
+        Assert.Equal("CaptionMaximize_Click", (string?)GetNamedElement(document, "BtnCaptionMaximize").Attribute("Click"));
+        Assert.Equal("CaptionClose_Click", (string?)GetNamedElement(document, "BtnCaptionClose").Attribute("Click"));
+        Assert.Contains("CaptionMaximizeIcon.Glyph = maximized", source, StringComparison.Ordinal);
+        Assert.Contains("XamlRoot.RasterizationScale", source, StringComparison.Ordinal);
+        Assert.Contains("CaptionButtons.SizeChanged", source, StringComparison.Ordinal);
+        Assert.Contains("NonClientRegionKind.Passthrough", hostSource, StringComparison.Ordinal);
+        Assert.Contains("IsMaximized ? []", hostSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PanelHost_PreservesIslandContentsWhileMinimizedAndRestoresOnShow()
+    {
+        string hostSource = ReadSource("src", "DcompPanelHost.cs");
+        int handlerIndex = hostSource.IndexOf("private void OnWindowSizeChanged()", StringComparison.Ordinal);
+        Assert.True(handlerIndex >= 0);
+        string handler = hostSource[handlerIndex..hostSource.IndexOf("private void UpdateXamlIslandBounds()", handlerIndex, StringComparison.Ordinal)];
+
+        Assert.Contains("if (IsIconic(_hwnd))", handler, StringComparison.Ordinal);
+        Assert.True(handler.IndexOf("return;", StringComparison.Ordinal) < handler.IndexOf("UpdateXamlIslandBounds()", StringComparison.Ordinal));
+        Assert.Contains("IsIconic(_hwnd) ? SW_RESTORE : SW_SHOW", hostSource, StringComparison.Ordinal);
+        Assert.Contains("Marshal.StructureToPtr(info.rcWork, lParam", hostSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("Marshal.StructureToPtr(window, lParam", hostSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ControlPanel_ClosingReleasesTheIslandAndNativeHost()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string hostSource = ReadSource("src", "DcompPanelHost.cs");
+
+        Assert.Contains("_host.CloseRequested += ControlPanelWindow_Closed", source, StringComparison.Ordinal);
+        Assert.Contains("_host.Dispose()", source, StringComparison.Ordinal);
+        Assert.Contains("Closed?.Invoke(this, EventArgs.Empty)", source, StringComparison.Ordinal);
+        Assert.Contains("_xamlSource.Dispose()", hostSource, StringComparison.Ordinal);
+        Assert.Contains("DestroyWindow(hwnd)", hostSource, StringComparison.Ordinal);
+        Assert.Contains("Instances.Remove(hwnd)", hostSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PanelHost_RestoresKeyboardFocusAndWrapsTabNavigation()
+    {
+        string hostSource = ReadSource("src", "DcompPanelHost.cs");
+
+        Assert.Contains("_xamlSource.TakeFocusRequested +=", hostSource, StringComparison.Ordinal);
+        Assert.Contains("XamlSourceFocusNavigationReason.First or XamlSourceFocusNavigationReason.Last", hostSource, StringComparison.Ordinal);
+        Assert.Contains("XamlSourceFocusNavigationReason.Restore", hostSource, StringComparison.Ordinal);
     }
 
     private static XDocument LoadXaml(params string[] pathParts) =>

@@ -25,7 +25,7 @@ namespace BASpark;
 /// 非客户区则由 <see cref="WmNcCalcSize"/> 抹平，客户区铺满整窗；拖拽移动与四边缩放
 /// 改用 <see cref="InputNonClientPointerSource"/> 的命中区域交还给系统模态循环处理。
 /// </summary>
-internal sealed class DcompPanelHost
+internal sealed class DcompPanelHost : IDisposable
 {
     private const string WindowClassName = "BASparkPanelHost";
 
@@ -34,13 +34,14 @@ internal sealed class DcompPanelHost
     private const int WsSysMenu = 0x00080000;
     private const int WsMinimizeBox = 0x00020000;
     private const int WsMaximizeBox = 0x00010000;
-    private const int WsVisible = 0x10000000;
     private const int WsClipSiblings = 0x04000000;
     private const int WsExNoRedirectionBitmap = 0x00200000;
 
     private const int WmSize = 0x0005;
+    private const int WmSetFocus = 0x0007;
     private const int WmClose = 0x0010;
     private const int WmDestroy = 0x0002;
+    private const int WmNcDestroy = 0x0082;
     private const int WmEraseBkgnd = 0x0014;
     private const int WmNcCalcSize = 0x0083;
     private const int WmGetMinMaxInfo = 0x0024;
@@ -58,7 +59,9 @@ internal sealed class DcompPanelHost
     private static WndProcDelegate? _wndProc;
 
     private readonly DesktopWindowXamlSource _xamlSource;
+    private readonly AppWindow _appWindow;
     private IntPtr _hwnd;
+    private RectInt32 _captionButtonsBounds;
 
     private delegate IntPtr WndProcDelegate(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -67,7 +70,7 @@ internal sealed class DcompPanelHost
         EnsureClassRegistered();
 
         int style = WsCaption | WsThickFrame | WsSysMenu | WsMinimizeBox | WsMaximizeBox
-                    | WsVisible | WsClipSiblings;
+                    | WsClipSiblings;
 
         _hwnd = CreateWindowEx(
             WsExNoRedirectionBitmap,
@@ -83,10 +86,33 @@ internal sealed class DcompPanelHost
                 $"控制面板宿主窗口创建失败，Win32 错误码 {Marshal.GetLastWin32Error()}。");
         }
 
-        _xamlSource = new DesktopWindowXamlSource();
-        _xamlSource.Initialize(Win32Interop.GetWindowIdFromWindow(_hwnd));
+        DesktopWindowXamlSource? xamlSource = null;
+        try
+        {
+            WindowId windowId = Win32Interop.GetWindowIdFromWindow(_hwnd);
+            _appWindow = AppWindow.GetFromWindowId(windowId);
+            xamlSource = new DesktopWindowXamlSource();
+            xamlSource.Initialize(windowId);
+            _xamlSource = xamlSource;
+            _xamlSource.TakeFocusRequested += (_, args) =>
+            {
+                XamlSourceFocusNavigationReason reason = args.Request.Reason;
+                if (reason is XamlSourceFocusNavigationReason.First or XamlSourceFocusNavigationReason.Last)
+                {
+                    _xamlSource.NavigateFocus(new XamlSourceFocusNavigationRequest(reason));
+                }
+            };
+        }
+        catch
+        {
+            xamlSource?.Dispose();
+            _ = DestroyWindow(_hwnd);
+            _hwnd = IntPtr.Zero;
+            throw;
+        }
 
         Instances[_hwnd] = this;
+        UpdateXamlIslandBounds();
     }
 
     /// <summary>宿主窗口句柄。</summary>
@@ -94,7 +120,9 @@ internal sealed class DcompPanelHost
 
     /// <summary>宿主窗口对应的 AppWindow（尺寸、最小尺寸、最小化/最大化都走它）。</summary>
     public AppWindow? AppWindow =>
-        _hwnd != IntPtr.Zero ? AppWindow.GetFromWindowId(Win32Interop.GetWindowIdFromWindow(_hwnd)) : null;
+        _hwnd != IntPtr.Zero ? _appWindow : null;
+
+    public bool IsMaximized => _hwnd != IntPtr.Zero && IsZoomed(_hwnd);
 
     /// <summary>用户关窗（标题栏关闭按钮）时触发；宿主只隐藏窗口，不销毁。</summary>
     public event EventHandler? CloseRequested;
@@ -106,6 +134,7 @@ internal sealed class DcompPanelHost
     public void SetContent(UIElement content)
     {
         _xamlSource.Content = content;
+        UpdateXamlIslandBounds();
     }
 
     /// <summary>设置窗口背景（系统背景，用于最小化/还原动画期间不出现黑块）。</summary>
@@ -129,8 +158,37 @@ internal sealed class DcompPanelHost
             return;
         }
 
-        _ = ShowWindow(_hwnd, SW_SHOW);
+        _ = ShowWindow(_hwnd, IsIconic(_hwnd) ? SW_RESTORE : SW_SHOW);
         _ = SetForegroundWindow(_hwnd);
+    }
+
+    public void Minimize()
+    {
+        if (AppWindow?.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.Minimize();
+        }
+    }
+
+    public void ToggleMaximize()
+    {
+        if (AppWindow?.Presenter is OverlappedPresenter presenter)
+        {
+            if (IsMaximized)
+            {
+                presenter.Restore();
+            }
+            else
+            {
+                presenter.Maximize();
+            }
+        }
+    }
+
+    public void SetCaptionButtonsBounds(RectInt32 bounds)
+    {
+        _captionButtonsBounds = bounds;
+        UpdateNonClientRegions();
     }
 
     public void Hide()
@@ -172,7 +230,7 @@ internal sealed class DcompPanelHost
     /// </summary>
     public void UpdateNonClientRegions()
     {
-        if (_hwnd == IntPtr.Zero || !GetWindowRect(_hwnd, out RECT rect))
+        if (_hwnd == IntPtr.Zero || IsIconic(_hwnd) || !GetClientRect(_hwnd, out RECT rect))
         {
             return;
         }
@@ -197,10 +255,15 @@ internal sealed class DcompPanelHost
             source.SetRegionRects(
                 NonClientRegionKind.Caption,
                 [new RectInt32(0, 0, width, Math.Min(caption, height))]);
-            source.SetRegionRects(NonClientRegionKind.TopBorder, [new RectInt32(0, 0, width, grip)]);
-            source.SetRegionRects(NonClientRegionKind.BottomBorder, [new RectInt32(0, height - grip, width, grip)]);
-            source.SetRegionRects(NonClientRegionKind.LeftBorder, [new RectInt32(0, 0, grip, height)]);
-            source.SetRegionRects(NonClientRegionKind.RightBorder, [new RectInt32(width - grip, 0, grip, height)]);
+            source.SetRegionRects(
+                NonClientRegionKind.Passthrough,
+                _captionButtonsBounds.Width > 0 && _captionButtonsBounds.Height > 0
+                    ? [_captionButtonsBounds]
+                    : []);
+            source.SetRegionRects(NonClientRegionKind.TopBorder, IsMaximized ? [] : [new RectInt32(0, 0, width, grip)]);
+            source.SetRegionRects(NonClientRegionKind.BottomBorder, IsMaximized ? [] : [new RectInt32(0, height - grip, width, grip)]);
+            source.SetRegionRects(NonClientRegionKind.LeftBorder, IsMaximized ? [] : [new RectInt32(0, 0, grip, height)]);
+            source.SetRegionRects(NonClientRegionKind.RightBorder, IsMaximized ? [] : [new RectInt32(width - grip, 0, grip, height)]);
         }
         catch (Exception ex)
         {
@@ -247,17 +310,8 @@ internal sealed class DcompPanelHost
         {
             case WmNcCalcSize:
                 // 客户区铺满整窗：非客户区（Windows 10 上是 9px 玻璃边框 + 顶部 1px）
-                // 因此完全消失。wParam=TRUE 时 lParam 是 NCCALCSIZE_PARAMS，
-                // 保持其 rgrc[0]（窗口矩形）不变并返回 0 即表示整窗为客户区；
-                // wParam=FALSE 时 lParam 是 RECT，需要写成窗口矩形。
-                if (wParam == IntPtr.Zero)
-                {
-                    if (GetWindowRect(hwnd, out RECT window))
-                    {
-                        Marshal.StructureToPtr(window, lParam, fDeleteOld: false);
-                    }
-                }
-                else if (IsZoomed(hwnd) && GetWindowRect(hwnd, out RECT zoomed))
+                // 因此完全消失。保持建议的窗口矩形不变并返回 0 即表示整窗为客户区。
+                if (IsZoomed(hwnd) && GetWindowRect(hwnd, out RECT zoomed))
                 {
                     // 最大化时窗口矩形比工作区各方向大一圈（约 9px 的不可见边框），
                     // 客户区若照搬窗口矩形，内容会顶出工作区被裁掉。这里改用监视器工作区。
@@ -281,6 +335,11 @@ internal sealed class DcompPanelHost
 
             case WmSize:
                 InstanceOf(hwnd)?.OnWindowSizeChanged();
+                return IntPtr.Zero;
+
+            case WmSetFocus:
+                InstanceOf(hwnd)?._xamlSource.NavigateFocus(
+                    new XamlSourceFocusNavigationRequest(XamlSourceFocusNavigationReason.Restore));
                 return IntPtr.Zero;
 
             case WmDpiChanged:
@@ -307,6 +366,10 @@ internal sealed class DcompPanelHost
 
             case WmDestroy:
                 return IntPtr.Zero;
+
+            case WmNcDestroy:
+                Instances.Remove(hwnd);
+                break;
         }
 
         return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -337,6 +400,11 @@ internal sealed class DcompPanelHost
 
     private void OnWindowSizeChanged()
     {
+        if (IsIconic(_hwnd))
+        {
+            return;
+        }
+
         UpdateXamlIslandBounds();
         UpdateNonClientRegions();
         SizeChanged?.Invoke(this, EventArgs.Empty);
@@ -380,12 +448,33 @@ internal sealed class DcompPanelHost
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    public void Dispose()
+    {
+        IntPtr hwnd = _hwnd;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        Instances.Remove(hwnd);
+        _hwnd = IntPtr.Zero;
+        try
+        {
+            _xamlSource.Dispose();
+        }
+        finally
+        {
+            _ = DestroyWindow(hwnd);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Win32 互操作
     // ------------------------------------------------------------------
 
     private const int SW_HIDE = 0;
     private const int SW_SHOW = 5;
+    private const int SW_RESTORE = 9;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
 
@@ -445,11 +534,17 @@ internal sealed class DcompPanelHost
         int x, int y, int width, int height,
         IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", EntryPoint = "DefWindowProcW", CharSet = CharSet.Unicode)]
     private static extern IntPtr DefWindowProc(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hwnd, int cmd);
+
+    [DllImport("user32.dll")]
+    private static extern bool DestroyWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hwnd);
 
     [DllImport("user32.dll")]
     private static extern IntPtr SetForegroundWindow(IntPtr hwnd);

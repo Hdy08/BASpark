@@ -15,6 +15,7 @@ using Microsoft.UI.Composition;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
@@ -81,7 +82,7 @@ public class ScreenOptionItem
 ///   * Yes/No 确认改用 ContentDialog（需要 XamlRoot）；纯提示仍走原生 NativeMessageBox。
 ///   * 旧版「滚动时临时显示滚动条」的 hack 去掉：OnScroll 直接映射为 Auto。
 /// </summary>
-public sealed partial class ControlPanelWindow : Window
+public sealed partial class ControlPanelWindow : UserControl
 {
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BASparkClient/1.0";
     private const uint MonitorDefaultToNearest = 2;
@@ -90,11 +91,6 @@ public sealed partial class ControlPanelWindow : Window
     // 初始尺寸。
     private const int DesignWidth = 680;
     private const int DesignHeight = 710;
-
-    // 最小尺寸下限：侧边栏固定 212px，设置页的滑块 + 数字框并排布局在此宽度下
-    // 开始被压扁，再窄会出现控件显示不全。
-    private const int MinDesignWidth = 560;
-    private const int MinDesignHeight = 560;
 
     /// <summary>
     /// 侧栏设置子导航的展开/收起。
@@ -334,9 +330,7 @@ public sealed partial class ControlPanelWindow : Window
     [DllImport("shcore.dll")]
     private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
 
-    [DllImport("user32.dll")]
-    private static extern uint GetDpiForWindow(IntPtr hwnd);
-
+    private readonly DcompPanelHost _host;
     private readonly DispatcherQueueTimer? _refreshTimer;
 
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
@@ -354,7 +348,6 @@ public sealed partial class ControlPanelWindow : Window
     private string _languageAtLoad = Localization.CultureZhCn;
     private string? _pendingLanguage;
 
-    // 纯色回退背景（Win10 上通常走 Desktop Acrylic，只有都不支持时才用它）。
     private AppBackdrop? _solidBackdrop;
 
     // 首页「当前状态」的三种配色，复用实例（见 RefreshTimer_Tick 的说明）。
@@ -370,43 +363,63 @@ public sealed partial class ControlPanelWindow : Window
     public ControlPanelWindow()
     {
         InitializeComponent();
+        _host = new DcompPanelHost();
 
-        _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
-            ? Localization.CurrentCultureName
-            : ConfigManager.UiLanguage;
+        try
+        {
+            _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
+                ? Localization.CurrentCultureName
+                : ConfigManager.UiLanguage;
 
-        ApplyWindowChrome();
-        BindCollections();
-        SetupSliderPairs();
+            ApplyWindowChrome();
+            BindCollections();
+            SetupSliderPairs();
 
-        ComboProfiles.ItemsSource = Profiles;
-        ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses;
-        ListRunningProcesses.ItemsSource = RunningProcessList;
+            ComboProfiles.ItemsSource = Profiles;
+            ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses;
+            ListRunningProcesses.ItemsSource = RunningProcessList;
 
-        // 版本号 / 外链 / 公告 / 状态等动态文案在代码里补上；静态文案见 ApplyLocalizedText。
-        ApplyLocalizedText();
-        PopulateLanguageCombo();
-        LoadVersion();
-        LoadSettings();
-        ApplyScrollbarSettings();
-        LoadScreenOptions();
-        ApplyDarkMode();
-        CheckAdminStatus();
-        UpdatePageVisibility();
-        InitLogView();
+            ApplyLocalizedText();
+            PopulateLanguageCombo();
+            LoadVersion();
+            LoadSettings();
+            ApplyScrollbarSettings();
+            LoadScreenOptions();
+            ApplyDarkMode();
+            CheckAdminStatus();
+            UpdatePageVisibility();
+            InitLogView();
 
-        AppLogger.EntryAdded += OnAppLogEntryAdded;
-        SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
-        Closed += ControlPanelWindow_Closed;
-        RootGrid.Loaded += RootGrid_Loaded;
+            _host.CloseRequested += ControlPanelWindow_Closed;
+            _host.SizeChanged += (_, _) => UpdateCaptionButtonState();
+            RootGrid.Loaded += RootGrid_Loaded;
+            RootGrid.SizeChanged += (_, _) => UpdateCaptionButtonBounds();
+            CaptionButtons.SizeChanged += (_, _) => UpdateCaptionButtonBounds();
 
+            _refreshTimer = App.DispatcherQueue.CreateTimer();
+            _refreshTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _refreshTimer.IsRepeating = true;
+            _refreshTimer.Tick += (_, _) => RefreshTimer_Tick();
 
-        _refreshTimer = App.DispatcherQueue.CreateTimer();
-        _refreshTimer.Interval = TimeSpan.FromMilliseconds(500);
-        _refreshTimer.IsRepeating = true;
-        _refreshTimer.Tick += (_, _) => RefreshTimer_Tick();
-        _refreshTimer.Start();
+            _host.SetContent(this);
+            AppLogger.EntryAdded += OnAppLogEntryAdded;
+            SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
+            _refreshTimer.Start();
+        }
+        catch
+        {
+            Close();
+            throw;
+        }
     }
+
+    public IntPtr Handle => _host.Handle;
+
+    public event EventHandler? Closed;
+
+    public void Activate() => _host.Show();
+
+    public void Close() => ControlPanelWindow_Closed(this, EventArgs.Empty);
 
     /// <summary>UI 已加载且窗口未关闭时，控件事件才会产生副作用（等价于旧版的 IsLoaded 判断）。</summary>
     private bool IsUiReady => !_isClosed && RootGrid is { IsLoaded: true };
@@ -417,7 +430,7 @@ public sealed partial class ControlPanelWindow : Window
 
     private void ApplyWindowChrome()
     {
-        Title = Localization.Get("App_Title_ControlPanel");
+        _host.SetTitle(Localization.Get("App_Title_ControlPanel"));
 
         RootGrid.RequestedTheme = App.ResolveElementTheme();
         ApplySystemBackdrop();
@@ -439,59 +452,9 @@ public sealed partial class ControlPanelWindow : Window
             page.RenderTransform = new TranslateTransform();
         }
 
-        // 去掉系统标题栏、改用原生 TitleBar 控件。
-        // 注意：SetTitleBar 必须在视觉树加载完成后调用，否则会抛 E_INVALIDARG
-        // （Value does not fall within the expected range），导致整个窗口构造失败。
-        RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
-
-        AppWindow? appWindow = AppWindow;
-        if (appWindow == null)
-        {
-            return;
-        }
-
         try
         {
-            // 按显示器 DPI 换算后居中。
-            double scale = GetWindowDpiScale();
-            int width = (int)Math.Round(DesignWidth * scale);
-            int height = (int)Math.Round(DesignHeight * scale);
-
-            DisplayArea? area = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest);
-            area ??= DisplayArea.Primary;
-
-            if (area != null)
-            {
-                Windows.Graphics.RectInt32 work = area.WorkArea;
-                int x = work.X + Math.Max(0, (work.Width - width) / 2);
-                int y = work.Y + Math.Max(0, (work.Height - height) / 2);
-                appWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, width, height));
-            }
-
-            // 限制最小尺寸：侧边栏固定 212px，设置页的滑块/数字框并排布局在更窄的
-            // 宽度下会被压到无法使用。这里按同样的 DPI 比例换算，保证逻辑尺寸下限。
-            //
-            // 只用 OverlappedPresenter 的原生属性，不做窗口子类化：comctl32 的
-            // SetWindowSubclass 会接管窗口过程链，与 XAML 框架自身的消息处理叠加后
-            // 极易造成 UI 线程死锁（实测表现为打开控制面板立即卡死、CPU 归零）。
-            int minWidth = (int)Math.Round(MinDesignWidth * scale);
-            int minHeight = (int)Math.Round(MinDesignHeight * scale);
-            if (appWindow.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.PreferredMinimumWidth = minWidth;
-                presenter.PreferredMinimumHeight = minHeight;
-            }
-
-            // WinUI 在最大化/还原（presenter 变化）后会丢掉 SystemBackdrop：
-            // 现象是「最大化过一次之后，再最小化-显示时动画期间又变成整块黑」。
-            // 状态变化后重新挂一次背景即可（应用新实例才会触发内部重新连接）。
-            appWindow.Changed += (_, args) =>
-            {
-                if (args.DidPresenterChange)
-                {
-                    ApplySystemBackdrop();
-                }
-            };
+            _host.CenterOnCurrentDisplay(DesignWidth, DesignHeight);
         }
         catch (Exception ex)
         {
@@ -499,15 +462,6 @@ public sealed partial class ControlPanelWindow : Window
         }
     }
 
-    /// <summary>
-    /// 设置窗口背景：Windows 11 用原生 Mica；不支持时（如 Windows 10）用与页面底色
-    /// 一致的纯色 <see cref="AppBackdrop"/>。
-    ///
-    /// 纯色回退不只是观感问题：WinUI 3 的窗口内容在子窗口里，顶层窗口自身的表面是
-    /// 空的，而 DWM 做最小化/还原动画时合成的正是那一层 —— 没有背景时整窗是**纯黑**
-    /// （用户录屏确认：参照程序动画期间仍能看到界面，本程序是黑块）。挂上纯色背景后，
-    /// 动画期间显示的是应用底色，边框一带也不再透出桌面。
-    /// </summary>
     private void ApplySystemBackdrop()
     {
         // Windows 11：原生 Mica。
@@ -515,7 +469,7 @@ public sealed partial class ControlPanelWindow : Window
         {
             if (Microsoft.UI.Composition.SystemBackdrops.MicaController.IsSupported())
             {
-                SystemBackdrop = new MicaBackdrop();
+                _host.SetBackdrop(new MicaBackdrop());
                 return;
             }
         }
@@ -524,15 +478,11 @@ public sealed partial class ControlPanelWindow : Window
             AppLogger.Debug($"Mica backdrop unavailable: {ex.Message}");
         }
 
-        // Windows 10 上 Mica 不受支持。这里刻意**不用** Desktop Acrylic：它内部是
-        // 控制器对象，窗口最小化/最大化后会被断开，实测「最大化过一次之后再最小化-显示
-        // 动画又变回整块黑」；而纯色背景只是给窗口挂一个合成器画刷，最小化/还原动画
-        // 期间一直有效。
         try
         {
             _solidBackdrop = new AppBackdrop();
             _solidBackdrop.SetTheme(RootGrid.ActualTheme);
-            SystemBackdrop = _solidBackdrop;
+            _host.SetBackdrop(_solidBackdrop);
         }
         catch (Exception ex)
         {
@@ -540,65 +490,50 @@ public sealed partial class ControlPanelWindow : Window
         }
     }
 
-    /// <summary>
-    /// 去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
-    ///
-    /// 两个必须遵守的约束：
-    ///   1. 只设置 <c>ExtendsContentIntoTitleBar</c>，**不要**再调用
-    ///      <c>SetTitleBar(AppTitleBar)</c>。SetTitleBar 只适用于普通 UIElement
-    ///      拖拽区域；对 TitleBar 控件调用会抛 E_BOUNDS（0x800f1000），异常在
-    ///      Microsoft.UI.Xaml.dll 内未被捕获，进程直接崩溃退出。
-    ///   2. 必须在视觉树加载后调用；构造函数里执行会抛 E_INVALIDARG 并导致
-    ///      窗口构造失败、界面完全不出现。
-    /// </summary>
-    private void ApplyCustomTitleBar()
+    private void UpdateCaptionButtonBounds()
     {
-        if (_titleBarApplied)
+        if (_isClosed || !RootGrid.IsLoaded || CaptionButtons.ActualWidth <= 0)
         {
             return;
         }
 
-        _titleBarApplied = true;
-
-        try
-        {
-            ExtendsContentIntoTitleBar = true;
-        }
-        catch (Exception ex)
-        {
-            // 失败时回退到系统标题栏，功能不受影响。
-            AppLogger.Warn($"Failed to extend content into the title bar: {ex.Message}");
-        }
+        Windows.Foundation.Rect bounds = CaptionButtons.TransformToVisual(RootGrid).TransformBounds(
+            new Windows.Foundation.Rect(0, 0, CaptionButtons.ActualWidth, CaptionButtons.ActualHeight));
+        double scale = XamlRoot.RasterizationScale;
+        int left = (int)Math.Floor(bounds.X * scale);
+        int top = (int)Math.Floor(bounds.Y * scale);
+        int right = (int)Math.Ceiling((bounds.X + bounds.Width) * scale);
+        int bottom = (int)Math.Ceiling((bounds.Y + bounds.Height) * scale);
+        _host.SetCaptionButtonsBounds(new Windows.Graphics.RectInt32(left, top, right - left, bottom - top));
     }
 
-    private bool _titleBarApplied;
-
-    private double GetWindowDpiScale()
+    private void UpdateCaptionButtonState()
     {
-        try
-        {
-            IntPtr hwnd = WindowNative.GetWindowHandle(this);
-            if (hwnd != IntPtr.Zero)
-            {
-                uint dpi = GetDpiForWindow(hwnd);
-                if (dpi > 0)
-                {
-                    return dpi / 96.0;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug($"GetDpiForWindow failed: {ex.Message}");
-        }
-
-        return 1.0;
+        bool maximized = _host.IsMaximized;
+        CaptionMaximizeIcon.Glyph = maximized ? "\uE923" : "\uE922";
+        SetCaptionButtonLabel(BtnCaptionMaximize, maximized ? "Window_Restore" : "Window_Maximize");
     }
+
+    private static void SetCaptionButtonLabel(Button button, string key)
+    {
+        string label = Localization.Get(key);
+        AutomationProperties.SetName(button, label);
+        ToolTipService.SetToolTip(button, label);
+    }
+
+    private void CaptionMinimize_Click(object sender, RoutedEventArgs args) => _host.Minimize();
+
+    private void CaptionMaximize_Click(object sender, RoutedEventArgs args) => _host.ToggleMaximize();
+
+    private void CaptionClose_Click(object sender, RoutedEventArgs args) => _host.RequestClose();
 
     private void RootGrid_Loaded(object sender, RoutedEventArgs e)
     {
         _ = sender;
         _ = e;
+        XamlRoot.Changed += (_, _) => UpdateCaptionButtonBounds();
+        UpdateCaptionButtonBounds();
+        UpdateCaptionButtonState();
         ApplyTitleBarTheme();
     }
 
@@ -607,32 +542,7 @@ public sealed partial class ControlPanelWindow : Window
     {
         try
         {
-            if (!AppWindowTitleBar.IsCustomizationSupported())
-            {
-                return;
-            }
-
-            AppWindowTitleBar? titleBar = AppWindow?.TitleBar;
-            if (titleBar == null)
-            {
-                return;
-            }
-
-            bool dark = IsDarkThemeEffective();
-            Color foreground = dark ? Colors.White : Colors.Black;
-            Color hover = dark ? Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x1F, 0x00, 0x00, 0x00);
-            Color pressed = dark ? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x33, 0x00, 0x00, 0x00);
-
-            titleBar.ButtonBackgroundColor = Colors.Transparent;
-            titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-            titleBar.ButtonForegroundColor = foreground;
-            titleBar.ButtonHoverForegroundColor = foreground;
-            titleBar.ButtonPressedForegroundColor = foreground;
-            titleBar.ButtonHoverBackgroundColor = hover;
-            titleBar.ButtonPressedBackgroundColor = pressed;
-            titleBar.ButtonInactiveForegroundColor = dark
-                ? Color.FromArgb(0x80, 0xFF, 0xFF, 0xFF)
-                : Color.FromArgb(0x80, 0x00, 0x00, 0x00);
+            WindowChrome.ApplyTitleBarTheme(Handle, IsDarkThemeEffective());
         }
         catch (Exception ex)
         {
@@ -811,6 +721,10 @@ public sealed partial class ControlPanelWindow : Window
         TabLogLabel.Text = Localization.Get("Nav_Log");
         TabAboutLabel.Text = Localization.Get("Nav_About");
         AppTitleBar.Title = Localization.Get("App_Title_ControlPanel");
+        _host.SetTitle(AppTitleBar.Title);
+        SetCaptionButtonLabel(BtnCaptionMinimize, "Window_Minimize");
+        SetCaptionButtonLabel(BtnCaptionClose, "Window_Close");
+        UpdateCaptionButtonState();
         TxtSidebarCopyright.Text = Localization.Get("Sidebar_Copyright");
         TxtWelcomeTitle.Text = Localization.Get("Welcome_Title");
         TxtWelcomeSubtitle.Text = Localization.Get("Welcome_Subtitle");
@@ -1742,7 +1656,7 @@ public sealed partial class ControlPanelWindow : Window
         {
             var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.ComputerFolder };
             picker.FileTypeFilter.Add(".exe");
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+            InitializeWithWindow.Initialize(picker, Handle);
 
             StorageFile? file = await picker.PickSingleFileAsync();
             if (file != null)
@@ -2861,10 +2775,15 @@ public sealed partial class ControlPanelWindow : Window
         });
     }
 
-    private void ControlPanelWindow_Closed(object sender, WindowEventArgs args)
+    private void ControlPanelWindow_Closed(object? sender, EventArgs args)
     {
         _ = sender;
         _ = args;
+
+        if (_isClosed)
+        {
+            return;
+        }
 
         _isClosed = true;
 
@@ -2884,5 +2803,8 @@ public sealed partial class ControlPanelWindow : Window
         {
             AppLogger.Warn($"Failed to stop panel timers during close: {ex.Message}");
         }
+
+        _host.Dispose();
+        Closed?.Invoke(this, EventArgs.Empty);
     }
 }

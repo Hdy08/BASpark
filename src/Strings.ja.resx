@@ -39,6 +39,18 @@
     <data name="App_Title_ControlPanel" xml:space="preserve">
       <value>BASpark - コントロールパネル</value>
     </data>
+    <data name="Window_Minimize" xml:space="preserve">
+      <value>最小化</value>
+    </data>
+    <data name="Window_Maximize" xml:space="preserve">
+      <value>最大化</value>
+    </data>
+    <data name="Window_Restore" xml:space="preserve">
+      <value>元に戻す</value>
+    </data>
+    <data name="Window_Close" xml:space="preserve">
+      <value>閉じる</value>
+    </data>
     <data name="Basic_AutoStart" xml:space="preserve">
       <value>Windows 起動時に実行</value>
     </data>
