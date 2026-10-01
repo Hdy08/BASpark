@@ -418,6 +418,29 @@ public class WinUi3UiTests
         Assert.Contains("ControllerAttachAttempts", overlaySource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Overlay_AttachesControllerWhileHostWindowIsHidden()
+    {
+        string overlaySource = ReadSource("src", "OverlayWindow.cs");
+
+        // UIAccess 进程（安装包带 uiAccess="true" 清单）下，若宿主窗口已经显示/置顶
+        // 再创建 WebView2 控制器，CreateCoreWebView2ControllerAsync 会立即以
+        // E_INVALIDARG 失败。必须保持隐藏挂载，显示与置顶推迟到导航成功之后。
+        int initIndex = overlaySource.IndexOf("private async Task InitWebViewAsync()", StringComparison.Ordinal);
+        Assert.True(initIndex >= 0, "InitWebViewAsync is missing.");
+
+        int initEnd = overlaySource.IndexOf("private async Task<bool> TryAttachControllerAsync", initIndex, StringComparison.Ordinal);
+        Assert.True(initEnd > initIndex, "InitWebViewAsync structure changed unexpectedly.");
+
+        string initBody = overlaySource[initIndex..initEnd];
+        Assert.DoesNotContain("_host.Show()", initBody, StringComparison.Ordinal);
+
+        // 显示必须发生在导航完成之后。
+        int navIndex = overlaySource.IndexOf("private void OnNavigationCompleted", StringComparison.Ordinal);
+        Assert.True(navIndex > initIndex, "OnNavigationCompleted is missing.");
+        Assert.Contains("_host.Show()", overlaySource[navIndex..], StringComparison.Ordinal);
+    }
+
     private static XDocument LoadXaml(params string[] pathParts) =>
         XDocument.Parse(ReadSource(pathParts), LoadOptions.SetLineInfo);
 

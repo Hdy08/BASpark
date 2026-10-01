@@ -231,8 +231,11 @@ internal sealed class OverlayWindow : IDisposable
                 return;
             }
 
-            _host.Show();
-
+            // 关键顺序：宿主窗口必须保持隐藏、且尚未置顶时挂载 WebView2 控制器。
+            // UIAccess 进程（安装包带 uiAccess="true" 清单）下，若窗口已经显示/置顶
+            // 再创建控制器，CreateCoreWebView2ControllerAsync 会立即以
+            // E_INVALIDARG 失败。显示与置顶推迟到导航成功之后（见
+            // OnNavigationCompleted）。WPF 时代的实现同样依赖这个顺序。
             bool attached = false;
             bool resetRequested = false;
 
