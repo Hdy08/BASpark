@@ -354,6 +354,28 @@ public class WinUi3UiTests
         Assert.Contains("Windows.UI", pickerSource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RendererReadyTimeout_ProbesBeforeFallingBackToLegacy()
+    {
+        string overlaySource = ReadSource("src", "OverlayWindow.cs");
+
+        // 主渲染器需要等 DOMContentLoaded 后再初始化 WebGL/WebGPU，低端机上会
+        // 明显超过 2 秒。若超时即回退到 legacy，会把「还在初始化」误判为
+        // 「渲染器损坏」，用户会直接看不到特效。
+        Assert.Contains("ProbeRendererBeforeFallbackAsync", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("RendererProbeScript", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("window.externalBoom", overlaySource, StringComparison.Ordinal);
+
+        // 探测判定的间隔必须远大于原来的 2 秒。
+        int timeoutIndex = overlaySource.IndexOf(
+            "RendererReadyTimeout = TimeSpan.FromSeconds(",
+            StringComparison.Ordinal);
+        Assert.True(timeoutIndex >= 0, "Renderer ready timeout constant is missing.");
+
+        string timeoutLine = overlaySource[timeoutIndex..overlaySource.IndexOf(';', timeoutIndex)];
+        Assert.DoesNotContain("FromSeconds(2)", timeoutLine, StringComparison.Ordinal);
+    }
+
     private static XDocument LoadXaml(params string[] pathParts) =>
         XDocument.Parse(ReadSource(pathParts), LoadOptions.SetLineInfo);
 

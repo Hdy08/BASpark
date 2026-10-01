@@ -247,6 +247,13 @@ internal sealed class OverlayWindow : IDisposable
             _controller.Bounds = new Windows.Foundation.Rect(0, 0, bounds.Width, bounds.Height);
             _controller.IsVisible = true;
 
+            _host.TryGetWindowRect(out NativeMethods.RECT hostRect);
+            AppLogger.Debug(
+                $"[overlay:{_screenDeviceName}] controller ready " +
+                $"(hwnd=0x{_host.Handle.ToInt64():X}, host={hostRect.Width}x{hostRect.Height}, " +
+                $"dpiScale={_host.DpiScale.ToString("F3", CultureInfo.InvariantCulture)}, " +
+                $"runtime={env.BrowserVersionString})");
+
             CoreWebView2? coreWebView = _controller.CoreWebView2;
             if (coreWebView == null)
             {
@@ -527,11 +534,25 @@ internal sealed class OverlayWindow : IDisposable
     // 渲染器就绪超时与回退
     // ------------------------------------------------------------------
 
+    // 主渲染器需要先等 DOMContentLoaded，再解析 vendor 包并初始化 WebGL/WebGPU，
+    // 低端机或首次创建用户数据目录时明显超过 2 秒。首轮给足时间，避免把「还在初始化」
+    // 误判为「渲染器损坏」而白白丢掉主渲染器。
+    private static readonly TimeSpan RendererReadyTimeout = TimeSpan.FromSeconds(12);
+
+    // 超时后不直接判定失败：先向页面确认宿主 API 是否已经注入。
+    private const string RendererProbeScript =
+        "(function(){" +
+        "  try {" +
+        "    return (typeof window.externalBoom === 'function' &&" +
+        "            typeof window.externalMove === 'function') ? 'ready' : 'pending';" +
+        "  } catch (e) { return 'pending'; }" +
+        "})()";
+
     private void StartRendererReadyTimeout()
     {
         StopRendererReadyTimeout();
         _rendererReadyTimeoutTimer = App.DispatcherQueue.CreateTimer();
-        _rendererReadyTimeoutTimer.Interval = TimeSpan.FromSeconds(2);
+        _rendererReadyTimeoutTimer.Interval = RendererReadyTimeout;
         _rendererReadyTimeoutTimer.Tick += OnRendererReadyTimeout;
         _rendererReadyTimeoutTimer.Start();
     }
@@ -549,8 +570,56 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
+        // ready 消息可能因时序原因丢失，但渲染器本身已经可用。此时回退到 legacy
+        // 只会让特效质量下降，因此先探测宿主 API 再决定。
+        _ = ProbeRendererBeforeFallbackAsync();
+    }
+
+    private async Task ProbeRendererBeforeFallbackAsync()
+    {
+        CoreWebView2? coreWebView = _coreWebView;
+        if (coreWebView == null || _isClosing || _rendererReady || _usingLegacyRenderer)
+        {
+            return;
+        }
+
+        string probeResult = string.Empty;
+        try
+        {
+            string raw = await coreWebView.ExecuteScriptAsync(RendererProbeScript)
+                .AsTask()
+                .ConfigureAwait(true);
+            probeResult = raw.Trim().Trim('"');
+        }
+        catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn(
+                $"Renderer probe failed on '{_screenDeviceName}': {ex.Message}");
+        }
+
+        if (_isClosing || _rendererReady || _usingLegacyRenderer)
+        {
+            return;
+        }
+
+        if (string.Equals(probeResult, "ready", StringComparison.Ordinal))
+        {
+            // 渲染器已注入宿主 API，视为就绪：停止回退，避免无谓降级。
+            _rendererReady = true;
+            _unresponsiveTracker.Reset();
+            AppLogger.Info(
+                $"BA click renderer reports ready via probe on '{_screenDeviceName}' " +
+                $"(no ready message within {RendererReadyTimeout.TotalSeconds:F0}s).");
+            return;
+        }
+
         AppLogger.Warn(
-            $"BA click renderer ready timeout on '{_screenDeviceName}'; switching to legacy renderer.");
+            $"BA click renderer ready timeout on '{_screenDeviceName}' " +
+            $"(probe: {probeResult}); switching to legacy renderer.");
         FallbackToLegacyRenderer("ready timeout");
     }
 
