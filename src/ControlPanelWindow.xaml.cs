@@ -94,17 +94,21 @@ public sealed partial class ControlPanelWindow : Window
     private const int MinDesignHeight = 560;
 
     /// <summary>
-    /// 侧边栏设置子导航的展开/收起动画。
-    /// 由原生 <see cref="DoubleAnimation"/> 驱动高度与位移。
+    /// <summary>
+    /// 侧边栏设置子导航的展开/收起动画：容器高度逐帧变化 + 裁剪超出部分，
+    /// 下面的「日志 / 关于」因此被连续推开，而不是等动画结束才跳位。
     ///
-    /// 三条必须遵守的约束（都是实测踩出来的）：
-    ///   1. **绝不**给 <c>Border.Height</c> 赋 0 或 <c>double.NaN</c> —— 会抛
-    ///      E_INVALIDARG。收起后保持高度为 0 并令内容高度为 0 即可。
-    ///   2. **不要**复用 <c>DoubleAnimation</c> 实例：同一动画对象被先后挂到多个
+    /// 必须遵守的约束（都是实测踩出来的）：
+    ///   1. **绝不**用 <c>double.NaN</c> 表示「收起」。NaN 在 WinUI 里表示自动
+    ///      高度（会被内容撑开），收起必须写 0。
+    ///   2. **不要**复用 <c>DoubleAnimation</c> 实例：同一动画对象先后挂到多个
     ///      Storyboard 上，在快速切换时会产生竞态。
     ///   3. Storyboard 的 <c>Completed</c> 是异步回调，**不在**调用方 try/catch 的
     ///      栈上；其中抛出的异常会直接终结进程。因此回调里只做无异常风险的赋值，
     ///      并且必须用代次号忽略过期回调（否则快速点击时旧回调会覆盖新状态）。
+    ///   4. 裁剪高度必须跟随 **实际** 高度（<see cref="FrameworkElement.SizeChanged"/>）。
+    ///      用 <c>Measure</c> 的估算值收尾时，估算与真实渲染高度一旦有差异，
+    ///      动画末帧就会明显跳一下 —— 表现为「展开/收回动画不完整」。
     /// </summary>
     private sealed class AnimatedSubNav
     {
@@ -123,10 +127,11 @@ public sealed partial class ControlPanelWindow : Window
             _panel = panel;
             _shift = shift;
 
-            // 用裁剪 + 高度动画实现下拉展开：内容本身不改变尺寸，只把超出容器的
-            // 部分裁掉。这样容器高度在动画过程中逐帧变化，下面的「日志 / 关于」
-            // 会被连续推开，而不是等动画结束才瞬移。
             _host.Clip = new RectangleGeometry();
+
+            // 内容高度变化时同步裁剪，保证可见范围始终与内容一致
+            // （窗口缩放、字体或语言切换导致文案换行都会改变高度）。
+            _panel.SizeChanged += (_, e) => UpdateClip(e.NewSize.Height);
 
             // 初始为收起状态。
             _host.Height = 0;
@@ -157,12 +162,12 @@ public sealed partial class ControlPanelWindow : Window
         }
 
         /// <summary>
-        /// 量出内容的自然高度。
+        /// 量出内容的自然高度。用 <see cref="UIElement.Measure"/> 而非
+        /// <c>ActualHeight</c>：容器被压到 0 高度时 ActualHeight 也是 0。
         ///
-        /// 注意：这里用 <c>Measure</c> 会在布局过程中递归进入测量。若在窗口尚未
-        /// 完成首次布局时调用，XAML 会陷入自我递归并停掉 UI 线程（CPU 不再增长、
-        /// 消息循环停摆）。因此只在元素已经完成过布局（ActualWidth &gt; 0）时才测量，
-        /// 否则直接返回 0 由调用方走「不做动画、直接到位」的兜底路径。
+        /// 注意：<c>Measure</c> 会在布局中递归进入测量，若在窗口尚未完成首次布局时
+        /// 调用会让 XAML 陷入自我递归并停掉 UI 线程。因此只在宽度可用时才测量，
+        /// 否则返回 0 由调用方走「不做动画、直接到位」的兜底。
         /// </summary>
         private double MeasureNaturalHeight()
         {
@@ -195,12 +200,11 @@ public sealed partial class ControlPanelWindow : Window
 
         private void Animate(bool expanded, int generation)
         {
-            double targetHeight = expanded
-                ? MeasureNaturalHeight()
-                : _host.ActualHeight;
+            double targetHeight = expanded ? MeasureNaturalHeight() : _host.ActualHeight;
 
             if (targetHeight <= 0)
             {
+                // 尚未布局出可用尺寸：直接到位，下次交互再动画。
                 ApplyFinalState(expanded);
                 return;
             }
@@ -247,7 +251,7 @@ public sealed partial class ControlPanelWindow : Window
         }
 
         /// <summary>
-        /// 裁剪矩形始终覆盖完整内容高度，动画中只有容器高度在变。
+        /// 设置裁剪矩形。动画中只有容器高度在变，裁剪始终覆盖完整内容高度。
         /// 宽度为 0 时 WinUI 会把裁剪视为空（内容整个消失），因此必须给正值。
         /// </summary>
         private void UpdateClip(double contentHeight)
@@ -257,9 +261,8 @@ public sealed partial class ControlPanelWindow : Window
             double width = ResolveContentWidth();
             if (width <= 0)
             {
-                // 尚未布局：先不裁剪，等首次布局后的调用再设置。给 0 宽会让内容
-                // 被判定为完全裁掉，因此这里用一个足够大的有限宽度。
-                clip.Rect = new Windows.Foundation.Rect(0, 0, 100000, contentHeight);
+                // 尚未布局：先用足够大的有限宽度，等首次布局后的调用再收紧。
+                clip.Rect = new Windows.Foundation.Rect(0, 0, 100000, Math.Max(0, contentHeight));
                 return;
             }
 
@@ -271,8 +274,11 @@ public sealed partial class ControlPanelWindow : Window
         {
             if (expanded)
             {
-                // 展开后解除裁剪与固定高度，让内容自然参与布局。
-                UpdateClip(MeasureNaturalHeight());
+                // 优先按真实内容高度裁剪，再解除高度约束交还给布局：两者一致，
+                // 因此不会出现动画结束时的跳变。
+                UpdateClip(_panel.ActualHeight > 0
+                    ? _panel.ActualHeight
+                    : MeasureNaturalHeight());
                 _host.Height = double.NaN;
             }
             else
