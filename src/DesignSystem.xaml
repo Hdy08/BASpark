@@ -264,7 +264,12 @@
                                 Height="16"
                                 CornerRadius="2"
                                 Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                Opacity="0" />
+                                Opacity="0"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="IndicatorScale" ScaleX="1" ScaleY="0.35" />
+                            </Border.RenderTransform>
+                        </Border>
                         <ContentPresenter x:Name="ContentPresenter"
                                           Grid.Column="1"
                                           Margin="13,0,12,0"
@@ -305,10 +310,20 @@
                             <VisualStateGroup x:Name="CheckStates">
                                 <VisualState x:Name="Checked">
                                     <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SelectionIndicator"
-                                                                       Storyboard.TargetProperty="Opacity">
-                                            <DiscreteObjectKeyFrame KeyTime="0" Value="1" />
-                                        </ObjectAnimationUsingKeyFrames>
+                                        <!-- 左侧强调色小条以原生动画「长出来」：
+                                             透明度淡入 + 纵向缩放，而不是瞬间显隐。 -->
+                                        <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.15" />
+                                        <DoubleAnimation Storyboard.TargetName="IndicatorScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         To="1"
+                                                         Duration="0:0:0.22">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
                                                                        Storyboard.TargetProperty="Foreground">
                                             <DiscreteObjectKeyFrame KeyTime="0"
@@ -316,7 +331,18 @@
                                         </ObjectAnimationUsingKeyFrames>
                                     </Storyboard>
                                 </VisualState>
-                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Unchecked">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="IndicatorScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         To="0.35"
+                                                         Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </VisualState>
                                 <VisualState x:Name="Indeterminate" />
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>

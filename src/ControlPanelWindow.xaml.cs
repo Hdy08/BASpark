@@ -84,6 +84,15 @@ public sealed partial class ControlPanelWindow : Window
     private const uint MonitorDefaultToNearest = 2;
     private const int MdtEffectiveDpi = 0;
 
+    // 初始尺寸。
+    private const int DesignWidth = 680;
+    private const int DesignHeight = 710;
+
+    // 最小尺寸下限：侧边栏固定 212px，设置页的滑块 + 数字框并排布局在此宽度下
+    // 开始被压扁，再窄会出现控件显示不全。
+    private const int MinDesignWidth = 560;
+    private const int MinDesignHeight = 560;
+
     /// <summary>
     /// 侧边栏设置子导航的展开/收起动画。
     /// 由原生 <see cref="DoubleAnimation"/> 驱动高度与位移。
@@ -99,7 +108,7 @@ public sealed partial class ControlPanelWindow : Window
     /// </summary>
     private sealed class AnimatedSubNav
     {
-        private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(200);
+        private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(220);
 
         private readonly Border _host;
         private readonly StackPanel _panel;
@@ -114,10 +123,12 @@ public sealed partial class ControlPanelWindow : Window
             _panel = panel;
             _shift = shift;
 
-            // 初始为收起状态。收起态靠「容器高度 0 + 内容高度 0」实现，
-            // 不改 Visibility —— Visibility 切换会让过渡动画失去可见的起止状态。
-            _panel.Opacity = 0;
-            _panel.Height = 0;
+            // 用裁剪 + 高度动画实现下拉展开：内容本身不改变尺寸，只把超出容器的
+            // 部分裁掉。这样容器高度在动画过程中逐帧变化，下面的「日志 / 关于」
+            // 会被连续推开，而不是等动画结束才瞬移。
+            _host.Clip = new RectangleGeometry();
+
+            // 初始为收起状态。
             _host.Height = 0;
             _host.IsHitTestVisible = false;
         }
@@ -145,40 +156,66 @@ public sealed partial class ControlPanelWindow : Window
             }
         }
 
+        /// <summary>
+        /// 量出内容的自然高度。用 <see cref="UIElement.Measure"/> 而不是
+        /// <c>ActualHeight</c>：容器被压到 0 高度时 ActualHeight 也是 0，
+        /// 会让展开动画变成 0→0。
+        /// </summary>
+        private double MeasureNaturalHeight()
+        {
+            double availableWidth = ResolveContentWidth();
+            if (availableWidth <= 0)
+            {
+                return 0;
+            }
+
+            _panel.Measure(new Windows.Foundation.Size(
+                availableWidth,
+                double.PositiveInfinity));
+
+            return _panel.DesiredSize.Height;
+        }
+
+        /// <summary>
+        /// 内容可用宽度。首次布局前两者都可能为 0，此时返回 0 由调用方跳过动画
+        /// （直接落到目标状态），避免用非法宽度测量。
+        /// </summary>
+        private double ResolveContentWidth()
+        {
+            if (_panel.ActualWidth > 0)
+            {
+                return _panel.ActualWidth;
+            }
+
+            return _host.ActualWidth > 0 ? _host.ActualWidth : 0;
+        }
+
         private void Animate(bool expanded, int generation)
         {
-            // 收起时可直接用当前高度；展开时必须先量出自然高度 —— 容器被压到 0
-            // 高度时 ActualHeight 也是 0，直接用它会让展开动画变成 0→0。
-            double naturalHeight = expanded ? MeasureNaturalHeight() : _panel.ActualHeight;
-            if (naturalHeight <= 0)
+            double targetHeight = expanded
+                ? MeasureNaturalHeight()
+                : _host.ActualHeight;
+
+            if (targetHeight <= 0)
             {
-                // 仍未量出高度：直接到位，避免出现 0 高度的死状态。
                 ApplyFinalState(expanded);
                 return;
             }
+
+            UpdateClip(targetHeight);
 
             var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
             var duration = new Duration(Duration);
 
             var height = new DoubleAnimation
             {
-                From = expanded ? 0 : naturalHeight,
-                To = expanded ? naturalHeight : 0,
+                From = expanded ? 0 : _host.ActualHeight,
+                To = targetHeight,
                 Duration = duration,
                 EasingFunction = easing
             };
             Storyboard.SetTarget(height, _host);
             Storyboard.SetTargetProperty(height, "Height");
-
-            var opacity = new DoubleAnimation
-            {
-                From = expanded ? 0 : 1,
-                To = expanded ? 1 : 0,
-                Duration = duration,
-                EasingFunction = easing
-            };
-            Storyboard.SetTarget(opacity, _panel);
-            Storyboard.SetTargetProperty(opacity, "Opacity");
 
             var slide = new DoubleAnimation
             {
@@ -192,7 +229,6 @@ public sealed partial class ControlPanelWindow : Window
 
             var storyboard = new Storyboard();
             storyboard.Children.Add(height);
-            storyboard.Children.Add(opacity);
             storyboard.Children.Add(slide);
             storyboard.Completed += (_, _) =>
             {
@@ -208,38 +244,38 @@ public sealed partial class ControlPanelWindow : Window
         }
 
         /// <summary>
-        /// 临时解除高度约束、强制一次布局，量出内容的自然高度。
-        /// 量完立即按需恢复，不会留下可见的跳动。
+        /// 裁剪矩形始终覆盖完整内容高度，动画中只有容器高度在变。
+        /// 宽度为 0 时 WinUI 会把裁剪视为空（内容整个消失），因此必须给正值。
         /// </summary>
-        private double MeasureNaturalHeight()
+        private void UpdateClip(double contentHeight)
         {
-            _panel.Height = double.NaN;
-            _host.Height = double.NaN;
-            _panel.UpdateLayout();
+            var clip = (RectangleGeometry)_host.Clip;
 
-            double measured = _panel.ActualHeight;
+            double width = ResolveContentWidth();
+            if (width <= 0)
+            {
+                // 尚未布局：先不裁剪，等首次布局后的调用再设置。给 0 宽会让内容
+                // 被判定为完全裁掉，因此这里用一个足够大的有限宽度。
+                clip.Rect = new Windows.Foundation.Rect(0, 0, 100000, contentHeight);
+                return;
+            }
 
-            // 回到收起态基线，让随后的展开动画从 0 开始。
-            _host.Height = 0;
-            return measured;
+            clip.Rect = new Windows.Foundation.Rect(0, 0, width, Math.Max(0, contentHeight));
         }
 
-        /// <summary>
-        /// 直接落到目标状态。这里只做无异常风险的赋值：不给 Height 赋 NaN。
-        /// </summary>
+        /// <summary>直接落到目标状态。只做无异常风险的赋值。</summary>
         private void ApplyFinalState(bool expanded)
         {
             if (expanded)
             {
-                _panel.Opacity = 1;
-                _panel.Height = double.NaN;
+                // 展开后解除裁剪与固定高度，让内容自然参与布局。
+                UpdateClip(MeasureNaturalHeight());
                 _host.Height = double.NaN;
             }
             else
             {
-                _panel.Opacity = 0;
-                _panel.Height = 0;
                 _host.Height = 0;
+                UpdateClip(0);
             }
         }
     }
@@ -263,7 +299,6 @@ public sealed partial class ControlPanelWindow : Window
     private static extern uint GetDpiForWindow(IntPtr hwnd);
 
     private readonly DispatcherQueueTimer? _refreshTimer;
-    private readonly DispatcherQueueTimer? _noticeTimer;
 
     private readonly object _networkPromptLock = new();
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
@@ -325,7 +360,6 @@ public sealed partial class ControlPanelWindow : Window
         Closed += ControlPanelWindow_Closed;
         RootGrid.Loaded += RootGrid_Loaded;
 
-        _ = LoadRemoteNoticeAsync(isManual: false);
         _ = CheckForUpdates(isManual: false);
 
         _refreshTimer = App.DispatcherQueue.CreateTimer();
@@ -333,12 +367,6 @@ public sealed partial class ControlPanelWindow : Window
         _refreshTimer.IsRepeating = true;
         _refreshTimer.Tick += (_, _) => RefreshTimer_Tick();
         _refreshTimer.Start();
-
-        _noticeTimer = App.DispatcherQueue.CreateTimer();
-        _noticeTimer.Interval = TimeSpan.FromHours(3);
-        _noticeTimer.IsRepeating = true;
-        _noticeTimer.Tick += (_, _) => _ = LoadRemoteNoticeAsync(isManual: false);
-        _noticeTimer.Start();
     }
 
     /// <summary>UI 已加载且窗口未关闭时，控件事件才会产生副作用（等价于旧版的 IsLoaded 判断）。</summary>
@@ -370,7 +398,11 @@ public sealed partial class ControlPanelWindow : Window
         _subNav = new AnimatedSubNav(SettingsSubNavHost, SettingsSubNav, subNavShift);
 
         // 页面切换动画需要在不透明变换上做位移。
-        foreach (FrameworkElement page in new FrameworkElement[] { PageWelcome, PageSettings, PageLog, PageAbout })
+        foreach (FrameworkElement page in new FrameworkElement[]
+                 {
+                     PageWelcome, PageSettings, PageLog, PageAbout,
+                     SectionBasic, SectionVisual, SectionFilter, SectionMultiScreen
+                 })
         {
             page.RenderTransform = new TranslateTransform();
         }
@@ -388,10 +420,10 @@ public sealed partial class ControlPanelWindow : Window
 
         try
         {
-            // 旧版按显示器 DPI 缩放 680x710；AppWindow 用物理像素，这里换算后居中。
+            // 按显示器 DPI 换算后居中。
             double scale = GetWindowDpiScale();
-            int width = (int)Math.Round(680 * scale);
-            int height = (int)Math.Round(710 * scale);
+            int width = (int)Math.Round(DesignWidth * scale);
+            int height = (int)Math.Round(DesignHeight * scale);
 
             DisplayArea? area = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest);
             area ??= DisplayArea.Primary;
@@ -403,12 +435,91 @@ public sealed partial class ControlPanelWindow : Window
                 int y = work.Y + Math.Max(0, (work.Height - height) / 2);
                 appWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, width, height));
             }
+
+            // 限制最小尺寸：侧边栏固定 212px，设置页的滑块/数字框并排布局在更窄的
+            // 宽度下会被压到无法使用。这里按同样的 DPI 比例换算，保证逻辑尺寸下限。
+            int minWidth = (int)Math.Round(MinDesignWidth * scale);
+            int minHeight = (int)Math.Round(MinDesignHeight * scale);
+            if (appWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.PreferredMinimumWidth = minWidth;
+                presenter.PreferredMinimumHeight = minHeight;
+            }
+
+            ApplyMinimumWindowSize(WindowNative.GetWindowHandle(this), minWidth, minHeight);
         }
         catch (Exception ex)
         {
             AppLogger.Warn($"Failed to size/center control panel: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// 通过 <c>WM_GETMINMAXINFO</c> 限制窗口最小尺寸。
+    /// <see cref="OverlappedPresenter.PreferredMinimumWidth"/> 只约束程序化调整，
+    /// 拖拽边框缩放会绕过它，因此这里同时拦截窗口消息。
+    /// </summary>
+    private void ApplyMinimumWindowSize(IntPtr hwnd, int minWidth, int minHeight)
+    {
+        if (hwnd == IntPtr.Zero || _minSizeHookApplied)
+        {
+            return;
+        }
+
+        _minSizeHookApplied = true;
+        _minWindowWidth = minWidth;
+        _minWindowHeight = minHeight;
+
+        if (SetWindowSubclass(hwnd, MinSizeSubclassProc, UIntPtr.Zero, UIntPtr.Zero))
+        {
+            return;
+        }
+
+        // 子类化失败时退化为显示后钳制一次，至少不会一打开就过窄。
+        AppLogger.Warn("Failed to subclass the control panel window for minimum sizing.");
+    }
+
+    private int _minWindowWidth;
+    private int _minWindowHeight;
+    private bool _minSizeHookApplied;
+
+    private IntPtr MinSizeSubclassProc(
+        IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
+    {
+        _ = uIdSubclass;
+        _ = dwRefData;
+
+        const uint WmGetMinMaxInfo = 0x0024;
+
+        if (uMsg == WmGetMinMaxInfo && lParam != IntPtr.Zero)
+        {
+            var info = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+            info.ptMinTrackSize.X = Math.Max(info.ptMinTrackSize.X, _minWindowWidth);
+            info.ptMinTrackSize.Y = Math.Max(info.ptMinTrackSize.Y, _minWindowHeight);
+            Marshal.StructureToPtr(info, lParam, fDeleteOld: false);
+        }
+
+        return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public Windows.Foundation.Point ptReserved;
+        public Windows.Foundation.Point ptMaxSize;
+        public Windows.Foundation.Point ptMaxPosition;
+        public Windows.Foundation.Point ptMinTrackSize;
+        public Windows.Foundation.Point ptMaxTrackSize;
+    }
+
+    private delegate IntPtr SubclassProc(
+        IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, UIntPtr dwRefData);
+
+    [DllImport("comctl32.dll")]
+    private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 
     /// <summary>
     /// 去掉系统标题栏、改用原生 <c>TitleBar</c> 控件。
@@ -682,7 +793,6 @@ public sealed partial class ControlPanelWindow : Window
         TabAboutLabel.Text = Localization.Get("Nav_About");
         AppTitleBar.Title = Localization.Get("App_Title_ControlPanel");
         TxtSidebarCopyright.Text = Localization.Get("Sidebar_Copyright");
-        NoticeTitle.Text = Localization.Get("Welcome_NoticeLoading");
         TxtWelcomeTitle.Text = Localization.Get("Welcome_Title");
         TxtWelcomeSubtitle.Text = Localization.Get("Welcome_Subtitle");
         TxtStatsTitle.Text = Localization.Get("Welcome_StatsTitle");
@@ -1166,10 +1276,22 @@ public sealed partial class ControlPanelWindow : Window
 
     private void UpdateSettingsSectionVisibility()
     {
-        SectionBasic.Visibility = SubTabBasic.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        SectionVisual.Visibility = SubTabVisual.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        SectionFilter.Visibility = SubTabFilter.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        SectionMultiScreen.Visibility = SubTabMultiScreen.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        // 四个子项之间切换同样需要过渡动画，因此逐个走 SetPageVisible（它会对
+        // 「本次新进入」的那一项播放动画），而不是直接赋 Visibility。
+        FrameworkElement? incoming = SubTabBasic.IsChecked == true
+            ? SectionBasic
+            : SubTabVisual.IsChecked == true
+                ? SectionVisual
+                : SubTabFilter.IsChecked == true
+                    ? SectionFilter
+                    : SubTabMultiScreen.IsChecked == true
+                        ? SectionMultiScreen
+                        : null;
+
+        SetPageVisible(SectionBasic, ReferenceEquals(incoming, SectionBasic), incoming);
+        SetPageVisible(SectionVisual, ReferenceEquals(incoming, SectionVisual), incoming);
+        SetPageVisible(SectionFilter, ReferenceEquals(incoming, SectionFilter), incoming);
+        SetPageVisible(SectionMultiScreen, ReferenceEquals(incoming, SectionMultiScreen), incoming);
     }
 
     // ==================================================================
@@ -2568,8 +2690,6 @@ public sealed partial class ControlPanelWindow : Window
             ApplyLocalizedText();
             ApplyAboutLinkVisibility();
             LoadScreenOptions();
-            ConfigManager.Save("LastNoticeContent", string.Empty);
-            _ = LoadRemoteNoticeAsync(isManual: false);
             _languageAtLoad = selectedLanguage!;
 
             bool restart = await ConfirmAsync(
@@ -2587,8 +2707,6 @@ public sealed partial class ControlPanelWindow : Window
         {
             ApplyLocalizedText();
             ApplyAboutLinkVisibility();
-            ConfigManager.Save("LastNoticeContent", string.Empty);
-            _ = LoadRemoteNoticeAsync(isManual: false);
             _networkRegionAtLoad = selectedNetworkRegion;
         }
 
@@ -2789,64 +2907,6 @@ public sealed partial class ControlPanelWindow : Window
         }
     }
 
-    private async Task LoadRemoteNoticeAsync(bool isManual)
-    {
-        string noticeUrl = Localization.GetRemoteNoticeUrl();
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            client.DefaultRequestHeaders.Add("User-Agent", UserAgent);
-
-            string json = await client.GetStringAsync(noticeUrl);
-            using JsonDocument doc = JsonDocument.Parse(json);
-            JsonElement root = doc.RootElement;
-
-            string title = root.GetProperty("title").GetString() ?? Localization.Get("Msg_DefaultNoticeTitle");
-            string content = root.GetProperty("content").GetString() ?? string.Empty;
-            string date = root.GetProperty("date").GetString() ?? string.Empty;
-            string lastContent = ConfigManager.LastNoticeContent;
-
-            await RunOnUiThreadAsync(() =>
-            {
-                if (_isClosed)
-                {
-                    return Task.CompletedTask;
-                }
-
-                if (!string.IsNullOrEmpty(content))
-                {
-                    NoticeTitle.Text = title;
-                    NoticeContent.Text = content;
-                    NoticeDate.Text = date;
-                    NoticeBar.IsOpen = true;
-
-                    if (content != lastContent)
-                    {
-                        ShowWindowsNotification(title, content);
-                        ConfigManager.Save("LastNoticeContent", content);
-                    }
-                }
-
-                return Task.CompletedTask;
-            });
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn($"Notice fetch failed: {ex.Message}");
-
-            await RunOnUiThreadAsync(() =>
-            {
-                if (string.IsNullOrEmpty(NoticeContent.Text) || NoticeContent.Text == "...")
-                {
-                    NoticeBar.IsOpen = false;
-                }
-
-                return Task.CompletedTask;
-            });
-
-            HandleNetworkFetchFailure(isManual, ex.Message);
-        }
-    }
 
     private void HandleNetworkFetchFailure(bool isManual, string errorMessage)
     {
@@ -2886,10 +2946,8 @@ public sealed partial class ControlPanelWindow : Window
         SelectNetworkRegion(alternateRegion);
         ApplyLocalizedText();
         ApplyAboutLinkVisibility();
-        ConfigManager.Save("LastNoticeContent", string.Empty);
         AppLogger.Info($"Network source switched to {alternateRegion}.");
 
-        _ = LoadRemoteNoticeAsync(isManual: false);
         if (isManual)
         {
             _ = CheckForUpdates(isManual: true);
@@ -3068,7 +3126,6 @@ public sealed partial class ControlPanelWindow : Window
         try
         {
             _refreshTimer?.Stop();
-            _noticeTimer?.Stop();
         }
         catch (Exception ex)
         {

@@ -43,7 +43,7 @@ public class WinUi3UiTests
 
         // 侧边栏与卡片同样走主题资源。
         Assert.Contains("BasSidebarBackgroundBrush", (string?)GetNamedElement(document, "Sidebar").Attribute("Background"));
-        Assert.Contains("BasCardStyle", (string?)GetNamedElement(document, "NoticeBar").Parent?.Attribute("Style") ?? "BasCardStyle");
+        Assert.Contains("BasCardStyle", (string?)GetNamedElement(document, "ColorPreview").Parent?.Parent?.Attribute("Style") ?? "BasCardStyle");
 
         // 深色模式三态：使用 WinUI 的 RadioButtons 容器，SelectedIndex 即状态；
         // 文案由代码填充（见 StaticText_IsFilledFromCodeBecauseWinUi3RejectsMarkupExtensions）。
@@ -98,9 +98,13 @@ public class WinUi3UiTests
                 element => element.Name.LocalName == nativeType);
         }
 
-        // 公告与安全提示使用 InfoBar，而不是自绘 Border。
+        // 安全提示使用 InfoBar，而不是自绘 Border。
+        // （首页公告栏已按要求移除，这里只断言仍然存在的安全提示。）
         Assert.Equal("Warning", (string?)GetNamedElement(document, "SecurityWarningBar").Attribute("Severity"));
-        Assert.Equal("Informational", (string?)GetNamedElement(document, "NoticeBar").Attribute("Severity"));
+        Assert.Equal("InfoBar", GetNamedElement(document, "SecurityWarningBar").Name.LocalName);
+
+        // 首页公告栏不得再出现。
+        Assert.DoesNotContain("NoticeBar", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -486,10 +490,11 @@ public class WinUi3UiTests
         Assert.True(classEnd > classIndex, "AnimatedSubNav structure changed unexpectedly.");
         string body = source[classIndex..classEnd];
 
-        // 1. 收起态不能用 Visibility 切换来实现：那会让过渡动画失去可见的起止
-        //    状态；且绝不给 Border.Height 赋 NaN 作为「收起」值（会抛 E_INVALIDARG）。
+        // 1. 收起态用「容器高度 0 + 裁剪」实现，不靠 Visibility 切换（那会让过渡
+        //    动画失去可见的起止状态）；绝不给 Border.Height 赋 NaN 作为「收起」值。
         Assert.Contains("_host.Height = 0;", body, StringComparison.Ordinal);
-        Assert.Contains("_panel.Height = 0;", body, StringComparison.Ordinal);
+        Assert.Contains("RectangleGeometry", body, StringComparison.Ordinal);
+        Assert.Contains("UpdateClip", body, StringComparison.Ordinal);
 
         // 2. Storyboard.Completed 是异步回调，不在 try/catch 栈上；其中的异常会
         //    直接终结进程。必须有代次号来忽略过期回调，否则快速点击会让旧回调
@@ -500,7 +505,6 @@ public class WinUi3UiTests
         // 3. 动画对象不得跨 Storyboard 复用（快速切换时会产生竞态）：
         //    动画必须是局部变量、每次新建。
         Assert.Contains("var height = new DoubleAnimation", body, StringComparison.Ordinal);
-        Assert.Contains("var opacity = new DoubleAnimation", body, StringComparison.Ordinal);
         Assert.Contains("var slide = new DoubleAnimation", body, StringComparison.Ordinal);
         Assert.DoesNotContain("private readonly DoubleAnimation", body, StringComparison.Ordinal);
 
@@ -509,8 +513,12 @@ public class WinUi3UiTests
         Assert.True(setIndex >= 0, "SetExpanded is missing.");
         Assert.Contains("catch (Exception", body[setIndex..], StringComparison.Ordinal);
 
-        // 5. 展开前必须先量出自然高度：容器被压到 0 时 ActualHeight 也是 0。
+        // 5. 展开前必须先量出内容自然高度：容器被压到 0 时 ActualHeight 也是 0。
         Assert.Contains("MeasureNaturalHeight", body, StringComparison.Ordinal);
+
+        // 6. 展开过程必须逐帧改变容器高度，下面的「日志 / 关于」才会被连续推开，
+        //    而不是等动画结束才瞬移 —— 因此必须有 Height 的 DoubleAnimation。
+        Assert.Contains("Storyboard.SetTargetProperty(height, \"Height\")", body, StringComparison.Ordinal);
     }
 
     private static XDocument LoadXaml(params string[] pathParts) =>

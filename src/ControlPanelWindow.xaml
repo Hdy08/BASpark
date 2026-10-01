@@ -69,12 +69,13 @@
                     </RadioButton>
 
                     <!--
-                        设置子导航：展开/收起用原生 ExpandDirection 过渡
-                        （EntranceThemeTransition / ExitThemeTransition）+ 位移，
-                        由 code-behind 的 AnimatedSubNav 驱动。
+                        设置子导航：展开/收起用裁剪 + 高度动画（AnimatedSubNav），
+                        容器高度在动画过程中逐帧变化，下面的「日志 / 关于」被连续
+                        推开而不是等动画结束才瞬移。Margin 必须为 0，否则收起时会在
+                        「设置」与「日志」之间留下比其它导航项更大的间距。
                     -->
                     <Border x:Name="SettingsSubNavHost"
-                            Margin="0,2,0,2"
+                            Margin="0"
                             VerticalAlignment="Top"
                             IsHitTestVisible="False">
                         <StackPanel x:Name="SettingsSubNav" Spacing="2">
@@ -155,32 +156,6 @@
                           Padding="{StaticResource BasPagePadding}"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <!-- 官方公告 -->
-                    <InfoBar x:Name="NoticeBar"
-                             IsOpen="False"
-                             IsClosable="False"
-                             Severity="Informational"
-                             Margin="0,0,0,20">
-                        <InfoBar.Content>
-                            <StackPanel>
-                                <TextBlock x:Name="NoticeTitle"
-                                           Text=""
-                                           FontWeight="SemiBold"
-                                           TextWrapping="Wrap" />
-                                <TextBlock x:Name="NoticeContent"
-                                           Text="..."
-                                           Margin="0,6,0,0"
-                                           TextWrapping="Wrap"
-                                           Foreground="{ThemeResource BasTextSecondaryBrush}" />
-                                <TextBlock x:Name="NoticeDate"
-                                           Text=""
-                                           Margin="0,6,0,0"
-                                           FontSize="{StaticResource BasFontSizeCaption}"
-                                           Foreground="{ThemeResource BasTextTertiaryBrush}" />
-                            </StackPanel>
-                        </InfoBar.Content>
-                    </InfoBar>
-
                     <TextBlock x:Name="TxtWelcomeTitle"
                                Text=""
                                Style="{StaticResource BasPageTitleStyle}" />
