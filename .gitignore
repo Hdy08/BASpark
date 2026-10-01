@@ -438,3 +438,11 @@ Thumbs.db
 desktop.ini
 
 config.json
+
+# ===== WinUI 3 (Windows App SDK) 打包输出 =====
+# 注意：上面的 publish/ 只匹配名为 publish 的目录，不匹配这里的 publish_* 前缀目录。
+src/publish_app/
+src/publish_full/
+src/publish_uiaccess/
+dist/
+*.cer

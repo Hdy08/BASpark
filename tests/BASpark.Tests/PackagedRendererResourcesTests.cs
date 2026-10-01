@@ -1,17 +1,20 @@
-using System.Collections;
 using System.Reflection;
-using System.Resources;
 
 namespace BASpark.Tests;
 
 public class PackagedRendererResourcesTests
 {
+    /// <summary>
+    /// 渲染负载以 <c>EmbeddedResource</c> + 显式 LogicalName 打包
+    /// （BASpark.csproj）。迁移到 WinUI 3 后不再有 WPF 的 <c>.g.resources</c>，
+    /// 但资源内容与加载路径必须保持不变——特效渲染不允许被改动。
+    /// </summary>
     private static readonly string[] ExpectedWebResources =
     {
-        "web/index.html",
-        "web/index.legacy.html",
-        "web/fx-adapter.js",
-        "web/vendor/ba-click-fx.iife.js"
+        "Web/index.html",
+        "Web/index.legacy.html",
+        "Web/fx-adapter.js",
+        "Web/vendor/ba-click-fx.iife.js"
     };
 
     private static readonly string[] ExpectedLicenseFiles =
@@ -25,28 +28,32 @@ public class PackagedRendererResourcesTests
     public void WebResources_AreEmbeddedAndNonEmpty()
     {
         Assembly assembly = typeof(WebRendererDocumentBuilder).Assembly;
-        string generatedResourceName = Assert.Single(
-            assembly.GetManifestResourceNames(),
-            name => name.EndsWith(".g.resources", StringComparison.Ordinal));
-
-        using Stream stream = Assert.IsAssignableFrom<Stream>(
-            assembly.GetManifestResourceStream(generatedResourceName));
-        using var reader = new ResourceReader(stream);
-        var resourceNames = reader.Cast<DictionaryEntry>()
-            .Select(entry => Assert.IsType<string>(entry.Key))
-            .ToHashSet(StringComparer.Ordinal);
 
         foreach (string expectedResource in ExpectedWebResources)
         {
-            Assert.Contains(expectedResource, resourceNames);
-            reader.GetResourceData(
-                expectedResource,
-                out string resourceType,
-                out byte[] resourceData);
+            string logicalName = WebRendererResourceProvider.ToLogicalName(expectedResource);
 
-            Assert.False(string.IsNullOrWhiteSpace(resourceType));
-            Assert.NotEmpty(resourceData);
+            Assert.Contains(logicalName, assembly.GetManifestResourceNames());
+
+            string content = WebRendererResourceProvider.ReadResourceText(expectedResource);
+            Assert.False(
+                string.IsNullOrWhiteSpace(content),
+                $"Embedded renderer resource '{expectedResource}' is empty.");
         }
+    }
+
+    [Fact]
+    public void PrimaryRenderer_KeepsTheScriptPlaceholderContract()
+    {
+        // 宿主通过 WebRendererDocumentBuilder 注入 vendor + adapter；
+        // 占位符缺失或重复都会让渲染器初始化失败。
+        string html = WebRendererResourceProvider.ReadResourceText(
+            WebRendererResourceProvider.PrimaryRendererResourcePath);
+
+        Assert.Contains(
+            WebRendererDocumentBuilder.ScriptPlaceholder,
+            html,
+            StringComparison.Ordinal);
     }
 
     [Fact]

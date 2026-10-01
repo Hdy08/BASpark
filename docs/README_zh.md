@@ -26,8 +26,10 @@
 
 ### 核心特性
 
-BASpark 采用 **“WPF 骨架 + WebView2 渲染”** 的混合架构。
+BASpark 采用 **“WinUI 3 界面 + 原生分层窗口承载 WebView2 渲染”** 的单进程混合架构。
 
+* 界面完全由 **WinUI 3 (Windows App SDK)** 构建：Mica 背景材质、Fluent 圆角卡片、系统强调色、原生 `ToggleSwitch` / `ComboBox` / `Slider` / `InfoBar` / `RadioButtons` 控件，并随系统深浅色主题自动切换。
+* 特效叠加层不使用 XAML 窗口，而是由一个自建的 Win32 分层窗口（`WS_EX_LAYERED | WS_EX_TRANSPARENT`）直接承载 WebView2，因此能实现**每像素透明**与**鼠标穿透**，且不抢焦点、不进入 Alt+Tab。
 * 精准还原《蔚蓝档案》标志性的交互质感。
 * 基于 WebView2 优化，特效触发即渲染，闲置即休眠，不抢占额外系统资源。
 * 支持全屏应用与游戏环境，实时感知鼠标动作。
@@ -46,10 +48,11 @@ BASpark 采用 **“WPF 骨架 + WebView2 渲染”** 的混合架构。
 
 ### 1. 系统需求
 * *需要 64 位处理器和操作系统
-* 操作系统 : Windows 10 / 11
+* 操作系统 : Windows 10 1809 (17763) / 11
 * 内存: 200 MB RAM
 * 显卡: 支持 DirectX 11 / OpenGL 的集成或独立显卡
-* 存储空间: 需要 200 MB 可用空间
+* 存储空间: 需要 400 MB 可用空间
+* 运行库: 无需额外安装，Windows App SDK 与 .NET 运行时已随程序自包含发布
 
 ### 2. 安装步骤
 1. 前往 [Releases](https://github.com/DoomVoss/BASpark/releases) 页面下载最新的安装包 BASpark_Installer_vX.X.X_x64.exe。

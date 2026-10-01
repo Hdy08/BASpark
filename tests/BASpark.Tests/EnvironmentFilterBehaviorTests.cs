@@ -7,7 +7,9 @@ public sealed class EnvironmentFilterBehaviorTests
     [Fact]
     public void EnvironmentSuppression_LeavesExistingEffectsRunning()
     {
-        string mainWindowSource = ReadSource("src", "MainWindow.xaml.cs");
+        // 迁移到 WinUI 3 后，WPF 的 MainWindow.xaml.cs 由 OverlayWindow.cs 取代
+        // （自建 Win32 分层窗口 + WebView2 宿主）。
+        string mainWindowSource = ReadSource("src", "OverlayWindow.cs");
         int methodStart = mainWindowSource.IndexOf(
             "public void SetEnvironmentSuppressed(bool suppressed)",
             StringComparison.Ordinal);

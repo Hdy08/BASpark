@@ -1,6 +1,5 @@
 using System.Globalization;
-using MediaColor = System.Windows.Media.Color;
-using MediaColors = System.Windows.Media.Colors;
+using Windows.UI;
 
 namespace BASpark
 {
@@ -8,7 +7,7 @@ namespace BASpark
 
     public static class ColorPickerColorMath
     {
-        public static HsvColor RgbToHsv(MediaColor color)
+        public static HsvColor RgbToHsv(Color color)
         {
             double red = color.R / 255.0;
             double green = color.G / 255.0;
@@ -44,10 +43,10 @@ namespace BASpark
             return new HsvColor(hue, saturation, maximum);
         }
 
-        public static MediaColor HsvToRgb(HsvColor hsv) =>
+        public static Color HsvToRgb(HsvColor hsv) =>
             HsvToRgb(hsv.Hue, hsv.Saturation, hsv.Value);
 
-        public static MediaColor HsvToRgb(double hue, double saturation, double value)
+        public static Color HsvToRgb(double hue, double saturation, double value)
         {
             hue = NormalizeHue(hue);
             saturation = ClampUnit(saturation);
@@ -67,18 +66,19 @@ namespace BASpark
             };
 
             double match = value - chroma;
-            return MediaColor.FromRgb(
+            return Color.FromArgb(
+                255,
                 ToByte(red + match),
                 ToByte(green + match),
                 ToByte(blue + match));
         }
 
-        public static string ToHex(MediaColor color) =>
+        public static string ToHex(Color color) =>
             $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 
-        public static bool TryParseHex(string? text, out MediaColor color)
+        public static bool TryParseHex(string? text, out Color color)
         {
-            color = MediaColors.Transparent;
+            color = Color.FromArgb(0, 0, 0, 0);
             if (string.IsNullOrWhiteSpace(text))
             {
                 return false;
@@ -106,13 +106,13 @@ namespace BASpark
                 return false;
             }
 
-            color = MediaColor.FromRgb(red, green, blue);
+            color = Color.FromArgb(255, red, green, blue);
             return true;
         }
 
-        public static bool TryParseRgb(string? text, out MediaColor color)
+        public static bool TryParseRgb(string? text, out Color color)
         {
-            color = MediaColors.Transparent;
+            color = Color.FromArgb(0, 0, 0, 0);
             if (string.IsNullOrWhiteSpace(text))
             {
                 return false;
@@ -127,11 +127,11 @@ namespace BASpark
                 return false;
             }
 
-            color = MediaColor.FromRgb(red, green, blue);
+            color = Color.FromArgb(255, red, green, blue);
             return true;
         }
 
-        public static string ToRgbString(MediaColor color) =>
+        public static string ToRgbString(Color color) =>
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"{color.R},{color.G},{color.B}");

@@ -1,65 +1,200 @@
-using System.Windows;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 
-namespace BASpark
+namespace BASpark;
+
+/// <summary>
+/// 语言选择窗口。WinUI 3 没有模态 <c>ShowDialog</c>，
+/// 结果通过 <see cref="ShowDialogAsync"/> 返回：继续得到所选区域标记，关闭得到 null。
+/// </summary>
+public partial class LanguageSelectWindow : Window
 {
-    public partial class LanguageSelectWindow : Window
+    private const int DesignWidth = 460;
+    private const int DesignHeight = 420;
+
+    private readonly TaskCompletionSource<string?> _completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private readonly string _displayCulture;
+
+    private bool _closed;
+
+    /// <summary>构造期间（默认选中项）不切换全局语言，只有用户勾选才预览。</summary>
+    private bool _initializing = true;
+
+    /// <summary>用户点“继续”后选中的语言标记；未确认时为 null。</summary>
+    public string? SelectedCulture { get; private set; }
+
+    public LanguageSelectWindow()
     {
-        private readonly string _displayCulture;
+        _displayCulture = Localization.DetectCultureFromSystem();
+        InitializeComponent();
 
-        public LanguageSelectWindow()
+        Title = Localization.Get("LangSelect_Title", _displayCulture);
+        ApplyLanguageText(_displayCulture);
+
+        if (Content is FrameworkElement root)
         {
-            _displayCulture = Localization.DetectCultureFromSystem();
-            InitializeComponent();
-            ThemeManager.ApplyWindow(this);
-            SourceInitialized += (_, _) => ThemeManager.ApplyTitleBar(this);
-            Activated += (_, _) => ThemeManager.ApplyTitleBar(this);
-            ApplyDisplayLanguage();
-            SelectDefaultRadio();
+            root.RequestedTheme = App.ResolveElementTheme();
+            root.Loaded += LanguageSelectWindow_Loaded;
         }
 
-        private void ApplyDisplayLanguage()
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
-            Title = Localization.Get("LangSelect_Title", _displayCulture);
-            TxtTitle.Text = Localization.Get("LangSelect_Title", _displayCulture);
-            TxtSubtitle.Text = Localization.Get("LangSelect_Subtitle", _displayCulture);
-            RadioChinese.Content = Localization.Get("LangSelect_Chinese", _displayCulture);
-            RadioEnglish.Content = Localization.Get("LangSelect_English", _displayCulture);
-            RadioJapanese.Content = Localization.Get("LangSelect_Japanese", _displayCulture);
-            BtnContinue.Content = Localization.Get("LangSelect_Continue", _displayCulture);
+            presenter.IsResizable = false;
+            presenter.IsMaximizable = false;
+            presenter.IsMinimizable = false;
+            presenter.IsAlwaysOnTop = true;
         }
 
-        private void SelectDefaultRadio()
+        AppWindow.IsShownInSwitchers = false;
+
+        WindowChrome.ApplyAppIcon(this);
+        ApplyTitleBarTheme(App.ResolveElementTheme());
+
+        SelectDefaultRadio();
+        _initializing = false;
+    }
+
+    /// <summary>返回所选语言标记（zh-CN / en / ja）；窗口被关闭时返回 null。</summary>
+    public Task<string?> ShowDialogAsync(XamlRoot xamlRoot)
+    {
+        if (_closed)
         {
-            switch (_displayCulture)
-            {
-                case Localization.CultureJa:
-                    RadioJapanese.IsChecked = true;
-                    break;
-                case Localization.CultureEn:
-                    RadioEnglish.IsChecked = true;
-                    break;
-                default:
-                    RadioChinese.IsChecked = true;
-                    break;
-            }
+            return Task.FromResult<string?>(null);
         }
 
-        private void BtnContinue_Click(object sender, RoutedEventArgs e)
+        WindowChrome.SetInitialSize(this, DesignWidth, DesignHeight);
+
+        Closed += LanguageSelectWindow_Closed;
+        Activate();
+        return _completion.Task;
+    }
+
+    // ------------------------------------------------------------------
+    // 文案与默认选中项
+    // ------------------------------------------------------------------
+
+    private void ApplyLanguageText(string cultureName)
+    {
+        Title = Localization.Get("LangSelect_Title", cultureName);
+        TxtTitle.Text = Localization.Get("LangSelect_Title", cultureName);
+        TxtSubtitle.Text = Localization.Get("LangSelect_Subtitle", cultureName);
+        RadioChinese.Content = Localization.Get("LangSelect_Chinese", cultureName);
+        RadioEnglish.Content = Localization.Get("LangSelect_English", cultureName);
+        RadioJapanese.Content = Localization.Get("LangSelect_Japanese", cultureName);
+        BtnContinue.Content = Localization.Get("LangSelect_Continue", cultureName);
+    }
+
+    private void SelectDefaultRadio()
+    {
+        switch (_displayCulture)
         {
-            string selected = Localization.CultureZhCn;
-            if (RadioEnglish.IsChecked == true)
+            case Localization.CultureJa:
+                RadioJapanese.IsChecked = true;
+                break;
+            case Localization.CultureEn:
+                RadioEnglish.IsChecked = true;
+                break;
+            default:
+                RadioChinese.IsChecked = true;
+                break;
+        }
+    }
+
+    /// <summary>勾选即预览：立刻按目标语言刷新对话框文案；用户操作时同步全局语言。</summary>
+    private void LangOption_Checked(object sender, RoutedEventArgs e)
+    {
+        _ = e;
+        if (sender is not RadioButton { Tag: string culture } || string.IsNullOrEmpty(culture))
+        {
+            return;
+        }
+
+        ApplyLanguageText(culture);
+        if (!_initializing)
+        {
+            Localization.ApplyCulture(culture);
+        }
+    }
+
+    private void BtnContinue_Click(object sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+
+        string selected = Localization.CultureZhCn;
+        if (RadioEnglish.IsChecked == true)
+        {
+            selected = Localization.CultureEn;
+        }
+        else if (RadioJapanese.IsChecked == true)
+        {
+            selected = Localization.CultureJa;
+        }
+
+        ConfigManager.Save("UiLanguage", selected);
+        Localization.ApplyCulture(selected);
+        SelectedCulture = selected;
+        _completion.TrySetResult(selected);
+        Close();
+    }
+
+    // ------------------------------------------------------------------
+    // 窗口生命周期
+    // ------------------------------------------------------------------
+
+    private void LanguageSelectWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+
+        if (Content is FrameworkElement root)
+        {
+            ApplyTitleBarTheme(root.ActualTheme);
+        }
+    }
+
+    private void LanguageSelectWindow_Closed(object sender, WindowEventArgs args)
+    {
+        _ = sender;
+        _ = args;
+        _closed = true;
+        _completion.TrySetResult(null);
+    }
+
+    /// <summary>
+    /// WinUI 只负责内容区主题，非客户区标题栏要自己跟随；
+    /// <see cref="ElementTheme.Default"/> 时留给 <c>Loaded</c> 用实际主题校准。
+    /// </summary>
+    private void ApplyTitleBarTheme(ElementTheme theme)
+    {
+        if (theme == ElementTheme.Default)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!AppWindowTitleBar.IsCustomizationSupported())
             {
-                selected = Localization.CultureEn;
-            }
-            else if (RadioJapanese.IsChecked == true)
-            {
-                selected = Localization.CultureJa;
+                return;
             }
 
-            ConfigManager.Save("UiLanguage", selected);
-            Localization.ApplyCulture(selected);
-            DialogResult = true;
-            Close();
+            AppWindowTitleBar? titleBar = AppWindow?.TitleBar;
+            if (titleBar == null)
+            {
+                return;
+            }
+
+            titleBar.PreferredTheme = theme == ElementTheme.Dark
+                ? TitleBarTheme.Dark
+                : TitleBarTheme.Light;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug($"语言选择标题栏主题设置失败：{ex.Message}");
         }
     }
 }

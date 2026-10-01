@@ -9,7 +9,6 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 using System.Collections.Generic;
 
 namespace BASpark
@@ -128,9 +127,10 @@ namespace BASpark
             string versionText = version == null ? "unknown" : $"{version.Major}.{version.Minor}.{version.Build}";
 
             var screensInfo = new List<string>();
+            IReadOnlyList<ScreenInfo> screens = ScreenInfo.AllScreens;
             try
             {
-                foreach (var screen in Screen.AllScreens)
+                foreach (var screen in screens)
                 {
                     var dm = new DEVMODE();
                     dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
@@ -142,13 +142,15 @@ namespace BASpark
                     else
                     {
                         int fallbackRate = GetRefreshRateViaWmiFallback();
-                        screensInfo.Add($"{screen.Bounds.Width}x{screen.Bounds.Height}@{fallbackRate}Hz");
+                        screensInfo.Add($"{screen.BoundsWidth}x{screen.BoundsHeight}@{fallbackRate}Hz");
                     }
                 }
             }
             catch
             {
-                screensInfo.Add($"{Screen.PrimaryScreen?.Bounds.Width ?? 1920}x{Screen.PrimaryScreen?.Bounds.Height ?? 1080}@60Hz");
+                // 枚举异常时退回主显示器（原点总在主显示器上）尺寸
+                ScreenInfo? primary = ScreenInfo.FromPoint(0, 0);
+                screensInfo.Add($"{primary?.BoundsWidth ?? 1920}x{primary?.BoundsHeight ?? 1080}@60Hz");
             }
 
             return new
@@ -166,7 +168,7 @@ namespace BASpark
                 autoStart = ConfigManager.AutoStart,
                 isSilentStart = ConfigManager.StartSilent,
                 runAsAdmin = ConfigManager.RunAsAdmin,
-                screenCount = Math.Clamp(Screen.AllScreens.Length, 0, 32),
+                screenCount = Math.Clamp(screens.Count, 0, 32),
                 screens = screensInfo,
                 cpuModel = Sanitize(GetCpuName(), 64),
                 gpuModel = Sanitize(GetGpuName(), 64),

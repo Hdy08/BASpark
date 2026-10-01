@@ -33,7 +33,7 @@ jobs:
         shell: pwsh
         run: dotnet test BASpark.sln -c Release --verbosity normal
 
-      - name: Build Single EXE
+      - name: Build App
         shell: pwsh
         run: |
           $RAW_VER = "${{ github.ref_name }}".TrimStart("v")
@@ -50,18 +50,22 @@ jobs:
           Write-Host "Targeting Version: $RAW_VER"
           Write-Host "----------------------------------------------"
 
+          # WinUI 3 (Windows App SDK) + WebView2 both ship native components that
+          # cannot be merged into a single-file bundle, so the app publishes as a
+          # self-contained folder. WindowsAppSDKSelfContained removes the need for
+          # the Windows App Runtime to be installed on the target machine.
           dotnet publish src/BASpark.csproj `
             -c Release `
             -r win-x64 `
             --self-contained true `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:Platform=x64 `
+            -p:PublishSingleFile=false `
             -p:Version=$RAW_VER `
-            -o src/publish_single
+            -o src/publish_app
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BASpark-Executable-Preview
-          path: src/publish_single/
+          path: src/publish_app/
           retention-days: 7

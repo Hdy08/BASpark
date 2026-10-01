@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Windows.Forms;
 using Microsoft.Win32;
 
 namespace BASpark
@@ -81,7 +80,7 @@ namespace BASpark
             public int dmPanningHeight;
         }
 
-        public static ScreenIdentityInfo FromScreen(Screen screen)
+        public static ScreenIdentityInfo FromScreen(ScreenInfo screen)
         {
             string displayName = screen.DeviceName;
             string identityKey = screen.DeviceName;

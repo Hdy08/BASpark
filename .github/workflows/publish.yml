@@ -41,10 +41,13 @@ jobs:
         run: |
           $RAW_VER = "${{ github.ref_name }}".TrimStart("v")
           
+          # WinUI 3 (Windows App SDK) + WebView2 ship native components that cannot
+          # be merged into a single-file bundle; publish as a self-contained folder.
           dotnet publish src/BASpark.csproj `
             -c Release `
             -r win-x64 `
             --self-contained true `
+            -p:Platform=x64 `
             -p:PublishSingleFile=false `
             -p:Version=$RAW_VER `
             -o src/publish_full

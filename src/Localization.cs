@@ -8,7 +8,7 @@ namespace BASpark
     public static class Localization
     {
         private static readonly ResourceManager ResourceManager = new(
-            "BASpark.Resources.Strings",
+            "BASpark.Strings",
             typeof(Localization).Assembly);
 
         public const string CultureZhCn = "zh-CN";

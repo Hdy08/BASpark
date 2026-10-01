@@ -26,9 +26,11 @@
 
 ## Features
 
-BASpark operates on a hybrid rendering architecture utilizing a **WPF host infrastructure powered by localized WebView2 rendering runtimes**.
+BASpark runs on a single-process hybrid architecture: a **WinUI 3 (Windows App SDK) interface** driving a **native layered window that hosts the WebView2 effect renderer**.
 
 * **Authentic Visual Fidelity:** Flawlessly replicates the particle responses, easing animations, and interactive textures of the classic Blue Archive visual framework.
+* **Native WinUI 3 Interface:** Every surface is built from WinUI 3 primitives — Mica backdrop, Fluent rounded cards, system accent colour, and stock `ToggleSwitch` / `ComboBox` / `Slider` / `InfoBar` / `RadioButtons` controls that follow the system light/dark theme automatically.
+* **Transparent Click-Through Overlay:** The effect layer is not a XAML window. It is a hand-built Win32 layered window (`WS_EX_LAYERED | WS_EX_TRANSPARENT`) hosting WebView2 directly, which is what makes true per-pixel transparency and mouse pass-through possible without stealing focus or appearing in Alt+Tab.
 * **Aggressive Resource Optimization:** Leveraging WebView2 lifecycle management, rendering procedures are invoked strictly upon input triggers. The graphics context completely hibernates when idle, causing zero overhead to active background processes or system resources.
 * **System-Wide Environment Perception:** Full compatibility with full-screen entertainment and production environments. Real-time hook intercepting accurately routes input feedback without interrupting target processes.
 
@@ -38,10 +40,11 @@ BASpark operates on a hybrid rendering architecture utilizing a **WPF host infra
 
 ### System Specifications
 * **Architecture:** Requires a 64-bit processor and native OS environment.
-* **Operating System:** Windows 10 / Windows 11 (X64 architectures).
+* **Operating System:** Windows 10 1809 (build 17763) / Windows 11 (X64 architectures).
 * **Memory:** Minimum 200 MB RAM allocation.
 * **Graphics Unit:** Discrete or integrated graphics processing units natively supporting DirectX 11 or OpenGL runtimes.
-* **Storage Matrix:** Minimum 200 MB available physical storage workspace.
+* **Storage Matrix:** Minimum 400 MB available physical storage workspace.
+* **Runtime:** None required. The Windows App SDK and .NET runtime ship self-contained with the application.
 
 ### Installation
 1. Navigate to the official [Releases Hub](https://github.com/DoomVoss/BASpark/releases). Download the latest setup binary: `BASpark_Installer_vX.X.X_x64.exe`.

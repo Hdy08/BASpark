@@ -1,44 +1,61 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-    
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>BASpark</RootNamespace>
+
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
-    <UseVisualBasic>true</UseVisualBasic>
-    <ApplicationIcon>app.ico</ApplicationIcon>
 
-    <Version>1.6.2</Version>
-    <AssemblyVersion>1.6.2</AssemblyVersion>
-    <FileVersion>1.6.2</FileVersion>
-    
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    
-    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    
+    <!-- WinUI 3 (Windows App SDK) replaces the former WPF/WinForms host. -->
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishProfile Condition="'$(PublishProfile)' == ''">win-x64</PublishProfile>
+
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest Condition="'$(EnableUIAccess)' != 'true'">app.manifest</ApplicationManifest>
     <ApplicationManifest Condition="'$(EnableUIAccess)' == 'true'">app.uiaccess.manifest</ApplicationManifest>
     <DefaultItemExcludes Condition="'$(EnableUIAccess)' == 'true'">$(DefaultItemExcludes);$(MSBuildProjectDirectory)\obj\**;$(MSBuildProjectDirectory)\bin\**</DefaultItemExcludes>
 
+    <!-- Microsoft.Web.WebView2 ships both a WPF and a WinForms projection; the
+         Win32/WinRT projection is the one this app hosts manually. -->
     <WebView2LoaderPreference>Static</WebView2LoaderPreference>
+    <WebView2EnableCsWinRTProjection>true</WebView2EnableCsWinRTProjection>
+
+    <Version>1.7.0</Version>
+    <AssemblyVersion>1.7.0</AssemblyVersion>
+    <FileVersion>1.7.0</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
     <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2365.46" />
     <PackageReference Include="MouseKeyHook" Version="5.7.1" />
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="app.ico" />
-    <Resource Include="Web\index.html" />
-    <Resource Include="Web\index.legacy.html" />
-    <Resource Include="Web\fx-adapter.js" />
-    <Resource Include="Web\vendor\ba-click-fx.iife.js" />
+  </ItemGroup>
+
+  <!-- The effect renderer payloads stay byte-identical to the previous WPF build.
+       They are read back through Assembly.GetManifestResourceStream in
+       WebRendererResourceProvider. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Web\index.html" LogicalName="BASpark.Web.index.html" />
+    <EmbeddedResource Include="Web\index.legacy.html" LogicalName="BASpark.Web.index.legacy.html" />
+    <EmbeddedResource Include="Web\fx-adapter.js" LogicalName="BASpark.Web.fx-adapter.js" />
+    <EmbeddedResource Include="Web\vendor\ba-click-fx.iife.js" LogicalName="BASpark.Web.vendor.ba-click-fx.iife.js" />
   </ItemGroup>
 
   <ItemGroup>
@@ -52,5 +69,27 @@
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!--
+    WinUI 3 的编译产物（各窗口的 .xbf 与合并后的资源索引 BASpark.pri）
+    只在 Build 输出目录生成，`dotnet publish` 的默认复制管线不会带上它们。
+    缺少这些文件时应用会在启动时崩溃在 CoreMessagingXP.dll（0xc000027b），
+    因为没有可加载的编译 XAML。这里在 publish 收尾时显式补齐。
+  -->
+  <Target Name="CopyWinUiCompiledResourcesToPublish"
+          AfterTargets="Publish"
+          Condition="'$(PublishDir)' != ''">
+    <ItemGroup>
+      <WinUiCompiledResource Include="$(TargetDir)*.xbf" />
+      <WinUiCompiledResource Include="$(TargetDir)$(AssemblyName).pri" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WinUiCompiledResource)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(WinUiCompiledResource)' != ''" />
+    <Message Importance="high"
+             Text="Copied @(WinUiCompiledResource->Count()) WinUI compiled resource(s) to $(PublishDir)."
+             Condition="'@(WinUiCompiledResource)' != ''" />
+  </Target>
 
 </Project>

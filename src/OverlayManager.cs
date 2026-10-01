@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
@@ -7,84 +5,25 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
-using System.Windows.Threading;
 using Gma.System.MouseKeyHook;
+using Microsoft.UI.Dispatching;
 using Microsoft.Win32;
 
 namespace BASpark
 {
     public sealed class OverlayManager : IDisposable
     {
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(IntPtr hObject);
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-        private static extern bool QueryFullProcessImageName(IntPtr hProcess, int dwFlags, StringBuilder lpExeName, ref int lpdwSize);
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-        [DllImport("user32.dll")]
-        private static extern bool IsWindow(IntPtr hWnd);
-        [DllImport("user32.dll")]
-        private static extern bool IsWindowVisible(IntPtr hWnd);
-        [DllImport("user32.dll")]
-        private static extern bool IsIconic(IntPtr hWnd);
-        [DllImport("user32.dll")]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-        [DllImport("user32.dll")]
-        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-        [DllImport("user32.dll")]
-        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetDesktopWindow();
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetShellWindow();
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetCursorPos(out POINT lpPoint);
-        [DllImport("user32.dll")]
-        private static extern bool GetCursorInfo(out CURSORINFO pci);
-        [DllImport("user32.dll")]
-        private static extern IntPtr WindowFromPoint(POINT Point);
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
-        [DllImport("user32.dll")]
-        private static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventProcDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
-        [DllImport("user32.dll")]
-        private static extern bool UnhookWinEvent(IntPtr hWinEventHook);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct POINT { public int x; public int y; }
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-        private struct MONITORINFO
-        {
-            public int cbSize;
-            public RECT rcMonitor;
-            public RECT rcWork;
-            public uint dwFlags;
-        }
-
-        private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
-        private const uint GA_ROOT = 2;
-        private const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
-        private const uint WINEVENT_OUTOFCONTEXT = 0;
-        private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+        // 全部 Win32 声明集中在 NativeMethods；此处只保留业务常量。
         private const int FullscreenTolerance = 2;
         private const int DisplaySettingsRecoveryDebounceMilliseconds = 400;
         private static readonly long SuppressionCacheDurationTicks = TimeSpan.FromMilliseconds(250).Ticks;
         private const long ClickIntervalTicks = 300000;
 
-        private readonly Dictionary<string, MainWindow> _overlays = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, OverlayWindow> _overlays = new(StringComparer.OrdinalIgnoreCase);
         private IKeyboardMouseEvents? _globalHook;
-        private MainWindow? _activePointerOverlay;
-        private MainWindow? _lastTrailOverlay;
-        private MainWindow? _lastTrailThrottleOverlay;
+        private OverlayWindow? _activePointerOverlay;
+        private OverlayWindow? _lastTrailOverlay;
+        private OverlayWindow? _lastTrailThrottleOverlay;
         private long _lastMoveTimestamp;
         private long _lastClickTicks;
         private long _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / 60);
@@ -102,21 +41,12 @@ namespace BASpark
         private bool _winKeyDown;
         private bool _shiftKeyDown;
         private IntPtr _foregroundWinEventHook = IntPtr.Zero;
-        private WinEventProcDelegate? _foregroundWinEventDelegate;
+        private NativeMethods.WinEventProc? _foregroundWinEventDelegate;
         private System.Threading.Timer? _screenshotFailsafeTimer;
-        private DispatcherTimer? _screenshotEndDebounceTimer;
-        private DispatcherTimer? _displaySettingsRecoveryTimer;
+        private DispatcherQueueTimer? _screenshotEndDebounceTimer;
+        private DispatcherQueueTimer? _displaySettingsRecoveryTimer;
         private long _lastResumeRecoveryTicks;
         private static readonly long ResumeRecoveryDebounceTicks = TimeSpan.FromSeconds(2).Ticks;
-
-        private delegate void WinEventProcDelegate(
-            IntPtr hWinEventHook,
-            uint eventType,
-            IntPtr hwnd,
-            int idObject,
-            int idChild,
-            uint dwEventThread,
-            uint dwmsEventTime);
 
         private static readonly HashSet<string> ScreenshotForegroundHostExe = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -253,14 +183,14 @@ namespace BASpark
             }
 
             _foregroundWinEventDelegate ??= ForegroundWinEventProc;
-            _foregroundWinEventHook = SetWinEventHook(
-                EVENT_SYSTEM_FOREGROUND,
-                EVENT_SYSTEM_FOREGROUND,
+            _foregroundWinEventHook = NativeMethods.SetWinEventHook(
+                NativeMethods.EVENT_SYSTEM_FOREGROUND,
+                NativeMethods.EVENT_SYSTEM_FOREGROUND,
                 IntPtr.Zero,
                 _foregroundWinEventDelegate,
                 0,
                 0,
-                WINEVENT_OUTOFCONTEXT);
+                NativeMethods.WINEVENT_OUTOFCONTEXT);
         }
 
         private void UninstallForegroundWinEventHook()
@@ -270,7 +200,7 @@ namespace BASpark
                 return;
             }
 
-            UnhookWinEvent(_foregroundWinEventHook);
+            NativeMethods.UnhookWinEvent(_foregroundWinEventHook);
             _foregroundWinEventHook = IntPtr.Zero;
         }
 
@@ -289,12 +219,12 @@ namespace BASpark
             _ = idChild;
             _ = dwEventThread;
             _ = dwmsEventTime;
-            if (eventType != EVENT_SYSTEM_FOREGROUND)
+            if (eventType != NativeMethods.EVENT_SYSTEM_FOREGROUND)
             {
                 return;
             }
 
-            System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(HandleForegroundWindowChanged));
+            App.DispatcherQueue.TryEnqueue(HandleForegroundWindowChanged);
         }
 
         private void HandleForegroundWindowChanged()
@@ -339,7 +269,7 @@ namespace BASpark
 
         private bool IsForegroundScreenshotHost()
         {
-            return IsKnownScreenshotHostWindow(GetForegroundWindow());
+            return IsKnownScreenshotHostWindow(NativeMethods.GetForegroundWindow());
         }
 
         private bool IsKnownScreenshotHostWindow(IntPtr hwnd)
@@ -349,7 +279,7 @@ namespace BASpark
                 return false;
             }
 
-            IntPtr root = GetAncestor(hwnd, GA_ROOT);
+            IntPtr root = NativeMethods.GetAncestor(hwnd, NativeMethods.GA_ROOT);
             if (root == IntPtr.Zero)
             {
                 root = hwnd;
@@ -360,12 +290,12 @@ namespace BASpark
                 return false;
             }
 
-            if (!IsWindow(root) || !IsWindowVisible(root))
+            if (!NativeMethods.IsWindow(root) || !NativeMethods.IsWindowVisible(root))
             {
                 return false;
             }
 
-            GetWindowThreadProcessId(root, out uint pid);
+            NativeMethods.GetWindowThreadProcessId(root, out uint pid);
             if (pid == 0 || pid == (uint)Environment.ProcessId)
             {
                 return false;
@@ -470,7 +400,7 @@ namespace BASpark
 
         private void ScheduleEndScreenshotCaptureSessionDebounced()
         {
-            System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(ScheduleEndOnDispatcherThread));
+            App.DispatcherQueue.TryEnqueue(ScheduleEndOnDispatcherThread);
         }
 
         private void ScheduleEndOnDispatcherThread()
@@ -481,13 +411,16 @@ namespace BASpark
             }
 
             StopScreenshotEndDebounce();
-            _screenshotEndDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(360) };
+            _screenshotEndDebounceTimer = App.DispatcherQueue.CreateTimer();
+            _screenshotEndDebounceTimer.Interval = TimeSpan.FromMilliseconds(360);
             _screenshotEndDebounceTimer.Tick += OnScreenshotEndDebounceTick;
             _screenshotEndDebounceTimer.Start();
         }
 
-        private void OnScreenshotEndDebounceTick(object? sender, EventArgs e)
+        private void OnScreenshotEndDebounceTick(DispatcherQueueTimer sender, object args)
         {
+            _ = sender;
+            _ = args;
             StopScreenshotEndDebounce();
             if (_disposed || !ConfigManager.ScreenshotCompatibilityMode)
             {
@@ -517,7 +450,7 @@ namespace BASpark
             {
                 try
                 {
-                    System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+                    App.DispatcherQueue.TryEnqueue(() =>
                     {
                         if (_disposed)
                         {
@@ -525,7 +458,7 @@ namespace BASpark
                         }
 
                         EndScreenshotCaptureSession();
-                    }));
+                    });
                 }
                 catch
                 {
@@ -566,7 +499,7 @@ namespace BASpark
                 cursorY = e.Y;
             }
 
-            MainWindow? target = ResolveTargetOverlay(cursorX, cursorY);
+            OverlayWindow? target = ResolveTargetOverlay(cursorX, cursorY);
             if (target == null)
             {
                 return;
@@ -627,7 +560,7 @@ namespace BASpark
                 cursorY = e.Y;
             }
 
-            MainWindow? hoveredTarget = ResolveTargetOverlay(cursorX, cursorY);
+            OverlayWindow? hoveredTarget = ResolveTargetOverlay(cursorX, cursorY);
             if (_isPrimaryPointerDown &&
                 hoveredTarget != null &&
                 !ReferenceEquals(_activePointerOverlay, hoveredTarget))
@@ -637,7 +570,7 @@ namespace BASpark
                 hoveredTarget.EmitTrailStart(cursorX, cursorY, _isTouchLikeInput || !cursorVisible);
             }
 
-            MainWindow? target = _activePointerOverlay ?? hoveredTarget;
+            OverlayWindow? target = _activePointerOverlay ?? hoveredTarget;
             bool targetChanged = !ReferenceEquals(target, _lastTrailThrottleOverlay);
             long currentTimestamp = Stopwatch.GetTimestamp();
             long moveInterval = target?.TrailMoveIntervalTimestamp ?? _idleMoveIntervalTimestamp;
@@ -705,7 +638,7 @@ namespace BASpark
 
         private void ReleasePointerStateSilent()
         {
-            MainWindow? activePointerOverlay = _activePointerOverlay;
+            OverlayWindow? activePointerOverlay = _activePointerOverlay;
             activePointerOverlay?.EmitCancel();
             if (_lastTrailOverlay != null &&
                 !ReferenceEquals(_lastTrailOverlay, activePointerOverlay))
@@ -747,7 +680,7 @@ namespace BASpark
             _activePointerOverlay = null;
         }
 
-        private void SwitchAlwaysTrailOverlay(MainWindow? target)
+        private void SwitchAlwaysTrailOverlay(OverlayWindow? target)
         {
             if (ReferenceEquals(_lastTrailOverlay, target))
             {
@@ -759,23 +692,29 @@ namespace BASpark
             _lastTrailOverlay = target;
         }
 
-        private MainWindow? ResolveTargetOverlay(int x, int y)
+        private OverlayWindow? ResolveTargetOverlay(int x, int y)
         {
-            MainWindow? direct = _overlays.Values.FirstOrDefault(w => w.ContainsScreenPoint(x, y));
+            OverlayWindow? direct = _overlays.Values.FirstOrDefault(w => w.ContainsScreenPoint(x, y));
             if (direct != null) return direct;
 
-            Screen nearest = Screen.FromPoint(new Point(x, y));
-            if (_overlays.TryGetValue(nearest.DeviceName, out MainWindow? byDevice))
+            ScreenInfo? nearest = ScreenInfo.FromPoint(x, y);
+            if (nearest == null)
+            {
+                return _overlays.Values.FirstOrDefault();
+            }
+
+            if (_overlays.TryGetValue(nearest.DeviceName, out OverlayWindow? byDevice))
             {
                 return byDevice;
             }
 
-            return _overlays.Values.FirstOrDefault(w => w.ContainsScreenPoint(nearest.Bounds.Left, nearest.Bounds.Top));
+            return _overlays.Values.FirstOrDefault(
+                w => w.ContainsScreenPoint(nearest.BoundsLeft, nearest.BoundsTop));
         }
 
         private void RebuildWindows(bool forceRebuild)
         {
-            var screenInfos = Screen.AllScreens
+            var screenInfos = ScreenInfo.AllScreens
                 .Select(screen => new { Screen = screen, Identity = ScreenIdentity.FromScreen(screen) })
                 .ToList();
             var enabledIds = ConfigManager.ResolveEnabledScreenDeviceNames(screenInfos.Select(item => item.Identity));
@@ -813,9 +752,8 @@ namespace BASpark
                 int refreshRate = _followDisplayRefreshRate
                     ? ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)
                     : _manualTrailRefreshRate;
-                var win = new MainWindow(pair.Value, refreshRate);
+                var win = new OverlayWindow(pair.Value, refreshRate);
                 _overlays[pair.Key] = win;
-                win.Show();
             }
         }
 
@@ -829,7 +767,7 @@ namespace BASpark
 
         private void CloseOverlay(string deviceName)
         {
-            if (!_overlays.TryGetValue(deviceName, out MainWindow? overlay))
+            if (!_overlays.TryGetValue(deviceName, out OverlayWindow? overlay))
             {
                 return;
             }
@@ -870,13 +808,13 @@ namespace BASpark
                 return false;
             }
 
-            GetCursorPos(out POINT pt);
-            IntPtr cursorHwnd = WindowFromPoint(pt);
-            IntPtr targetWindow = GetAncestor(cursorHwnd, GA_ROOT);
+            NativeMethods.GetCursorPos(out NativeMethods.POINT pt);
+            IntPtr cursorHwnd = NativeMethods.WindowFromPoint(pt);
+            IntPtr targetWindow = NativeMethods.GetAncestor(cursorHwnd, NativeMethods.GA_ROOT);
 
             if (targetWindow == IntPtr.Zero || IsOverlayWindow(targetWindow))
             {
-                targetWindow = GetForegroundWindow();
+                targetWindow = NativeMethods.GetForegroundWindow();
             }
 
             if (targetWindow != _lastForegroundWindow)
@@ -892,7 +830,7 @@ namespace BASpark
             string className = GetWindowClassName(targetWindow);
             if (string.IsNullOrEmpty(className))
             {
-                className = GetWindowClassName(GetForegroundWindow());
+                className = GetWindowClassName(NativeMethods.GetForegroundWindow());
             }
 
             bool isDesktop = string.Equals(className, "Progman", StringComparison.OrdinalIgnoreCase) ||
@@ -912,14 +850,14 @@ namespace BASpark
 
             if (!TryGetForegroundProcessName(targetWindow, out string processName))
             {
-                if (!TryGetForegroundProcessName(GetForegroundWindow(), out processName))
+                if (!TryGetForegroundProcessName(NativeMethods.GetForegroundWindow(), out processName))
                 {
                     UpdateSuppressionState(nowTicks, false);
                     return false;
                 }
             }
 
-            IntPtr actualForeground = GetForegroundWindow();
+            IntPtr actualForeground = NativeMethods.GetForegroundWindow();
             if (ConfigManager.HideInFullscreen && IsEffectiveFullscreenWindow(actualForeground))
             {
                 UpdateSuppressionState(nowTicks, true);
@@ -943,7 +881,7 @@ namespace BASpark
                 return false;
             }
 
-            GetWindowThreadProcessId(hwnd, out uint processId);
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint processId);
             return processId == (uint)Environment.ProcessId;
         }
 
@@ -998,7 +936,7 @@ namespace BASpark
                 return false;
             }
 
-            GetWindowThreadProcessId(hwnd, out uint processId);
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint processId);
             if (processId == 0 || processId == (uint)Environment.ProcessId)
             {
                 return false;
@@ -1014,11 +952,11 @@ namespace BASpark
             {
                 return false;
             }
-            if (!IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd))
+            if (!NativeMethods.IsWindow(hwnd) || !NativeMethods.IsWindowVisible(hwnd) || NativeMethods.IsIconic(hwnd))
             {
                 return false;
             }
-            if (hwnd == GetDesktopWindow() || hwnd == GetShellWindow())
+            if (hwnd == NativeMethods.GetDesktopWindow() || hwnd == NativeMethods.GetShellWindow())
             {
                 return false;
             }
@@ -1029,51 +967,30 @@ namespace BASpark
                    !string.Equals(className, "WorkerW", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string GetWindowClassName(IntPtr hwnd)
-        {
-            var classNameBuilder = new StringBuilder(256);
-            return GetClassName(hwnd, classNameBuilder, classNameBuilder.Capacity) > 0
-                ? classNameBuilder.ToString()
-                : string.Empty;
-        }
+        private static string GetWindowClassName(IntPtr hwnd) => NativeMethods.GetWindowClassName(hwnd);
 
-        private static string GetProcessExecutableName(uint processId)
-        {
-            IntPtr hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
-            if (hProc == IntPtr.Zero) return string.Empty;
-
-            var sb = new StringBuilder(1024);
-            int size = sb.Capacity;
-            if (!QueryFullProcessImageName(hProc, 0, sb, ref size))
-            {
-                CloseHandle(hProc);
-                return string.Empty;
-            }
-
-            CloseHandle(hProc);
-            string fileName = System.IO.Path.GetFileName(sb.ToString());
-            if (!fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            {
-                fileName += ".exe";
-            }
-            return fileName.ToLowerInvariant();
-        }
+        private static string GetProcessExecutableName(uint processId) =>
+            NativeMethods.GetProcessExecutableName(processId);
 
         private static bool IsEffectiveFullscreenWindow(IntPtr hwnd)
         {
-            if (!GetWindowRect(hwnd, out RECT windowRect))
+            if (!NativeMethods.GetWindowRect(hwnd, out NativeMethods.RECT windowRect))
             {
                 return false;
             }
 
-            IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            IntPtr monitor = NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MONITOR_DEFAULTTONEAREST);
             if (monitor == IntPtr.Zero)
             {
                 return false;
             }
 
-            MONITORINFO monitorInfo = new() { cbSize = Marshal.SizeOf<MONITORINFO>() };
-            if (!GetMonitorInfo(monitor, ref monitorInfo))
+            var monitorInfo = new NativeMethods.MONITORINFOEX
+            {
+                cbSize = Marshal.SizeOf<NativeMethods.MONITORINFOEX>(),
+                szDevice = string.Empty
+            };
+            if (!NativeMethods.GetMonitorInfo(monitor, ref monitorInfo))
             {
                 return false;
             }
@@ -1084,34 +1001,10 @@ namespace BASpark
                    Math.Abs(windowRect.Bottom - monitorInfo.rcMonitor.Bottom) <= FullscreenTolerance;
         }
 
-        private static bool CursorIsVisible()
-        {
-            CURSORINFO pci = new() { cbSize = Marshal.SizeOf(typeof(CURSORINFO)) };
-            return GetCursorInfo(out pci) && (pci.flags & 0x00000001) != 0;
-        }
+        private static bool CursorIsVisible() => NativeMethods.IsCursorVisible();
 
-        private static bool TryGetPhysicalCursorPosition(out int x, out int y)
-        {
-            x = 0;
-            y = 0;
-            if (!GetCursorPos(out POINT pt))
-            {
-                return false;
-            }
-
-            x = pt.x;
-            y = pt.y;
-            return true;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct CURSORINFO
-        {
-            public int cbSize;
-            public int flags;
-            public IntPtr hCursor;
-            public POINT ptScreenPos;
-        }
+        private static bool TryGetPhysicalCursorPosition(out int x, out int y) =>
+            NativeMethods.TryGetCursorPosition(out x, out y);
 
         private void HandleDisplaySettingsChanged(object? sender, EventArgs e)
         {
@@ -1122,8 +1015,7 @@ namespace BASpark
                 return;
             }
 
-            System.Windows.Application.Current.Dispatcher.BeginInvoke(
-                new Action(RestartDisplaySettingsRecoveryTimer));
+            App.DispatcherQueue.TryEnqueue(RestartDisplaySettingsRecoveryTimer);
         }
 
         private void RestartDisplaySettingsRecoveryTimer()
@@ -1135,10 +1027,9 @@ namespace BASpark
 
             if (_displaySettingsRecoveryTimer == null)
             {
-                _displaySettingsRecoveryTimer = new DispatcherTimer
-                {
-                    Interval = TimeSpan.FromMilliseconds(DisplaySettingsRecoveryDebounceMilliseconds)
-                };
+                _displaySettingsRecoveryTimer = App.DispatcherQueue.CreateTimer();
+                _displaySettingsRecoveryTimer.Interval =
+                    TimeSpan.FromMilliseconds(DisplaySettingsRecoveryDebounceMilliseconds);
                 _displaySettingsRecoveryTimer.Tick += DisplaySettingsRecoveryTimer_Tick;
             }
 
@@ -1146,10 +1037,10 @@ namespace BASpark
             _displaySettingsRecoveryTimer.Start();
         }
 
-        private void DisplaySettingsRecoveryTimer_Tick(object? sender, EventArgs e)
+        private void DisplaySettingsRecoveryTimer_Tick(DispatcherQueueTimer sender, object args)
         {
             _ = sender;
-            _ = e;
+            _ = args;
             _displaySettingsRecoveryTimer?.Stop();
             if (!_disposed)
             {
@@ -1184,10 +1075,10 @@ namespace BASpark
             _lastResumeRecoveryTicks = nowTicks;
             System.Threading.Tasks.Task.Delay(1500).ContinueWith(_ =>
             {
-                var app = System.Windows.Application.Current;
-                if (app == null) return;
+                var dispatcher = App.DispatcherQueue;
+                if (dispatcher == null) return;
 
-                app.Dispatcher.BeginInvoke(new Action(() =>
+                dispatcher.TryEnqueue(() =>
                 {
                     if (_disposed) return;
                     try
@@ -1198,7 +1089,7 @@ namespace BASpark
                     {
                         Debug.WriteLine("Resume recovery failed: " + ex.Message);
                     }
-                }));
+                });
             });
         }
 
@@ -1210,7 +1101,7 @@ namespace BASpark
             RefreshEnvironmentFilterState();
         }
 
-        private void ForEachOverlay(Action<MainWindow> action)
+        private void ForEachOverlay(Action<OverlayWindow> action)
         {
             foreach (var overlay in _overlays.Values.ToList())
             {
