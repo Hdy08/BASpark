@@ -597,6 +597,36 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void ControlPanel_KeepsTheCompactTitleBarAndRightAlignedCaptionButtons()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement titleBarHost = GetNamedElement(document, "TitleBarHost");
+        XElement titleBar = GetNamedElement(document, "AppTitleBar");
+        XElement captionButtons = GetNamedElement(document, "CaptionButtons");
+        string hostSource = ReadSource("src", "DcompPanelHost.cs");
+
+        Assert.Equal("32", (string?)titleBarHost.Attribute("Height"));
+        Assert.Equal("0", (string?)titleBar.Attribute("Grid.Column"));
+        Assert.Equal("1", (string?)captionButtons.Attribute("Grid.Column"));
+        Assert.Equal(titleBarHost, captionButtons.Parent);
+        Assert.Equal("Right", (string?)captionButtons.Attribute("HorizontalAlignment"));
+        Assert.Equal("Top", (string?)captionButtons.Attribute("VerticalAlignment"));
+        Assert.Equal(
+            new[] { "*", "Auto" },
+            titleBarHost.Element(Presentation + "Grid.ColumnDefinitions")!
+                .Elements().Select(column => (string?)column.Attribute("Width")));
+        Assert.DoesNotContain(document.Descendants(), element => element.Name.LocalName == "TitleBar.RightHeader");
+        foreach (XElement button in captionButtons.Elements())
+        {
+            Assert.Equal("46", (string?)button.Attribute("Width"));
+            Assert.Equal("32", (string?)button.Attribute("Height"));
+        }
+
+        Assert.Contains("CaptionHeight = 32", hostSource, StringComparison.Ordinal);
+        Assert.Contains("new RectInt32(0, 0, captionWidth, Math.Min(caption, height))", hostSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PanelHost_PreservesIslandContentsWhileMinimizedAndRestoresOnShow()
     {
         string hostSource = ReadSource("src", "DcompPanelHost.cs");

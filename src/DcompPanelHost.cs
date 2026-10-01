@@ -48,7 +48,7 @@ internal sealed class DcompPanelHost : IDisposable
     private const int WmDpiChanged = 0x02E0;
 
     /// <summary>标题栏拖拽带高度（逻辑像素）与四边缩放抓取宽度。</summary>
-    private const int CaptionHeight = 48;
+    private const int CaptionHeight = 32;
     private const int ResizeGrip = 6;
 
     /// <summary>窗口最小尺寸（逻辑像素），与设计下限一致。</summary>
@@ -246,6 +246,10 @@ internal sealed class DcompPanelHost : IDisposable
             return;
         }
 
+        int captionWidth = _captionButtonsBounds.Width > 0
+            ? Math.Clamp(_captionButtonsBounds.X, 0, width)
+            : width;
+
         try
         {
             InputNonClientPointerSource source =
@@ -254,7 +258,7 @@ internal sealed class DcompPanelHost : IDisposable
             // 标题栏拖拽带交给系统（拖动走系统模态循环，与普通窗口一致）。
             source.SetRegionRects(
                 NonClientRegionKind.Caption,
-                [new RectInt32(0, 0, width, Math.Min(caption, height))]);
+                [new RectInt32(0, 0, captionWidth, Math.Min(caption, height))]);
             source.SetRegionRects(
                 NonClientRegionKind.Passthrough,
                 _captionButtonsBounds.Width > 0 && _captionButtonsBounds.Height > 0

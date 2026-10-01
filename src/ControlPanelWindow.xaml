@@ -13,35 +13,40 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TitleBar x:Name="AppTitleBar"
-                  Grid.Row="0"
-                  Title=""
-                  Subtitle=""
-                  IsBackButtonVisible="False"
-                  IsPaneToggleButtonVisible="False">
-            <TitleBar.RightHeader>
-                <StackPanel x:Name="CaptionButtons" Orientation="Horizontal">
-                    <Button x:Name="BtnCaptionMinimize"
-                            Width="46" Height="48" Padding="0"
-                            Background="Transparent" BorderThickness="0" CornerRadius="0"
-                            Click="CaptionMinimize_Click">
-                        <FontIcon Glyph="&#xE921;" FontSize="10" />
-                    </Button>
-                    <Button x:Name="BtnCaptionMaximize"
-                            Width="46" Height="48" Padding="0"
-                            Background="Transparent" BorderThickness="0" CornerRadius="0"
-                            Click="CaptionMaximize_Click">
-                        <FontIcon x:Name="CaptionMaximizeIcon" Glyph="&#xE922;" FontSize="10" />
-                    </Button>
-                    <Button x:Name="BtnCaptionClose"
-                            Width="46" Height="48" Padding="0"
-                            Background="Transparent" BorderThickness="0" CornerRadius="0"
-                            Click="CaptionClose_Click">
-                        <FontIcon Glyph="&#xE8BB;" FontSize="10" />
-                    </Button>
-                </StackPanel>
-            </TitleBar.RightHeader>
-        </TitleBar>
+        <Grid x:Name="TitleBarHost" Grid.Row="0" Height="32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TitleBar x:Name="AppTitleBar"
+                      Grid.Column="0"
+                      Title=""
+                      Subtitle=""
+                      IsBackButtonVisible="False"
+                      IsPaneToggleButtonVisible="False" />
+            <StackPanel x:Name="CaptionButtons" Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button x:Name="BtnCaptionMinimize"
+                        Width="46" Height="32" Padding="0"
+                        Background="Transparent" BorderThickness="0" CornerRadius="0"
+                        Click="CaptionMinimize_Click">
+                    <FontIcon Glyph="&#xE921;" FontSize="10" />
+                </Button>
+                <Button x:Name="BtnCaptionMaximize"
+                        Width="46" Height="32" Padding="0"
+                        Background="Transparent" BorderThickness="0" CornerRadius="0"
+                        Click="CaptionMaximize_Click">
+                    <FontIcon x:Name="CaptionMaximizeIcon" Glyph="&#xE922;" FontSize="10" />
+                </Button>
+                <Button x:Name="BtnCaptionClose"
+                        Width="46" Height="32" Padding="0"
+                        Background="Transparent" BorderThickness="0" CornerRadius="0"
+                        Click="CaptionClose_Click">
+                    <FontIcon Glyph="&#xE8BB;" FontSize="10" />
+                </Button>
+            </StackPanel>
+        </Grid>
 
         <Grid Grid.Row="1">
         <Grid.ColumnDefinitions>
