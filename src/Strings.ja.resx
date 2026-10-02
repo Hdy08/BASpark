@@ -76,10 +76,10 @@
       <value>管理者として実行</value>
     </data>
     <data name="Basic_RunAsAdminHint" xml:space="preserve">
-      <value>* タスクマネージャーなどの高権限ウィンドウでエフェクトを表示する場合に必要です。</value>
+      <value>タスクマネージャーなどの高権限ウィンドウでエフェクトを表示する場合に必要です。</value>
     </data>
     <data name="Basic_ScreenshotHint" xml:space="preserve">
-      <value>*（実験的）スクリーンショット、QQ の既定ショートカット (Ctrl+Alt+A)、または WeChat の既定ショートカット (Alt+A) 検出時にオーバーレイを一時非表示にします。</value>
+      <value>（実験的）スクリーンショット、QQ の既定ショートカット (Ctrl+Alt+A)、または WeChat の既定ショートカット (Alt+A) 検出時にオーバーレイを一時非表示にします。</value>
     </data>
     <data name="Basic_ScreenshotMode" xml:space="preserve">
       <value>スクリーンショット互換</value>
@@ -94,7 +94,7 @@
       <value>タッチスクリーンモード</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
-      <value>* カーソル非表示時もエフェクトが動作します。タッチスクリーンや特定の全画面アプリ向けです。</value>
+      <value>カーソル非表示時もエフェクトが動作します。タッチスクリーンや特定の全画面アプリ向けです。</value>
     </data>
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>マウスの常時トレイルを有効にする</value>
@@ -110,18 +110,6 @@
     </data>
     <data name="Basic_DarkModeSystem" xml:space="preserve">
       <value>システムに合わせる</value>
-    </data>
-    <data name="Basic_ScrollbarVisibility" xml:space="preserve">
-      <value>スクロールバーの表示</value>
-    </data>
-    <data name="Basic_ScrollbarAlways" xml:space="preserve">
-      <value>常に表示</value>
-    </data>
-    <data name="Basic_ScrollbarOnScroll" xml:space="preserve">
-      <value>スクロール時のみ</value>
-    </data>
-    <data name="Basic_ScrollbarHint" xml:space="preserve">
-      <value>* 細いスクロールバーを使用します。スクロール時のみ表示にすると、ウィンドウサイズ変更やタブ切替時の表示/非表示のちらつきを抑えられます。</value>
     </data>
     <data name="Dialog_ExeFilter" xml:space="preserve">
       <value>実行ファイル (*.exe)|*.exe</value>

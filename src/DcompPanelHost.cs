@@ -52,7 +52,7 @@ internal sealed class DcompPanelHost : IDisposable
     private const int ResizeGrip = 6;
 
     /// <summary>窗口最小尺寸（逻辑像素），与设计下限一致。</summary>
-    private const int MinWidthDesign = 560;
+    private const int MinWidthDesign = 800;
     private const int MinHeightDesign = 560;
 
     private static bool _classRegistered;

@@ -69,6 +69,12 @@
                         Width="46" Height="32" Padding="0"
                         Background="Transparent" BorderThickness="0" CornerRadius="0"
                         Click="CaptionClose_Click">
+                    <Button.Resources>
+                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#C42B1C" />
+                        <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#A2231A" />
+                        <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White" />
+                        <SolidColorBrush x:Key="ButtonForegroundPressed" Color="White" />
+                    </Button.Resources>
                     <FontIcon Glyph="&#xE8BB;" FontSize="10" />
                 </Button>
             </StackPanel>
@@ -97,27 +103,29 @@
             <ScrollViewer Grid.Row="0"
                           VerticalScrollBarVisibility="Auto"
                           Padding="8,12,8,8">
-                <StackPanel Spacing="2">
-                    <RadioButton x:Name="TabWelcome"
-                                 GroupName="MainNav"
-                                 IsChecked="True"
-                                 Style="{StaticResource BasNavRadioStyle}"
-                                 Click="Tab_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <FontIcon Glyph="&#xE80F;" FontSize="16" />
-                            <TextBlock x:Name="TabWelcomeLabel" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </RadioButton>
+                <StackPanel Spacing="0">
+                    <StackPanel x:Name="NavBeforeSettings" Spacing="4">
+                        <RadioButton x:Name="TabWelcome"
+                                     GroupName="MainNav"
+                                     IsChecked="True"
+                                     Style="{StaticResource BasNavRadioStyle}"
+                                     Click="Tab_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE80F;" FontSize="16" />
+                                <TextBlock x:Name="TabWelcomeLabel" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
 
-                    <RadioButton x:Name="TabSettings"
-                                 GroupName="MainNav"
-                                 Style="{StaticResource BasNavRadioStyle}"
-                                 Click="Tab_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <FontIcon Glyph="&#xE713;" FontSize="16" Width="16" />
-                            <TextBlock x:Name="TabSettingsLabel" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </RadioButton>
+                        <RadioButton x:Name="TabSettings"
+                                     GroupName="MainNav"
+                                     Style="{StaticResource BasNavRadioStyle}"
+                                     Click="Tab_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE713;" FontSize="16" Width="16" />
+                                <TextBlock x:Name="TabSettingsLabel" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
 
                     <!--
                         设置子导航：容器高度由 SubNavAnimator 做「依赖动画」+ 裁剪，
@@ -130,7 +138,7 @@
                             Margin="0"
                             VerticalAlignment="Top"
                             IsHitTestVisible="False">
-                        <StackPanel x:Name="SettingsSubNav" Spacing="2">
+                        <StackPanel x:Name="SettingsSubNav" Spacing="2" Margin="0,2,0,0">
                             <RadioButton x:Name="SubTabBasic"
                                          GroupName="SettingsNav"
                                          IsChecked="True"
@@ -164,7 +172,7 @@
                         平移动画（合成器线程插值，按屏幕刷新率更新）被连续推开，
                         容器自身的布局高度只在切换的那一刻改一次，因此不会掉帧。
                     -->
-                    <StackPanel x:Name="NavAfterSettings" Spacing="2">
+                    <StackPanel x:Name="NavAfterSettings" Spacing="4" Margin="0,4,0,0">
                         <RadioButton x:Name="TabLog"
                                      GroupName="MainNav"
                                      Style="{StaticResource BasNavRadioStyle}"
@@ -351,37 +359,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="TxtScrollbarVisibility"
-                                            Text=""
-                                            Style="{StaticResource BasSettingTitleStyle}" />
-                                        <TextBlock
-                                            x:Name="TxtScrollbarHint"
-                                            Text=""
-                                            Style="{StaticResource BasCaptionStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <Border Style="{StaticResource BasSegmentedSelectorStyle}">
-                                            <RadioButtons
-                                                x:Name="RadioScrollbarVisibility"
-                                                Style="{StaticResource BasSegmentedRadioButtonsStyle}"
-                                                MaxColumns="2"
-                                                HorizontalAlignment="Stretch"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtScrollbarVisibility}" >
-                                                <RadioButton x:Name="RadioScrollbarAlways" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
-                                                <RadioButton x:Name="RadioScrollbarOnScroll" Content="" IsChecked="True" Style="{StaticResource BasSegmentedRadioStyle}" />
-                                            </RadioButtons>
-                                        </Border>
-                                    </Grid>
-                                </Grid>
-                            </Border>
+
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1063,14 +1041,18 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}" Padding="0">
+                            <Border x:Name="EffectColorCard" Style="{StaticResource BasSettingCardStyle}" Padding="0">
                                 <Expander x:Name="EffectColorExpander" Style="{StaticResource BasSettingExpanderStyle}"
+                                          VerticalAlignment="Top" Loaded="EffectColorExpander_Loaded"
+                                          Expanding="EffectColorExpander_Expanding" Collapsed="EffectColorExpander_Collapsed"
                                           AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}">
                                     <Expander.Resources>
                                         <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="{ThemeResource BasSettingsCardColor}" />
                                         <Thickness x:Key="ExpanderHeaderBorderThickness">0</Thickness>
                                         <Thickness x:Key="ExpanderContentDownBorderThickness">0</Thickness>
                                         <Thickness x:Key="ExpanderHeaderPadding">16,12</Thickness>
+                                        <Thickness x:Key="ExpanderChevronMargin">8,0,0,0</Thickness>
+                                        <x:Double x:Key="ExpanderChevronButtonSize">16</x:Double>
                                     </Expander.Resources>
                                     <Expander.Header>
                                         <Grid ColumnSpacing="12">
@@ -1091,26 +1073,19 @@
                                             </StackPanel>
                                         </Grid>
                                     </Expander.Header>
-                                    <Grid x:Name="ColorPickerBody" SizeChanged="ColorPickerBody_SizeChanged" RowSpacing="12">
+                                    <Grid x:Name="ColorPickerBody" ColumnSpacing="12" HorizontalAlignment="Left">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition x:Name="ColorPickerDetailsColumn" Width="0" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="198" />
                                         </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <Viewbox MaxWidth="300" HorizontalAlignment="Left" Stretch="Uniform" StretchDirection="DownOnly">
-                                            <ColorPicker x:Name="EffectColorPicker" Width="300" Orientation="Horizontal"
-                                                         IsAlphaEnabled="False" IsAlphaSliderVisible="False"
-                                                         IsColorSpectrumVisible="True" IsColorSliderVisible="True"
-                                                         ColorSpectrumComponents="SaturationValue"
-                                                         IsColorPreviewVisible="False" IsColorChannelTextInputVisible="False"
-                                                         IsHexInputVisible="False" IsAlphaTextInputVisible="False"
-                                                         ColorChanged="EffectColorPicker_ColorChanged"
-                                                         AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}" />
-                                        </Viewbox>
-                                        <StackPanel x:Name="ColorPickerDetails" Grid.Row="1" Width="200" Spacing="10"
+                                        <ColorPicker x:Name="EffectColorPicker" Style="{StaticResource BasColorPickerStyle}"
+                                                     IsAlphaEnabled="True" IsAlphaSliderVisible="True"
+                                                     ColorSpectrumComponents="SaturationValue" Loaded="EffectColorPicker_Loaded"
+                                                     IsColorPreviewVisible="False" IsColorChannelTextInputVisible="False"
+                                                     IsHexInputVisible="False" IsAlphaTextInputVisible="False"
+                                                     ColorChanged="EffectColorPicker_ColorChanged"
+                                                     AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}" />
+                                        <StackPanel x:Name="ColorPickerDetails" Grid.Column="1" Width="198" Margin="0,8,0,0" Spacing="10"
                                                     HorizontalAlignment="Left" VerticalAlignment="Top">
                                             <Grid ColumnSpacing="12">
                                                 <Grid.ColumnDefinitions>
@@ -1119,8 +1094,10 @@
                                                 </Grid.ColumnDefinitions>
                                                 <Border x:Name="ExpandedColorPreview" Width="64" Height="64" CornerRadius="6"
                                                         BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}" />
-                                                <TextBlock x:Name="ExpandedColorHex" Grid.Column="1" FontWeight="SemiBold"
-                                                           Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                                                    <TextBlock x:Name="ExpandedColorHex" Style="{StaticResource BasSettingTitleStyle}" />
+                                                    <TextBlock x:Name="ExpandedColorOpacity" Style="{StaticResource BasCaptionStyle}" />
+                                                </StackPanel>
                                             </Grid>
                                             <RadioButtons x:Name="EffectColorPresets" MaxColumns="6"
                                                           Style="{StaticResource BasColorPresetsStyle}"
@@ -1335,7 +1312,7 @@
                                     </StackPanel>
                                     <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                                         <ComboBox x:Name="ListConfiguredProcesses"
-                                                  MinWidth="0" MaxDropDownHeight="200"
+                                                  MinWidth="0" Height="32" MaxDropDownHeight="200"
                                                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                                   PlaceholderText="{Binding Text, ElementName=TxtProcessList}"
                                                   Background="{ThemeResource BasSettingsControlBackgroundBrush}"
@@ -1348,7 +1325,7 @@
                                             </ComboBox.ItemContainerStyle>
                                             <ComboBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid ColumnSpacing="12" Padding="0,4">
+                                                    <Grid ColumnSpacing="8">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
                                                             <ColumnDefinition Width="Auto" />
@@ -1360,7 +1337,7 @@
                                                         <Button Grid.Column="1"
                                                                 Click="RemoveProcess_Click"
                                                                 Tag="{Binding}"
-                                                                Padding="8,2">
+                                                                MinWidth="0" MinHeight="0" Width="20" Height="20" Padding="0">
                                                             <FontIcon Glyph="&#xE711;" FontSize="12" />
                                                         </Button>
                                                     </Grid>

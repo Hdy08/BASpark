@@ -19,16 +19,55 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Text;
 using Microsoft.Win32;
+using Windows.Foundation;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.UI;
 using WinRT.Interop;
 
 namespace BASpark;
+
+public sealed class SegmentedRadioLayout : NonVirtualizingLayout
+{
+    protected override Size MeasureOverride(NonVirtualizingLayoutContext context, Size availableSize)
+    {
+        int count = context.Children.Count;
+        if (count == 0)
+        {
+            return new Size();
+        }
+
+        double width = double.IsFinite(availableSize.Width) ? availableSize.Width : 240;
+        double height = 0;
+        foreach (UIElement child in context.Children)
+        {
+            child.Measure(new Size(width / count, availableSize.Height));
+            height = Math.Max(height, child.DesiredSize.Height);
+        }
+
+        return new Size(width, height);
+    }
+
+    protected override Size ArrangeOverride(NonVirtualizingLayoutContext context, Size finalSize)
+    {
+        int count = context.Children.Count;
+        double scale = count > 0 ? context.Children[0].XamlRoot?.RasterizationScale ?? 1 : 1;
+        double left = 0;
+        for (int index = 0; index < count; index++)
+        {
+            double right = index == count - 1 ? finalSize.Width : Math.Round(finalSize.Width * (index + 1) / count * scale) / scale;
+            context.Children[index].Arrange(new Rect(left, 0, right - left, finalSize.Height));
+            left = right;
+        }
+
+        return finalSize;
+    }
+}
 
 /// <summary>运行中进程选择列表的一行。</summary>
 public class ProcessItem
@@ -89,7 +128,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private const int MdtEffectiveDpi = 0;
 
     // 初始尺寸。
-    private const int DesignWidth = 680;
+    private const int DesignWidth = 800;
     private const int DesignHeight = 710;
 
     /// <summary>
@@ -337,6 +376,9 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
+    private Storyboard? _colorCardAnimation;
+    private int _colorCardAnimationGeneration;
+    private Microsoft.UI.Xaml.Controls.Primitives.ColorSpectrum? _configuredColorSpectrum;
     private readonly Dictionary<Slider, NumberBox> _sliderToBox = new();
     private readonly Dictionary<NumberBox, Slider> _boxToSlider = new();
 
@@ -375,6 +417,8 @@ public sealed partial class ControlPanelWindow : UserControl
             ApplyWindowChrome();
             BindCollections();
             SetupSliderPairs();
+            ConfigureInputControls();
+            RootGrid.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(RootGrid_PointerPressed), true);
 
             ComboProfiles.ItemsSource = Profiles;
             ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses;
@@ -656,6 +700,11 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             _suppressValueSync = false;
         }
+
+        if (slider == SliderOpacity && !_syncingColorControls)
+        {
+            UpdateColorPreview(ConfigManager.ParticleColor);
+        }
     }
 
     private void EffectNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
@@ -680,6 +729,99 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             _suppressValueSync = false;
         }
+
+        if (slider == SliderOpacity && !_syncingColorControls)
+        {
+            UpdateColorPreview(ConfigManager.ParticleColor);
+        }
+    }
+
+    private void ConfigureInputControls()
+    {
+        foreach (NumberBox input in _boxToSlider.Keys)
+        {
+            input.Loaded += InputControl_Loaded;
+        }
+
+        foreach (TextBox input in new[] { EffectColorHexInput, ManualProcessInput, SearchRunningProcess, SearchVisualReset, NewProfileNameInput })
+        {
+            input.Loaded += InputControl_Loaded;
+        }
+    }
+
+    private void InputControl_Loaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is not Control control)
+        {
+            return;
+        }
+
+        control.ApplyTemplate();
+        TextBox? input = control as TextBox ?? FindVisualDescendant<TextBox>(control);
+        if (input == null)
+        {
+            return;
+        }
+
+        input.ApplyTemplate();
+        input.Padding = new Thickness(10, 0, 6, 0);
+        input.VerticalContentAlignment = VerticalAlignment.Center;
+        if (FindVisualDescendant<ScrollViewer>(input, "ContentElement") is { } content)
+        {
+            content.VerticalContentAlignment = VerticalAlignment.Center;
+            content.VerticalAlignment = VerticalAlignment.Center;
+        }
+
+        if (FindVisualDescendant<TextBlock>(input, "PlaceholderTextContentPresenter") is { } placeholder)
+        {
+            placeholder.VerticalAlignment = VerticalAlignment.Center;
+        }
+
+        if (FindVisualDescendant<Button>(input, "DeleteButton") is { } clearButton)
+        {
+            clearButton.MinWidth = 0;
+            clearButton.Width = 0;
+            clearButton.MaxWidth = 0;
+            clearButton.Margin = new Thickness(0);
+            clearButton.IsHitTestVisible = false;
+        }
+    }
+
+    private void RootGrid_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
+    {
+        if (FocusManager.GetFocusedElement(XamlRoot) is not TextBox focusedInput)
+        {
+            return;
+        }
+
+        for (DependencyObject? target = args.OriginalSource as DependencyObject; target != null; target = VisualTreeHelper.GetParent(target))
+        {
+            if (target == focusedInput || target is TextBox)
+            {
+                return;
+            }
+        }
+
+        Focus(FocusState.Programmatic);
+    }
+
+    private static T? FindVisualDescendant<T>(DependencyObject parent, string? name = null) where T : DependencyObject
+    {
+        for (int childIndex = 0; childIndex < VisualTreeHelper.GetChildrenCount(parent); childIndex++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(parent, childIndex);
+            if (child is T match && (name == null || child is FrameworkElement element && element.Name == name))
+            {
+                return match;
+            }
+
+            if (FindVisualDescendant<T>(child, name) is { } descendant)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
     }
 
     private void FollowDisplayRefreshRate_Toggled(object sender, RoutedEventArgs e)
@@ -740,10 +882,7 @@ public sealed partial class ControlPanelWindow : UserControl
         RadioDarkModeOff.Content = Localization.Get("Basic_DarkModeOff");
         RadioDarkModeOn.Content = Localization.Get("Basic_DarkModeOn");
         RadioDarkModeSystem.Content = Localization.Get("Basic_DarkModeSystem");
-        TxtScrollbarVisibility.Text = Localization.Get("Basic_ScrollbarVisibility");
-        RadioScrollbarAlways.Content = Localization.Get("Basic_ScrollbarAlways");
-        RadioScrollbarOnScroll.Content = Localization.Get("Basic_ScrollbarOnScroll");
-        TxtScrollbarHint.Text = Localization.Get("Basic_ScrollbarHint");
+
         CheckAlwaysTrailEffectSwitch.Header = Localization.Get("Basic_TrailSwitch");
         CheckMasterSwitch.Header = Localization.Get("Basic_MasterSwitch");
         TxtClickType.Text = Localization.Get("Basic_ClickType");
@@ -909,8 +1048,7 @@ public sealed partial class ControlPanelWindow : UserControl
             return;
         }
 
-        ConfigManager.ParticleColor = ToRgbString(args.NewColor);
-        UpdateColorPreview(ConfigManager.ParticleColor);
+        SetEffectColor(args.NewColor, updateOpacity: true);
     }
 
     private void EffectColorPresets_SelectionChanged(object sender, SelectionChangedEventArgs args)
@@ -950,34 +1088,136 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         string hex = EffectColorHexInput.Text.Trim().TrimStart('#');
-        if (hex.Length == 8 && hex.StartsWith("FF", StringComparison.OrdinalIgnoreCase))
+        bool hasAlpha = hex.Length == 8;
+        byte alpha = 255;
+        if (hasAlpha && byte.TryParse(hex.AsSpan(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out alpha))
         {
             hex = hex[2..];
         }
 
         if (ColorPickerColorMath.TryParseHex(hex, out Color color))
         {
+            SetEffectColor(Color.FromArgb(alpha, color.R, color.G, color.B), hasAlpha);
+        }
+        else
+        {
+            UpdateColorPreview(ConfigManager.ParticleColor);
+        }
+    }
+
+    private void SetEffectColor(Color color, bool updateOpacity)
+    {
+        _syncingColorControls = true;
+        try
+        {
             ConfigManager.ParticleColor = ToRgbString(color);
+            if (updateOpacity)
+            {
+                SliderOpacity.Value = Math.Clamp(color.A / 255.0 * 100, SliderOpacity.Minimum, SliderOpacity.Maximum);
+                TxtOpacityValue.Value = Math.Round(SliderOpacity.Value, 4);
+            }
+        }
+        finally
+        {
+            _syncingColorControls = false;
         }
 
         UpdateColorPreview(ConfigManager.ParticleColor);
     }
 
-    private void ColorPickerBody_SizeChanged(object sender, SizeChangedEventArgs args)
+    private void EffectColorExpander_Loaded(object sender, RoutedEventArgs args)
     {
-        bool horizontal = args.NewSize.Width >= 516;
-        ColorPickerDetailsColumn.Width = new GridLength(horizontal ? 200 : 0);
-        Grid.SetColumn(ColorPickerDetails, horizontal ? 1 : 0);
-        Grid.SetRow(ColorPickerDetails, horizontal ? 0 : 1);
-        ColorPickerBody.ColumnSpacing = horizontal ? 16 : 0;
-        ColorPickerBody.RowSpacing = horizontal ? 0 : 12;
+        EffectColorExpander.ApplyTemplate();
+        if (FindVisualDescendant<ToggleButton>(EffectColorExpander, "ExpanderHeader") is { } header)
+        {
+            header.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        }
+    }
+
+    private void EffectColorExpander_Expanding(Expander sender, object args) => AnimateColorCard(expanding: true);
+
+    private void EffectColorExpander_Collapsed(Expander sender, object args) => AnimateColorCard(expanding: false);
+
+    private void AnimateColorCard(bool expanding)
+    {
+        if (!EffectColorCard.IsLoaded)
+        {
+            return;
+        }
+
+        int generation = ++_colorCardAnimationGeneration;
+        double fromHeight = EffectColorCard.ActualHeight;
+        _colorCardAnimation?.Stop();
+        EffectColorCard.Height = fromHeight;
+        App.DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_isClosed || generation != _colorCardAnimationGeneration)
+            {
+                return;
+            }
+
+            EffectColorExpander.Measure(new Size(Math.Max(0, EffectColorCard.ActualWidth - 2), double.PositiveInfinity));
+            double toHeight = expanding ? EffectColorExpander.DesiredSize.Height + 2 : 60;
+            var animation = new DoubleAnimation
+            {
+                From = fromHeight,
+                To = Math.Max(60, toHeight),
+                Duration = new Duration(TimeSpan.FromMilliseconds(expanding ? 220 : 180)),
+                EnableDependentAnimation = true,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            Storyboard.SetTarget(animation, EffectColorCard);
+            Storyboard.SetTargetProperty(animation, "Height");
+            var storyboard = new Storyboard();
+            storyboard.Children.Add(animation);
+            storyboard.Completed += (_, _) =>
+            {
+                if (_isClosed || generation != _colorCardAnimationGeneration)
+                {
+                    return;
+                }
+
+                storyboard.Stop();
+                EffectColorCard.Height = double.NaN;
+                _colorCardAnimation = null;
+            };
+            _colorCardAnimation = storyboard;
+            storyboard.Begin();
+        });
+    }
+
+    private void EffectColorPicker_Loaded(object sender, RoutedEventArgs args)
+    {
+        EffectColorPicker.ApplyTemplate();
+        if (FindVisualDescendant<Microsoft.UI.Xaml.Controls.Primitives.ColorPickerSlider>(EffectColorPicker, "AlphaSlider") is { } alphaSlider)
+        {
+            alphaSlider.Minimum = SliderOpacity.Minimum;
+        }
+
+        if (FindVisualDescendant<Microsoft.UI.Xaml.Controls.Primitives.ColorSpectrum>(EffectColorPicker, "ColorSpectrum") is { } spectrum && spectrum != _configuredColorSpectrum)
+        {
+            _configuredColorSpectrum = spectrum;
+            spectrum.SizeChanged += (_, _) => UpdateSpectrumClip();
+        }
+
+        UpdateSpectrumClip();
+    }
+
+    private void UpdateSpectrumClip()
+    {
+        if (_configuredColorSpectrum is { } spectrum && FindVisualDescendant<Grid>(spectrum, "SizingGrid") is { } sizing)
+        {
+            sizing.Clip = new RectangleGeometry { Rect = new Rect(-8, -8, spectrum.ActualWidth + 16, spectrum.ActualHeight + 16) };
+        }
     }
 
     private void UpdateColorPreview(string rgbString)
     {
-        Color color = TryParseRgbString(rgbString, out Color parsed) ? parsed : Colors.Gray;
+        Color rgb = TryParseRgbString(rgbString, out Color parsed) ? parsed : Colors.Gray;
+        byte alpha = (byte)Math.Round(Math.Clamp(SliderOpacity.Value / 100, 0.1, 1) * 255);
+        Color color = Color.FromArgb(alpha, rgb.R, rgb.G, rgb.B);
         var brush = new SolidColorBrush(color);
-        string hex = $"#FF{ColorPickerColorMath.ToHex(color)[1..]}";
+        string hex = $"#{alpha:X2}{ColorPickerColorMath.ToHex(color)[1..]}";
 
         _syncingColorControls = true;
         try
@@ -986,13 +1226,14 @@ public sealed partial class ControlPanelWindow : UserControl
             ExpandedColorPreview.Background = brush;
             EffectColorHexInput.Text = hex;
             ExpandedColorHex.Text = hex;
+            ExpandedColorOpacity.Text = $"{Localization.Get("Visual_Opacity")} {SliderOpacity.Value:0.#}%";
             EffectColorPicker.Color = color;
 
             int selectedIndex = -1;
             for (int index = 0; index < EffectColorPresets.Items.Count; index++)
             {
                 if (EffectColorPresets.Items[index] is RadioButton { Tag: string preset } &&
-                    ColorPickerColorMath.TryParseHex(preset, out Color presetColor) && presetColor == color)
+                    ColorPickerColorMath.TryParseHex(preset, out Color presetColor) && presetColor.R == color.R && presetColor.G == color.G && presetColor.B == color.B)
                 {
                     selectedIndex = index;
                     break;
@@ -1306,7 +1547,6 @@ public sealed partial class ControlPanelWindow : UserControl
 
         ComboProfiles.SelectedItem = ConfigManager.GetActiveProfile();
 
-        UpdateColorPreview(ConfigManager.ParticleColor);
         UpdateClickEffectPanelVisibility();
         UpdateEnvironmentFilterInterlock();
 
@@ -1324,12 +1564,11 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckFollowDisplayRefreshRate.IsOn = ConfigManager.FollowDisplayRefreshRate;
         SliderTrailRefresh.Value = ConfigManager.TrailRefreshRate;
         SyncSliderAndBoxValues();
+        UpdateColorPreview(ConfigManager.ParticleColor);
 
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
         UpdateTrailRefreshInterlock();
-
-        RadioScrollbarVisibility.SelectedIndex = ConfigManager.ScrollbarVisibility == PanelScrollbarVisibility.Always ? 0 : 1;
 
         SelectDarkMode(ConfigManager.DarkMode);
     }
@@ -1376,10 +1615,6 @@ public sealed partial class ControlPanelWindow : UserControl
         };
     }
 
-    private PanelScrollbarVisibility GetSelectedScrollbarVisibility() =>
-        // RadioScrollbarVisibility 顺序：Always / OnScroll
-        RadioScrollbarVisibility.SelectedIndex == 0 ? PanelScrollbarVisibility.Always : PanelScrollbarVisibility.OnScroll;
-
     private int GetSelectedClickTrigger()
     {
         // RadioClickType 顺序：左键 / 右键 / 左右键，正好对应 ClickTriggerType 取值。
@@ -1389,10 +1624,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ApplyScrollbarSettings()
     {
-        // 旧版“滚动时临时显示”的 hack 在 WinUI 不需要：OnScroll 直接映射为 Auto。
-        ScrollBarVisibility visibility = ConfigManager.ScrollbarVisibility == PanelScrollbarVisibility.Always
-            ? ScrollBarVisibility.Visible
-            : ScrollBarVisibility.Auto;
+        ScrollBarVisibility visibility = ScrollBarVisibility.Auto;
 
         SettingsContentScrollViewer.VerticalScrollBarVisibility = visibility;
         PageWelcome.VerticalScrollBarVisibility = visibility;
@@ -2504,7 +2736,6 @@ public sealed partial class ControlPanelWindow : UserControl
         ConfigManager.Save("FollowDisplayRefreshRate", followDisplayRefreshRate);
         ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
         ConfigManager.Save("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch.IsOn);
-        ConfigManager.Save("ScrollbarVisibility", GetSelectedScrollbarVisibility());
         ApplyScrollbarSettings();
         ConfigManager.Save("DarkMode", selectedDarkMode);
         ConfigManager.Save("StartSilent", startSilentEnabled);

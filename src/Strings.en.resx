@@ -76,10 +76,10 @@
       <value>Run as administrator</value>
     </data>
     <data name="Basic_RunAsAdminHint" xml:space="preserve">
-      <value>* Required for effects over elevated windows such as Task Manager.</value>
+      <value>Required for effects over elevated windows such as Task Manager.</value>
     </data>
     <data name="Basic_ScreenshotHint" xml:space="preserve">
-      <value>* (Experimental) Hides overlay briefly during screenshots, QQ screenshot hotkeys (Ctrl+Alt+A), or WeChat screenshot hotkeys (Alt+A).</value>
+      <value>(Experimental) Hides overlay briefly during screenshots, QQ screenshot hotkeys (Ctrl+Alt+A), or WeChat screenshot hotkeys (Alt+A).</value>
     </data>
     <data name="Basic_ScreenshotMode" xml:space="preserve">
       <value>Screenshot compatibility</value>
@@ -94,7 +94,7 @@
       <value>Touchscreen mode</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
-      <value>* Effects work when the cursor is hidden; for touchscreens or certain fullscreen apps.</value>
+      <value>Effects work when the cursor is hidden; for touchscreens or certain fullscreen apps.</value>
     </data>
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>Enable mouse trail</value>
@@ -110,18 +110,6 @@
     </data>
     <data name="Basic_DarkModeSystem" xml:space="preserve">
       <value>System</value>
-    </data>
-    <data name="Basic_ScrollbarVisibility" xml:space="preserve">
-      <value>Scrollbar visibility</value>
-    </data>
-    <data name="Basic_ScrollbarAlways" xml:space="preserve">
-      <value>Always visible</value>
-    </data>
-    <data name="Basic_ScrollbarOnScroll" xml:space="preserve">
-      <value>While scrolling only</value>
-    </data>
-    <data name="Basic_ScrollbarHint" xml:space="preserve">
-      <value>* Uses a thinner scrollbar. Showing it only while scrolling reduces flicker when resizing the panel or switching tabs.</value>
     </data>
     <data name="Dialog_ExeFilter" xml:space="preserve">
       <value>Executables (*.exe)|*.exe</value>
