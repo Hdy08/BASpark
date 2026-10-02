@@ -548,9 +548,6 @@
     <data name="ColorPicker_Cancel" xml:space="preserve">
       <value>キャンセル</value>
     </data>
-    <data name="Visual_InputHint" xml:space="preserve">
-      <value>ヒント: 数値をクリックして編集し Enter で適用</value>
-    </data>
     <data name="Visual_LinkedSpeed" xml:space="preserve">
       <value>トレイルとクリックで同じアニメ速度を使用</value>
     </data>
@@ -625,5 +622,17 @@
     </data>
     <data name="Welcome_Title" xml:space="preserve">
       <value>おかえりなさい、先生！</value>
+    </data>
+    <data name="Basic_HideTrayIcon" xml:space="preserve">
+      <value>トレイアイコンを非表示</value>
+    </data>
+    <data name="Basic_HideTrayHint" xml:space="preserve">
+      <value>非表示中も BASpark を再度起動してコントロールパネルを開けます。</value>
+    </data>
+    <data name="Msg_ConfirmBasicDefaults" xml:space="preserve">
+      <value>基本設定のみを既定値に戻しますか？言語とテーマはシステムに従います。他のページは変更されません。「変更を適用」で保存します。</value>
+    </data>
+    <data name="Msg_ConfirmFilterDefaults" xml:space="preserve">
+      <value>現在のプロファイルのフィルター設定を既定値に戻し、プロセス一覧を消去しますか？他のプロファイルとページは変更されません。「変更を適用」で保存します。</value>
     </data>
   </root>

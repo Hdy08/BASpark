@@ -699,12 +699,12 @@ public class WinUi3UiTests
         [
             "ComboLanguage", "RadioDarkMode", "CheckAlwaysTrailEffectSwitch",
             "CheckMasterSwitch", "RadioClickType", "CheckMiddleClickTrigger", "CheckScreenshotCompatibilityMode",
-            "CheckAutoStart", "CheckStartSilent", "CheckRunAsAdmin", "CheckTouchscreenMode",
+            "CheckAutoStart", "CheckStartSilent", "CheckHideTrayIcon", "CheckRunAsAdmin", "CheckTouchscreenMode",
             "CheckLinkedEffectScale", "SliderScale", "SliderTrailScale", "SliderClickScale",
             "SliderGlow", "CheckLinkedAnimationSpeed", "SliderSpeed", "SliderTrailAnimSpeed", "SliderClickAnimSpeed",
             "CheckApplyCurveDraw", "CheckFollowDisplayRefreshRate", "SliderTrailRefresh",
             "CheckEnvironmentFilter", "CheckHideInFullscreen", "CheckShowEffectOnDesktop",
-            "ComboProfiles", "ComboProcessFilterMode", "ListConfiguredProcesses", "ManualProcessInput"
+            "ComboProfiles", "ComboProcessFilterMode", "ListConfiguredProcesses"
         ];
         var cards = new HashSet<XElement>();
         foreach (string name in controlNames)
@@ -811,7 +811,9 @@ public class WinUi3UiTests
             Assert.DoesNotContain(common.Descendants(), element => (string?)element.Attribute("Storyboard.TargetName") == "SelectionBackground");
         }
         XElement segmentStyle = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioStyle");
-        Assert.Contains(segmentStyle.Descendants(), element => (string?)element.Attribute("Target") == "SegmentSelection.Background");
+        XElement selection = GetNamedElement(document, "SegmentedSelection");
+        Assert.Equal("{ThemeResource BasSettingsAccentBrush}", (string?)selection.Attribute("Background"));
+        Assert.DoesNotContain(segmentStyle.Descendants(), element => ((string?)element.Attribute("Target"))?.EndsWith(".Background", StringComparison.Ordinal) == true);
         Assert.Contains(segmentStyle.Descendants(), element => (string?)element.Attribute("Target") == "SegmentHover.Opacity");
     }
 
@@ -1099,10 +1101,15 @@ public class WinUi3UiTests
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement dropdown = GetNamedElement(document, "ListConfiguredProcesses");
         Assert.Equal("32", (string?)dropdown.Attribute("Height"));
+        Assert.Equal("Center", (string?)dropdown.Attribute("VerticalContentAlignment"));
+        Assert.Equal("10,0,28,0", (string?)dropdown.Attribute("Padding"));
         XElement remove = Assert.Single(dropdown.Descendants(), element => (string?)element.Attribute("Click") == "RemoveProcess_Click");
         Assert.Equal("20", (string?)remove.Attribute("Height"));
         Assert.Equal("0", (string?)remove.Attribute("MinHeight"));
         Assert.Equal("0", (string?)remove.Attribute("Padding"));
+        Assert.Equal("Center", (string?)remove.Attribute("VerticalAlignment"));
+        Assert.Equal("Center", (string?)remove.Attribute("VerticalContentAlignment"));
+        Assert.Equal("Center", (string?)remove.Parent!.Attribute("VerticalAlignment"));
     }
 
     [Fact]
@@ -1212,10 +1219,138 @@ public class WinUi3UiTests
         Assert.Equal(2, about.Descendants().Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
         Assert.Equal("Right", (string?)GetNamedElement(panel, "BtnResetAll").Attribute("HorizontalAlignment"));
         XDocument app = LoadXaml("src", "App.xaml");
-        Assert.Contains(app.Descendants(), element => element.Name.LocalName == "Style" && (string?)element.Attribute("TargetType") == "TextBlock");
+        Assert.Contains(app.Descendants(), element => element.Name.LocalName == "XamlControlsResources");
+        Assert.DoesNotContain(app.Descendants(), element => element.Name.LocalName == "Style" && element.Attribute(Xaml + "Key") == null);
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.DoesNotContain("ApplySystemBackdrop", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Failed to apply the solid backdrop", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NativeTrayMenu_UsesSystemRenderingAndThemeWithNoOwnerDraw()
+    {
+        string source = ReadSource("src", "TrayIconController.cs");
+        Assert.Contains("CreatePopupMenu()", source, StringComparison.Ordinal);
+        Assert.Contains("TrackPopupMenuEx(menu, 0x102", source, StringComparison.Ordinal);
+        Assert.Contains("SetForegroundWindow(_messageWindow.Handle)", source, StringComparison.Ordinal);
+        Assert.Contains("DestroyMenu(menu)", source, StringComparison.Ordinal);
+        Assert.Contains("PreferredAppMode.AllowDark", source, StringComparison.Ordinal);
+        Assert.Contains("SystemInformation.HighContrast", source, StringComparison.Ordinal);
+        Assert.Contains("_refreshColorPolicy?.Invoke()", source, StringComparison.Ordinal);
+        Assert.Contains("_flushMenuThemes?.Invoke()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ContextMenuStrip", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToolStripRenderer", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HiddenTrayPreference_FollowsSilentStartupAndCanReopenThePanel()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement silent = GetSettingCard(GetNamedElement(panel, "CheckStartSilent"));
+        XElement hidden = GetSettingCard(GetNamedElement(panel, "CheckHideTrayIcon"));
+        Assert.Same(hidden, silent.ElementsAfterSelf().First());
+        AssertSettingHint(GetNamedElement(panel, "CheckHideTrayIcon"), GetNamedElement(panel, "TxtHideTrayHint"));
+        string config = ReadSource("src", "ConfigManager.cs");
+        Assert.Contains("public static bool HideTrayIcon { get; set; } = false", config, StringComparison.Ordinal);
+        Assert.Contains("key.GetValue(\"HideTrayIcon\", false)", config, StringComparison.Ordinal);
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("CheckHideTrayIcon.IsOn = ConfigManager.HideTrayIcon", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.Save(\"HideTrayIcon\", hideTrayIcon)", source, StringComparison.Ordinal);
+        Assert.Contains("App.Tray?.SetHidden(hideTrayIcon)", source, StringComparison.Ordinal);
+        string tray = ReadSource("src", "TrayIconController.cs");
+        Assert.Contains("Visible = !ConfigManager.HideTrayIcon", tray, StringComparison.Ordinal);
+        Assert.Contains("TrayMessageWindow(Action openPanel) : Form", tray, StringComparison.Ordinal);
+        Assert.Contains("ShowInTaskbar = false", tray, StringComparison.Ordinal);
+        Assert.Contains("FindWindow(null, HiddenTrayWindowTitle)", tray, StringComparison.Ordinal);
+        Assert.Contains("TrayIconController.TryShowHiddenControlPanel()", ReadSource("src", "App.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BasicAndFilterDefaults_ResetOnlyTheirOwnSettingsBeforeApply()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        Assert.Equal("ResetBasicDefaults_Click", (string?)GetNamedElement(panel, "BtnBasicReset").Attribute("Click"));
+        Assert.Equal("ResetFilterDefaults_Click", (string?)GetNamedElement(panel, "BtnFilterReset").Attribute("Click"));
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string basic = source[source.IndexOf("private void RestoreBasicDefaults()", StringComparison.Ordinal)..source.IndexOf("private async void ResetFilterDefaults_Click", StringComparison.Ordinal)];
+        Assert.Contains("CheckHideTrayIcon.IsOn = false", basic, StringComparison.Ordinal);
+        Assert.Contains("SelectDarkMode(DarkModeOption.System)", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfigManager.Save", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("SliderScale", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("ComboProfiles", basic, StringComparison.Ordinal);
+        string filter = source[source.IndexOf("private void RestoreFilterDefaults()", StringComparison.Ordinal)..source.IndexOf("private void CheckMasterSwitch_Changed", StringComparison.Ordinal)];
+        Assert.Contains("active.Processes.Clear()", filter, StringComparison.Ordinal);
+        Assert.Contains("active.Mode = ProcessFilterModeOption.Blacklist", filter, StringComparison.Ordinal);
+        Assert.Contains("CheckHideInFullscreen.IsOn = true", filter, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfigManager.Save", filter, StringComparison.Ordinal);
+        Assert.DoesNotContain("_editableProfiles.Clear", filter, StringComparison.Ordinal);
+        foreach (string file in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
+        {
+            XDocument resources = LoadXaml("src", file);
+            foreach (string key in new[] { "Basic_HideTrayIcon", "Basic_HideTrayHint", "Msg_ConfirmBasicDefaults", "Msg_ConfirmFilterDefaults" })
+            {
+                XElement item = Assert.Single(resources.Descendants("data"), element => (string?)element.Attribute("name") == key);
+                Assert.False(string.IsNullOrWhiteSpace(item.Element("value")?.Value));
+            }
+        }
+    }
+
+    [Fact]
+    public void ProcessActions_KeepOnlyTwoButtonsOnTheSameRowWithoutManualEntry()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement browse = GetNamedElement(panel, "BtnBrowseProcess");
+        XElement running = GetNamedElement(panel, "BtnSelectRunningProcess");
+        Assert.Same(browse.Parent, running.Parent);
+        Assert.Equal("Grid", browse.Parent!.Name.LocalName);
+        Assert.Equal("1", (string?)running.Attribute("Grid.Column"));
+        Assert.Equal(2, browse.Parent.Elements().Count(element => element.Name.LocalName == "Button"));
+        Assert.DoesNotContain(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Name") is "ManualProcessInput" or "BtnAddProcess" or "TxtVisualInputHint");
+        Assert.DoesNotContain("AddManualProcess_Click", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SegmentedSelection_UsesCompositionAnimationAndPhysicalPixelSymmetricInsets()
+    {
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement selection = GetNamedElement(styles, "SegmentedSelection");
+        Assert.Equal("Border", selection.Name.LocalName);
+        Assert.Equal("False", (string?)selection.Attribute("IsHitTestVisible"));
+        XElement style = Assert.Single(selection.Ancestors(), element => element.Name.LocalName == "Style");
+        Assert.Equal("BasSegmentedRadioButtonsStyle", (string?)style.Attribute(Xaml + "Key"));
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("SetIsTranslationEnabled(_selection, true)", source, StringComparison.Ordinal);
+        Assert.Contains("_translation.StartAnimation(\"Translation.X\", animation)", source, StringComparison.Ordinal);
+        Assert.Contains("Math.Round(2 * scale, MidpointRounding.AwayFromZero) / scale", source, StringComparison.Ordinal);
+        Assert.Contains("frame.Padding = inset", source, StringComparison.Ordinal);
+        Assert.Contains("foreach (var selector in _segmentedSelectors) selector.Dispose()", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ColorExpander_ChevronTracksEveryNativeToggleState()
+    {
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement header = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorExpanderHeaderStyle");
+        XElement states = Assert.Single(header.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "CommonStates");
+        foreach (string name in new[] { "Normal", "PointerOver", "Pressed", "Disabled", "Checked", "CheckedPointerOver", "CheckedPressed", "CheckedDisabled" })
+        {
+            XElement state = Assert.Single(states.Elements(), element => (string?)element.Attribute(Xaml + "Name") == name);
+            XElement glyph = Assert.Single(state.Descendants(), element => (string?)element.Attribute("Target") == "HeaderChevron.Glyph");
+            Assert.Equal(name.StartsWith("Checked", StringComparison.Ordinal) ? "\uE70E" : "\uE70D", (string?)glyph.Attribute("Value"));
+        }
+        Assert.DoesNotContain(header.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "CheckStates");
+    }
+
+    [Fact]
+    public void ColorExpander_LayoutChangesDoNotCancelExpandOrCollapseAnimation()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("_colorCardGeometry != null && !_colorCardAnimating", source, StringComparison.Ordinal);
+        string animate = source[source.IndexOf("private void AnimateColorCard(bool expanding)", StringComparison.Ordinal)..source.IndexOf("private void EffectColorPicker_Loaded", StringComparison.Ordinal)];
+        Assert.True(animate.IndexOf("_colorCardAnimating = true", StringComparison.Ordinal) < animate.IndexOf("_colorContentHost.Height = contentHeight", StringComparison.Ordinal));
+        Assert.Contains("animation.InsertExpressionKeyFrame(0, \"this.StartingValue\")", animate, StringComparison.Ordinal);
+        Assert.Contains("_colorCardGeometry.StartAnimation(\"Size.Y\", animation)", animate, StringComparison.Ordinal);
+        Assert.Contains("generation != _colorCardAnimationGeneration", animate, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -156,6 +156,107 @@ public class ScreenOptionItem
 /// </summary>
 public sealed partial class ControlPanelWindow : UserControl
 {
+    private sealed class SegmentedSelectorAnimator : IDisposable
+    {
+        private readonly RadioButtons _selector;
+        private Border? _selection;
+        private ItemsRepeater? _repeater;
+        private CompositionPropertySet? _translation;
+        private int _selectedIndex = -1;
+        private bool _queued;
+        private bool _animatePending;
+        private bool _disposed;
+
+        public SegmentedSelectorAnimator(RadioButtons selector)
+        {
+            _selector = selector;
+            selector.Loaded += Selector_Loaded;
+            selector.SizeChanged += Selector_SizeChanged;
+            selector.SelectionChanged += Selector_SelectionChanged;
+        }
+
+        private void Selector_Loaded(object sender, RoutedEventArgs args)
+        {
+            _selector.ApplyTemplate();
+            _selection = FindVisualDescendant<Border>(_selector, "SegmentedSelection");
+            _repeater = FindVisualDescendant<ItemsRepeater>(_selector, "InnerRepeater");
+            if (_selection != null)
+            {
+                ElementCompositionPreview.SetIsTranslationEnabled(_selection, true);
+                _translation = ElementCompositionPreview.GetElementVisual(_selection).Properties;
+            }
+            QueueUpdate(false);
+        }
+
+        private void Selector_SizeChanged(object sender, SizeChangedEventArgs args) => QueueUpdate(false);
+        private void Selector_SelectionChanged(object sender, SelectionChangedEventArgs args) => QueueUpdate(true);
+
+        private void QueueUpdate(bool animate)
+        {
+            if (_disposed) return;
+            _animatePending |= animate;
+            if (_queued) return;
+            _queued = true;
+            App.DispatcherQueue.TryEnqueue(() =>
+            {
+                _queued = false;
+                bool shouldAnimate = _animatePending;
+                _animatePending = false;
+                if (!_disposed) Update(shouldAnimate);
+            });
+        }
+
+        private void Update(bool animate)
+        {
+            if (!_selector.IsLoaded || _selection == null || _repeater == null || _translation == null) return;
+            double scale = _selector.XamlRoot.RasterizationScale;
+            if (_selector.Parent is Border frame)
+            {
+                double stroke = Math.Max(1, Math.Round(scale, MidpointRounding.AwayFromZero)) / scale;
+                double padding = Math.Round(2 * scale, MidpointRounding.AwayFromZero) / scale;
+                var thickness = new Thickness(stroke);
+                var inset = new Thickness(padding);
+                if (frame.BorderThickness != thickness) frame.BorderThickness = thickness;
+                if (frame.Padding != inset) frame.Padding = inset;
+            }
+            int index = _selector.SelectedIndex;
+            if (index < 0 || _repeater.TryGetElement(index) is not FrameworkElement cell || cell.ActualWidth <= 0)
+            {
+                _selection.Opacity = 0;
+                _selectedIndex = -1;
+                return;
+            }
+            Point position = cell.TransformToVisual(_repeater).TransformPoint(new Point());
+            _selection.Width = cell.ActualWidth;
+            _selection.Height = _repeater.ActualHeight;
+            _selection.Opacity = 1;
+            if (animate && _selectedIndex >= 0 && _selectedIndex != index)
+            {
+                var compositor = _translation.Compositor;
+                var animation = compositor.CreateScalarKeyFrameAnimation();
+                animation.InsertExpressionKeyFrame(0, "this.StartingValue");
+                animation.InsertKeyFrame(1, (float)position.X,
+                    compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0.7f), new Vector2(0.2f, 1)));
+                animation.Duration = TimeSpan.FromMilliseconds(160);
+                _translation.StartAnimation("Translation.X", animation);
+            }
+            else
+            {
+                _translation.StopAnimation("Translation.X");
+                _translation.InsertVector3("Translation", new Vector3((float)position.X, 0, 0));
+            }
+            _selectedIndex = index;
+        }
+
+        public void Dispose()
+        {
+            _disposed = true;
+            _translation?.StopAnimation("Translation.X");
+            _selector.Loaded -= Selector_Loaded;
+            _selector.SizeChanged -= Selector_SizeChanged;
+            _selector.SelectionChanged -= Selector_SelectionChanged;
+        }
+    }
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BASparkClient/1.0";
     private const uint MonitorDefaultToNearest = 2;
     private const int MdtEffectiveDpi = 0;
@@ -419,6 +520,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private Color _pendingPreviewColor;
     private readonly SolidColorBrush _previewColorBrush = new();
     private Microsoft.UI.Xaml.Controls.Primitives.ColorSpectrum? _configuredColorSpectrum;
+    private readonly List<SegmentedSelectorAnimator> _segmentedSelectors = new();
     private readonly Dictionary<Slider, NumberBox> _sliderToBox = new();
     private readonly Dictionary<NumberBox, Slider> _boxToSlider = new();
 
@@ -457,6 +559,10 @@ public sealed partial class ControlPanelWindow : UserControl
             BindCollections();
             SetupSliderPairs();
             ConfigureInputControls();
+            foreach (var selector in new[] { RadioDarkMode, RadioClickType })
+            {
+                _segmentedSelectors.Add(new SegmentedSelectorAnimator(selector));
+            }
             var checkerBrush = CreateColorCheckerBrush();
             ColorPreviewCheckers.Fill = checkerBrush;
             ExpandedColorPreviewCheckers.Fill = checkerBrush;
@@ -744,7 +850,7 @@ public sealed partial class ControlPanelWindow : UserControl
             input.Loaded += InputControl_Loaded;
         }
 
-        foreach (TextBox input in new[] { EffectColorHexInput, ManualProcessInput, SearchRunningProcess, SearchVisualReset, NewProfileNameInput })
+        foreach (TextBox input in new[] { EffectColorHexInput, SearchRunningProcess, SearchVisualReset, NewProfileNameInput })
         {
             input.Loaded += InputControl_Loaded;
         }
@@ -892,13 +998,16 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtScreenshotHint.Text = Localization.Get("Basic_ScreenshotHint");
         CheckAutoStart.Header = Localization.Get("Basic_AutoStart");
         CheckStartSilent.Header = Localization.Get("Basic_StartSilent");
+        CheckHideTrayIcon.Header = Localization.Get("Basic_HideTrayIcon");
+        TxtHideTrayHint.Text = Localization.Get("Basic_HideTrayHint");
+        BtnBasicReset.Content = Localization.Get("Visual_ResetDefaults");
+        BtnFilterReset.Content = Localization.Get("Visual_ResetDefaults");
         CheckRunAsAdmin.Header = Localization.Get("Basic_RunAsAdmin");
         TxtRunAsAdminHint.Text = Localization.Get("Basic_RunAsAdminHint");
         CheckTouchscreenMode.Header = Localization.Get("Basic_Touchscreen");
         TxtTouchscreenHint.Text = Localization.Get("Basic_TouchscreenHint");
         TxtVisualTitle.Text = Localization.Get("Visual_Title");
         BtnVisualReset.Content = Localization.Get("Visual_ResetDefaults");
-        TxtVisualInputHint.Text = Localization.Get("Visual_InputHint");
         CheckLinkedEffectScale.Header = Localization.Get("Visual_LinkedScale");
         TxtLinkedScaleHint.Text = Localization.Get("Visual_LinkedScaleHint");
         TxtVisualScale.Text = Localization.Get("Visual_Scale");
@@ -927,7 +1036,6 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtFilterMode.Text = Localization.Get("Filter_Mode");
         TxtProcessList.Text = Localization.Get("Filter_ProcessList");
         TxtAddProcess.Text = Localization.Get("Filter_AddProcess");
-        BtnAddProcess.Content = Localization.Get("Filter_Add");
         BtnBrowseProcess.Content = Localization.Get("Filter_Browse");
         BtnSelectRunningProcess.Content = Localization.Get("Filter_SelectRunning");
         TxtMultiScreenTitle.Text = Localization.Get("MultiScreen_Title");
@@ -1143,10 +1251,9 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void EffectColorCard_SizeChanged(object sender, SizeChangedEventArgs args)
     {
-        if (_colorCardGeometry != null)
+        if (_colorCardGeometry != null && !_colorCardAnimating)
         {
-            _colorCardGeometry.Size = new Vector2((float)args.NewSize.Width,
-                _colorCardAnimating ? _colorCardGeometry.Size.Y : (float)args.NewSize.Height);
+            _colorCardGeometry.Size = new Vector2((float)args.NewSize.Width, (float)args.NewSize.Height);
         }
     }
 
@@ -1164,11 +1271,12 @@ public sealed partial class ControlPanelWindow : UserControl
         int generation = ++_colorCardAnimationGeneration;
         ColorPickerBody.Measure(new Size(Math.Max(0, EffectColorCard.ActualWidth - 34), double.PositiveInfinity));
         double contentHeight = ColorPickerBody.DesiredSize.Height + _colorContentHost.Padding.Top + _colorContentHost.Padding.Bottom;
+        _colorCardAnimating = true;
         _colorContentHost.Height = contentHeight;
         _colorContentHost.IsHitTestVisible = expanding;
-        _colorCardAnimating = true;
         var compositor = _colorCardGeometry.Compositor;
         var animation = compositor.CreateScalarKeyFrameAnimation();
+        animation.InsertExpressionKeyFrame(0, "this.StartingValue");
         animation.InsertKeyFrame(1, expanding ? (float)(60 + contentHeight) : 60,
             compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0.7f), new Vector2(0.2f, 1)));
         animation.Duration = TimeSpan.FromMilliseconds(expanding ? 220 : 180);
@@ -1608,6 +1716,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckMasterSwitch.IsOn = ConfigManager.IsEffectEnabled;
         CheckAutoStart.IsOn = ConfigManager.AutoStart;
         CheckStartSilent.IsOn = ConfigManager.StartSilent;
+        CheckHideTrayIcon.IsOn = ConfigManager.HideTrayIcon;
         CheckAlwaysTrailEffectSwitch.IsOn = ConfigManager.EnableAlwaysTrailEffect;
         CheckEnvironmentFilter.IsOn = ConfigManager.EnableEnvironmentFilter;
         CheckHideInFullscreen.IsOn = ConfigManager.HideInFullscreen;
@@ -1724,6 +1833,59 @@ public sealed partial class ControlPanelWindow : UserControl
     // 基础设置联动
     // ==================================================================
 
+    private async void ResetBasicDefaults_Click(object sender, RoutedEventArgs args)
+    {
+        if (await ConfirmAsync(Localization.Get("Msg_ConfirmBasicDefaults"), Localization.Get("Visual_ResetDefaults")))
+        {
+            RestoreBasicDefaults();
+        }
+    }
+
+    private void RestoreBasicDefaults()
+    {
+        string culture = Localization.NormalizeCulture(CultureInfo.GetCultureInfo(GetUserDefaultUILanguage()).Name);
+        ComboLanguage.SelectedItem = ComboLanguage.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), culture, StringComparison.OrdinalIgnoreCase));
+        SelectDarkMode(DarkModeOption.System);
+        CheckAlwaysTrailEffectSwitch.IsOn = false;
+        CheckMasterSwitch.IsOn = true;
+        RadioClickType.SelectedIndex = 0;
+        CheckMiddleClickTrigger.IsOn = false;
+        CheckScreenshotCompatibilityMode.IsOn = false;
+        CheckAutoStart.IsOn = false;
+        CheckStartSilent.IsOn = false;
+        CheckHideTrayIcon.IsOn = false;
+        CheckRunAsAdmin.IsOn = false;
+        CheckTouchscreenMode.IsOn = false;
+        UpdateClickEffectPanelVisibility();
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern ushort GetUserDefaultUILanguage();
+
+    private async void ResetFilterDefaults_Click(object sender, RoutedEventArgs args)
+    {
+        if (await ConfirmAsync(Localization.Get("Msg_ConfirmFilterDefaults"), Localization.Get("Visual_ResetDefaults")))
+        {
+            RestoreFilterDefaults();
+        }
+    }
+
+    private void RestoreFilterDefaults()
+    {
+        CheckEnvironmentFilter.IsOn = false;
+        CheckHideInFullscreen.IsOn = true;
+        CheckShowEffectOnDesktop.IsOn = true;
+        if (ComboProfiles.SelectedItem is FilterProfile active)
+        {
+            active.Mode = ProcessFilterModeOption.Blacklist;
+            active.Processes.Clear();
+        }
+        SelectProcessFilterMode(ProcessFilterModeOption.Blacklist);
+        RefreshCurrentProfileProcesses(ComboProfiles.SelectedItem as FilterProfile);
+        UpdateEnvironmentFilterInterlock();
+    }
+
     private void CheckMasterSwitch_Changed(object sender, RoutedEventArgs e)
     {
         _ = sender;
@@ -1811,7 +1973,8 @@ public sealed partial class ControlPanelWindow : UserControl
         // 旧版在深色下换用暗色禁用模板；WinUI 的禁用态由系统负责，这里只保留透明度的细微差别。
         ListConfiguredProcesses.IsEnabled = processFilterEnabled;
         ListConfiguredProcesses.Opacity = processFilterEnabled ? 1.0 : 0.65;
-        ManualProcessInput.IsEnabled = processFilterEnabled;
+        BtnBrowseProcess.IsEnabled = processFilterEnabled;
+        BtnSelectRunningProcess.IsEnabled = processFilterEnabled;
     }
 
     private void SelectProcessFilterMode(ProcessFilterModeOption mode)
@@ -2006,21 +2169,6 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             CurrentProfileProcesses.Remove(processName);
         }
-    }
-
-    private void AddManualProcess_Click(object sender, RoutedEventArgs e)
-    {
-        _ = sender;
-        _ = e;
-
-        string input = NormalizeProcessName(ManualProcessInput.Text);
-        if (string.IsNullOrEmpty(input))
-        {
-            return;
-        }
-
-        AddProcessToActiveProfile(input);
-        ManualProcessInput.Text = string.Empty;
     }
 
     private async void BrowseProcess_Click(object sender, RoutedEventArgs e)
@@ -2787,6 +2935,7 @@ public sealed partial class ControlPanelWindow : UserControl
         bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsOn;
         bool autoStartEnabled = CheckAutoStart.IsOn;
         bool startSilentEnabled = CheckStartSilent.IsOn;
+        bool hideTrayIcon = CheckHideTrayIcon.IsOn;
         bool runAsAdminEnabled = CheckRunAsAdmin.IsOn;
         bool isTouchscreenEnabled = CheckTouchscreenMode.IsOn;
         bool middleClickEnabled = CheckMiddleClickTrigger.IsOn;
@@ -2820,6 +2969,8 @@ public sealed partial class ControlPanelWindow : UserControl
         ApplyScrollbarSettings();
         ConfigManager.Save("DarkMode", selectedDarkMode);
         ConfigManager.Save("StartSilent", startSilentEnabled);
+        ConfigManager.Save("HideTrayIcon", hideTrayIcon);
+        App.Tray?.SetHidden(hideTrayIcon);
         ConfigManager.Save("EnableEnvironmentFilter", CheckEnvironmentFilter.IsOn);
         ConfigManager.Save("HideInFullscreen", CheckHideInFullscreen.IsOn);
         ConfigManager.Save("ShowEffectOnDesktop", CheckShowEffectOnDesktop.IsOn);
@@ -3155,6 +3306,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         _isClosed = true;
+        foreach (var selector in _segmentedSelectors) selector.Dispose();
         CompositionTarget.Rendering -= ColorPreview_Rendering;
         _colorCardGeometry?.StopAnimation("Size.Y");
         if (_colorAlphaSlider != null)

@@ -73,6 +73,7 @@ namespace BASpark
         public static string LastNoticeContent { get; set; } = "";
         public static bool EnableAlwaysTrailEffect { get; set; } = false;
         public static bool StartSilent { get; set; } = false;
+        public static bool HideTrayIcon { get; set; } = false;
         public static bool RunAsAdmin { get; set; } = false;
         public static double EffectScale { get; set; } = 1.0;
         public static bool UseLinkedEffectScale { get; set; } = true;
@@ -137,6 +138,7 @@ namespace BASpark
                         LastNoticeContent = key.GetValue("LastNoticeContent", "")?.ToString() ?? "";
                         EnableAlwaysTrailEffect = Convert.ToBoolean(key.GetValue("EnableAlwaysTrailEffect", false));
                         StartSilent = Convert.ToBoolean(key.GetValue("StartSilent", false));
+                        HideTrayIcon = Convert.ToBoolean(key.GetValue("HideTrayIcon", false));
                         RunAsAdmin = Convert.ToBoolean(key.GetValue("RunAsAdmin", false));
                         EffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("EffectScale", 1.0), CultureInfo.InvariantCulture), 0.5, 3.0);
                         UseLinkedEffectScale = Convert.ToBoolean(key.GetValue("UseLinkedEffectScale", true));
@@ -607,6 +609,7 @@ namespace BASpark
                     LastNoticeContent = "";
                     EnableAlwaysTrailEffect = false;
                     StartSilent = false;
+                    HideTrayIcon = false;
                     RunAsAdmin = false;
                     EffectScale = 1.0;
                     UseLinkedEffectScale = true;

@@ -548,9 +548,6 @@
     <data name="ColorPicker_Cancel" xml:space="preserve">
       <value>Cancel</value>
     </data>
-    <data name="Visual_InputHint" xml:space="preserve">
-      <value>Tip: click a number, edit, then press Enter</value>
-    </data>
     <data name="Visual_LinkedSpeed" xml:space="preserve">
       <value>Use same animation speed for trail and click</value>
     </data>
@@ -625,5 +622,17 @@
     </data>
     <data name="Welcome_Title" xml:space="preserve">
       <value>Welcome back, Sensei!</value>
+    </data>
+    <data name="Basic_HideTrayIcon" xml:space="preserve">
+      <value>Hide tray icon</value>
+    </data>
+    <data name="Basic_HideTrayHint" xml:space="preserve">
+      <value>Run BASpark again to reopen the control panel when its tray icon is hidden.</value>
+    </data>
+    <data name="Msg_ConfirmBasicDefaults" xml:space="preserve">
+      <value>Restore only basic settings? Language and theme will follow Windows. Other pages are unchanged. Click Apply changes to save.</value>
+    </data>
+    <data name="Msg_ConfirmFilterDefaults" xml:space="preserve">
+      <value>Restore defaults for the current filter profile and clear its process list? Other profiles and pages are unchanged. Click Apply changes to save.</value>
     </data>
   </root>

@@ -302,11 +302,15 @@
 
                         <!-- ===== 基础设置 ===== -->
                         <StackPanel x:Name="SectionBasic">
-                            <TextBlock
-                                x:Name="TxtBasicTitle"
-                                Text=""
-                                Style="{StaticResource BasSettingsSectionTitleStyle}"
-                                Margin="0,8,0,8" />
+                            <Grid ColumnSpacing="12" Margin="0,8,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TxtBasicTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}"
+                                           Margin="0" VerticalAlignment="Center" />
+                                <Button x:Name="BtnBasicReset" Grid.Column="1" Content="" Click="ResetBasicDefaults_Click" />
+                            </Grid>
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -506,6 +510,23 @@
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckHideTrayIcon}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock x:Name="TxtHideTrayHint" Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch x:Name="CheckHideTrayIcon" Header=""
+                                                      Style="{StaticResource BasSettingToggleStyle}"
+                                                      AutomationProperties.Name="{Binding Header, ElementName=CheckHideTrayIcon}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.15*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
@@ -570,11 +591,6 @@
                                     Content=""
                                     Click="OpenVisualResetOverlay_Click" />
                             </Grid>
-                            <TextBlock
-                                x:Name="TxtVisualInputHint"
-                                Text=""
-                                Margin="0,0,0,12"
-                                Style="{StaticResource BasCaptionStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1111,11 +1127,15 @@
 
                         <!-- ===== 环境过滤 ===== -->
                         <StackPanel x:Name="SectionFilter" Visibility="Collapsed">
-                            <TextBlock
-                                x:Name="TxtFilterTitle"
-                                Text=""
-                                Style="{StaticResource BasSettingsSectionTitleStyle}"
-                                Margin="0,8,0,8" />
+                            <Grid ColumnSpacing="12" Margin="0,8,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TxtFilterTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}"
+                                           Margin="0" VerticalAlignment="Center" />
+                                <Button x:Name="BtnFilterReset" Grid.Column="1" Content="" Click="ResetFilterDefaults_Click" />
+                            </Grid>
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1277,6 +1297,7 @@
                                         <ComboBox x:Name="ListConfiguredProcesses"
                                                   MinWidth="0" Height="32" MaxDropDownHeight="200"
                                                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                  VerticalContentAlignment="Center" Padding="10,0,28,0"
                                                   PlaceholderText="{Binding Text, ElementName=TxtProcessList}"
                                                   Background="{ThemeResource BasSettingsControlBackgroundBrush}"
                                                   BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
@@ -1284,11 +1305,12 @@
                                             <ComboBox.ItemContainerStyle>
                                                 <Style TargetType="ComboBoxItem" BasedOn="{StaticResource DefaultComboBoxItemStyle}">
                                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="VerticalContentAlignment" Value="Center" />
                                                 </Style>
                                             </ComboBox.ItemContainerStyle>
                                             <ComboBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid ColumnSpacing="8">
+                                                    <Grid ColumnSpacing="8" MinHeight="20" VerticalAlignment="Center">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
                                                             <ColumnDefinition Width="Auto" />
@@ -1300,7 +1322,8 @@
                                                         <Button Grid.Column="1"
                                                                 Click="RemoveProcess_Click"
                                                                 Tag="{Binding}"
-                                                                MinWidth="0" MinHeight="0" Width="20" Height="20" Padding="0">
+                                                                MinWidth="0" MinHeight="0" Width="20" Height="20" Padding="0"
+                                                                VerticalAlignment="Center" VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
                                                             <FontIcon Glyph="&#xE711;" FontSize="12" />
                                                         </Button>
                                                     </Grid>
@@ -1313,65 +1336,20 @@
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="TxtAddProcess"
-                                            Text=""
-                                            Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <StackPanel Spacing="8">
-                                            <TextBox
-                                                x:Name="ManualProcessInput"
-                                                MinWidth="0"
-                                                PlaceholderText="notepad.exe"
-                                                HorizontalAlignment="Stretch"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtAddProcess}" />
-                                            <Grid ColumnSpacing="4" RowSpacing="4">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                </Grid.RowDefinitions>
-                                                <Button
-                                                    x:Name="BtnAddProcess"
-                                                    Content=""
-                                                    Click="AddManualProcess_Click"
-                                                    Grid.Column="0"
-                                                    Grid.Row="0"
-                                                    MinWidth="0"
-                                                    Padding="6,4"
-                                                    FontSize="12"
-                                                    HorizontalAlignment="Stretch" />
-                                                <Button
-                                                    x:Name="BtnBrowseProcess"
-                                                    Content=""
-                                                    Click="BrowseProcess_Click"
-                                                    Grid.Column="1"
-                                                    Grid.Row="0"
-                                                    MinWidth="0"
-                                                    Padding="6,4"
-                                                    FontSize="12"
-                                                    HorizontalAlignment="Stretch" />
-                                                <Button
-                                                    x:Name="BtnSelectRunningProcess"
-                                                    Content=""
-                                                    Click="SelectRunningProcess_Click"
-                                                    Grid.Column="0"
-                                                    Grid.Row="1"
-                                                    Grid.ColumnSpan="2"
-                                                    MinWidth="0"
-                                                    Padding="6,4"
-                                                    FontSize="12"
-                                                    HorizontalAlignment="Stretch" />
-                                            </Grid>
-                                        </StackPanel>
+                                    <TextBlock x:Name="TxtAddProcess" Text="" Style="{StaticResource BasSettingTitleStyle}"
+                                               VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" ColumnSpacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="BtnBrowseProcess" Content="" Click="BrowseProcess_Click"
+                                                MinWidth="0" Padding="6,4" FontSize="12" />
+                                        <Button x:Name="BtnSelectRunningProcess" Grid.Column="1" Content=""
+                                                Click="SelectRunningProcess_Click" MinWidth="0" Padding="6,4" FontSize="12" />
                                     </Grid>
                                 </Grid>
                             </Border>

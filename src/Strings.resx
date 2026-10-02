@@ -548,9 +548,6 @@
     <data name="ColorPicker_Cancel" xml:space="preserve">
       <value>取消</value>
     </data>
-    <data name="Visual_InputHint" xml:space="preserve">
-      <value>提示：可点击数字输入精确值后可按回车应用</value>
-    </data>
     <data name="Visual_LinkedSpeed" xml:space="preserve">
       <value>拖尾与点击使用同一动画速度</value>
     </data>
@@ -625,5 +622,17 @@
     </data>
     <data name="Welcome_Title" xml:space="preserve">
       <value>欢迎回来，老师！</value>
+    </data>
+    <data name="Basic_HideTrayIcon" xml:space="preserve">
+      <value>隐藏托盘图标</value>
+    </data>
+    <data name="Basic_HideTrayHint" xml:space="preserve">
+      <value>隐藏后可再次运行 BASpark 打开控制面板。</value>
+    </data>
+    <data name="Msg_ConfirmBasicDefaults" xml:space="preserve">
+      <value>仅恢复基础设置的默认值，语言和主题将跟随系统，其他页面不变。点击“应用更改”后生效。是否继续？</value>
+    </data>
+    <data name="Msg_ConfirmFilterDefaults" xml:space="preserve">
+      <value>恢复当前配置组的过滤默认值并清空其进程列表，其他配置组和页面不变。点击“应用更改”后生效。是否继续？</value>
     </data>
   </root>

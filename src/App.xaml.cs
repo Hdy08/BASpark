@@ -39,6 +39,12 @@ public partial class App : Application
     {
         DispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
+        if (TrayIconController.TryShowHiddenControlPanel())
+        {
+            Exit();
+            return;
+        }
+
         // 单实例：第二个进程直接退出并提示。
         _mutex = new Mutex(true, SingleInstanceMutexName, out bool createdNew);
         if (!createdNew)

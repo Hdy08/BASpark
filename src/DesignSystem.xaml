@@ -352,9 +352,43 @@
                             <ColumnDefinition Width="16" />
                         </Grid.ColumnDefinitions>
                         <VisualStateManager.VisualStateGroups>
-                            <VisualStateGroup x:Name="CheckStates">
-                                <VisualState x:Name="Unchecked" />
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal">
+                                    <VisualState.Setters>
+                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70D;" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70D;" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70D;" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70D;" />
+                                    </VisualState.Setters>
+                                </VisualState>
                                 <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedDisabled">
                                     <VisualState.Setters>
                                         <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
                                     </VisualState.Setters>
@@ -574,6 +608,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButtons">
                     <Grid>
+                        <Border x:Name="SegmentedSelection" Background="{ThemeResource BasSettingsAccentBrush}"
+                                CornerRadius="3" Opacity="0" IsHitTestVisible="False"
+                                HorizontalAlignment="Left" VerticalAlignment="Top" Width="0" Height="0" />
                         <ItemsRepeater x:Name="InnerRepeater">
                             <ItemsRepeater.Layout>
                                 <local:SegmentedRadioLayout />
@@ -627,7 +664,6 @@
                             <VisualStateGroup x:Name="CheckStates">
                                 <VisualState x:Name="Checked">
                                     <VisualState.Setters>
-                                        <Setter Target="SegmentSelection.Background" Value="{ThemeResource BasSettingsAccentBrush}" />
                                         <Setter Target="SegmentContent.Foreground" Value="{ThemeResource BasSettingsAccentTextBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -635,7 +671,6 @@
                                 <VisualState x:Name="Indeterminate" />
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
-                        <Border x:Name="SegmentSelection" Background="Transparent" CornerRadius="3" />
                         <Border x:Name="SegmentHover" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                 CornerRadius="3" Opacity="0" />
                         <ContentPresenter x:Name="SegmentContent" Content="{TemplateBinding Content}"

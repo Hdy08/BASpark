@@ -1,27 +1,25 @@
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using Microsoft.Win32;
 using WinFormsApp = System.Windows.Forms.Application;
 
 namespace BASpark;
 
 /// <summary>
 /// 系统托盘图标与右键菜单。
-///
-/// WinUI 3 没有托盘 API，因此这里在一条独立的 STA 线程上运行 WinForms 的
-/// <see cref="NotifyIcon"/>。菜单刻意使用系统原生渲染器（<c>SystemRenderer</c>）：
-/// 由 Windows 决定背景、悬停高亮与分隔线，与系统托盘菜单完全一致，
-/// 不再像迁移前那样自绘一套浅色/深色配色。
-/// 菜单命令一律通过 <see cref="App.DispatcherQueue"/> 回到 UI 线程执行。
+/// WinUI 3 没有托盘 API，因此在独立 STA 线程上运行 NotifyIcon。
+/// 右键菜单用 Win32 HMENU 交给 Windows 绘制，并跟随系统主题。
+/// 菜单命令通过 App.DispatcherQueue 回到 UI 线程执行。
 /// </summary>
 public sealed class TrayIconController : IDisposable
 {
+    private const string TrayWindowTitle = "BASpark.Tray.CommandWindow";
+    private const string HiddenTrayWindowTitle = "BASpark.Tray.CommandWindow.Hidden";
+    private static readonly uint OpenPanelMessage = RegisterWindowMessage("BASpark.OpenHiddenControlPanel");
     private readonly ManualResetEventSlim _ready = new(false);
     private Thread? _thread;
     private NotifyIcon? _notifyIcon;
-    private ContextMenuStrip? _menu;
-    private ToolStripMenuItem? _openPanelItem;
-    private ToolStripMenuItem? _restartItem;
-    private ToolStripMenuItem? _exitItem;
+    private TrayMessageWindow? _messageWindow;
+    private NativeMenuTheme? _menuTheme;
     private Action? _openPanel;
     private Action? _restart;
     private Action? _exit;
@@ -32,16 +30,9 @@ public sealed class TrayIconController : IDisposable
         _openPanel = openPanel;
         _restart = restart;
         _exit = exit;
-
-        _thread = new Thread(TrayThreadMain)
-        {
-            IsBackground = true,
-            Name = "BASpark.Tray"
-        };
+        _thread = new Thread(TrayThreadMain) { IsBackground = true, Name = "BASpark.Tray" };
         _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
-
-        // 等待图标真正建立，避免启动早期托盘短暂缺失。
         _ready.Wait(TimeSpan.FromSeconds(5));
     }
 
@@ -51,143 +42,248 @@ public sealed class TrayIconController : IDisposable
         {
             WinFormsApp.EnableVisualStyles();
             WinFormsApp.SetCompatibleTextRenderingDefault(false);
-
-            _menu = new ContextMenuStrip
+            _messageWindow = new TrayMessageWindow(() => Dispatch(_openPanel))
             {
-                // 跟随系统：深浅色、高亮、圆角、阴影全部交给 Windows。
-                Renderer = new ToolStripSystemRenderer(),
-                ShowImageMargin = false
+                ShowInTaskbar = false,
+                FormBorderStyle = FormBorderStyle.None,
+                Text = ConfigManager.HideTrayIcon ? HiddenTrayWindowTitle : TrayWindowTitle
             };
-
-            _openPanelItem = new ToolStripMenuItem(Localization.Get("Tray_OpenPanel"));
-            _openPanelItem.Click += (_, _) => Dispatch(_openPanel);
-
-            _restartItem = new ToolStripMenuItem(Localization.Get("Tray_Restart"));
-            _restartItem.Click += (_, _) => Dispatch(_restart);
-
-            _exitItem = new ToolStripMenuItem(Localization.Get("Tray_Exit"));
-            _exitItem.Click += (_, _) => Dispatch(_exit);
-
-            _menu.Items.Add(_openPanelItem);
-            _menu.Items.Add(new ToolStripSeparator());
-            _menu.Items.Add(_restartItem);
-            _menu.Items.Add(_exitItem);
-
+            _ = _messageWindow.Handle;
+            ChangeWindowMessageFilterEx(_messageWindow.Handle, OpenPanelMessage, 1, 0);
+            _menuTheme = new NativeMenuTheme();
             _notifyIcon = new NotifyIcon
             {
                 Icon = LoadAppIcon(),
                 Text = Localization.Get("Tray_Text"),
-                ContextMenuStrip = _menu,
-                Visible = true
+                Visible = !ConfigManager.HideTrayIcon
             };
             _notifyIcon.DoubleClick += (_, _) => Dispatch(_openPanel);
-
-            _openPanelItem.Font = new System.Drawing.Font(_openPanelItem.Font, System.Drawing.FontStyle.Bold);
-            _restartItem.Font = new System.Drawing.Font(_restartItem.Font, System.Drawing.FontStyle.Bold);
-            _exitItem.Font = new System.Drawing.Font(_exitItem.Font, System.Drawing.FontStyle.Bold);
+            _notifyIcon.MouseUp += (_, args) =>
+            {
+                if (args.Button == MouseButtons.Right) ShowNativeMenu();
+            };
+            _ready.Set();
+            WinFormsApp.Run();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            AppLogger.Error("托盘图标初始化失败。", ex);
+            AppLogger.Error("托盘图标初始化失败。", exception);
         }
         finally
         {
             _ready.Set();
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.Dispose();
+                _notifyIcon = null;
+            }
+            _messageWindow?.Dispose();
+            _messageWindow = null;
+            _menuTheme?.Dispose();
+            _menuTheme = null;
         }
-
-        WinFormsApp.Run();
-
-        // Run() 返回后清理原生资源。
-        if (_notifyIcon != null)
-        {
-            _notifyIcon.Visible = false;
-            _notifyIcon.Dispose();
-            _notifyIcon = null;
-        }
-
-        _menu?.Dispose();
-        _menu = null;
     }
 
-    /// <summary>把托盘线程上的点击转回 WinUI UI 线程。</summary>
+    private static nint CreateNativeMenu()
+    {
+        nint menu = CreatePopupMenu();
+        if (menu == 0) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        if (!AppendMenu(menu, 0, 1, Localization.Get("Tray_OpenPanel")) ||
+            !AppendMenu(menu, 0x800, 0, null) ||
+            !AppendMenu(menu, 0, 2, Localization.Get("Tray_Restart")) ||
+            !AppendMenu(menu, 0, 3, Localization.Get("Tray_Exit")))
+        {
+            int error = Marshal.GetLastWin32Error();
+            DestroyMenu(menu);
+            throw new System.ComponentModel.Win32Exception(error);
+        }
+        return menu;
+    }
+
+    private void ShowNativeMenu()
+    {
+        if (_disposed || _messageWindow == null || !GetCursorPos(out NativePoint cursor)) return;
+        nint menu = 0;
+        try
+        {
+            _menuTheme?.Apply(_messageWindow.Handle);
+            menu = CreateNativeMenu();
+            SetForegroundWindow(_messageWindow.Handle);
+            uint command = TrackPopupMenuEx(menu, 0x102, cursor.Left, cursor.Top, _messageWindow.Handle, 0);
+            PostMessage(_messageWindow.Handle, 0, 0, 0);
+            Dispatch(command switch { 1 => _openPanel, 2 => _restart, 3 => _exit, _ => null });
+        }
+        catch (Exception exception)
+        {
+            AppLogger.Error("Failed to show the native tray menu.", exception);
+        }
+        finally
+        {
+            if (menu != 0) DestroyMenu(menu);
+        }
+    }
+
     private static void Dispatch(Action? action)
     {
-        if (action == null)
-        {
-            return;
-        }
-
-        App.DispatcherQueue.TryEnqueue(() => action());
+        if (action != null) App.DispatcherQueue.TryEnqueue(() => action());
     }
 
     private static System.Drawing.Icon LoadAppIcon()
     {
         try
         {
-            string? exePath = Environment.ProcessPath;
-            if (!string.IsNullOrEmpty(exePath))
-            {
-                System.Drawing.Icon? extracted =
-                    System.Drawing.Icon.ExtractAssociatedIcon(exePath);
-                if (extracted != null)
-                {
-                    return extracted;
-                }
-            }
+            if (Environment.ProcessPath is { Length: > 0 } path &&
+                System.Drawing.Icon.ExtractAssociatedIcon(path) is { } icon) return icon;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            AppLogger.Debug($"Failed to extract the application icon: {ex.Message}");
+            AppLogger.Debug($"Failed to extract the application icon: {exception.Message}");
         }
-
         return System.Drawing.SystemIcons.Application;
     }
 
-    /// <summary>语言或系统主题变化后刷新托盘文本。</summary>
+    private void InvokeOnTray(Action action)
+    {
+        var window = _messageWindow;
+        if (window == null || window.IsDisposed || !window.IsHandleCreated) return;
+        try { window.BeginInvoke(action); }
+        catch (InvalidOperationException) { }
+    }
+
+    public void SetHidden(bool hidden)
+    {
+        if (_disposed) return;
+        InvokeOnTray(() =>
+        {
+            if (_notifyIcon != null) _notifyIcon.Visible = !hidden;
+            if (_messageWindow != null) _messageWindow.Text = hidden ? HiddenTrayWindowTitle : TrayWindowTitle;
+        });
+    }
+
+    public static bool TryShowHiddenControlPanel()
+    {
+        nint window = FindWindow(null, HiddenTrayWindowTitle);
+        return window != 0 && OpenPanelMessage != 0 && PostMessage(window, OpenPanelMessage, 0, 0);
+    }
+
     public void RefreshLocalization()
     {
-        if (_disposed || _menu == null)
+        if (_disposed) return;
+        InvokeOnTray(() =>
         {
-            return;
-        }
-
-        _menu.BeginInvoke(new Action(() =>
-        {
-            if (_notifyIcon != null)
-            {
-                _notifyIcon.Text = Localization.Get("Tray_Text");
-            }
-
-            if (_openPanelItem != null) _openPanelItem.Text = Localization.Get("Tray_OpenPanel");
-            if (_restartItem != null) _restartItem.Text = Localization.Get("Tray_Restart");
-            if (_exitItem != null) _exitItem.Text = Localization.Get("Tray_Exit");
-        }));
+            if (_notifyIcon != null) _notifyIcon.Text = Localization.Get("Tray_Text");
+        });
     }
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
+        if (_disposed) return;
         _disposed = true;
-
-        if (_notifyIcon != null)
-        {
-            _notifyIcon.Visible = false;
-        }
-
-        try
-        {
-            // 结束托盘线程的消息循环，让 TrayThreadMain 走完清理路径。
-            _menu?.BeginInvoke(new Action(WinFormsApp.ExitThread));
-        }
-        catch
-        {
-            // 线程可能已经结束。
-        }
-
-        _ready.Dispose();
+        InvokeOnTray(() => { EndMenu(); WinFormsApp.ExitThread(); });
+        if (_thread == null || (_thread.ManagedThreadId != Environment.CurrentManagedThreadId && _thread.Join(TimeSpan.FromSeconds(2)))) _ready.Dispose();
     }
+
+    private sealed class TrayMessageWindow(Action openPanel) : Form
+    {
+        protected override void WndProc(ref Message message)
+        {
+            if (OpenPanelMessage != 0 && message.Msg == OpenPanelMessage)
+            {
+                openPanel();
+                return;
+            }
+            base.WndProc(ref message);
+        }
+    }
+
+    private sealed class NativeMenuTheme : IDisposable
+    {
+        private readonly nint _library;
+        private readonly SetPreferredAppMode? _setPreferredAppMode;
+        private readonly AllowDarkModeForWindow? _allowDarkModeForWindow;
+        private readonly RefreshImmersiveColorPolicyState? _refreshColorPolicy;
+        private readonly FlushMenuThemes? _flushMenuThemes;
+        private readonly ShouldAppsUseDarkMode? _shouldAppsUseDarkMode;
+
+        public NativeMenuTheme()
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 18362) ||
+                !NativeLibrary.TryLoad(Path.Combine(Environment.SystemDirectory, "uxtheme.dll"), out nint library)) return;
+            _library = library;
+            _setPreferredAppMode = Bind<SetPreferredAppMode>(135);
+            _allowDarkModeForWindow = Bind<AllowDarkModeForWindow>(133);
+            _refreshColorPolicy = Bind<RefreshImmersiveColorPolicyState>(104);
+            _flushMenuThemes = Bind<FlushMenuThemes>(136);
+            _shouldAppsUseDarkMode = Bind<ShouldAppsUseDarkMode>(132);
+            _setPreferredAppMode?.Invoke(PreferredAppMode.AllowDark);
+        }
+
+        private T? Bind<T>(int ordinal) where T : Delegate
+        {
+            nint address = GetProcAddress(_library, ordinal);
+            return address == 0 ? null : Marshal.GetDelegateForFunctionPointer<T>(address);
+        }
+
+        public void Apply(nint owner)
+        {
+            _refreshColorPolicy?.Invoke();
+            bool dark = !SystemInformation.HighContrast && (_shouldAppsUseDarkMode?.Invoke() ?? false);
+            _allowDarkModeForWindow?.Invoke(owner, dark);
+            _flushMenuThemes?.Invoke();
+        }
+
+        public void Dispose()
+        {
+            if (_library != 0) NativeLibrary.Free(_library);
+        }
+
+        private enum PreferredAppMode { Default, AllowDark, ForceDark, ForceLight }
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+        private delegate PreferredAppMode SetPreferredAppMode(PreferredAppMode mode);
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        private delegate bool AllowDarkModeForWindow(nint window, [MarshalAs(UnmanagedType.U1)] bool allow);
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+        private delegate void RefreshImmersiveColorPolicyState();
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+        private delegate void FlushMenuThemes();
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        private delegate bool ShouldAppsUseDarkMode();
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint { public int Left; public int Top; }
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint CreatePopupMenu();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AppendMenu(nint menu, uint flags, nuint identifier, string? text);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyMenu(nint menu);
+    [DllImport("user32.dll")]
+    private static extern uint TrackPopupMenuEx(nint menu, uint flags, int left, int top, nint owner, nint parameters);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out NativePoint point);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(nint window);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EndMenu();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string message);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint FindWindow(string? className, string title);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(nint window, uint message, nuint parameter, nint data);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ChangeWindowMessageFilterEx(nint window, uint message, uint action, nint status);
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    private static extern nint GetProcAddress(nint library, nint ordinal);
 }
