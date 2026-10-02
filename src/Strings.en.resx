@@ -18,8 +18,11 @@
     <data name="About_Description" xml:space="preserve">
       <value>Blue Archive–style mouse click effects for Windows</value>
     </data>
-    <data name="About_DevOptions" xml:space="preserve">
-      <value>Developer options</value>
+    <data name="About_OpenRepository" xml:space="preserve">
+      <value>Open</value>
+    </data>
+    <data name="About_Repositories" xml:space="preserve">
+      <value>Repositories</value>
     </data>
     <data name="About_ResetAll" xml:space="preserve">
       <value>Reset all settings and exit</value>
@@ -634,5 +637,38 @@
     </data>
     <data name="Msg_ConfirmFilterDefaults" xml:space="preserve">
       <value>Restore defaults for the current filter profile and clear its process list? Other profiles and pages are unchanged. Click Apply changes to save.</value>
+    </data>
+    <data name="Overlay_BasicReset" xml:space="preserve">
+      <value>Choose basic settings to restore</value>
+    </data>
+    <data name="Overlay_FilterReset" xml:space="preserve">
+      <value>Choose environment filter settings to restore</value>
+    </data>
+    <data name="Overlay_SearchSettings" xml:space="preserve">
+      <value>Search settings</value>
+    </data>
+    <data name="Reset_DefaultValue" xml:space="preserve">
+      <value>Default: {0}</value>
+    </data>
+    <data name="Reset_DefaultProfile" xml:space="preserve">
+      <value>One default profile (blacklist, empty process list)</value>
+    </data>
+    <data name="Reset_EmptyList" xml:space="preserve">
+      <value>Empty process list</value>
+    </data>
+    <data name="Settings_ResetPage" xml:space="preserve">
+      <value>Reset page settings</value>
+    </data>
+    <data name="Settings_Reset" xml:space="preserve">
+      <value>Reset settings</value>
+    </data>
+    <data name="Overlay_AllReset" xml:space="preserve">
+      <value>Choose settings to reset</value>
+    </data>
+    <data name="Overlay_ScreenReset" xml:space="preserve">
+      <value>Choose display settings to reset</value>
+    </data>
+    <data name="Msg_PageResetDone" xml:space="preserve">
+      <value>Selected settings have been restored to defaults. Click Apply changes to save.</value>
     </data>
   </root>

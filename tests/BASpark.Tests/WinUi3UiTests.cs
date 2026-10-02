@@ -267,7 +267,8 @@ public class WinUi3UiTests
         string[] mustBeFilledWithContent =
         [
             "BtnApplySettings", "BtnVisualReset", "BtnClearLog",
-            "BtnResetAll", "BtnRefreshScreens", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile",
+            "BtnResetSettings", "BtnScreensReset", "BtnRefreshScreens", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile",
+            "BtnRepoDoomVoss", "BtnRepoCialloKing", "BtnRepoWinUI",
         ];
 
         foreach (string name in mustBeFilledWithContent)
@@ -939,6 +940,10 @@ public class WinUi3UiTests
             Assert.Equal("0", (string?)label.Attribute("Grid.Column"));
             Assert.Equal("1", (string?)value.Attribute("Grid.Column"));
             Assert.Equal("Right", (string?)value.Attribute("HorizontalAlignment"));
+            Assert.Equal((string?)label.Attribute("Style"), (string?)value.Attribute("Style"));
+            Assert.Equal("{StaticResource BasSettingTitleStyle}", (string?)value.Attribute("Style"));
+            Assert.Null(value.Attribute("FontSize"));
+            Assert.Null(value.Attribute("FontWeight"));
         }
     }
 
@@ -1216,14 +1221,64 @@ public class WinUi3UiTests
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement about = GetNamedElement(panel, "PageAbout");
-        Assert.Equal(2, about.Descendants().Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
-        Assert.Equal("Right", (string?)GetNamedElement(panel, "BtnResetAll").Attribute("HorizontalAlignment"));
+        Assert.Equal(4, about.Descendants().Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
+        Assert.DoesNotContain(about.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "BtnResetAll");
+        Assert.Equal("{StaticResource BasSettingTitleStyle}", (string?)GetNamedElement(panel, "AboutVersionText").Attribute("Style"));
+        Assert.DoesNotContain("TxtDevOptions", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
+        Assert.DoesNotContain("TxtDevOptions", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
         XDocument app = LoadXaml("src", "App.xaml");
         Assert.Contains(app.Descendants(), element => element.Name.LocalName == "XamlControlsResources");
         Assert.DoesNotContain(app.Descendants(), element => element.Name.LocalName == "Style" && element.Attribute(Xaml + "Key") == null);
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.DoesNotContain("ApplySystemBackdrop", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Failed to apply the solid backdrop", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AboutRepositoryCards_ShowRequestedUrlsWithRightAlignedOpenButtons()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement about = GetNamedElement(panel, "PageAbout");
+        Assert.Equal("{StaticResource BasSettingsSectionTitleStyle}", (string?)GetNamedElement(panel, "TxtRepositoryLinks").Attribute("Style"));
+        foreach ((string name, string url) in new[]
+                 {
+                     ("BtnRepoDoomVoss", "https://github.com/DoomVoss/BASpark"),
+                     ("BtnRepoCialloKing", "https://github.com/CialloKing/BASpark"),
+                     ("BtnRepoWinUI", "https://github.com/Hdy08/BASpark/tree/WinUI3")
+                 })
+        {
+            XElement button = GetNamedElement(panel, name);
+            Assert.Equal(url, (string?)button.Attribute("Tag"));
+            Assert.Equal("OpenRepository_Click", (string?)button.Attribute("Click"));
+            Assert.Equal("1", (string?)button.Attribute("Grid.Column"));
+            Assert.Equal("Right", (string?)button.Attribute("HorizontalAlignment"));
+            XElement card = GetSettingCard(button);
+            Assert.Contains(about, card.Ancestors());
+            XElement title = Assert.Single(card.Descendants(), element => element.Name.LocalName == "TextBlock");
+            Assert.Equal("{Binding Tag, ElementName=" + name + "}", (string?)title.Attribute("Text"));
+            Assert.Equal("{StaticResource BasSettingTitleStyle}", (string?)title.Attribute("Style"));
+            Assert.Contains(name + ".Content = Localization.Get(\"About_OpenRepository\")", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        }
+        foreach (string file in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
+        {
+            XDocument resources = LoadXaml("src", file);
+            Assert.DoesNotContain(resources.Descendants("data"), element => (string?)element.Attribute("name") == "About_DevOptions");
+            foreach (string key in new[] { "About_Repositories", "About_OpenRepository" })
+            {
+                XElement item = Assert.Single(resources.Descendants("data"), element => (string?)element.Attribute("name") == key);
+                Assert.False(string.IsNullOrWhiteSpace(item.Element("value")?.Value));
+            }
+        }
+    }
+
+    [Fact]
+    public void AboutRepositoryActions_UseTheSystemBrowserAndLocalizedFailureFeedback()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string handler = source[source.IndexOf("private async void OpenRepository_Click", StringComparison.Ordinal)..source.IndexOf("private void LoadVersion()", StringComparison.Ordinal)];
+        Assert.Contains("sender is not Button { Tag: string url }", handler, StringComparison.Ordinal);
+        Assert.Contains("Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })", handler, StringComparison.Ordinal);
+        Assert.Contains("Localization.Format(\"Msg_OpenLinkFailed\", exception.Message)", handler, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1266,33 +1321,103 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void BasicAndFilterDefaults_ResetOnlyTheirOwnSettingsBeforeApply()
+    public void ResetActions_UseOneSearchableCardListWithAllFourSettingsGroups()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
-        Assert.Equal("ResetBasicDefaults_Click", (string?)GetNamedElement(panel, "BtnBasicReset").Attribute("Click"));
-        Assert.Equal("ResetFilterDefaults_Click", (string?)GetNamedElement(panel, "BtnFilterReset").Attribute("Click"));
+        XElement overlay = GetNamedElement(panel, "VisualResetOverlay");
+        Assert.Equal("{StaticResource BasModalCardStyle}", (string?)overlay.Elements().Single().Attribute("Style"));
+        foreach (string name in new[] { "TxtOverlayVisualReset", "SearchVisualReset", "ListVisualResetItems", "BtnOverlayVisualCancel", "BtnOverlayVisualConfirm" })
+            Assert.Contains(overlay, GetNamedElement(panel, name).Ancestors());
+        Assert.Equal("{StaticResource AccentButtonStyle}", (string?)GetNamedElement(panel, "BtnOverlayVisualConfirm").Attribute("Style"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        string basic = source[source.IndexOf("private void RestoreBasicDefaults()", StringComparison.Ordinal)..source.IndexOf("private async void ResetFilterDefaults_Click", StringComparison.Ordinal)];
-        Assert.Contains("CheckHideTrayIcon.IsOn = false", basic, StringComparison.Ordinal);
-        Assert.Contains("SelectDarkMode(DarkModeOption.System)", basic, StringComparison.Ordinal);
-        Assert.DoesNotContain("ConfigManager.Save", basic, StringComparison.Ordinal);
-        Assert.DoesNotContain("SliderScale", basic, StringComparison.Ordinal);
-        Assert.DoesNotContain("ComboProfiles", basic, StringComparison.Ordinal);
-        string filter = source[source.IndexOf("private void RestoreFilterDefaults()", StringComparison.Ordinal)..source.IndexOf("private void CheckMasterSwitch_Changed", StringComparison.Ordinal)];
-        Assert.Contains("active.Processes.Clear()", filter, StringComparison.Ordinal);
-        Assert.Contains("active.Mode = ProcessFilterModeOption.Blacklist", filter, StringComparison.Ordinal);
-        Assert.Contains("CheckHideInFullscreen.IsOn = true", filter, StringComparison.Ordinal);
-        Assert.DoesNotContain("ConfigManager.Save", filter, StringComparison.Ordinal);
-        Assert.DoesNotContain("_editableProfiles.Clear", filter, StringComparison.Ordinal);
+        foreach (string group in new[] { "Basic", "Visual", "Filter", "Screen" })
+            Assert.Contains("Rebuild" + group + "ResetItems()", source, StringComparison.Ordinal);
+        Assert.Contains("item.Group.Contains(filter", source, StringComparison.Ordinal);
+        Assert.Contains("_resetScope == ResetScope.All && group != item.Group", source, StringComparison.Ordinal);
+        Assert.Contains("ListVisualResetItems.Items.Add(CreateVisualResetRow(item))", source, StringComparison.Ordinal);
+        string row = source[source.IndexOf("private static Border CreateVisualResetRow", StringComparison.Ordinal)..source.IndexOf("private async void ConfirmVisualReset_Click", StringComparison.Ordinal)];
+        Assert.Contains("BasSettingCardStyle", row, StringComparison.Ordinal);
+        Assert.Contains("BasSettingTitleStyle", row, StringComparison.Ordinal);
+        Assert.Contains("BasCaptionStyle", row, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment = HorizontalAlignment.Right", row, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetColumn(check, 1)", row, StringComparison.Ordinal);
+        Assert.Contains("item.IsSelected = false", row, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResetButtons_MoveGlobalResetToApplyAndUseLocalizedPageLabels()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement reset = GetNamedElement(panel, "BtnResetSettings");
+        XElement apply = GetNamedElement(panel, "BtnApplySettings");
+        Assert.Same(reset.Parent, apply.Parent);
+        Assert.Contains(apply, reset.ElementsAfterSelf());
+        Assert.Equal("{StaticResource BasDangerButtonStyle}", (string?)reset.Attribute("Style"));
+        Assert.Equal("OpenAllResetOverlay_Click", (string?)reset.Attribute("Click"));
+        Assert.DoesNotContain("BtnResetAll", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
+        Assert.DoesNotContain("ResetConfig_Click", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        foreach (string name in new[] { "BtnBasicReset", "BtnVisualReset", "BtnFilterReset", "BtnScreensReset" })
+            Assert.Contains(name + ".Content = Localization.Get(\"Settings_ResetPage\")", source, StringComparison.Ordinal);
         foreach (string file in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
         {
             XDocument resources = LoadXaml("src", file);
-            foreach (string key in new[] { "Basic_HideTrayIcon", "Basic_HideTrayHint", "Msg_ConfirmBasicDefaults", "Msg_ConfirmFilterDefaults" })
+            foreach (string key in new[] { "Settings_ResetPage", "Settings_Reset", "Overlay_AllReset", "Overlay_ScreenReset", "Overlay_SearchSettings", "Reset_DefaultValue", "Reset_DefaultProfile", "Msg_PageResetDone" })
             {
                 XElement item = Assert.Single(resources.Descendants("data"), element => (string?)element.Attribute("name") == key);
                 Assert.False(string.IsNullOrWhiteSpace(item.Element("value")?.Value));
             }
         }
+        XElement label = Assert.Single(LoadXaml("src", "Strings.resx").Descendants("data"), item => (string?)item.Attribute("name") == "Settings_ResetPage");
+        Assert.Equal("重置本页设置", label.Element("value")!.Value);
+    }
+
+    [Fact]
+    public void ResetSelection_ChangesOnlySelectedItemsAndPreservesUnselectedPendingChanges()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string confirm = source[source.IndexOf("private async void ConfirmVisualReset_Click", StringComparison.Ordinal)..source.IndexOf("private void LinkedEffectScale_Changed", StringComparison.Ordinal)];
+        Assert.Contains("VisualResetItems.Where(item => item.IsSelected)", confirm, StringComparison.Ordinal);
+        Assert.Contains("foreach (VisualResetItem item in selected) item.Restore?.Invoke()", confirm, StringComparison.Ordinal);
+        Assert.Contains("foreach (VisualResetItem item in selected) item.Save?.Invoke()", confirm, StringComparison.Ordinal);
+        Assert.Contains("if (_resetScope == ResetScope.Visual)", confirm, StringComparison.Ordinal);
+        Assert.DoesNotContain("LoadSettings()", confirm, StringComparison.Ordinal);
+        Assert.DoesNotContain("NativeMessageBox", confirm, StringComparison.Ordinal);
+        Assert.Contains("MarkVisualSettingsSaved(selected)", confirm, StringComparison.Ordinal);
+        Assert.Contains("saved[key] = current[key]?.DeepClone()", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.ParticleColor = \"76,167,255\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApplySettings_RemainsDisabledUntilSettingsDifferFromTheSavedBaseline()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        Assert.Equal("False", (string?)GetNamedElement(panel, "BtnApplySettings").Attribute("IsEnabled"));
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("InitializeSettingsTracking()", source, StringComparison.Ordinal);
+        Assert.Contains("_currentSettingsState != _savedSettingsState", source, StringComparison.Ordinal);
+        Assert.Contains("RegisterPropertyChangedCallback", source, StringComparison.Ordinal);
+        Assert.Contains("DispatcherQueuePriority.Low", source, StringComparison.Ordinal);
+        Assert.Contains("Profiles.CollectionChanged +=", source, StringComparison.Ordinal);
+        Assert.Contains("CurrentProfileProcesses.CollectionChanged +=", source, StringComparison.Ordinal);
+        Assert.Contains("CaptureScreenSettings()", source, StringComparison.Ordinal);
+        Assert.Contains("GetPendingSliderValue", source, StringComparison.Ordinal);
+        Assert.Contains("CaptureSettingsBaseline();", source, StringComparison.Ordinal);
+        Assert.Contains("UnregisterPropertyChangedCallback", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InWindowMessages_UseNativeContentDialogsBoundToTheCurrentXamlRootAndTheme()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.DoesNotContain("NativeMessageBox", source, StringComparison.Ordinal);
+        string dialog = source[source.IndexOf("private async Task ShowMessageAsync", StringComparison.Ordinal)..source.IndexOf("private async Task<bool> ConfirmAsync", StringComparison.Ordinal)];
+        Assert.Contains("_messageDialog = new ContentDialog", dialog, StringComparison.Ordinal);
+        Assert.Contains("XamlRoot = root", dialog, StringComparison.Ordinal);
+        Assert.Contains("RequestedTheme = RootGrid.ActualTheme", dialog, StringComparison.Ordinal);
+        Assert.Contains("await _messageDialog.ShowAsync()", dialog, StringComparison.Ordinal);
+        Assert.Contains("_dialogGate.WaitAsync()", dialog, StringComparison.Ordinal);
+        Assert.Contains("await ShowMessageAsync(Localization.Get(\"Msg_VisualResetDone\")", source, StringComparison.Ordinal);
     }
 
     [Fact]

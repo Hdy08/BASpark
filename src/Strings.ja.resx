@@ -18,8 +18,11 @@
     <data name="About_Description" xml:space="preserve">
       <value>『ブルーアーカイブ』風 UI のマウスクリックエフェクト</value>
     </data>
-    <data name="About_DevOptions" xml:space="preserve">
-      <value>開発者向け</value>
+    <data name="About_OpenRepository" xml:space="preserve">
+      <value>開く</value>
+    </data>
+    <data name="About_Repositories" xml:space="preserve">
+      <value>リポジトリリンク</value>
     </data>
     <data name="About_ResetAll" xml:space="preserve">
       <value>すべての設定をリセットして終了</value>
@@ -634,5 +637,38 @@
     </data>
     <data name="Msg_ConfirmFilterDefaults" xml:space="preserve">
       <value>現在のプロファイルのフィルター設定を既定値に戻し、プロセス一覧を消去しますか？他のプロファイルとページは変更されません。「変更を適用」で保存します。</value>
+    </data>
+    <data name="Overlay_BasicReset" xml:space="preserve">
+      <value>初期化する基本設定を選択</value>
+    </data>
+    <data name="Overlay_FilterReset" xml:space="preserve">
+      <value>初期化する環境フィルター設定を選択</value>
+    </data>
+    <data name="Overlay_SearchSettings" xml:space="preserve">
+      <value>設定を検索</value>
+    </data>
+    <data name="Reset_DefaultValue" xml:space="preserve">
+      <value>既定値：{0}</value>
+    </data>
+    <data name="Reset_DefaultProfile" xml:space="preserve">
+      <value>既定の構成グループ1件（ブラックリスト、空のプロセス一覧）</value>
+    </data>
+    <data name="Reset_EmptyList" xml:space="preserve">
+      <value>空のプロセス一覧</value>
+    </data>
+    <data name="Settings_ResetPage" xml:space="preserve">
+      <value>このページの設定をリセット</value>
+    </data>
+    <data name="Settings_Reset" xml:space="preserve">
+      <value>設定をリセット</value>
+    </data>
+    <data name="Overlay_AllReset" xml:space="preserve">
+      <value>リセットする設定を選択</value>
+    </data>
+    <data name="Overlay_ScreenReset" xml:space="preserve">
+      <value>リセットするディスプレイ設定を選択</value>
+    </data>
+    <data name="Msg_PageResetDone" xml:space="preserve">
+      <value>選択した設定を既定値に戻しました。「変更を適用」を押して保存してください。</value>
     </data>
   </root>

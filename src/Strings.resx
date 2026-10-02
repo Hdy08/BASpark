@@ -18,8 +18,11 @@
     <data name="About_Description" xml:space="preserve">
       <value>深度复刻《蔚蓝档案》UI 风格动效的鼠标特效工具</value>
     </data>
-    <data name="About_DevOptions" xml:space="preserve">
-      <value>开发者选项</value>
+    <data name="About_OpenRepository" xml:space="preserve">
+      <value>打开</value>
+    </data>
+    <data name="About_Repositories" xml:space="preserve">
+      <value>仓库链接</value>
     </data>
     <data name="About_ResetAll" xml:space="preserve">
       <value>重置所有设置并退出</value>
@@ -634,5 +637,38 @@
     </data>
     <data name="Msg_ConfirmFilterDefaults" xml:space="preserve">
       <value>恢复当前配置组的过滤默认值并清空其进程列表，其他配置组和页面不变。点击“应用更改”后生效。是否继续？</value>
+    </data>
+    <data name="Overlay_BasicReset" xml:space="preserve">
+      <value>选择要恢复默认的基础设置项</value>
+    </data>
+    <data name="Overlay_FilterReset" xml:space="preserve">
+      <value>选择要恢复默认的环境过滤项</value>
+    </data>
+    <data name="Overlay_SearchSettings" xml:space="preserve">
+      <value>搜索设置项</value>
+    </data>
+    <data name="Reset_DefaultValue" xml:space="preserve">
+      <value>默认：{0}</value>
+    </data>
+    <data name="Reset_DefaultProfile" xml:space="preserve">
+      <value>单个默认配置组（黑名单、空进程列表）</value>
+    </data>
+    <data name="Reset_EmptyList" xml:space="preserve">
+      <value>空进程列表</value>
+    </data>
+    <data name="Settings_ResetPage" xml:space="preserve">
+      <value>重置本页设置</value>
+    </data>
+    <data name="Settings_Reset" xml:space="preserve">
+      <value>重置设置</value>
+    </data>
+    <data name="Overlay_AllReset" xml:space="preserve">
+      <value>选择要重置的设置项</value>
+    </data>
+    <data name="Overlay_ScreenReset" xml:space="preserve">
+      <value>选择要重置的多屏设置项</value>
+    </data>
+    <data name="Msg_PageResetDone" xml:space="preserve">
+      <value>所选设置已恢复为默认值，请点击“应用更改”保存。</value>
     </data>
   </root>

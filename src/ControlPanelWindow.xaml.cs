@@ -117,6 +117,16 @@ public class VisualResetItem
     public string Title { get; }
     public string Subtitle { get; }
     public bool IsSelected { get; set; }
+    public Action? Restore { get; set; }
+    public Action? Save { get; set; }
+    public string? SettingKey { get; set; }
+    public string Group { get; set; } = string.Empty;
+
+    public VisualResetItem(string title, string subtitle, Action restore)
+        : this(VisualAppearanceResetFlags.None, title, subtitle)
+    {
+        Restore = restore;
+    }
 
     public VisualResetItem(VisualAppearanceResetFlags flags, string title, string subtitle)
     {
@@ -151,7 +161,7 @@ public class ScreenOptionItem
 ///     统一由 <see cref="ApplyLocalizedText"/> 在加载时填充——语义等同于旧版
 ///     的 UiLocalizer，切换语言后重新调用即可整体刷新。
 ///   * RadioButtons 容器统一读写 SelectedIndex（旧版是各个 RadioButton.IsChecked）。
-///   * Yes/No 确认改用 ContentDialog（需要 XamlRoot）；纯提示仍走原生 NativeMessageBox。
+///   * 确认与纯提示均使用绑定当前 XamlRoot 的原生 ContentDialog。
 ///   * 旧版「滚动时临时显示滚动条」的 hack 去掉：OnScroll 直接映射为 Auto。
 /// </summary>
 public sealed partial class ControlPanelWindow : UserControl
@@ -532,6 +542,19 @@ public sealed partial class ControlPanelWindow : UserControl
     private int _themeRefreshPending;
     private string _languageAtLoad = Localization.CultureZhCn;
     private string? _pendingLanguage;
+    private enum ResetScope { Visual, Basic, Filter, Screens, All }
+    private ResetScope _resetScope;
+    [Flags]
+    private enum SettingsSections { General = 1, Visual = 2, Screens = 4, All = 7 }
+    private sealed record SettingsState(string General, string Visual, string Screens);
+    private SettingsState? _savedSettingsState;
+    private SettingsState? _currentSettingsState;
+    private SettingsSections _pendingSettingsSections;
+    private bool _settingsCheckQueued;
+    private bool _isApplyingSettings;
+    private ContentDialog? _messageDialog;
+    private readonly List<(DependencyObject Control, DependencyProperty Property, long Token)> _settingsCallbacks = new();
+    private readonly Dictionary<NumberBox, TextBox> _numberInputs = new();
 
 
     // 首页「当前状态」的三种配色，复用实例（见 RefreshTimer_Tick 的说明）。
@@ -582,6 +605,7 @@ public sealed partial class ControlPanelWindow : UserControl
             CheckAdminStatus();
             UpdatePageVisibility();
             InitLogView();
+            InitializeSettingsTracking();
 
             _host.CloseRequested += ControlPanelWindow_Closed;
             _host.SizeChanged += (_, _) => UpdateCaptionButtonState();
@@ -742,6 +766,131 @@ public sealed partial class ControlPanelWindow : UserControl
     // 数据绑定与滑块 / 数字框联动
     // ==================================================================
 
+    private void InitializeSettingsTracking()
+    {
+        foreach (ToggleSwitch toggle in new[] { CheckMasterSwitch, CheckAutoStart, CheckStartSilent, CheckHideTrayIcon,
+                     CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMiddleClickTrigger,
+                     CheckScreenshotCompatibilityMode, CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop })
+            TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.General);
+        foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw, CheckFollowDisplayRefreshRate })
+            TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Visual);
+        foreach (ComboBox combo in new[] { ComboLanguage, ComboProfiles, ComboProcessFilterMode })
+            TrackSettingsProperty(combo, ComboBox.SelectedIndexProperty, SettingsSections.General);
+        foreach (RadioButtons selector in new[] { RadioDarkMode, RadioClickType })
+            TrackSettingsProperty(selector, RadioButtons.SelectedIndexProperty, SettingsSections.General);
+        foreach (Slider slider in _sliderToBox.Keys)
+            TrackSettingsProperty(slider, Slider.ValueProperty, SettingsSections.Visual);
+        TrackSettingsProperty(EffectColorPicker, ColorPicker.ColorProperty, SettingsSections.Visual);
+        TrackSettingsProperty(EffectColorHexInput, TextBox.TextProperty, SettingsSections.Visual);
+        Profiles.CollectionChanged += GeneralSettingsCollectionChanged;
+        CurrentProfileProcesses.CollectionChanged += GeneralSettingsCollectionChanged;
+        ScreenOptions.CollectionChanged += ScreenSettingsCollectionChanged;
+        CaptureSettingsBaseline();
+    }
+
+    private void TrackSettingsProperty(DependencyObject control, DependencyProperty property, SettingsSections sections)
+    {
+        long token = control.RegisterPropertyChangedCallback(property, (_, _) => QueueSettingsChangeCheck(sections));
+        _settingsCallbacks.Add((control, property, token));
+    }
+
+    private void GeneralSettingsCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args) =>
+        QueueSettingsChangeCheck(SettingsSections.General);
+
+    private void ScreenSettingsCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args) =>
+        QueueSettingsChangeCheck(SettingsSections.Screens);
+
+    private string CaptureGeneralSettings() => JsonSerializer.Serialize(new
+    {
+        Language = GetSelectedLanguage(), Theme = GetSelectedDarkMode(), ClickType = GetSelectedClickTrigger(),
+        Switches = new[] { CheckMasterSwitch.IsOn, CheckAutoStart.IsOn, CheckStartSilent.IsOn, CheckHideTrayIcon.IsOn,
+            CheckAlwaysTrailEffectSwitch.IsOn, CheckRunAsAdmin.IsOn, CheckTouchscreenMode.IsOn, CheckMiddleClickTrigger.IsOn,
+            CheckScreenshotCompatibilityMode.IsOn, CheckEnvironmentFilter.IsOn, CheckHideInFullscreen.IsOn, CheckShowEffectOnDesktop.IsOn },
+        ActiveProfile = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
+        Profiles = Profiles.OrderBy(profile => profile.Id, StringComparer.Ordinal).Select(profile => new
+        {
+            profile.Id, profile.Name, profile.Mode,
+            Processes = profile.Processes.Select(name => name.ToUpperInvariant()).OrderBy(name => name, StringComparer.Ordinal).ToArray()
+        }).ToArray()
+    });
+
+    private double GetPendingSliderValue(Slider slider)
+    {
+        if (_numberInputs.TryGetValue(_sliderToBox[slider], out TextBox? input) && input.FocusState != FocusState.Unfocused &&
+            double.TryParse(input.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out double value) && double.IsFinite(value))
+            return Math.Round(Math.Clamp(value, slider.Minimum, slider.Maximum), 2);
+        return Math.Round(slider.Value, 2);
+    }
+
+    private string CaptureVisualSettings()
+    {
+        string color = ConfigManager.ParticleColor;
+        double opacity = _effectOpacity;
+        if (EffectColorHexInput.FocusState != FocusState.Unfocused && ColorPickerColorMath.TryParseHex(EffectColorHexInput.Text, out Color pending))
+        {
+            color = ToRgbString(pending);
+            opacity = Math.Clamp(pending.A / 255.0, 0.1, 1);
+        }
+        return JsonSerializer.Serialize(new
+        {
+            UseLinkedEffectScale = CheckLinkedEffectScale.IsOn,
+            EffectScale = GetPendingSliderValue(SliderScale), TrailEffectScale = GetPendingSliderValue(SliderTrailScale),
+            ClickEffectScale = GetPendingSliderValue(SliderClickScale), GlowIntensity = GetPendingSliderValue(SliderGlow),
+            UseLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsOn,
+            EffectSpeed = GetPendingSliderValue(SliderSpeed), TrailAnimationSpeed = GetPendingSliderValue(SliderTrailAnimSpeed),
+            ClickAnimationSpeed = GetPendingSliderValue(SliderClickAnimSpeed),
+            ApplyCurveDraw = CheckApplyCurveDraw.IsOn, FollowDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsOn,
+            TrailRefreshRate = GetPendingSliderValue(SliderTrailRefresh), ParticleColor = color, EffectOpacity = Math.Round(opacity, 2)
+        });
+    }
+
+    private string CaptureScreenSettings() => JsonSerializer.Serialize(ScreenOptions
+        .OrderBy(item => item.IdentityKey, StringComparer.Ordinal).ThenBy(item => item.DeviceName, StringComparer.Ordinal)
+        .Select(item => new { item.IdentityKey, item.DeviceName, item.IsEnabled }).ToArray());
+
+    private SettingsState CaptureSettingsState() => new(CaptureGeneralSettings(), CaptureVisualSettings(), CaptureScreenSettings());
+
+    private void CaptureSettingsBaseline()
+    {
+        _savedSettingsState = _currentSettingsState = CaptureSettingsState();
+        BtnApplySettings.IsEnabled = false;
+    }
+
+    private void MarkVisualSettingsSaved(IEnumerable<VisualResetItem> selected)
+    {
+        if (_savedSettingsState == null) return;
+        var saved = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.Visual)!.AsObject();
+        var current = System.Text.Json.Nodes.JsonNode.Parse(CaptureVisualSettings())!.AsObject();
+        foreach (VisualResetItem item in selected)
+            if (item.SettingKey is string key) saved[key] = current[key]?.DeepClone();
+        _savedSettingsState = _savedSettingsState with { Visual = saved.ToJsonString() };
+        UpdateApplySettingsState(SettingsSections.All);
+    }
+
+    private void QueueSettingsChangeCheck(SettingsSections sections)
+    {
+        if (_isLoading || !IsUiReady || _savedSettingsState == null) return;
+        _pendingSettingsSections |= sections;
+        if (_settingsCheckQueued) return;
+        _settingsCheckQueued = true;
+        App.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            _settingsCheckQueued = false;
+            SettingsSections pending = _pendingSettingsSections;
+            _pendingSettingsSections = 0;
+            if (!_isClosed) UpdateApplySettingsState(pending);
+        });
+    }
+
+    private void UpdateApplySettingsState(SettingsSections sections)
+    {
+        if (_savedSettingsState == null || _currentSettingsState == null) return;
+        if (sections.HasFlag(SettingsSections.General)) _currentSettingsState = _currentSettingsState with { General = CaptureGeneralSettings() };
+        if (sections.HasFlag(SettingsSections.Visual)) _currentSettingsState = _currentSettingsState with { Visual = CaptureVisualSettings() };
+        if (sections.HasFlag(SettingsSections.Screens)) _currentSettingsState = _currentSettingsState with { Screens = CaptureScreenSettings() };
+        BtnApplySettings.IsEnabled = !_isApplyingSettings && _currentSettingsState != _savedSettingsState;
+    }
+
     private void BindCollections()
     {
         // 新标记没有声明 ItemTemplate / DisplayMemberPath，这里在代码里补上显示字段。
@@ -871,6 +1020,11 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         input.ApplyTemplate();
+        if (control is NumberBox number && !_numberInputs.ContainsKey(number))
+        {
+            _numberInputs[number] = input;
+            TrackSettingsProperty(input, TextBox.TextProperty, SettingsSections.Visual);
+        }
         input.Padding = new Thickness(10, 0, 6, 0);
         input.VerticalContentAlignment = VerticalAlignment.Center;
         if (FindVisualDescendant<ScrollViewer>(input, "ContentElement") is { } content)
@@ -1000,14 +1154,14 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckStartSilent.Header = Localization.Get("Basic_StartSilent");
         CheckHideTrayIcon.Header = Localization.Get("Basic_HideTrayIcon");
         TxtHideTrayHint.Text = Localization.Get("Basic_HideTrayHint");
-        BtnBasicReset.Content = Localization.Get("Visual_ResetDefaults");
-        BtnFilterReset.Content = Localization.Get("Visual_ResetDefaults");
+        BtnBasicReset.Content = Localization.Get("Settings_ResetPage");
+        BtnFilterReset.Content = Localization.Get("Settings_ResetPage");
         CheckRunAsAdmin.Header = Localization.Get("Basic_RunAsAdmin");
         TxtRunAsAdminHint.Text = Localization.Get("Basic_RunAsAdminHint");
         CheckTouchscreenMode.Header = Localization.Get("Basic_Touchscreen");
         TxtTouchscreenHint.Text = Localization.Get("Basic_TouchscreenHint");
         TxtVisualTitle.Text = Localization.Get("Visual_Title");
-        BtnVisualReset.Content = Localization.Get("Visual_ResetDefaults");
+        BtnVisualReset.Content = Localization.Get("Settings_ResetPage");
         CheckLinkedEffectScale.Header = Localization.Get("Visual_LinkedScale");
         TxtLinkedScaleHint.Text = Localization.Get("Visual_LinkedScaleHint");
         TxtVisualScale.Text = Localization.Get("Visual_Scale");
@@ -1046,8 +1200,12 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtLogHint.Text = Localization.Get("Log_Hint");
         TxtAboutTitle.Text = Localization.Get("About_Title");
         TxtAboutDescription.Text = Localization.Get("About_Description");
-        TxtDevOptions.Text = Localization.Get("About_DevOptions");
-        BtnResetAll.Content = Localization.Get("About_ResetAll");
+        TxtRepositoryLinks.Text = Localization.Get("About_Repositories");
+        BtnRepoDoomVoss.Content = Localization.Get("About_OpenRepository");
+        BtnRepoCialloKing.Content = Localization.Get("About_OpenRepository");
+        BtnRepoWinUI.Content = Localization.Get("About_OpenRepository");
+        BtnResetSettings.Content = Localization.Get("Settings_Reset");
+        BtnScreensReset.Content = Localization.Get("Settings_ResetPage");
         TxtOverlayRunning.Text = Localization.Get("Overlay_RunningProcess");
         SearchRunningProcess.PlaceholderText = Localization.Get("Filter_Browse");
         BtnOverlayCancel.Content = Localization.Get("Overlay_Cancel");
@@ -1055,6 +1213,7 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtOverlayVisualReset.Text = Localization.Get("Overlay_VisualReset");
         BtnOverlayVisualCancel.Content = Localization.Get("Overlay_Cancel");
         BtnOverlayVisualConfirm.Content = Localization.Get("Overlay_ConfirmReset");
+        SearchVisualReset.PlaceholderText = Localization.Get("Overlay_SearchSettings");
         TxtOverlayRename.Text = Localization.Get("Overlay_RenameProfile");
         TxtOverlayRenamePrompt.Text = Localization.Get("Overlay_RenamePrompt");
         BtnOverlayRenameCancel.Content = Localization.Get("Overlay_Cancel");
@@ -1349,6 +1508,7 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             _colorAlphaSlider.Value = 10;
         }
+        QueueSettingsChangeCheck(SettingsSections.Visual);
     }
 
     private void UpdateSpectrumClip()
@@ -1464,6 +1624,20 @@ public sealed partial class ControlPanelWindow : UserControl
     // ==================================================================
     // 外链 / 版本 / 语言
     // ==================================================================
+
+    private async void OpenRepository_Click(object sender, RoutedEventArgs args)
+    {
+        if (sender is not Button { Tag: string url }) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception exception)
+        {
+            AppLogger.Warn($"Failed to open repository link: {exception.Message}");
+            await ShowMessageAsync(Localization.Format("Msg_OpenLinkFailed", exception.Message));
+        }
+    }
 
     private void LoadVersion()
     {
@@ -1833,58 +2007,19 @@ public sealed partial class ControlPanelWindow : UserControl
     // 基础设置联动
     // ==================================================================
 
-    private async void ResetBasicDefaults_Click(object sender, RoutedEventArgs args)
-    {
-        if (await ConfirmAsync(Localization.Get("Msg_ConfirmBasicDefaults"), Localization.Get("Visual_ResetDefaults")))
-        {
-            RestoreBasicDefaults();
-        }
-    }
+    private void ResetBasicDefaults_Click(object sender, RoutedEventArgs args) => OpenResetOverlay(ResetScope.Basic);
 
-    private void RestoreBasicDefaults()
+    private void ResetFilterDefaults_Click(object sender, RoutedEventArgs args) => OpenResetOverlay(ResetScope.Filter);
+
+    private void RestoreLanguageDefault()
     {
         string culture = Localization.NormalizeCulture(CultureInfo.GetCultureInfo(GetUserDefaultUILanguage()).Name);
         ComboLanguage.SelectedItem = ComboLanguage.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), culture, StringComparison.OrdinalIgnoreCase));
-        SelectDarkMode(DarkModeOption.System);
-        CheckAlwaysTrailEffectSwitch.IsOn = false;
-        CheckMasterSwitch.IsOn = true;
-        RadioClickType.SelectedIndex = 0;
-        CheckMiddleClickTrigger.IsOn = false;
-        CheckScreenshotCompatibilityMode.IsOn = false;
-        CheckAutoStart.IsOn = false;
-        CheckStartSilent.IsOn = false;
-        CheckHideTrayIcon.IsOn = false;
-        CheckRunAsAdmin.IsOn = false;
-        CheckTouchscreenMode.IsOn = false;
-        UpdateClickEffectPanelVisibility();
     }
 
     [DllImport("kernel32.dll")]
     private static extern ushort GetUserDefaultUILanguage();
-
-    private async void ResetFilterDefaults_Click(object sender, RoutedEventArgs args)
-    {
-        if (await ConfirmAsync(Localization.Get("Msg_ConfirmFilterDefaults"), Localization.Get("Visual_ResetDefaults")))
-        {
-            RestoreFilterDefaults();
-        }
-    }
-
-    private void RestoreFilterDefaults()
-    {
-        CheckEnvironmentFilter.IsOn = false;
-        CheckHideInFullscreen.IsOn = true;
-        CheckShowEffectOnDesktop.IsOn = true;
-        if (ComboProfiles.SelectedItem is FilterProfile active)
-        {
-            active.Mode = ProcessFilterModeOption.Blacklist;
-            active.Processes.Clear();
-        }
-        SelectProcessFilterMode(ProcessFilterModeOption.Blacklist);
-        RefreshCurrentProfileProcesses(ComboProfiles.SelectedItem as FilterProfile);
-        UpdateEnvironmentFilterInterlock();
-    }
 
     private void CheckMasterSwitch_Changed(object sender, RoutedEventArgs e)
     {
@@ -2118,7 +2253,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         if (Profiles.Count <= 1)
         {
-            NativeMessageBox.Show(Localization.Get("Msg_KeepOneProfile"), Localization.Get("Msg_Info"));
+            await ShowMessageAsync(Localization.Get("Msg_KeepOneProfile"), Localization.Get("Msg_Info"));
             return;
         }
 
@@ -2391,133 +2526,232 @@ public sealed partial class ControlPanelWindow : UserControl
     // 视觉表现恢复默认
     // ==================================================================
 
-    private void OpenVisualResetOverlay_Click(object sender, RoutedEventArgs e)
+    private void OpenVisualResetOverlay_Click(object sender, RoutedEventArgs args) => OpenResetOverlay(ResetScope.Visual);
+    private void OpenAllResetOverlay_Click(object sender, RoutedEventArgs args) => OpenResetOverlay(ResetScope.All);
+    private void ResetScreenDefaults_Click(object sender, RoutedEventArgs args) => OpenResetOverlay(ResetScope.Screens);
+
+    private void OpenResetOverlay(ResetScope scope)
     {
-        _ = sender;
-        _ = e;
-
-        RebuildVisualResetItems();
-        foreach (VisualResetItem item in VisualResetItems)
+        _resetScope = scope;
+        VisualResetItems.Clear();
+        if (scope is ResetScope.Basic or ResetScope.All) RebuildBasicResetItems();
+        if (scope is ResetScope.Visual or ResetScope.All) RebuildVisualResetItems();
+        if (scope is ResetScope.Filter or ResetScope.All) RebuildFilterResetItems();
+        if (scope is ResetScope.Screens or ResetScope.All) RebuildScreenResetItems();
+        TxtOverlayVisualReset.Text = Localization.Get(scope switch
         {
-            item.IsSelected = true;
-        }
-
+            ResetScope.Basic => "Overlay_BasicReset",
+            ResetScope.Filter => "Overlay_FilterReset",
+            ResetScope.Screens => "Overlay_ScreenReset",
+            ResetScope.All => "Overlay_AllReset",
+            _ => "Overlay_VisualReset"
+        });
+        foreach (VisualResetItem item in VisualResetItems) item.IsSelected = true;
         SearchVisualReset.Text = string.Empty;
         RefreshVisualResetRows(null);
         VisualResetOverlay.Visibility = Visibility.Visible;
     }
 
-    private void CloseVisualResetOverlay_Click(object sender, RoutedEventArgs e)
+    private void AddPageResetItem(string group, string title, string value, Action restore) =>
+        VisualResetItems.Add(new VisualResetItem(title, Localization.Format("Reset_DefaultValue", value), restore) { Group = group });
+
+    private void AddToggleResetItem(string group, ToggleSwitch toggle, bool value) =>
+        AddPageResetItem(group, toggle.Header?.ToString() ?? string.Empty,
+            Localization.Get(value ? "Basic_DarkModeOn" : "Basic_DarkModeOff"), () => toggle.IsOn = value);
+
+    private void RebuildBasicResetItems()
     {
-        _ = sender;
-        _ = e;
-        VisualResetOverlay.Visibility = Visibility.Collapsed;
+        string group = TxtBasicTitle.Text;
+        AddPageResetItem(group, TxtBasicLanguage.Text, Localization.Get("Basic_DarkModeSystem"), RestoreLanguageDefault);
+        AddPageResetItem(group, TxtDarkMode.Text, Localization.Get("Basic_DarkModeSystem"), () => SelectDarkMode(DarkModeOption.System));
+        AddToggleResetItem(group, CheckAlwaysTrailEffectSwitch, false);
+        AddToggleResetItem(group, CheckMasterSwitch, true);
+        AddPageResetItem(group, TxtClickType.Text, Localization.Get("Basic_LeftClick"), () => RadioClickType.SelectedIndex = 0);
+        foreach (ToggleSwitch toggle in new[] { CheckMiddleClickTrigger, CheckScreenshotCompatibilityMode, CheckAutoStart,
+                     CheckStartSilent, CheckHideTrayIcon, CheckRunAsAdmin, CheckTouchscreenMode })
+            AddToggleResetItem(group, toggle, false);
     }
 
-    private void SearchVisualReset_TextChanged(object sender, TextChangedEventArgs e)
+    private void RebuildFilterResetItems()
     {
-        _ = e;
-        RefreshVisualResetRows(SearchVisualReset.Text);
+        string group = TxtFilterTitle.Text;
+        AddToggleResetItem(group, CheckEnvironmentFilter, false);
+        AddToggleResetItem(group, CheckHideInFullscreen, true);
+        AddToggleResetItem(group, CheckShowEffectOnDesktop, true);
+        AddPageResetItem(group, TxtFilterProfiles.Text, Localization.Get("Reset_DefaultProfile"), () =>
+        {
+            FilterProfile profile = Profiles.FirstOrDefault(item => item.Name == Localization.Get("Profile_Default"))
+                ?? Profiles.FirstOrDefault() ?? new FilterProfile();
+            profile.Name = Localization.Get("Profile_Default");
+            profile.Mode = ProcessFilterModeOption.Blacklist;
+            profile.Processes.Clear();
+            Profiles.Clear();
+            Profiles.Add(profile);
+            ComboProfiles.SelectedIndex = 0;
+        });
+        AddPageResetItem(group, TxtFilterMode.Text, Localization.Get("Filter_Mode_Blacklist"), () =>
+        {
+            if (ComboProfiles.SelectedItem is FilterProfile active) active.Mode = ProcessFilterModeOption.Blacklist;
+            SelectProcessFilterMode(ProcessFilterModeOption.Blacklist);
+        });
+        AddPageResetItem(group, TxtProcessList.Text, Localization.Get("Reset_EmptyList"), () =>
+        {
+            if (ComboProfiles.SelectedItem is not FilterProfile active) return;
+            active.Processes.Clear();
+            RefreshCurrentProfileProcesses(active);
+        });
+    }
+
+    private void RebuildScreenResetItems()
+    {
+        foreach (ScreenOptionItem screen in ScreenOptions)
+            AddPageResetItem(TxtMultiScreenTitle.Text, screen.Title, Localization.Get("Basic_DarkModeOn"), () =>
+            {
+                screen.IsEnabled = true;
+                SyncScreenToggles();
+            });
+    }
+
+    private void CloseVisualResetOverlay_Click(object sender, RoutedEventArgs args)
+    {
+        VisualResetOverlay.Visibility = Visibility.Collapsed;
+        VisualResetItems.Clear();
+    }
+
+    private void SearchVisualReset_TextChanged(object sender, TextChangedEventArgs args) => RefreshVisualResetRows(SearchVisualReset.Text);
+
+    private void AddVisualResetItem(VisualAppearanceResetFlags flags, string title, string key, object value, Action restore)
+    {
+        object label = value is bool enabled ? Localization.Get(enabled ? "Basic_DarkModeOn" : "Basic_DarkModeOff") : value;
+        var item = new VisualResetItem(flags, title, Localization.Format("Reset_DefaultValue", label))
+        {
+            Group = TxtVisualTitle.Text,
+            Restore = restore,
+            Save = () => ConfigManager.Save(key, value),
+            SettingKey = key
+        };
+        VisualResetItems.Add(item);
     }
 
     private void RebuildVisualResetItems()
     {
-        VisualResetItems.Clear();
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.UnifiedEffectScale, Localization.Get("VisualReset_UnifiedScale"), Localization.Get("VisualReset_UnifiedScale_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailEffectScale, Localization.Get("VisualReset_TrailScale"), Localization.Get("VisualReset_TrailScale_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ClickEffectScale, Localization.Get("VisualReset_ClickScale"), Localization.Get("VisualReset_ClickScale_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.EffectOpacity, Localization.Get("VisualReset_Opacity"), Localization.Get("VisualReset_Opacity_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), Localization.Get("VisualReset_UnifiedSpeed_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), Localization.Get("VisualReset_TrailSpeed_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ClickAnimationSpeed, Localization.Get("VisualReset_ClickSpeed"), Localization.Get("VisualReset_ClickSpeed_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, Localization.Get("VisualReset_TrailRefresh"), Localization.Get("VisualReset_TrailRefresh_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), Localization.Get("VisualReset_GlowIntensity_Sub")));
-        VisualResetItems.Add(new VisualResetItem(VisualAppearanceResetFlags.ParticleColor, Localization.Get("VisualReset_Color"), Localization.Get("VisualReset_Color_Sub")));
+        AddVisualResetItem(VisualAppearanceResetFlags.UnifiedEffectScale, CheckLinkedEffectScale.Header.ToString()!, "UseLinkedEffectScale", true,
+            () => CheckLinkedEffectScale.IsOn = true);
+        AddVisualResetItem(VisualAppearanceResetFlags.UnifiedEffectScale, Localization.Get("VisualReset_UnifiedScale"), "EffectScale", 1.0, () => SliderScale.Value = 1);
+        AddVisualResetItem(VisualAppearanceResetFlags.TrailEffectScale, Localization.Get("VisualReset_TrailScale"), "TrailEffectScale", 1.0, () => SliderTrailScale.Value = 1);
+        AddVisualResetItem(VisualAppearanceResetFlags.ClickEffectScale, Localization.Get("VisualReset_ClickScale"), "ClickEffectScale", 1.0, () => SliderClickScale.Value = 1);
+        AddVisualResetItem(VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), "GlowIntensity", 1.0, () => SliderGlow.Value = 1);
+        AddVisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, CheckLinkedAnimationSpeed.Header.ToString()!, "UseLinkedAnimationSpeed", true,
+            () => CheckLinkedAnimationSpeed.IsOn = true);
+        AddVisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), "EffectSpeed", 1.0, () => SliderSpeed.Value = 1);
+        AddVisualResetItem(VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), "TrailAnimationSpeed", 1.0, () => SliderTrailAnimSpeed.Value = 1);
+        AddVisualResetItem(VisualAppearanceResetFlags.ClickAnimationSpeed, Localization.Get("VisualReset_ClickSpeed"), "ClickAnimationSpeed", 1.0, () => SliderClickAnimSpeed.Value = 1);
+        AddVisualResetItem(VisualAppearanceResetFlags.None, CheckApplyCurveDraw.Header.ToString()!, "ApplyCurveDraw", false, () => CheckApplyCurveDraw.IsOn = false);
+        AddVisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, CheckFollowDisplayRefreshRate.Header.ToString()!, "FollowDisplayRefreshRate", true,
+            () => CheckFollowDisplayRefreshRate.IsOn = true);
+        AddVisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, Localization.Get("VisualReset_TrailRefresh"), "TrailRefreshRate", 60, () => SliderTrailRefresh.Value = 60);
+        AddVisualResetItem(VisualAppearanceResetFlags.EffectOpacity, Localization.Get("VisualReset_Opacity"), "EffectOpacity", 1.0, () =>
+        {
+            _effectOpacity = 1;
+            UpdateColorPreview(ConfigManager.ParticleColor);
+        });
+        AddVisualResetItem(VisualAppearanceResetFlags.ParticleColor, Localization.Get("VisualReset_Color"), "ParticleColor", "76,167,255",
+            () =>
+            {
+                ConfigManager.ParticleColor = "76,167,255";
+                UpdateColorPreview(ConfigManager.ParticleColor);
+            });
     }
 
-    /// <summary>
-    /// 标记里这个 ListView 没有 ItemTemplate，因此行（标题 + 副标题 + 复选框）在代码里构建，
-    /// 语义与旧版 DataTemplate + IsSelected 一致。
-    /// </summary>
     private void RefreshVisualResetRows(string? filter)
     {
         ListVisualResetItems.Items.Clear();
-
+        string? group = null;
         foreach (VisualResetItem item in VisualResetItems)
         {
             if (!string.IsNullOrWhiteSpace(filter) &&
-                item.Title.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
-                item.Subtitle.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                !item.Title.Contains(filter, StringComparison.OrdinalIgnoreCase) &&
+                !item.Subtitle.Contains(filter, StringComparison.OrdinalIgnoreCase) &&
+                !item.Group.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
+            if (_resetScope == ResetScope.All && group != item.Group)
             {
-                continue;
+                group = item.Group;
+                ListVisualResetItems.Items.Add(new TextBlock
+                {
+                    Text = group, Style = TryGetAppResource<Style>("BasSettingsSectionTitleStyle"), IsHitTestVisible = false
+                });
             }
-
             ListVisualResetItems.Items.Add(CreateVisualResetRow(item));
         }
     }
 
-    private static CheckBox CreateVisualResetRow(VisualResetItem item)
+    private static Border CreateVisualResetRow(VisualResetItem item)
     {
-        var text = new StackPanel { Spacing = 2 };
-        text.Children.Add(new TextBlock { Text = item.Title, TextWrapping = TextWrapping.Wrap });
-        text.Children.Add(new TextBlock
-        {
-            Text = item.Subtitle,
-            Opacity = 0.7,
-            FontSize = 12,
-            TextWrapping = TextWrapping.Wrap
-        });
-
+        var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(new TextBlock { Text = item.Title, Style = TryGetAppResource<Style>("BasSettingTitleStyle") });
+        if (!string.IsNullOrEmpty(item.Subtitle))
+            text.Children.Add(new TextBlock { Text = item.Subtitle, Style = TryGetAppResource<Style>("BasCaptionStyle") });
         var check = new CheckBox
         {
-            IsChecked = item.IsSelected,
-            Content = text,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            Tag = item
+            IsChecked = item.IsSelected, MinWidth = 0, Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center
         };
-
+        AutomationProperties.SetName(check, item.Title);
         check.Checked += (_, _) => item.IsSelected = true;
         check.Unchecked += (_, _) => item.IsSelected = false;
-        return check;
+        var layout = new Grid { ColumnSpacing = 16 };
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(check, 1);
+        layout.Children.Add(text);
+        layout.Children.Add(check);
+        return new Border { Child = layout, Style = TryGetAppResource<Style>("BasSettingCardStyle") };
     }
 
-    private void ConfirmVisualReset_Click(object sender, RoutedEventArgs e)
+    private async void ConfirmVisualReset_Click(object sender, RoutedEventArgs args)
     {
-        _ = sender;
-        _ = e;
-
-        VisualAppearanceResetFlags flags = VisualAppearanceResetFlags.None;
-        foreach (VisualResetItem item in VisualResetItems)
+        VisualResetItem[] selected = VisualResetItems.Where(item => item.IsSelected).ToArray();
+        if (selected.Length == 0)
         {
-            if (item.IsSelected)
-            {
-                flags |= item.Flags;
-            }
-        }
-
-        if (flags == VisualAppearanceResetFlags.None)
-        {
-            NativeMessageBox.Show(Localization.Get("Msg_SelectVisualReset"), Localization.Get("Msg_VisualReset_Title"));
+            await ShowMessageAsync(Localization.Get("Msg_SelectVisualReset"), Localization.Get("Msg_VisualReset_Title"));
             return;
         }
-
-        ConfigManager.ApplyVisualAppearanceDefaults(flags);
-        LoadSettings();
-
-        int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
-        bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsOn;
-        ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
-        ConfigManager.GetAnimationSpeedsForOverlay(out double trailSpeed, out double clickSpeed);
-        double effectOpacity = Math.Round(_effectOpacity, 2);
-
-        App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
-        App.Overlay?.UpdateEffectSettings(trailScale, clickScale, effectOpacity, trailSpeed, clickSpeed, ConfigManager.GlowIntensity);
-        App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
-        App.Overlay?.SetCurveDraw(CheckApplyCurveDraw.IsOn);
-
+        Focus(FocusState.Programmatic);
+        _isLoading = true;
+        _suppressValueSync = true;
+        try
+        {
+            foreach (VisualResetItem item in selected) item.Restore?.Invoke();
+            SyncSliderAndBoxValues();
+        }
+        finally
+        {
+            _suppressValueSync = false;
+            _isLoading = false;
+        }
+        UpdateClickEffectPanelVisibility();
+        UpdateEnvironmentFilterInterlock();
+        UpdateEffectScalePanelVisibility();
+        UpdateAnimationSpeedPanelVisibility();
+        UpdateTrailRefreshInterlock();
         VisualResetOverlay.Visibility = Visibility.Collapsed;
-        NativeMessageBox.Show(Localization.Get("Msg_VisualResetDone"), Localization.Get("Msg_VisualReset_Title"));
+        if (_resetScope == ResetScope.Visual)
+        {
+            foreach (VisualResetItem item in selected) item.Save?.Invoke();
+            MarkVisualSettingsSaved(selected);
+            ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
+            ConfigManager.GetAnimationSpeedsForOverlay(out double trailSpeed, out double clickSpeed);
+            App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
+            App.Overlay?.UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSpeed, clickSpeed, ConfigManager.GlowIntensity);
+            App.Overlay?.UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
+            App.Overlay?.SetCurveDraw(ConfigManager.ApplyCurveDraw);
+            await ShowMessageAsync(Localization.Get("Msg_VisualResetDone"), Localization.Get("Msg_VisualReset_Title"));
+        }
+        else
+        {
+            UpdateApplySettingsState(SettingsSections.All);
+            await ShowMessageAsync(Localization.Get("Msg_PageResetDone"), Localization.Get("Msg_VisualReset_Title"));
+        }
     }
 
     // ==================================================================
@@ -2768,7 +3002,11 @@ public sealed partial class ControlPanelWindow : UserControl
             Style = TryGetAppResource<Style>("BasSettingToggleStyle")
         };
         AutomationProperties.SetName(toggle, $"{item.Title} - {item.EnableLabel}");
-        toggle.Toggled += (_, _) => item.IsEnabled = toggle.IsOn;
+        toggle.Toggled += (_, _) =>
+        {
+            item.IsEnabled = toggle.IsOn;
+            QueueSettingsChangeCheck(SettingsSections.Screens);
+        };
 
         var row = new Grid { ColumnSpacing = 16 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -2880,9 +3118,24 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private async void SaveSettings_Click(object sender, RoutedEventArgs e)
     {
-        _ = sender;
-        _ = e;
+        Focus(FocusState.Programmatic);
+        UpdateApplySettingsState(SettingsSections.All);
+        if (!BtnApplySettings.IsEnabled) return;
+        _isApplyingSettings = true;
+        BtnApplySettings.IsEnabled = false;
+        try
+        {
+            await SaveSettingsCoreAsync();
+        }
+        finally
+        {
+            _isApplyingSettings = false;
+            if (!_isClosed) UpdateApplySettingsState(SettingsSections.All);
+        }
+    }
 
+    private async Task SaveSettingsCoreAsync()
+    {
         DarkModeOption selectedDarkMode = GetSelectedDarkMode();
         string? selectedLanguage = GetSelectedLanguage() ?? _pendingLanguage;
         bool languageChanged = !string.IsNullOrWhiteSpace(selectedLanguage) &&
@@ -2988,7 +3241,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         if (selectedIds.Count == 0)
         {
-            NativeMessageBox.ShowWarning(Localization.Get("Msg_MinOneScreen"), Localization.Get("Msg_MultiScreen_Title"));
+            await ShowMessageAsync(Localization.Get("Msg_MinOneScreen"), Localization.Get("Msg_MultiScreen_Title"));
             return;
         }
 
@@ -3017,6 +3270,7 @@ public sealed partial class ControlPanelWindow : UserControl
             App.Overlay?.RefreshScreenSelection();
         }
 
+        CaptureSettingsBaseline();
         using (WindowsIdentity identity = WindowsIdentity.GetCurrent())
         {
             bool isCurrentAdmin = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
@@ -3136,41 +3390,41 @@ public sealed partial class ControlPanelWindow : UserControl
         }
     }
 
-    private async void ResetConfig_Click(object sender, RoutedEventArgs e)
-    {
-        _ = sender;
-        _ = e;
-
-        bool confirmed = await ConfirmAsync(
-            Localization.Get("Msg_ConfirmReset"),
-            Localization.Get("Msg_ConfirmReset_Title"));
-
-        if (!confirmed)
-        {
-            return;
-        }
-
-        try
-        {
-            _skipSaveOnClosing = true;
-            ConfigManager.ResetAndClear();
-            (Application.Current as App)?.ExitApplication();
-        }
-        catch (Exception ex)
-        {
-            _skipSaveOnClosing = false;
-            NativeMessageBox.Show(Localization.Format("Msg_DeleteFailed", ex.Message));
-        }
-    }
-
-    // ==================================================================
-    // ==================================================================
-
     // ==================================================================
     // 对话框 / UI 线程
     // ==================================================================
 
-    /// <summary>Yes/No 确认框。ContentDialog 需要 XamlRoot，早于窗口加载的场景会先等 Loaded。</summary>
+    private async Task ShowMessageAsync(string message, string? title = null)
+    {
+        bool gateHeld = false;
+        try
+        {
+            await _dialogGate.WaitAsync();
+            gateHeld = true;
+            XamlRoot? root = await EnsureXamlRootAsync();
+            if (root == null || _isClosed) return;
+            _messageDialog = new ContentDialog
+            {
+                XamlRoot = root,
+                RequestedTheme = RootGrid.ActualTheme,
+                Title = title ?? Localization.Get("Msg_Info"),
+                Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = Localization.Get("ColorPicker_Confirm"),
+                DefaultButton = ContentDialogButton.Close
+            };
+            await _messageDialog.ShowAsync();
+        }
+        catch (Exception exception)
+        {
+            AppLogger.Warn($"Failed to show in-window message: {exception.Message}");
+        }
+        finally
+        {
+            _messageDialog = null;
+            if (gateHeld) _dialogGate.Release();
+        }
+    }
+
     private async Task<bool> ConfirmAsync(string message, string title)
     {
         bool gateHeld = false;
@@ -3189,6 +3443,7 @@ public sealed partial class ControlPanelWindow : UserControl
             var dialog = new ContentDialog
             {
                 XamlRoot = root,
+                RequestedTheme = RootGrid.ActualTheme,
                 Title = title,
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
                 // 通用文案里没有 Yes/No，沿用已有的本地化「确定 / 取消」。
@@ -3306,6 +3561,11 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         _isClosed = true;
+        _messageDialog?.Hide();
+        foreach (var callback in _settingsCallbacks) callback.Control.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
+        Profiles.CollectionChanged -= GeneralSettingsCollectionChanged;
+        CurrentProfileProcesses.CollectionChanged -= GeneralSettingsCollectionChanged;
+        ScreenOptions.CollectionChanged -= ScreenSettingsCollectionChanged;
         foreach (var selector in _segmentedSelectors) selector.Dispose();
         CompositionTarget.Rendering -= ColorPreview_Rendering;
         _colorCardGeometry?.StopAnimation("Size.Y");
