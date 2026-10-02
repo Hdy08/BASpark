@@ -545,6 +545,9 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly DispatcherQueueTimer? _refreshTimer;
 
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
+    private readonly Dictionary<Panel, Storyboard> _settingsAnimations = new();
+    private sealed record ModalAnimation(Storyboard Storyboard, TaskCompletionSource<bool> Completion, bool Closing);
+    private readonly Dictionary<Grid, ModalAnimation> _modalAnimations = new();
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
@@ -658,7 +661,11 @@ public sealed partial class ControlPanelWindow : UserControl
             _host.CloseRequested += ControlPanelWindow_Closed;
             _host.SizeChanged += (_, _) => UpdateCaptionButtonState();
             RootGrid.Loaded += RootGrid_Loaded;
-            RootGrid.SizeChanged += (_, _) => UpdateCaptionButtonBounds();
+            RootGrid.SizeChanged += (_, _) =>
+            {
+                StopSettingsAnimations();
+                UpdateCaptionButtonBounds();
+            };
             CaptionButtons.SizeChanged += (_, _) => UpdateCaptionButtonBounds();
 
             _refreshTimer = App.DispatcherQueue.CreateTimer();
@@ -1490,14 +1497,14 @@ public sealed partial class ControlPanelWindow : UserControl
         EffectColorExpander.ApplyTemplate();
         _colorContentHost = FindVisualDescendant<Border>(EffectColorExpander, "ExpanderContentHost");
         Visual visual = ElementCompositionPreview.GetElementVisual(EffectColorCard);
-        _colorCardGeometry = visual.Compositor.CreateRoundedRectangleGeometry();
+        _colorCardGeometry ??= visual.Compositor.CreateRoundedRectangleGeometry();
         _colorCardGeometry.CornerRadius = new Vector2(6);
-        _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, 60);
         visual.Clip = visual.Compositor.CreateGeometricClip(_colorCardGeometry);
-        if (EffectColorExpander.IsExpanded)
-        {
-            AnimateColorCard(expanding: true);
-        }
+        if (_colorCardAnimating || _colorContentHost == null) return;
+        _colorContentHost.Height = EffectColorExpander.IsExpanded ? double.NaN : 0;
+        _colorContentHost.IsHitTestVisible = EffectColorExpander.IsExpanded;
+        EffectColorCard.UpdateLayout();
+        _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, (float)EffectColorCard.ActualHeight);
     }
 
     private void EffectColorCard_SizeChanged(object sender, SizeChangedEventArgs args)
@@ -1522,13 +1529,18 @@ public sealed partial class ControlPanelWindow : UserControl
         int generation = ++_colorCardAnimationGeneration;
         ColorPickerBody.Measure(new Size(Math.Max(0, EffectColorCard.ActualWidth - 34), double.PositiveInfinity));
         double contentHeight = ColorPickerBody.DesiredSize.Height + _colorContentHost.Padding.Top + _colorContentHost.Padding.Bottom;
+        if (!_colorCardAnimating)
+            _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, expanding ? 60 : (float)EffectColorCard.ActualHeight);
         _colorCardAnimating = true;
         _colorContentHost.Height = contentHeight;
         _colorContentHost.IsHitTestVisible = expanding;
+        EffectColorCard.UpdateLayout();
         var compositor = _colorCardGeometry.Compositor;
+        ElementCompositionPreview.GetElementVisual(EffectColorCard).Clip = compositor.CreateGeometricClip(_colorCardGeometry);
+        float targetHeight = expanding ? (float)EffectColorCard.ActualHeight : 60;
         var animation = compositor.CreateScalarKeyFrameAnimation();
         animation.InsertExpressionKeyFrame(0, "this.StartingValue");
-        animation.InsertKeyFrame(1, expanding ? (float)(60 + contentHeight) : 60,
+        animation.InsertKeyFrame(1, targetHeight,
             compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0.7f), new Vector2(0.2f, 1)));
         animation.Duration = TimeSpan.FromMilliseconds(expanding ? 220 : 180);
         var batch = compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
@@ -1543,14 +1555,11 @@ public sealed partial class ControlPanelWindow : UserControl
                     return;
                 }
 
-                _colorCardAnimating = false;
-                if (!expanding)
-                {
-                    _colorContentHost.Height = 0;
-                }
-
                 _colorCardGeometry.StopAnimation("Size.Y");
-                _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, expanding ? (float)(60 + contentHeight) : 60);
+                _colorContentHost.Height = expanding ? double.NaN : 0;
+                EffectColorCard.UpdateLayout();
+                _colorCardAnimating = false;
+                _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, (float)EffectColorCard.ActualHeight);
             });
         };
         batch.End();
@@ -1818,6 +1827,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void UpdatePageVisibility()
     {
+        StopSettingsAnimations();
         bool welcome = TabWelcome.IsChecked == true;
         bool settings = TabSettings.IsChecked == true;
         bool log = TabLog.IsChecked == true;
@@ -1904,6 +1914,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void UpdateSettingsSectionVisibility()
     {
+        StopSettingsAnimations();
         // 四个子项之间切换同样需要过渡动画，因此逐个走 SetPageVisible（它会对
         // 「本次新进入」的那一项播放动画），而不是直接赋 Visibility。
         FrameworkElement? incoming = SubTabBasic.IsChecked == true
@@ -2115,17 +2126,68 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         _ = sender;
         _ = e;
-        if (!IsUiReady)
+        if (!IsUiReady || _isLoading)
         {
             return;
         }
 
-        UpdateClickEffectPanelVisibility();
+        UpdateClickEffectPanelVisibility(animate: true);
     }
 
-    private void UpdateClickEffectPanelVisibility()
+    private void UpdateClickEffectPanelVisibility(bool animate = false) =>
+        SetSettingsVisibility(SectionBasic, animate, (PanelClickEffectOptions, CheckMasterSwitch.IsOn));
+
+    private void SetSettingsVisibility(Panel section, bool animate, params (FrameworkElement Element, bool Visible)[] changes)
     {
-        PanelClickEffectOptions.Visibility = CheckMasterSwitch.IsOn ? Visibility.Visible : Visibility.Collapsed;
+        StopSettingsAnimation(section);
+        if (changes.All(change => (change.Element.Visibility == Visibility.Visible) == change.Visible)) return;
+        bool play = animate && !_isLoading && IsUiReady && PageSettings.Visibility == Visibility.Visible &&
+            section.Visibility == Visibility.Visible && section.ActualHeight > 0;
+        section.UpdateLayout();
+        var positions = play
+            ? section.Children.OfType<FrameworkElement>().Where(element => element.Visibility == Visibility.Visible)
+                .ToDictionary(element => element, element => element.TransformToVisual(section).TransformPoint(new Point()).Y)
+            : new Dictionary<FrameworkElement, double>();
+        foreach (var change in changes) change.Element.Visibility = change.Visible ? Visibility.Visible : Visibility.Collapsed;
+        if (!play) return;
+        section.UpdateLayout();
+        var storyboard = new Storyboard();
+        foreach (FrameworkElement element in section.Children.OfType<FrameworkElement>().Where(element => element.Visibility == Visibility.Visible))
+        {
+            bool existing = positions.TryGetValue(element, out double previousTop);
+            double offset = existing ? previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : 16;
+            if (Math.Abs(offset) > 0.1)
+            {
+                var reposition = new RepositionThemeAnimation { FromHorizontalOffset = 0, FromVerticalOffset = offset };
+                Storyboard.SetTarget(reposition, element);
+                storyboard.Children.Add(reposition);
+            }
+            if (!existing)
+            {
+                var entrance = new FadeInThemeAnimation();
+                Storyboard.SetTarget(entrance, element);
+                storyboard.Children.Add(entrance);
+            }
+        }
+        if (storyboard.Children.Count == 0) return;
+        _settingsAnimations[section] = storyboard;
+        storyboard.Completed += (_, _) =>
+        {
+            if (_settingsAnimations.TryGetValue(section, out Storyboard? active) && ReferenceEquals(active, storyboard))
+                StopSettingsAnimation(section);
+        };
+        storyboard.Begin();
+    }
+
+    private void StopSettingsAnimation(Panel section)
+    {
+        if (_settingsAnimations.Remove(section, out Storyboard? storyboard)) storyboard.Stop();
+    }
+
+    private void StopSettingsAnimations()
+    {
+        foreach (Storyboard storyboard in _settingsAnimations.Values) storyboard.Stop();
+        _settingsAnimations.Clear();
     }
 
     private void CheckRunAsAdmin_Changed(object sender, RoutedEventArgs e)
@@ -2300,7 +2362,7 @@ public sealed partial class ControlPanelWindow : UserControl
         if (ComboProfiles.SelectedItem is FilterProfile active)
         {
             NewProfileNameInput.Text = active.Name;
-            RenameProfileOverlay.Visibility = Visibility.Visible;
+            _ = SetModalOverlayVisibleAsync(RenameProfileOverlay, visible: true);
             NewProfileNameInput.Focus(FocusState.Programmatic);
             NewProfileNameInput.SelectAll();
         }
@@ -2326,14 +2388,14 @@ public sealed partial class ControlPanelWindow : UserControl
             }
         }
 
-        RenameProfileOverlay.Visibility = Visibility.Collapsed;
+        _ = SetModalOverlayVisibleAsync(RenameProfileOverlay, visible: false);
     }
 
     private void CloseRenameOverlay_Click(object sender, RoutedEventArgs e)
     {
         _ = sender;
         _ = e;
-        RenameProfileOverlay.Visibility = Visibility.Collapsed;
+        _ = SetModalOverlayVisibleAsync(RenameProfileOverlay, visible: false);
     }
 
     private async void DeleteProfile_Click(object sender, RoutedEventArgs e)
@@ -2452,14 +2514,14 @@ public sealed partial class ControlPanelWindow : UserControl
         RefreshRunningProcessList();
         SearchRunningProcess.Text = string.Empty;
         ApplyRunningProcessFilter(null);
-        RunningProcessOverlay.Visibility = Visibility.Visible;
+        _ = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: true);
     }
 
     private void CloseRunningProcessOverlay_Click(object sender, RoutedEventArgs e)
     {
         _ = sender;
         _ = e;
-        RunningProcessOverlay.Visibility = Visibility.Collapsed;
+        _ = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: false);
     }
 
     private void ConfirmAddRunningProcesses_Click(object sender, RoutedEventArgs e)
@@ -2477,7 +2539,7 @@ public sealed partial class ControlPanelWindow : UserControl
             AddProcessToActiveProfile(processName);
         }
 
-        RunningProcessOverlay.Visibility = Visibility.Collapsed;
+        _ = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: false);
     }
 
     private void SearchRunningProcess_TextChanged(object sender, TextChangedEventArgs e)
@@ -2615,7 +2677,7 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (VisualResetItem item in VisualResetItems) item.IsSelected = true;
         SearchVisualReset.Text = string.Empty;
         RefreshVisualResetRows(null);
-        VisualResetOverlay.Visibility = Visibility.Visible;
+        _ = SetModalOverlayVisibleAsync(VisualResetOverlay, visible: true);
     }
 
     private void AddPageResetItem(string group, string title, string value, Action restore) =>
@@ -2678,9 +2740,9 @@ public sealed partial class ControlPanelWindow : UserControl
             });
     }
 
-    private void CloseVisualResetOverlay_Click(object sender, RoutedEventArgs args)
+    private async void CloseVisualResetOverlay_Click(object sender, RoutedEventArgs args)
     {
-        VisualResetOverlay.Visibility = Visibility.Collapsed;
+        if (!await SetModalOverlayVisibleAsync(VisualResetOverlay, visible: false) || _isClosed) return;
         ListVisualResetItems.ItemsSource = null;
         VisualResetItems.Clear();
     }
@@ -2791,7 +2853,7 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
         UpdateTrailRefreshInterlock();
-        VisualResetOverlay.Visibility = Visibility.Collapsed;
+        if (!await SetModalOverlayVisibleAsync(VisualResetOverlay, visible: false) || _isClosed) return;
         if (_resetScope == ResetScope.Visual)
         {
             foreach (VisualResetItem item in selected) item.Save?.Invoke();
@@ -2802,12 +2864,12 @@ public sealed partial class ControlPanelWindow : UserControl
             App.Overlay?.UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSpeed, clickSpeed, ConfigManager.GlowIntensity);
             App.Overlay?.UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
             App.Overlay?.SetCurveDraw(ConfigManager.ApplyCurveDraw);
-            await ShowMessageAsync(Localization.Get("Msg_VisualResetDone"), Localization.Get("Msg_VisualReset_Title"));
+            await ShowMessageAsync(Localization.Get("Msg_VisualResetDone"), string.Empty);
         }
         else
         {
             UpdateApplySettingsState(SettingsSections.All);
-            await ShowMessageAsync(Localization.Get("Msg_PageResetDone"), Localization.Get("Msg_VisualReset_Title"));
+            await ShowMessageAsync(Localization.Get("Msg_PageResetDone"), string.Empty);
         }
     }
 
@@ -2846,15 +2908,12 @@ public sealed partial class ControlPanelWindow : UserControl
             _suppressValueSync = false;
         }
 
-        UpdateEffectScalePanelVisibility();
+        UpdateEffectScalePanelVisibility(animate: true);
     }
 
-    private void UpdateEffectScalePanelVisibility()
-    {
-        bool linked = CheckLinkedEffectScale.IsOn;
-        PanelUnifiedEffectScale.Visibility = linked ? Visibility.Visible : Visibility.Collapsed;
-        PanelSplitEffectScale.Visibility = linked ? Visibility.Collapsed : Visibility.Visible;
-    }
+    private void UpdateEffectScalePanelVisibility(bool animate = false) =>
+        SetSettingsVisibility(SectionVisual, animate, (PanelUnifiedEffectScale, CheckLinkedEffectScale.IsOn),
+            (PanelSplitEffectScale, !CheckLinkedEffectScale.IsOn));
 
     private void LinkedAnimationSpeed_Changed(object sender, RoutedEventArgs e)
     {
@@ -2887,15 +2946,12 @@ public sealed partial class ControlPanelWindow : UserControl
             _suppressValueSync = false;
         }
 
-        UpdateAnimationSpeedPanelVisibility();
+        UpdateAnimationSpeedPanelVisibility(animate: true);
     }
 
-    private void UpdateAnimationSpeedPanelVisibility()
-    {
-        bool linked = CheckLinkedAnimationSpeed.IsOn;
-        PanelUnifiedAnimationSpeed.Visibility = linked ? Visibility.Visible : Visibility.Collapsed;
-        PanelSplitAnimationSpeed.Visibility = linked ? Visibility.Collapsed : Visibility.Visible;
-    }
+    private void UpdateAnimationSpeedPanelVisibility(bool animate = false) =>
+        SetSettingsVisibility(SectionVisual, animate, (PanelUnifiedAnimationSpeed, CheckLinkedAnimationSpeed.IsOn),
+            (PanelSplitAnimationSpeed, !CheckLinkedAnimationSpeed.IsOn));
 
     private void GetUiEffectScales(out double trailScale, out double clickScale)
     {
@@ -3456,6 +3512,94 @@ public sealed partial class ControlPanelWindow : UserControl
     // 对话框 / UI 线程
     // ==================================================================
 
+    private Task<bool> SetModalOverlayVisibleAsync(Grid overlay, bool visible)
+    {
+        if (_isClosed) return Task.FromResult(false);
+        if (_modalAnimations.TryGetValue(overlay, out ModalAnimation? previous))
+        {
+            if (previous.Closing == !visible) return previous.Completion.Task;
+            _modalAnimations.Remove(overlay);
+            previous.Storyboard.Stop();
+            previous.Completion.TrySetResult(false);
+        }
+        else if ((overlay.Visibility == Visibility.Visible) == visible)
+        {
+            return Task.FromResult(true);
+        }
+        var card = (Border)overlay.Children[0];
+        overlay.Visibility = Visibility.Visible;
+        card.IsHitTestVisible = visible;
+        overlay.UpdateLayout();
+        var storyboard = new Storyboard();
+        Timeline popup = visible ? new PopInThemeAnimation { FromVerticalOffset = 16 } : new PopOutThemeAnimation();
+        Timeline fade = visible ? new FadeInThemeAnimation() : new FadeOutThemeAnimation();
+        Storyboard.SetTarget(popup, card);
+        Storyboard.SetTarget(fade, overlay);
+        storyboard.Children.Add(popup);
+        storyboard.Children.Add(fade);
+        var completion = new TaskCompletionSource<bool>();
+        var state = new ModalAnimation(storyboard, completion, !visible);
+        _modalAnimations[overlay] = state;
+        storyboard.Completed += (_, _) =>
+        {
+            if (_isClosed || !_modalAnimations.TryGetValue(overlay, out ModalAnimation? current) || !ReferenceEquals(current, state)) return;
+            _modalAnimations.Remove(overlay);
+            storyboard.Stop();
+            overlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            card.IsHitTestVisible = true;
+            completion.TrySetResult(true);
+        };
+        try
+        {
+            storyboard.Begin();
+        }
+        catch (Exception exception)
+        {
+            _modalAnimations.Remove(overlay);
+            storyboard.Stop();
+            overlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            card.IsHitTestVisible = true;
+            completion.TrySetResult(true);
+            AppLogger.Warn($"Failed to animate modal overlay: {exception.Message}");
+        }
+        return completion.Task;
+    }
+
+    private void ConfigureContentDialog(ContentDialog dialog)
+    {
+        dialog.Style = (Style)Application.Current.Resources["BasContentDialogStyle"];
+        dialog.Resources["ContentDialogSmokeFill"] = VisualResetOverlay.Background;
+        dialog.Resources["ContentDialogTopOverlay"] = ((Border)VisualResetOverlay.Children[0]).Background;
+        dialog.Opened += (_, _) => UpdateDialogScrim(dialog);
+        dialog.Loaded += (_, _) =>
+        {
+            UpdateDialogScrim(dialog);
+            if (FindVisualDescendant<Grid>(dialog, "CommandSpace") is { } commands)
+            {
+                commands.HorizontalAlignment = HorizontalAlignment.Right;
+                foreach (ColumnDefinition column in commands.ColumnDefinitions) column.Width = GridLength.Auto;
+            }
+            foreach (string name in new[] { "PrimaryButton", "SecondaryButton", "CloseButton" })
+            {
+                if (FindVisualDescendant<Button>(dialog, name) is { } button)
+                {
+                    button.MinWidth = 0;
+                    button.HorizontalAlignment = HorizontalAlignment.Right;
+                }
+            }
+        };
+    }
+
+    private void UpdateDialogScrim(ContentDialog dialog)
+    {
+        if (dialog.XamlRoot == null || _isClosed) return;
+        foreach (Popup popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot))
+        {
+            if (popup.Child is Microsoft.UI.Xaml.Shapes.Rectangle { Name: "SmokeLayerBackground" } scrim)
+                scrim.Fill = VisualResetOverlay.Background;
+        }
+    }
+
     private async Task ShowMessageAsync(string message, string? title = null)
     {
         bool gateHeld = false;
@@ -3469,11 +3613,12 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 XamlRoot = root,
                 RequestedTheme = RootGrid.ActualTheme,
-                Title = title ?? Localization.Get("Msg_Info"),
+                Title = title == string.Empty ? null : title ?? Localization.Get("Msg_Info"),
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
                 CloseButtonText = Localization.Get("ColorPicker_Confirm"),
                 DefaultButton = ContentDialogButton.Close
             };
+            ConfigureContentDialog(_messageDialog);
             await _messageDialog.ShowAsync();
         }
         catch (Exception exception)
@@ -3514,6 +3659,8 @@ public sealed partial class ControlPanelWindow : UserControl
                 DefaultButton = ContentDialogButton.Primary
             };
 
+            _messageDialog = dialog;
+            ConfigureContentDialog(dialog);
             return await dialog.ShowAsync() == ContentDialogResult.Primary;
         }
         catch (Exception ex)
@@ -3523,6 +3670,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         finally
         {
+            _messageDialog = null;
             if (gateHeld)
             {
                 _dialogGate.Release();
@@ -3624,6 +3772,13 @@ public sealed partial class ControlPanelWindow : UserControl
 
         _isClosed = true;
         _messageDialog?.Hide();
+        StopSettingsAnimations();
+        foreach (ModalAnimation animation in _modalAnimations.Values)
+        {
+            animation.Storyboard.Stop();
+            animation.Completion.TrySetResult(false);
+        }
+        _modalAnimations.Clear();
         foreach (var callback in _settingsCallbacks) callback.Control.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
         Profiles.CollectionChanged -= GeneralSettingsCollectionChanged;
         CurrentProfileProcesses.CollectionChanged -= GeneralSettingsCollectionChanged;

@@ -26,12 +26,6 @@
         <SolidColorBrush x:Key="SliderTrackValueFill" Color="{ThemeResource BasSettingsAccentColor}" />
         <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="{ThemeResource BasSettingsAccentColor}" />
         <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="{ThemeResource BasSettingsAccentColor}" />
-        <SolidColorBrush x:Key="AccentButtonBackground" Color="{ThemeResource BasSettingsAccentColor}" />
-        <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="{ThemeResource BasSettingsAccentColor}" />
-        <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="{ThemeResource BasSettingsAccentColor}" />
-        <SolidColorBrush x:Key="AccentButtonForeground" Color="{ThemeResource BasSettingsAccentTextColor}" />
-        <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{ThemeResource BasSettingsAccentTextColor}" />
-        <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{ThemeResource BasSettingsAccentTextColor}" />
         <ResourceDictionary x:Key="DangerButtonResources">
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Default">
@@ -76,7 +70,7 @@
             CardTemplate="{StaticResource SelectionCardTemplate}" HeadingTemplate="{StaticResource SelectionHeadingTemplate}" />
         <Style x:Key="SelectionCardContainerStyle" TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,28,0" />
+            <Setter Property="Margin" Value="0,0,16,0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="IsTabStop" Value="False" />
         </Style>
@@ -349,7 +343,7 @@
                     <StackPanel>
 
                         <!-- ===== 基础设置 ===== -->
-                        <StackPanel x:Name="SectionBasic" Style="{StaticResource BasSettingsListStyle}">
+                        <StackPanel x:Name="SectionBasic">
                             <Grid ColumnSpacing="12" Margin="0,8,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -449,7 +443,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <StackPanel x:Name="PanelClickEffectOptions" Style="{StaticResource BasCollapsibleSettingsStyle}">
+                            <StackPanel x:Name="PanelClickEffectOptions">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -620,7 +614,7 @@
                         </StackPanel>
 
                         <!-- ===== 视觉表现 ===== -->
-                        <StackPanel x:Name="SectionVisual" Visibility="Collapsed" Style="{StaticResource BasSettingsListStyle}">
+                        <StackPanel x:Name="SectionVisual" Visibility="Collapsed">
                             <Grid ColumnSpacing="12" Margin="0,8,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -662,7 +656,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <StackPanel x:Name="PanelUnifiedEffectScale" Style="{StaticResource BasCollapsibleSettingsStyle}">
+                            <StackPanel x:Name="PanelUnifiedEffectScale">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -705,7 +699,7 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
-                            <StackPanel x:Name="PanelSplitEffectScale" Visibility="Collapsed" Style="{StaticResource BasCollapsibleSettingsStyle}">
+                            <StackPanel x:Name="PanelSplitEffectScale" Visibility="Collapsed">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -854,7 +848,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <StackPanel x:Name="PanelUnifiedAnimationSpeed" Style="{StaticResource BasCollapsibleSettingsStyle}">
+                            <StackPanel x:Name="PanelUnifiedAnimationSpeed">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -897,7 +891,7 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
-                            <StackPanel x:Name="PanelSplitAnimationSpeed" Visibility="Collapsed" Style="{StaticResource BasCollapsibleSettingsStyle}">
+                            <StackPanel x:Name="PanelSplitAnimationSpeed" Visibility="Collapsed">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -1174,7 +1168,7 @@
                         </StackPanel>
 
                         <!-- ===== 环境过滤 ===== -->
-                        <StackPanel x:Name="SectionFilter" Visibility="Collapsed" Style="{StaticResource BasSettingsListStyle}">
+                        <StackPanel x:Name="SectionFilter" Visibility="Collapsed">
                             <Grid ColumnSpacing="12" Margin="0,8,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -1403,7 +1397,7 @@
                         </StackPanel>
 
                         <!-- ===== 多屏管理 ===== -->
-                        <StackPanel x:Name="SectionMultiScreen" Visibility="Collapsed" Style="{StaticResource BasSettingsListStyle}">
+                        <StackPanel x:Name="SectionMultiScreen" Visibility="Collapsed">
                             <Grid ColumnSpacing="12" Margin="0,8,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />

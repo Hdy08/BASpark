@@ -1070,6 +1070,7 @@ public class WinUi3UiTests
             .Select(style => (string?)style.Attribute(Xaml + "Key"))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
+        styleKeys.Add("DefaultContentDialogStyle");
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
         {
@@ -1382,7 +1383,7 @@ public class WinUi3UiTests
             Assert.Single(list.Descendants(), element => element.Name.LocalName == "TransitionCollection");
         }
         XElement container = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionCardContainerStyle");
-        Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,28,0");
+        Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,16,0");
         XElement card = GetNamedElement(panel, "SelectionCard");
         Assert.Equal("SelectionCard_Tapped", (string?)card.Attribute("Tapped"));
         Assert.Equal("0", (string?)card.Attribute("MinHeight"));
@@ -1433,18 +1434,101 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void DependentSettings_UseNativeRepositionAndEntranceTransitions()
+    public void DependentSettings_AnimateOnlyExplicitToggleChangesWithoutPermanentLayoutTransitions()
     {
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
-        XElement list = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsListStyle");
-        Assert.Contains(list.Descendants(), element => element.Name.LocalName == "RepositionThemeTransition");
-        XElement collapsible = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasCollapsibleSettingsStyle");
-        Assert.Contains(collapsible.Descendants(), element => element.Name.LocalName == "EntranceThemeTransition");
+        Assert.DoesNotContain(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") is "BasSettingsListStyle" or "BasCollapsibleSettingsStyle");
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
-        foreach (string name in new[] { "SectionBasic", "SectionVisual", "SectionFilter", "SectionMultiScreen" })
-            Assert.Equal("{StaticResource BasSettingsListStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
-        foreach (string name in new[] { "PanelClickEffectOptions", "PanelUnifiedEffectScale", "PanelSplitEffectScale", "PanelUnifiedAnimationSpeed", "PanelSplitAnimationSpeed" })
-            Assert.Equal("{StaticResource BasCollapsibleSettingsStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
+        foreach (string name in new[] { "SectionBasic", "SectionVisual", "SectionFilter", "SectionMultiScreen", "PanelClickEffectOptions", "PanelUnifiedEffectScale", "PanelSplitEffectScale", "PanelUnifiedAnimationSpeed", "PanelSplitAnimationSpeed" })
+        {
+            XElement element = GetNamedElement(panel, name);
+            Assert.Null(element.Attribute("Style"));
+            Assert.DoesNotContain(element.Elements(), child => child.Name.LocalName.EndsWith("Transitions", StringComparison.Ordinal));
+        }
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        foreach (string name in new[] { "UpdateClickEffectPanelVisibility", "UpdateEffectScalePanelVisibility", "UpdateAnimationSpeedPanelVisibility" })
+        {
+            Assert.Contains($"private void {name}(bool animate = false)", source, StringComparison.Ordinal);
+            Assert.Equal(1, source.Split($"{name}(animate: true)", StringSplitOptions.None).Length - 1);
+        }
+        Assert.Contains("animate && !_isLoading && IsUiReady && PageSettings.Visibility == Visibility.Visible", source, StringComparison.Ordinal);
+        Assert.Contains("private void UpdatePageVisibility()\n    {\n        StopSettingsAnimations()", source, StringComparison.Ordinal);
+        Assert.Contains("private void UpdateSettingsSectionVisibility()\n    {\n        StopSettingsAnimations()", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DependentSettings_RepositionFromMeasuredLocalOffsetsAndAnimateNewCardsTogether()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string animate = source[source.IndexOf("private void SetSettingsVisibility", StringComparison.Ordinal)..source.IndexOf("private void StopSettingsAnimation(", StringComparison.Ordinal)];
+        Assert.True(animate.IndexOf("var positions", StringComparison.Ordinal) < animate.IndexOf("foreach (var change in changes) change.Element.Visibility =", StringComparison.Ordinal));
+        Assert.Contains("previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : 16", animate, StringComparison.Ordinal);
+        Assert.Contains("new RepositionThemeAnimation", animate, StringComparison.Ordinal);
+        Assert.Contains("new FadeInThemeAnimation()", animate, StringComparison.Ordinal);
+        Assert.Equal(1, animate.Split("storyboard.Begin()", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("EntranceThemeTransition", animate, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModalOverlays_UseNativeOpenAndCloseAnimationsAndWaitBeforeHidingContent()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("new PopInThemeAnimation", source, StringComparison.Ordinal);
+        Assert.Contains("new PopOutThemeAnimation()", source, StringComparison.Ordinal);
+        Assert.Contains("Timeline fade = visible ? new FadeInThemeAnimation() : new FadeOutThemeAnimation()", source, StringComparison.Ordinal);
+        Assert.Contains("previous.Completion.TrySetResult(false)", source, StringComparison.Ordinal);
+        Assert.Contains("!ReferenceEquals(current, state)", source, StringComparison.Ordinal);
+        Assert.Contains("animation.Completion.TrySetResult(false)", source, StringComparison.Ordinal);
+        foreach (string name in new[] { "RunningProcessOverlay", "VisualResetOverlay", "RenameProfileOverlay" })
+        {
+            Assert.Contains($"SetModalOverlayVisibleAsync({name}, visible: true)", source, StringComparison.Ordinal);
+            Assert.Contains($"SetModalOverlayVisibleAsync({name}, visible: false)", source, StringComparison.Ordinal);
+            Assert.DoesNotContain($"{name}.Visibility =", source, StringComparison.Ordinal);
+        }
+        string close = source[source.IndexOf("private async void CloseVisualResetOverlay_Click", StringComparison.Ordinal)..source.IndexOf("private void SearchVisualReset_TextChanged", StringComparison.Ordinal)];
+        Assert.True(close.IndexOf("await SetModalOverlayVisibleAsync", StringComparison.Ordinal) < close.IndexOf("VisualResetItems.Clear()", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NativeMessageDialogs_ShareModalBrushesNativeButtonSizesAndOmitResetSuccessTitles()
+    {
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasContentDialogStyle");
+        Assert.Equal("{StaticResource DefaultContentDialogStyle}", (string?)style.Attribute("BasedOn"));
+        Assert.DoesNotContain(style.Elements(), element => (string?)element.Attribute("Property") == "Template");
+        Assert.Contains(style.Elements(), element => (string?)element.Attribute("Property") == "Background" && (string?)element.Attribute("Value") == "{ThemeResource BasLayerBrush}");
+        foreach (XElement theme in styles.Root!.Element(Presentation + "ResourceDictionary.ThemeDictionaries")!.Elements())
+        {
+            Assert.Contains(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "ContentDialogSmokeFill" && (string?)element.Attribute("ResourceKey") == "BasModalScrimBrush");
+            Assert.Contains(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "ContentDialogTopOverlay" && (string?)element.Attribute("ResourceKey") == "BasLayerBrush");
+        }
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("Title = title == string.Empty ? null : title ?? Localization.Get(\"Msg_Info\")", source, StringComparison.Ordinal);
+        Assert.Contains("ShowMessageAsync(Localization.Get(\"Msg_PageResetDone\"), string.Empty)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowMessageAsync(Localization.Get(\"Msg_VisualResetDone\"), string.Empty)", source, StringComparison.Ordinal);
+        Assert.Contains("column.Width = GridLength.Auto", source, StringComparison.Ordinal);
+        Assert.Contains("button.MinWidth = 0", source, StringComparison.Ordinal);
+        Assert.Contains("dialog.Resources[\"ContentDialogSmokeFill\"] = VisualResetOverlay.Background", source, StringComparison.Ordinal);
+        Assert.Contains("VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot)", source, StringComparison.Ordinal);
+        Assert.Contains("scrim.Fill = VisualResetOverlay.Background", source, StringComparison.Ordinal);
+        Assert.Contains("dialog.Resources[\"ContentDialogTopOverlay\"] = ((Border)VisualResetOverlay.Children[0]).Background", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AccentButtons_KeepNativeTemplatesWithDistinctLightAndDarkInteractionColors()
+    {
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        foreach (XElement theme in styles.Root!.Element(Presentation + "ResourceDictionary.ThemeDictionaries")!.Elements().Where(element => (string?)element.Attribute(Xaml + "Key") is "Light" or "Dark"))
+        {
+            string color = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentColor").Value;
+            string hover = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentHoverColor").Value;
+            string pressed = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentPressedColor").Value;
+            Assert.NotEqual(color, hover);
+            Assert.NotEqual(hover, pressed);
+            Assert.NotEqual(color, pressed);
+        }
+        Assert.Contains(styles.Root!.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "AccentButtonBackgroundPointerOver" && (string?)element.Attribute("Color") == "{ThemeResource BasSettingsAccentHoverColor}");
+        Assert.Contains(styles.Root!.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "AccentButtonBackgroundPressed" && (string?)element.Attribute("Color") == "{ThemeResource BasSettingsAccentPressedColor}");
     }
 
     [Fact]
@@ -1593,6 +1677,11 @@ public class WinUi3UiTests
         Assert.Contains("animation.InsertExpressionKeyFrame(0, \"this.StartingValue\")", animate, StringComparison.Ordinal);
         Assert.Contains("_colorCardGeometry.StartAnimation(\"Size.Y\", animation)", animate, StringComparison.Ordinal);
         Assert.Contains("generation != _colorCardAnimationGeneration", animate, StringComparison.Ordinal);
+        Assert.True(animate.IndexOf("EffectColorCard.UpdateLayout()", StringComparison.Ordinal) < animate.IndexOf("_colorCardGeometry.StartAnimation", StringComparison.Ordinal));
+        Assert.Contains("float targetHeight = expanding ? (float)EffectColorCard.ActualHeight : 60", animate, StringComparison.Ordinal);
+        string loaded = source[source.IndexOf("private void EffectColorExpander_Loaded", StringComparison.Ordinal)..source.IndexOf("private void EffectColorCard_SizeChanged", StringComparison.Ordinal)];
+        Assert.Contains("_colorCardGeometry ??=", loaded, StringComparison.Ordinal);
+        Assert.DoesNotContain("AnimateColorCard", loaded, StringComparison.Ordinal);
     }
 
     [Fact]
