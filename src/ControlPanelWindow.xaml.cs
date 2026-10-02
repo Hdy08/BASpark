@@ -2440,7 +2440,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         if (Profiles.Count <= 1)
         {
-            await ShowMessageAsync(Localization.Get("Msg_KeepOneProfile"), Localization.Get("Msg_Info"));
+            await ShowMessageAsync(Localization.Get("Msg_KeepOneProfile"), string.Empty);
             return;
         }
 

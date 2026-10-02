@@ -1805,6 +1805,16 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void LastProfileDeletion_ShowsTheNativeMessageWithoutAnInformationHeading()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string delete = source[source.IndexOf("private async void DeleteProfile_Click", StringComparison.Ordinal)..source.IndexOf("private void RemoveProcess_Click", StringComparison.Ordinal)];
+        Assert.Contains("""await ShowMessageAsync(Localization.Get("Msg_KeepOneProfile"), string.Empty);""", delete, StringComparison.Ordinal);
+        Assert.Contains("Title = title == string.Empty ? null", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Msg_Info", delete, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProfileRename_KeepsOnlyTheTitleInputAndActionButtons()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
