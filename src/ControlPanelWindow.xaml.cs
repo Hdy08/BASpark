@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
@@ -102,21 +103,48 @@ public sealed class SegmentedRadioLayout : NonVirtualizingLayout
     }
 }
 
+public abstract class SelectionCardItem : INotifyPropertyChanged
+{
+    private bool _isSelected;
+    public abstract string Title { get; }
+    public abstract string Subtitle { get; }
+    public Visibility SubtitleVisibility => string.IsNullOrEmpty(Subtitle) ? Visibility.Collapsed : Visibility.Visible;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value) return;
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+public sealed class SelectionCardTemplateSelector : DataTemplateSelector
+{
+    public DataTemplate CardTemplate { get; set; } = null!;
+    public DataTemplate HeadingTemplate { get; set; } = null!;
+    protected override DataTemplate SelectTemplateCore(object item) => item is string ? HeadingTemplate : CardTemplate;
+    protected override DataTemplate SelectTemplateCore(object item, DependencyObject container) => SelectTemplateCore(item);
+}
+
 /// <summary>运行中进程选择列表的一行。</summary>
-public class ProcessItem
+public class ProcessItem : SelectionCardItem
 {
     public string DisplayName { get; set; } = string.Empty;
     public string ProcessName { get; set; } = string.Empty;
-    public bool IsSelected { get; set; }
+    public override string Title => DisplayName;
+    public override string Subtitle => DisplayName.Equals(ProcessName, StringComparison.OrdinalIgnoreCase) ? string.Empty : ProcessName;
 }
 
 /// <summary>视觉表现「恢复默认」列表的一项。</summary>
-public class VisualResetItem
+public class VisualResetItem : SelectionCardItem
 {
     public VisualAppearanceResetFlags Flags { get; }
-    public string Title { get; }
-    public string Subtitle { get; }
-    public bool IsSelected { get; set; }
+    public override string Title { get; }
+    public override string Subtitle { get; }
     public Action? Restore { get; set; }
     public Action? Save { get; set; }
     public string? SettingKey { get; set; }
@@ -528,6 +556,10 @@ public sealed partial class ControlPanelWindow : UserControl
     private double _effectOpacity = 1;
     private bool _colorPreviewPending;
     private Color _pendingPreviewColor;
+    private bool _colorPreviewSubscribed;
+    private bool _isColorDragging;
+    private long _lastColorLabelUpdate;
+    private readonly Dictionary<int, int> _presetColorIndices = new();
     private readonly SolidColorBrush _previewColorBrush = new();
     private Microsoft.UI.Xaml.Controls.Primitives.ColorSpectrum? _configuredColorSpectrum;
     private readonly List<SegmentedSelectorAnimator> _segmentedSelectors = new();
@@ -579,6 +611,14 @@ public sealed partial class ControlPanelWindow : UserControl
                 : ConfigManager.UiLanguage;
 
             ApplyWindowChrome();
+            var dangerResources = (ResourceDictionary)Resources["DangerButtonResources"];
+            foreach (Button button in new[] { BtnResetSettings, BtnDeleteProfile })
+                foreach (var theme in dangerResources.ThemeDictionaries)
+                {
+                    var resources = new ResourceDictionary();
+                    foreach (var resource in (ResourceDictionary)theme.Value) resources[resource.Key] = resource.Value;
+                    button.Resources.ThemeDictionaries[theme.Key] = resources;
+                }
             BindCollections();
             SetupSliderPairs();
             ConfigureInputControls();
@@ -589,7 +629,15 @@ public sealed partial class ControlPanelWindow : UserControl
             var checkerBrush = CreateColorCheckerBrush();
             ColorPreviewCheckers.Fill = checkerBrush;
             ExpandedColorPreviewCheckers.Fill = checkerBrush;
+            ColorPreviewFill.Background = _previewColorBrush;
+            ExpandedColorPreviewFill.Background = _previewColorBrush;
+            EffectColorPicker.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(ColorPicker_PointerPressed), true);
+            EffectColorPicker.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished), true);
+            EffectColorPicker.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished), true);
+            EffectColorPicker.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(ColorPicker_PointerFinished), true);
             RootGrid.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(RootGrid_PointerPressed), true);
+            RootGrid.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished), true);
+            RootGrid.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished), true);
 
             ComboProfiles.ItemsSource = Profiles;
             ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses;
@@ -790,7 +838,10 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void TrackSettingsProperty(DependencyObject control, DependencyProperty property, SettingsSections sections)
     {
-        long token = control.RegisterPropertyChangedCallback(property, (_, _) => QueueSettingsChangeCheck(sections));
+        long token = control.RegisterPropertyChangedCallback(property, (_, _) =>
+        {
+            if (!_syncingColorControls) QueueSettingsChangeCheck(sections);
+        });
         _settingsCallbacks.Add((control, property, token));
     }
 
@@ -871,6 +922,7 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         if (_isLoading || !IsUiReady || _savedSettingsState == null) return;
         _pendingSettingsSections |= sections;
+        if (_isColorDragging && sections == SettingsSections.Visual) return;
         if (_settingsCheckQueued) return;
         _settingsCheckQueued = true;
         App.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
@@ -895,7 +947,6 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         // 新标记没有声明 ItemTemplate / DisplayMemberPath，这里在代码里补上显示字段。
         ComboProfiles.DisplayMemberPath = nameof(FilterProfile.Name);
-        ListRunningProcesses.DisplayMemberPath = nameof(ProcessItem.DisplayName);
     }
 
     private void SetupSliderPairs()
@@ -1207,7 +1258,7 @@ public sealed partial class ControlPanelWindow : UserControl
         BtnResetSettings.Content = Localization.Get("Settings_Reset");
         BtnScreensReset.Content = Localization.Get("Settings_ResetPage");
         TxtOverlayRunning.Text = Localization.Get("Overlay_RunningProcess");
-        SearchRunningProcess.PlaceholderText = Localization.Get("Filter_Browse");
+        SearchRunningProcess.PlaceholderText = Localization.Get("Overlay_SearchProcesses");
         BtnOverlayCancel.Content = Localization.Get("Overlay_Cancel");
         BtnOverlayConfirmAdd.Content = Localization.Get("Overlay_ConfirmAdd");
         TxtOverlayVisualReset.Text = Localization.Get("Overlay_VisualReset");
@@ -1318,23 +1369,64 @@ public sealed partial class ControlPanelWindow : UserControl
         ConfigManager.ParticleColor = ToRgbString(args.NewColor);
         _effectOpacity = Math.Clamp((_colorAlphaSlider?.Value ?? args.NewColor.A / 255.0 * 100) / 100, 0.1, 1);
         _pendingPreviewColor = args.NewColor;
-        if (!_colorPreviewPending)
-        {
-            _colorPreviewPending = true;
-            CompositionTarget.Rendering += ColorPreview_Rendering;
-        }
+        _colorPreviewPending = true;
+        EnsureColorPreviewRendering();
+    }
+
+    private void EnsureColorPreviewRendering()
+    {
+        if (_colorPreviewSubscribed) return;
+        _colorPreviewSubscribed = true;
+        CompositionTarget.Rendering += ColorPreview_Rendering;
+    }
+
+    private void StopColorPreviewRendering()
+    {
+        if (!_colorPreviewSubscribed) return;
+        _colorPreviewSubscribed = false;
+        CompositionTarget.Rendering -= ColorPreview_Rendering;
+    }
+
+    private void ColorPicker_PointerPressed(object sender, PointerRoutedEventArgs args)
+    {
+        if (!args.GetCurrentPoint(EffectColorPicker).IsInContact) return;
+        DependencyObject? source = args.OriginalSource as DependencyObject;
+        while (source != null && source != EffectColorPicker && source is not ColorSpectrum and not ColorPickerSlider)
+            source = VisualTreeHelper.GetParent(source);
+        if (source is not ColorSpectrum and not ColorPickerSlider) return;
+        _isColorDragging = true;
+        _lastColorLabelUpdate = 0;
+        EnsureColorPreviewRendering();
+    }
+
+    private void ColorPicker_PointerFinished(object sender, PointerRoutedEventArgs args)
+    {
+        if (!_isColorDragging) return;
+        _isColorDragging = false;
+        _colorPreviewPending = true;
+        EnsureColorPreviewRendering();
+        QueueSettingsChangeCheck(SettingsSections.Visual);
     }
 
     private void ColorPreview_Rendering(object? sender, object args)
     {
-        CompositionTarget.Rendering -= ColorPreview_Rendering;
-        if (!_colorPreviewPending || _isClosed)
+        if (_isClosed)
         {
+            StopColorPreviewRendering();
             return;
         }
-
-        _colorPreviewPending = false;
-        ApplyColorPreview(_pendingPreviewColor, updatePicker: false);
+        if (_colorPreviewPending)
+        {
+            _colorPreviewPending = false;
+            ApplyColorPreview(_pendingPreviewColor, updatePicker: false);
+        }
+        if (_isColorDragging && _pendingSettingsSections != 0)
+        {
+            SettingsSections pending = _pendingSettingsSections;
+            _pendingSettingsSections = 0;
+            UpdateApplySettingsState(pending);
+        }
+        if (!_isColorDragging) StopColorPreviewRendering();
     }
 
     private void EffectColorPresets_SelectionChanged(object sender, SelectionChangedEventArgs args)
@@ -1550,41 +1642,39 @@ public sealed partial class ControlPanelWindow : UserControl
         Color rgb = TryParseRgbString(rgbString, out Color parsed) ? parsed : Colors.Gray;
         byte alpha = (byte)Math.Round(Math.Clamp(_effectOpacity, 0.1, 1) * 255);
         _colorPreviewPending = false;
-        CompositionTarget.Rendering -= ColorPreview_Rendering;
-        ApplyColorPreview(Color.FromArgb(alpha, rgb.R, rgb.G, rgb.B), updatePicker: true);
+        _pendingPreviewColor = Color.FromArgb(alpha, rgb.R, rgb.G, rgb.B);
+        if (!_isColorDragging) StopColorPreviewRendering();
+        ApplyColorPreview(_pendingPreviewColor, updatePicker: true);
+        QueueSettingsChangeCheck(SettingsSections.Visual);
     }
 
     private void ApplyColorPreview(Color color, bool updatePicker)
     {
-        string hex = $"#{color.A:X2}{ColorPickerColorMath.ToHex(color)[1..]}";
+        long now = Stopwatch.GetTimestamp();
+        bool updateLabels = !_isColorDragging || now - _lastColorLabelUpdate >= Stopwatch.Frequency / 20;
         _syncingColorControls = true;
         try
         {
-            _previewColorBrush.Color = color;
-            ColorPreviewFill.Background = _previewColorBrush;
-            ExpandedColorPreviewFill.Background = _previewColorBrush;
-            if (EffectColorHexInput.Text != hex)
+            if (_previewColorBrush.Color != color) _previewColorBrush.Color = color;
+            if (updateLabels)
             {
-                EffectColorHexInput.Text = hex;
-                ExpandedColorHex.Text = hex;
+                _lastColorLabelUpdate = now;
+                string hex = $"#{color.A:X2}{ColorPickerColorMath.ToHex(color)[1..]}";
+                if (EffectColorHexInput.Text != hex) EffectColorHexInput.Text = hex;
+                if (ExpandedColorHex.Text != hex) ExpandedColorHex.Text = hex;
+                string opacity = $"{Localization.Get("Visual_Opacity")} {_effectOpacity * 100:0.#}%";
+                if (ExpandedColorOpacity.Text != opacity) ExpandedColorOpacity.Text = opacity;
             }
-
-            ExpandedColorOpacity.Text = $"{Localization.Get("Visual_Opacity")} {_effectOpacity * 100:0.#}%";
             if (updatePicker && EffectColorPicker.Color != color)
             {
                 EffectColorPicker.Color = color;
             }
 
-            int selectedIndex = -1;
-            for (int index = 0; index < EffectColorPresets.Items.Count; index++)
-            {
-                if (EffectColorPresets.Items[index] is RadioButton { Tag: string preset } &&
-                    ColorPickerColorMath.TryParseHex(preset, out Color presetColor) && presetColor.R == color.R && presetColor.G == color.G && presetColor.B == color.B)
-                {
-                    selectedIndex = index;
-                    break;
-                }
-            }
+            if (_presetColorIndices.Count == 0)
+                for (int index = 0; index < EffectColorPresets.Items.Count; index++)
+                    if (EffectColorPresets.Items[index] is RadioButton { Tag: string preset } && ColorPickerColorMath.TryParseHex(preset, out Color presetColor))
+                        _presetColorIndices[presetColor.R << 16 | presetColor.G << 8 | presetColor.B] = index;
+            int selectedIndex = _presetColorIndices.TryGetValue(color.R << 16 | color.G << 8 | color.B, out int presetIndex) ? presetIndex : -1;
 
             if (EffectColorPresets.SelectedIndex != selectedIndex)
             {
@@ -1838,7 +1928,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void RefreshTimer_Tick()
     {
-        if (_isClosed)
+        if (_isClosed || PageWelcome.Visibility != Visibility.Visible)
         {
             return;
         }
@@ -2377,7 +2467,6 @@ public sealed partial class ControlPanelWindow : UserControl
         _ = sender;
         _ = e;
 
-        SyncRunningProcessSelection();
         List<string> selected = _allRunningProcesses
             .Where(item => item.IsSelected)
             .Select(item => item.ProcessName)
@@ -2399,7 +2488,6 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void RefreshRunningProcessList()
     {
-        SyncRunningProcessSelection();
         _allRunningProcesses.Clear();
         RunningProcessList.Clear();
 
@@ -2484,7 +2572,6 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ApplyRunningProcessFilter(string? filter)
     {
-        SyncRunningProcessSelection();
         RunningProcessList.Clear();
 
         foreach (ProcessItem item in _allRunningProcesses)
@@ -2499,27 +2586,6 @@ public sealed partial class ControlPanelWindow : UserControl
             RunningProcessList.Add(item);
         }
 
-        RestoreRunningProcessSelection();
-    }
-
-    /// <summary>把列表控件上的勾选写回数据项（筛选会重建集合，需要记住跨筛选的选择）。</summary>
-    private void SyncRunningProcessSelection()
-    {
-        foreach (ProcessItem item in RunningProcessList)
-        {
-            item.IsSelected = ListRunningProcesses.SelectedItems.Contains(item);
-        }
-    }
-
-    private void RestoreRunningProcessSelection()
-    {
-        foreach (ProcessItem item in RunningProcessList)
-        {
-            if (item.IsSelected && !ListRunningProcesses.SelectedItems.Contains(item))
-            {
-                ListRunningProcesses.SelectedItems.Add(item);
-            }
-        }
     }
 
     // ==================================================================
@@ -2615,6 +2681,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void CloseVisualResetOverlay_Click(object sender, RoutedEventArgs args)
     {
         VisualResetOverlay.Visibility = Visibility.Collapsed;
+        ListVisualResetItems.ItemsSource = null;
         VisualResetItems.Clear();
     }
 
@@ -2665,7 +2732,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void RefreshVisualResetRows(string? filter)
     {
-        ListVisualResetItems.Items.Clear();
+        var rows = new List<object>();
         string? group = null;
         foreach (VisualResetItem item in VisualResetItems)
         {
@@ -2676,36 +2743,26 @@ public sealed partial class ControlPanelWindow : UserControl
             if (_resetScope == ResetScope.All && group != item.Group)
             {
                 group = item.Group;
-                ListVisualResetItems.Items.Add(new TextBlock
-                {
-                    Text = group, Style = TryGetAppResource<Style>("BasSettingsSectionTitleStyle"), IsHitTestVisible = false
-                });
+                rows.Add(group);
             }
-            ListVisualResetItems.Items.Add(CreateVisualResetRow(item));
+            rows.Add(item);
         }
+        ListVisualResetItems.ItemsSource = rows;
     }
 
-    private static Border CreateVisualResetRow(VisualResetItem item)
+    private void SelectionCard_Tapped(object sender, TappedRoutedEventArgs args)
     {
-        var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new TextBlock { Text = item.Title, Style = TryGetAppResource<Style>("BasSettingTitleStyle") });
-        if (!string.IsNullOrEmpty(item.Subtitle))
-            text.Children.Add(new TextBlock { Text = item.Subtitle, Style = TryGetAppResource<Style>("BasCaptionStyle") });
-        var check = new CheckBox
-        {
-            IsChecked = item.IsSelected, MinWidth = 0, Padding = new Thickness(0),
-            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center
-        };
-        AutomationProperties.SetName(check, item.Title);
-        check.Checked += (_, _) => item.IsSelected = true;
-        check.Unchecked += (_, _) => item.IsSelected = false;
-        var layout = new Grid { ColumnSpacing = 16 };
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(check, 1);
-        layout.Children.Add(text);
-        layout.Children.Add(check);
-        return new Border { Child = layout, Style = TryGetAppResource<Style>("BasSettingCardStyle") };
+        if (sender is FrameworkElement card && TryToggleSelectionCard(card, args.OriginalSource as DependencyObject))
+            args.Handled = true;
+    }
+
+    private static bool TryToggleSelectionCard(FrameworkElement card, DependencyObject? source)
+    {
+        if (card.DataContext is not SelectionCardItem item) return false;
+        for (; source != null && source != card; source = VisualTreeHelper.GetParent(source))
+            if (source is CheckBox) return false;
+        item.IsSelected = !item.IsSelected;
+        return true;
     }
 
     private async void ConfirmVisualReset_Click(object sender, RoutedEventArgs args)
@@ -3115,6 +3172,11 @@ public sealed partial class ControlPanelWindow : UserControl
     // ==================================================================
     // 保存设置
     // ==================================================================
+
+    private void ResetSettings_SizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (BtnApplySettings != null && args.NewSize.Width > 0) BtnApplySettings.Width = args.NewSize.Width;
+    }
 
     private async void SaveSettings_Click(object sender, RoutedEventArgs e)
     {
@@ -3567,7 +3629,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CurrentProfileProcesses.CollectionChanged -= GeneralSettingsCollectionChanged;
         ScreenOptions.CollectionChanged -= ScreenSettingsCollectionChanged;
         foreach (var selector in _segmentedSelectors) selector.Dispose();
-        CompositionTarget.Rendering -= ColorPreview_Rendering;
+        StopColorPreviewRendering();
         _colorCardGeometry?.StopAnimation("Size.Y");
         if (_colorAlphaSlider != null)
         {

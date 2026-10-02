@@ -644,6 +644,9 @@
     <data name="Overlay_FilterReset" xml:space="preserve">
       <value>选择要恢复默认的环境过滤项</value>
     </data>
+    <data name="Overlay_SearchProcesses" xml:space="preserve">
+      <value>搜索进程名</value>
+    </data>
     <data name="Overlay_SearchSettings" xml:space="preserve">
       <value>搜索设置项</value>
     </data>
@@ -663,7 +666,7 @@
       <value>重置设置</value>
     </data>
     <data name="Overlay_AllReset" xml:space="preserve">
-      <value>选择要重置的设置项</value>
+      <value>选择要恢复默认的设置项</value>
     </data>
     <data name="Overlay_ScreenReset" xml:space="preserve">
       <value>选择要重置的多屏设置项</value>

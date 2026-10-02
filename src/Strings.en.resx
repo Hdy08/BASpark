@@ -644,6 +644,9 @@
     <data name="Overlay_FilterReset" xml:space="preserve">
       <value>Choose environment filter settings to restore</value>
     </data>
+    <data name="Overlay_SearchProcesses" xml:space="preserve">
+      <value>Search process name</value>
+    </data>
     <data name="Overlay_SearchSettings" xml:space="preserve">
       <value>Search settings</value>
     </data>
@@ -663,7 +666,7 @@
       <value>Reset settings</value>
     </data>
     <data name="Overlay_AllReset" xml:space="preserve">
-      <value>Choose settings to reset</value>
+      <value>Choose settings to restore to defaults</value>
     </data>
     <data name="Overlay_ScreenReset" xml:space="preserve">
       <value>Choose display settings to reset</value>

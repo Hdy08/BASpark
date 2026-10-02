@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:BASpark"
     mc:Ignorable="d"
     FontFamily="{ThemeResource ContentControlThemeFontFamily}">
 
@@ -31,6 +32,54 @@
         <SolidColorBrush x:Key="AccentButtonForeground" Color="{ThemeResource BasSettingsAccentTextColor}" />
         <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{ThemeResource BasSettingsAccentTextColor}" />
         <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{ThemeResource BasSettingsAccentTextColor}" />
+        <ResourceDictionary x:Key="DangerButtonResources">
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#C42B1C" />
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#C42B1C" />
+                    <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White" />
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#A72318" />
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#A72318" />
+                    <SolidColorBrush x:Key="ButtonForegroundPressed" Color="White" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+        <DataTemplate x:Key="SelectionCardTemplate">
+            <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" MinHeight="0" Tapped="SelectionCard_Tapped">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" Style="{StaticResource BasSettingTitleStyle}" />
+                        <TextBlock Text="{Binding Subtitle}" Visibility="{Binding SubtitleVisibility}" Style="{StaticResource BasCaptionStyle}" />
+                    </StackPanel>
+                    <CheckBox x:Name="SelectionCardCheck" Grid.Column="1" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                              MinWidth="0" Padding="0" HorizontalAlignment="Right" VerticalAlignment="Center"
+                              AutomationProperties.Name="{Binding Title}" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="SelectionHeadingTemplate">
+            <TextBlock Text="{Binding}" Style="{StaticResource BasSettingsSectionTitleStyle}" IsHitTestVisible="False" />
+        </DataTemplate>
+        <local:SelectionCardTemplateSelector x:Key="SelectionCardTemplates"
+            CardTemplate="{StaticResource SelectionCardTemplate}" HeadingTemplate="{StaticResource SelectionHeadingTemplate}" />
+        <Style x:Key="SelectionCardContainerStyle" TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,28,0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="IsTabStop" Value="False" />
+        </Style>
     </UserControl.Resources>
 
     <Grid x:Name="RootGrid" Background="{ThemeResource BasPageBackgroundBrush}">
@@ -286,9 +335,10 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button x:Name="BtnResetSettings" Content="" Click="OpenAllResetOverlay_Click"
-                                Style="{StaticResource BasDangerButtonStyle}" />
+                                Style="{StaticResource BasDangerButtonStyle}" SizeChanged="ResetSettings_SizeChanged">
+                        </Button>
                         <Button x:Name="BtnApplySettings" IsEnabled="False" Content="" Click="SaveSettings_Click"
-                                Style="{StaticResource AccentButtonStyle}" MinWidth="128" />
+                                Style="{StaticResource AccentButtonStyle}" MinWidth="0" />
                     </StackPanel>
                 </Grid>
 
@@ -299,7 +349,7 @@
                     <StackPanel>
 
                         <!-- ===== 基础设置 ===== -->
-                        <StackPanel x:Name="SectionBasic">
+                        <StackPanel x:Name="SectionBasic" Style="{StaticResource BasSettingsListStyle}">
                             <Grid ColumnSpacing="12" Margin="0,8,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -399,7 +449,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <StackPanel x:Name="PanelClickEffectOptions">
+                            <StackPanel x:Name="PanelClickEffectOptions" Style="{StaticResource BasCollapsibleSettingsStyle}">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -570,7 +620,7 @@
                         </StackPanel>
 
                         <!-- ===== 视觉表现 ===== -->
-                        <StackPanel x:Name="SectionVisual" Visibility="Collapsed">
+                        <StackPanel x:Name="SectionVisual" Visibility="Collapsed" Style="{StaticResource BasSettingsListStyle}">
                             <Grid ColumnSpacing="12" Margin="0,8,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -612,7 +662,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <StackPanel x:Name="PanelUnifiedEffectScale">
+                            <StackPanel x:Name="PanelUnifiedEffectScale" Style="{StaticResource BasCollapsibleSettingsStyle}">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -655,7 +705,7 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
-                            <StackPanel x:Name="PanelSplitEffectScale" Visibility="Collapsed">
+                            <StackPanel x:Name="PanelSplitEffectScale" Visibility="Collapsed" Style="{StaticResource BasCollapsibleSettingsStyle}">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -804,7 +854,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <StackPanel x:Name="PanelUnifiedAnimationSpeed">
+                            <StackPanel x:Name="PanelUnifiedAnimationSpeed" Style="{StaticResource BasCollapsibleSettingsStyle}">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -847,7 +897,7 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
-                            <StackPanel x:Name="PanelSplitAnimationSpeed" Visibility="Collapsed">
+                            <StackPanel x:Name="PanelSplitAnimationSpeed" Visibility="Collapsed" Style="{StaticResource BasCollapsibleSettingsStyle}">
                                 <Border Style="{StaticResource BasSettingCardStyle}">
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
@@ -1124,7 +1174,7 @@
                         </StackPanel>
 
                         <!-- ===== 环境过滤 ===== -->
-                        <StackPanel x:Name="SectionFilter" Visibility="Collapsed">
+                        <StackPanel x:Name="SectionFilter" Visibility="Collapsed" Style="{StaticResource BasSettingsListStyle}">
                             <Grid ColumnSpacing="12" Margin="0,8,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -1344,17 +1394,16 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <Button x:Name="BtnBrowseProcess" Content="" Click="BrowseProcess_Click"
-                                                MinWidth="0" Padding="6,4" FontSize="12" />
+                                        <Button x:Name="BtnBrowseProcess" Content="" Click="BrowseProcess_Click" />
                                         <Button x:Name="BtnSelectRunningProcess" Grid.Column="1" Content=""
-                                                Click="SelectRunningProcess_Click" MinWidth="0" Padding="6,4" FontSize="12" />
+                                                Click="SelectRunningProcess_Click" />
                                     </Grid>
                                 </Grid>
                             </Border>
                         </StackPanel>
 
                         <!-- ===== 多屏管理 ===== -->
-                        <StackPanel x:Name="SectionMultiScreen" Visibility="Collapsed">
+                        <StackPanel x:Name="SectionMultiScreen" Visibility="Collapsed" Style="{StaticResource BasSettingsListStyle}">
                             <Grid ColumnSpacing="12" Margin="0,8,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -1528,10 +1577,16 @@
                              Margin="0,12,0,12"
                              PlaceholderText=""
                              TextChanged="SearchRunningProcess_TextChanged" />
-                    <ListView x:Name="ListRunningProcesses"
-                              Grid.Row="2"
-                              SelectionMode="Multiple"
-                              MinHeight="240" />
+                    <ListView x:Name="ListRunningProcesses" Grid.Row="2" SelectionMode="None"
+                              MinHeight="240" Margin="0,0,-16,0" HorizontalContentAlignment="Stretch"
+                              ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
+                              ItemContainerStyle="{StaticResource SelectionCardContainerStyle}"
+                              ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate><ItemsStackPanel CacheLength="2" /></ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemContainerTransitions><TransitionCollection /></ListView.ItemContainerTransitions>
+                    </ListView>
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" HorizontalAlignment="Right">
                         <Button x:Name="BtnOverlayCancel"
                                 Content=""
@@ -1572,17 +1627,15 @@
                              Grid.Row="1"
                              Margin="0,12,0,12"
                              TextChanged="SearchVisualReset_TextChanged" />
-                    <ListView x:Name="ListVisualResetItems"
-                              Grid.Row="2"
-                              SelectionMode="None"
-                              MinHeight="260" HorizontalContentAlignment="Stretch">
-                        <ListView.ItemContainerStyle>
-                            <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
-                                <Setter Property="Padding" Value="0" />
-                                <Setter Property="Margin" Value="0" />
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            </Style>
-                        </ListView.ItemContainerStyle>
+                    <ListView x:Name="ListVisualResetItems" Grid.Row="2" SelectionMode="None"
+                              MinHeight="260" Margin="0,0,-16,0" HorizontalContentAlignment="Stretch"
+                              ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
+                              ItemContainerStyle="{StaticResource SelectionCardContainerStyle}"
+                              ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate><ItemsStackPanel CacheLength="2" /></ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemContainerTransitions><TransitionCollection /></ListView.ItemContainerTransitions>
                     </ListView>
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" HorizontalAlignment="Right">
                         <Button x:Name="BtnOverlayVisualCancel"

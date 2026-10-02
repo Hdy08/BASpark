@@ -1334,14 +1334,131 @@ public class WinUi3UiTests
             Assert.Contains("Rebuild" + group + "ResetItems()", source, StringComparison.Ordinal);
         Assert.Contains("item.Group.Contains(filter", source, StringComparison.Ordinal);
         Assert.Contains("_resetScope == ResetScope.All && group != item.Group", source, StringComparison.Ordinal);
-        Assert.Contains("ListVisualResetItems.Items.Add(CreateVisualResetRow(item))", source, StringComparison.Ordinal);
-        string row = source[source.IndexOf("private static Border CreateVisualResetRow", StringComparison.Ordinal)..source.IndexOf("private async void ConfirmVisualReset_Click", StringComparison.Ordinal)];
-        Assert.Contains("BasSettingCardStyle", row, StringComparison.Ordinal);
-        Assert.Contains("BasSettingTitleStyle", row, StringComparison.Ordinal);
-        Assert.Contains("BasCaptionStyle", row, StringComparison.Ordinal);
-        Assert.Contains("HorizontalAlignment = HorizontalAlignment.Right", row, StringComparison.Ordinal);
-        Assert.Contains("Grid.SetColumn(check, 1)", row, StringComparison.Ordinal);
-        Assert.Contains("item.IsSelected = false", row, StringComparison.Ordinal);
+        Assert.Contains("rows.Add(group)", source, StringComparison.Ordinal);
+        Assert.Contains("rows.Add(item)", source, StringComparison.Ordinal);
+        Assert.Contains("ListVisualResetItems.ItemsSource = rows", source, StringComparison.Ordinal);
+        XElement card = GetNamedElement(panel, "SelectionCard");
+        Assert.Equal("{StaticResource BasSettingCardStyle}", (string?)card.Attribute("Style"));
+        Assert.Contains(card.Descendants(), element => (string?)element.Attribute("Style") == "{StaticResource BasSettingTitleStyle}");
+        Assert.Contains(card.Descendants(), element => (string?)element.Attribute("Style") == "{StaticResource BasCaptionStyle}");
+        XElement check = GetNamedElement(panel, "SelectionCardCheck");
+        Assert.Equal("Right", (string?)check.Attribute("HorizontalAlignment"));
+        Assert.Equal("1", (string?)check.Attribute("Grid.Column"));
+        Assert.Equal("{Binding IsSelected, Mode=TwoWay}", (string?)check.Attribute("IsChecked"));
+    }
+
+    [Fact]
+    public void SelectionCards_NotifyOnlyActualChangesAndPreserveProcessNames()
+    {
+        var item = new ProcessItem { DisplayName = "Example application", ProcessName = "example.exe" };
+        int notifications = 0;
+        item.PropertyChanged += (_, args) =>
+        {
+            Assert.Equal(nameof(ProcessItem.IsSelected), args.PropertyName);
+            notifications++;
+        };
+        item.IsSelected = true;
+        item.IsSelected = true;
+        item.IsSelected = false;
+        Assert.Equal(2, notifications);
+        Assert.Equal("Example application", item.Title);
+        Assert.Equal("example.exe", item.Subtitle);
+        item.DisplayName = "EXAMPLE.EXE";
+        Assert.Empty(item.Subtitle);
+    }
+
+    [Fact]
+    public void PopupSelectionLists_UseVirtualizedDataTemplatesAndToggleWholeCards()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string name in new[] { "ListVisualResetItems", "ListRunningProcesses" })
+        {
+            XElement list = GetNamedElement(panel, name);
+            Assert.Equal("None", (string?)list.Attribute("SelectionMode"));
+            Assert.Equal("{StaticResource SelectionCardTemplates}", (string?)list.Attribute("ItemTemplateSelector"));
+            Assert.Equal("{StaticResource SelectionCardContainerStyle}", (string?)list.Attribute("ItemContainerStyle"));
+            Assert.Equal("0,0,-16,0", (string?)list.Attribute("Margin"));
+            Assert.Single(list.Descendants(), element => element.Name.LocalName == "ItemsStackPanel");
+            Assert.Single(list.Descendants(), element => element.Name.LocalName == "TransitionCollection");
+        }
+        XElement container = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionCardContainerStyle");
+        Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,28,0");
+        XElement card = GetNamedElement(panel, "SelectionCard");
+        Assert.Equal("SelectionCard_Tapped", (string?)card.Attribute("Tapped"));
+        Assert.Equal("0", (string?)card.Attribute("MinHeight"));
+        Assert.Null(card.Attribute("Height"));
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("if (source is CheckBox) return false", source, StringComparison.Ordinal);
+        Assert.Contains("item.IsSelected = !item.IsSelected", source, StringComparison.Ordinal);
+        Assert.Contains("args.Handled = true", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("new Border { Child = layout", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ListRunningProcesses.SelectedItems", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HeaderAndProcessButtons_UseMatchedWidthsAndNativeSizing()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement apply = GetNamedElement(panel, "BtnApplySettings");
+        Assert.Null(apply.Attribute("Width"));
+        Assert.Equal("ResetSettings_SizeChanged", (string?)GetNamedElement(panel, "BtnResetSettings").Attribute("SizeChanged"));
+        Assert.Contains("BtnApplySettings.Width = args.NewSize.Width", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        Assert.Equal("0", (string?)apply.Attribute("MinWidth"));
+        foreach (string name in new[] { "BtnBrowseProcess", "BtnSelectRunningProcess" })
+        {
+            XElement button = GetNamedElement(panel, name);
+            foreach (string property in new[] { "FontSize", "Padding", "Height", "MinWidth" })
+                Assert.Null(button.Attribute(property));
+        }
+        XElement reset = GetNamedElement(panel, "BtnResetSettings");
+        Assert.Null(reset.Attribute("Template"));
+        XElement dangerResources = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "DangerButtonResources");
+        Assert.Contains(dangerResources.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "ButtonBackgroundPointerOver" && (string?)element.Attribute("Color") == "#C42B1C");
+        Assert.Contains(dangerResources.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "ButtonForegroundPointerOver" && (string?)element.Attribute("Color") == "White");
+        Assert.Contains(dangerResources.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "HighContrast");
+        Assert.Contains("new[] { BtnResetSettings, BtnDeleteProfile }", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PopupCopy_UsesDefaultRestorationAndProcessNameSearch()
+    {
+        XDocument chinese = LoadXaml("src", "Strings.resx");
+        XElement title = Assert.Single(chinese.Descendants("data"), element => (string?)element.Attribute("name") == "Overlay_AllReset");
+        Assert.Equal("选择要恢复默认的设置项", title.Element("value")!.Value);
+        XElement search = Assert.Single(chinese.Descendants("data"), element => (string?)element.Attribute("name") == "Overlay_SearchProcesses");
+        Assert.Equal("搜索进程名", search.Element("value")!.Value);
+        foreach (string file in new[] { "Strings.en.resx", "Strings.ja.resx" })
+            Assert.Single(LoadXaml("src", file).Descendants("data"), element => (string?)element.Attribute("name") == "Overlay_SearchProcesses");
+        Assert.Contains("SearchRunningProcess.PlaceholderText = Localization.Get(\"Overlay_SearchProcesses\")", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DependentSettings_UseNativeRepositionAndEntranceTransitions()
+    {
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement list = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsListStyle");
+        Assert.Contains(list.Descendants(), element => element.Name.LocalName == "RepositionThemeTransition");
+        XElement collapsible = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasCollapsibleSettingsStyle");
+        Assert.Contains(collapsible.Descendants(), element => element.Name.LocalName == "EntranceThemeTransition");
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string name in new[] { "SectionBasic", "SectionVisual", "SectionFilter", "SectionMultiScreen" })
+            Assert.Equal("{StaticResource BasSettingsListStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
+        foreach (string name in new[] { "PanelClickEffectOptions", "PanelUnifiedEffectScale", "PanelSplitEffectScale", "PanelUnifiedAnimationSpeed", "PanelSplitAnimationSpeed" })
+            Assert.Equal("{StaticResource BasCollapsibleSettingsStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
+    }
+
+    [Fact]
+    public void ColorDragging_CoalescesSnapshotsAndLimitsOnlyTextLayoutWork()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("if (_isColorDragging && sections == SettingsSections.Visual) return", source, StringComparison.Ordinal);
+        Assert.Contains("if (_colorPreviewSubscribed) return", source, StringComparison.Ordinal);
+        Assert.Contains("if (!_isColorDragging) StopColorPreviewRendering()", source, StringComparison.Ordinal);
+        Assert.Contains("now - _lastColorLabelUpdate >= Stopwatch.Frequency / 20", source, StringComparison.Ordinal);
+        Assert.Contains("if (_previewColorBrush.Color != color) _previewColorBrush.Color = color", source, StringComparison.Ordinal);
+        Assert.Contains("_presetColorIndices.TryGetValue", source, StringComparison.Ordinal);
+        Assert.Contains("UIElement.PointerCaptureLostEvent", source, StringComparison.Ordinal);
+        Assert.Contains("if (_isColorDragging && _pendingSettingsSections != 0)", source, StringComparison.Ordinal);
     }
 
     [Fact]

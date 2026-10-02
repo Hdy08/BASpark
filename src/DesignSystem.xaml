@@ -308,6 +308,25 @@
         <Setter Property="MinHeight" Value="60" />
     </Style>
 
+    <Style x:Key="BasSettingsListStyle" TargetType="StackPanel">
+        <Setter Property="ChildrenTransitions">
+            <Setter.Value>
+                <TransitionCollection><RepositionThemeTransition /></TransitionCollection>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="BasCollapsibleSettingsStyle" TargetType="StackPanel" BasedOn="{StaticResource BasSettingsListStyle}">
+        <Setter Property="Transitions">
+            <Setter.Value>
+                <TransitionCollection>
+                    <EntranceThemeTransition FromVerticalOffset="16" IsStaggeringEnabled="False" />
+                    <RepositionThemeTransition />
+                </TransitionCollection>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="BasSettingToggleStyle" TargetType="ToggleSwitch">
         <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
