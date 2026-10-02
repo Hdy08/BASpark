@@ -672,6 +672,9 @@
       <value>リセットするディスプレイ設定を選択</value>
     </data>
     <data name="Msg_PageResetDone" xml:space="preserve">
-      <value>選択した設定を既定値に戻しました。「変更を適用」を押して保存してください。</value>
+      <value>選択した設定項目を既定値に戻して保存しました。</value>
+    </data>
+    <data name="Msg_SettingsSaveFailed" xml:space="preserve">
+      <value>選択した設定を保存できませんでした。ログを確認して再試行してください。</value>
     </data>
   </root>

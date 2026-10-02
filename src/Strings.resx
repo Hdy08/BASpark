@@ -672,6 +672,9 @@
       <value>选择要重置的多屏设置项</value>
     </data>
     <data name="Msg_PageResetDone" xml:space="preserve">
-      <value>所选设置已恢复为默认值，请点击“应用更改”保存。</value>
+      <value>所选设置项已恢复为默认值并已保存。</value>
+    </data>
+    <data name="Msg_SettingsSaveFailed" xml:space="preserve">
+      <value>无法保存所选设置。请检查日志后重试。</value>
     </data>
   </root>

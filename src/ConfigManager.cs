@@ -301,7 +301,11 @@ namespace BASpark
 
         public static List<FilterProfile> GetProfiles()
         {
-            lock (_syncLock) { return [.. _profiles]; }
+            lock (_syncLock)
+            {
+                return _profiles.Select(profile => new FilterProfile
+                { Id = profile.Id, Name = profile.Name, Mode = profile.Mode, Processes = new List<string>(profile.Processes) }).ToList();
+            }
         }
 
         public static FilterProfile? GetActiveProfile()
@@ -312,18 +316,17 @@ namespace BASpark
             }
         }
 
-        public static void SaveProfiles(List<FilterProfile> profiles, string activeId)
+        public static bool SaveProfiles(List<FilterProfile> profiles, string activeId)
         {
             lock (_syncLock)
             {
-                _profiles = profiles;
-                ActiveProfileId = activeId;
-                string json = System.Text.Json.JsonSerializer.Serialize(_profiles);
-                Save("FilterProfiles", json);
-                Save("ActiveProfileId", activeId);
-                
-                // 变更时实时更新过滤器缓存
+                var saved = profiles.Select(profile => new FilterProfile
+                { Id = profile.Id, Name = profile.Name, Mode = profile.Mode, Processes = new List<string>(profile.Processes) }).ToList();
+                string json = System.Text.Json.JsonSerializer.Serialize(saved);
+                if (!Save("FilterProfiles", json) || !Save("ActiveProfileId", activeId)) return false;
+                _profiles = saved;
                 UpdateProcessFilterCache();
+                return true;
             }
         }
 
@@ -393,7 +396,7 @@ namespace BASpark
             }
         }
 
-        public static void Save(string name, object value)
+        public static bool Save(string name, object value)
         {
             try
             {
@@ -439,11 +442,13 @@ namespace BASpark
 
                         prop.SetValue(null, propertyValue);
                     }
+                    return true;
                 }
             }
             catch (Exception ex)
             {
                 AppLogger.Warn($"Failed to save config entry '{name}': {ex.Message}");
+                return false;
             }
         }
 
@@ -474,7 +479,7 @@ namespace BASpark
             }
         }
 
-        public static void SaveEnabledScreenIds(IEnumerable<string> screenIds)
+        public static bool SaveEnabledScreenIds(IEnumerable<string> screenIds)
         {
             var normalized = screenIds
                 .Where(s => !string.IsNullOrWhiteSpace(s))
@@ -483,7 +488,7 @@ namespace BASpark
                 .ToList();
 
             string json = System.Text.Json.JsonSerializer.Serialize(normalized);
-            Save("EnabledScreenIds", json);
+            return Save("EnabledScreenIds", json);
         }
 
         public static List<ScreenSelectionState> GetScreenSelections()
@@ -525,7 +530,7 @@ namespace BASpark
             return enabled;
         }
 
-        public static void SaveScreenSelections(IEnumerable<ScreenSelectionState> screenSelections)
+        public static bool SaveScreenSelections(IEnumerable<ScreenSelectionState> screenSelections)
         {
             var incoming = screenSelections
                 .Where(s => !string.IsNullOrWhiteSpace(s.IdentityKey) || !string.IsNullOrWhiteSpace(s.DeviceName))
@@ -546,8 +551,7 @@ namespace BASpark
             }
 
             string json = System.Text.Json.JsonSerializer.Serialize(merged);
-            Save("ScreenSelections", json);
-            SaveEnabledScreenIds(incoming.Where(s => s.IsEnabled).Select(s => s.DeviceName));
+            return Save("ScreenSelections", json) && SaveEnabledScreenIds(incoming.Where(s => s.IsEnabled).Select(s => s.DeviceName));
         }
 
         private static bool IsScreenEnabledByPreference(

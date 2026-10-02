@@ -518,14 +518,20 @@ internal sealed class OverlayWindow : IDisposable
             _ = PollRendererReadyAsync();
         }
 
-        // 导航会重建 JS 全局对象，因此每个页面都需要重新下发完整的宿主状态。
+        ApplySavedRendererSettings();
+    }
+
+    private void ApplySavedRendererSettings()
+    {
         _lastReportedInputMode = null;
         _lastReportedAlwaysTrail = null;
         UpdateColor(ConfigManager.ParticleColor);
         ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
         ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
         UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.GlowIntensity);
-        SyncInputContext(InputModeMouse);
+        SetCurveDraw(ConfigManager.ApplyCurveDraw);
+        UpdateScreenshotCompatibilityMode(ConfigManager.ScreenshotCompatibilityMode);
+        SyncInputContext(ConfigManager.IsTouchscreenMode ? InputModeTouch : InputModeMouse);
         ApplyEnvironmentInputSuppression();
         if (_overlayRuntimePaused)
         {
@@ -602,6 +608,7 @@ internal sealed class OverlayWindow : IDisposable
                 StopRendererReadyTimeout();
                 if (firstReadyMessage)
                 {
+                    ApplySavedRendererSettings();
                     AppLogger.Info(
                         $"BA click renderer ready on '{_screenDeviceName}' " +
                         $"(effective: {backend}, effect: {resolvedEffectBackend}, " +
@@ -778,6 +785,7 @@ internal sealed class OverlayWindow : IDisposable
         StopRendererReadyTimeout();
         _rendererReady = true;
         _unresponsiveTracker.Reset();
+        ApplySavedRendererSettings();
 
         // 探针成功同时证明页面已加载完成，是比 NavigationCompleted 更可靠的
         // 「可以显示」信号；该事件在某些时序下不会到达，若只依赖它，叠加层

@@ -672,6 +672,9 @@
       <value>Choose display settings to reset</value>
     </data>
     <data name="Msg_PageResetDone" xml:space="preserve">
-      <value>Selected settings have been restored to defaults. Click Apply changes to save.</value>
+      <value>Selected settings were restored to their defaults and saved.</value>
+    </data>
+    <data name="Msg_SettingsSaveFailed" xml:space="preserve">
+      <value>The selected settings could not be saved. Please check the logs and try again.</value>
     </data>
   </root>

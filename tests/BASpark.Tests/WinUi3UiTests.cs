@@ -1033,7 +1033,7 @@ public class WinUi3UiTests
         Assert.DoesNotContain("PickColor_Click", source, StringComparison.Ordinal);
         Assert.Contains("_effectOpacity = Math.Clamp((_colorAlphaSlider?.Value", source, StringComparison.Ordinal);
         Assert.Contains("_syncingColorControls", source, StringComparison.Ordinal);
-        Assert.Contains("UpdateColorPreview(ConfigManager.ParticleColor)", source, StringComparison.Ordinal);
+        Assert.Contains("UpdateColorPreview(_particleColor)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SliderOpacity", source, StringComparison.Ordinal);
     }
 
@@ -1462,7 +1462,7 @@ public class WinUi3UiTests
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         string animate = source[source.IndexOf("private void SetSettingsVisibility", StringComparison.Ordinal)..source.IndexOf("private void StopSettingsAnimation(", StringComparison.Ordinal)];
         Assert.True(animate.IndexOf("var positions", StringComparison.Ordinal) < animate.IndexOf("foreach (var change in changes) change.Element.Visibility =", StringComparison.Ordinal));
-        Assert.Contains("previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : 16", animate, StringComparison.Ordinal);
+        Assert.Contains("previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : -16", animate, StringComparison.Ordinal);
         Assert.Contains("new RepositionThemeAnimation", animate, StringComparison.Ordinal);
         Assert.Contains("new FadeInThemeAnimation()", animate, StringComparison.Ordinal);
         Assert.Equal(1, animate.Split("storyboard.Begin()", StringSplitOptions.None).Length - 1);
@@ -1473,9 +1473,13 @@ public class WinUi3UiTests
     public void ModalOverlays_UseNativeOpenAndCloseAnimationsAndWaitBeforeHidingContent()
     {
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        Assert.Contains("new PopInThemeAnimation", source, StringComparison.Ordinal);
-        Assert.Contains("new PopOutThemeAnimation()", source, StringComparison.Ordinal);
-        Assert.Contains("Timeline fade = visible ? new FadeInThemeAnimation() : new FadeOutThemeAnimation()", source, StringComparison.Ordinal);
+        Assert.Contains("card.RenderTransformOrigin = new Point(0.5, 0.5)", source, StringComparison.Ordinal);
+        Assert.Contains("new SplineDoubleKeyFrame", source, StringComparison.Ordinal);
+        Assert.Contains("Value = visible ? 1.05 : 1", source, StringComparison.Ordinal);
+        Assert.Contains("ControlNormalAnimationDuration", source, StringComparison.Ordinal);
+        Assert.Contains("ControlFasterAnimationDuration", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("PopInThemeAnimation", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("PopOutThemeAnimation", source, StringComparison.Ordinal);
         Assert.Contains("previous.Completion.TrySetResult(false)", source, StringComparison.Ordinal);
         Assert.Contains("!ReferenceEquals(current, state)", source, StringComparison.Ordinal);
         Assert.Contains("animation.Completion.TrySetResult(false)", source, StringComparison.Ordinal);
@@ -1504,8 +1508,10 @@ public class WinUi3UiTests
         }
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("Title = title == string.Empty ? null : title ?? Localization.Get(\"Msg_Info\")", source, StringComparison.Ordinal);
-        Assert.Contains("ShowMessageAsync(Localization.Get(\"Msg_PageResetDone\"), string.Empty)", source, StringComparison.Ordinal);
-        Assert.Contains("ShowMessageAsync(Localization.Get(\"Msg_VisualResetDone\"), string.Empty)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowMessageAsync(Localization.Get(_resetScope == ResetScope.Visual ? \"Msg_VisualResetDone\" : \"Msg_PageResetDone\"), string.Empty)", source, StringComparison.Ordinal);
+        Assert.Contains("dialog.Resources[\"ContentDialogMinHeight\"] = 0d", source, StringComparison.Ordinal);
+        Assert.Contains("PanelBody.TransformToVisual(RootGrid)", source, StringComparison.Ordinal);
+        Assert.Contains("scrim.Clip = new RectangleGeometry", source, StringComparison.Ordinal);
         Assert.Contains("column.Width = GridLength.Auto", source, StringComparison.Ordinal);
         Assert.Contains("button.MinWidth = 0", source, StringComparison.Ordinal);
         Assert.Contains("dialog.Resources[\"ContentDialogSmokeFill\"] = VisualResetOverlay.Background", source, StringComparison.Ordinal);
@@ -1581,12 +1587,13 @@ public class WinUi3UiTests
         Assert.Contains("VisualResetItems.Where(item => item.IsSelected)", confirm, StringComparison.Ordinal);
         Assert.Contains("foreach (VisualResetItem item in selected) item.Restore?.Invoke()", confirm, StringComparison.Ordinal);
         Assert.Contains("foreach (VisualResetItem item in selected) item.Save?.Invoke()", confirm, StringComparison.Ordinal);
-        Assert.Contains("if (_resetScope == ResetScope.Visual)", confirm, StringComparison.Ordinal);
+        Assert.DoesNotContain("if (_resetScope == ResetScope.Visual)", confirm, StringComparison.Ordinal);
         Assert.DoesNotContain("LoadSettings()", confirm, StringComparison.Ordinal);
         Assert.DoesNotContain("NativeMessageBox", confirm, StringComparison.Ordinal);
-        Assert.Contains("MarkVisualSettingsSaved(selected)", confirm, StringComparison.Ordinal);
-        Assert.Contains("saved[key] = current[key]?.DeepClone()", source, StringComparison.Ordinal);
-        Assert.Contains("ConfigManager.ParticleColor = \"76,167,255\"", source, StringComparison.Ordinal);
+        Assert.Contains("MarkResetSettingsSaved(selected)", confirm, StringComparison.Ordinal);
+        Assert.Contains("visual[key] = currentVisual[key]?.DeepClone()", source, StringComparison.Ordinal);
+        Assert.Contains("general[key] = currentGeneral[key]?.DeepClone()", source, StringComparison.Ordinal);
+        Assert.Contains("_particleColor = \"76,167,255\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1608,6 +1615,70 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void ProfileSnapshots_KeepPendingEditsOutOfRuntimeSettings()
+    {
+        var field = typeof(ConfigManager).GetField("_profiles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        object previous = field.GetValue(null)!;
+        var profile = new FilterProfile { Name = "Saved", Mode = ProcessFilterModeOption.Blacklist, Processes = ["saved.exe"] };
+        try
+        {
+            field.SetValue(null, new List<FilterProfile> { profile });
+            List<FilterProfile> pending = ConfigManager.GetProfiles();
+            Assert.NotSame(profile, pending[0]);
+            Assert.NotSame(profile.Processes, pending[0].Processes);
+            pending[0].Name = "Pending";
+            pending[0].Mode = ProcessFilterModeOption.Whitelist;
+            pending[0].Processes.Clear();
+            Assert.Equal("Saved", profile.Name);
+            Assert.Equal(ProcessFilterModeOption.Blacklist, profile.Mode);
+            Assert.Equal(new[] { "saved.exe" }, profile.Processes);
+        }
+        finally
+        {
+            field.SetValue(null, previous);
+        }
+    }
+
+    [Fact]
+    public void ResetPersistence_UsesSavedValuesWithoutLeakingPendingProfilesOrColors()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("private string _particleColor = ConfigManager.ParticleColor", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfigManager.ParticleColor =", source, StringComparison.Ordinal);
+        Assert.Contains("SaveResetProfileProperty(profileId, resetProcesses: true)", source, StringComparison.Ordinal);
+        Assert.Contains("JsonSerializer.Deserialize<List<ScreenSelectionState>>(_savedSettingsState!.Screens)", source, StringComparison.Ordinal);
+        Assert.Contains("if (!ConfigManager.Save(key, value)) throw", source, StringComparison.Ordinal);
+        string config = ReadSource("src", "ConfigManager.cs");
+        Assert.Contains("Processes = new List<string>(profile.Processes)", config, StringComparison.Ordinal);
+        Assert.Contains("public static bool Save(string name, object value)", config, StringComparison.Ordinal);
+        Assert.Contains("public static bool SaveProfiles", config, StringComparison.Ordinal);
+        XDocument resources = LoadXaml("src", "Strings.resx");
+        Assert.Equal("所选设置项已恢复为默认值并已保存。", resources.Descendants("data").Single(item => (string?)item.Attribute("name") == "Msg_PageResetDone").Element("value")!.Value);
+    }
+
+    [Fact]
+    public void RendererStartup_ReappliesSavedRuntimeSettingsAfterNavigationAndReadiness()
+    {
+        string source = ReadSource("src", "OverlayWindow.cs");
+        Assert.Equal(3, source.Split("ApplySavedRendererSettings();", StringSplitOptions.None).Length - 1);
+        string sync = source[source.IndexOf("private void ApplySavedRendererSettings()", StringComparison.Ordinal)..source.IndexOf("private void OnWebMessageReceived", StringComparison.Ordinal)];
+        foreach (string setting in new[] { "ConfigManager.ParticleColor", "ConfigManager.EffectOpacity", "ConfigManager.GlowIntensity", "SetCurveDraw(ConfigManager.ApplyCurveDraw)", "ConfigManager.ScreenshotCompatibilityMode", "ConfigManager.IsTouchscreenMode ? InputModeTouch : InputModeMouse" })
+            Assert.Contains(setting, sync, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PanelRenderClock_UsesBalancedWin10PrecisionRequestsWithoutFixedFrameRateTimers()
+    {
+        string source = ReadSource("src", "DcompPanelHost.cs");
+        Assert.Contains("OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)", source, StringComparison.Ordinal);
+        Assert.Contains("TimeBeginPeriod(1) == 0", source, StringComparison.Ordinal);
+        Assert.Contains("TimeEndPeriod(1)", source, StringComparison.Ordinal);
+        Assert.Contains("SetRenderClockActive(IsWindowVisible(_hwnd) && !IsIconic(_hwnd))", source, StringComparison.Ordinal);
+        Assert.Equal(3, source.Split("SetRenderClockActive(false);", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("TimeSpan.FromMilliseconds", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void InWindowMessages_UseNativeContentDialogsBoundToTheCurrentXamlRootAndTheme()
     {
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
@@ -1618,7 +1689,7 @@ public class WinUi3UiTests
         Assert.Contains("RequestedTheme = RootGrid.ActualTheme", dialog, StringComparison.Ordinal);
         Assert.Contains("await _messageDialog.ShowAsync()", dialog, StringComparison.Ordinal);
         Assert.Contains("_dialogGate.WaitAsync()", dialog, StringComparison.Ordinal);
-        Assert.Contains("await ShowMessageAsync(Localization.Get(\"Msg_VisualResetDone\")", source, StringComparison.Ordinal);
+        Assert.Contains("await ShowMessageAsync(Localization.Get(_resetScope == ResetScope.Visual ? \"Msg_VisualResetDone\"", source, StringComparison.Ordinal);
     }
 
     [Fact]

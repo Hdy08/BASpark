@@ -148,6 +148,7 @@ public class VisualResetItem : SelectionCardItem
     public Action? Restore { get; set; }
     public Action? Save { get; set; }
     public string? SettingKey { get; set; }
+    public string? SelectionId { get; set; }
     public string Group { get; set; } = string.Empty;
 
     public VisualResetItem(string title, string subtitle, Action restore)
@@ -557,6 +558,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private int _colorCardAnimationGeneration;
     private ColorPickerSlider? _colorAlphaSlider;
     private double _effectOpacity = 1;
+    private string _particleColor = ConfigManager.ParticleColor;
     private bool _colorPreviewPending;
     private Color _pendingPreviewColor;
     private bool _colorPreviewSubscribed;
@@ -665,6 +667,7 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 StopSettingsAnimations();
                 UpdateCaptionButtonBounds();
+                if (_messageDialog != null) UpdateDialogScrim(_messageDialog);
             };
             CaptionButtons.SizeChanged += (_, _) => UpdateCaptionButtonBounds();
 
@@ -860,11 +863,13 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private string CaptureGeneralSettings() => JsonSerializer.Serialize(new
     {
-        Language = GetSelectedLanguage(), Theme = GetSelectedDarkMode(), ClickType = GetSelectedClickTrigger(),
-        Switches = new[] { CheckMasterSwitch.IsOn, CheckAutoStart.IsOn, CheckStartSilent.IsOn, CheckHideTrayIcon.IsOn,
-            CheckAlwaysTrailEffectSwitch.IsOn, CheckRunAsAdmin.IsOn, CheckTouchscreenMode.IsOn, CheckMiddleClickTrigger.IsOn,
-            CheckScreenshotCompatibilityMode.IsOn, CheckEnvironmentFilter.IsOn, CheckHideInFullscreen.IsOn, CheckShowEffectOnDesktop.IsOn },
-        ActiveProfile = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
+        UiLanguage = GetSelectedLanguage(), DarkMode = GetSelectedDarkMode(), ClickTriggerType = GetSelectedClickTrigger(),
+        IsEffectEnabled = CheckMasterSwitch.IsOn, AutoStart = CheckAutoStart.IsOn, StartSilent = CheckStartSilent.IsOn,
+        HideTrayIcon = CheckHideTrayIcon.IsOn, EnableAlwaysTrailEffect = CheckAlwaysTrailEffectSwitch.IsOn,
+        RunAsAdmin = CheckRunAsAdmin.IsOn, IsTouchscreenMode = CheckTouchscreenMode.IsOn,
+        EnableMiddleClickTrigger = CheckMiddleClickTrigger.IsOn, ScreenshotCompatibilityMode = CheckScreenshotCompatibilityMode.IsOn,
+        EnableEnvironmentFilter = CheckEnvironmentFilter.IsOn, HideInFullscreen = CheckHideInFullscreen.IsOn,
+        ShowEffectOnDesktop = CheckShowEffectOnDesktop.IsOn, ActiveProfileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
         Profiles = Profiles.OrderBy(profile => profile.Id, StringComparer.Ordinal).Select(profile => new
         {
             profile.Id, profile.Name, profile.Mode,
@@ -882,7 +887,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private string CaptureVisualSettings()
     {
-        string color = ConfigManager.ParticleColor;
+        string color = _particleColor;
         double opacity = _effectOpacity;
         if (EffectColorHexInput.FocusState != FocusState.Unfocused && ColorPickerColorMath.TryParseHex(EffectColorHexInput.Text, out Color pending))
         {
@@ -914,16 +919,44 @@ public sealed partial class ControlPanelWindow : UserControl
         BtnApplySettings.IsEnabled = false;
     }
 
-    private void MarkVisualSettingsSaved(IEnumerable<VisualResetItem> selected)
+    private void MarkResetSettingsSaved(IEnumerable<VisualResetItem> selected)
     {
         if (_savedSettingsState == null) return;
-        var saved = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.Visual)!.AsObject();
-        var current = System.Text.Json.Nodes.JsonNode.Parse(CaptureVisualSettings())!.AsObject();
+        var general = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.General)!.AsObject();
+        var visual = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.Visual)!.AsObject();
+        var screens = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.Screens)!.AsArray();
+        var currentGeneral = System.Text.Json.Nodes.JsonNode.Parse(CaptureGeneralSettings())!.AsObject();
+        var currentVisual = System.Text.Json.Nodes.JsonNode.Parse(CaptureVisualSettings())!.AsObject();
+        var currentScreens = System.Text.Json.Nodes.JsonNode.Parse(CaptureScreenSettings())!.AsArray();
         foreach (VisualResetItem item in selected)
-            if (item.SettingKey is string key) saved[key] = current[key]?.DeepClone();
-        _savedSettingsState = _savedSettingsState with { Visual = saved.ToJsonString() };
+        {
+            if (item.SettingKey is not string key) continue;
+            if (key == "Screen")
+            {
+                var savedScreen = screens.FirstOrDefault(screen => GetScreenResetKey(screen!) == item.SelectionId);
+                var currentScreen = currentScreens.FirstOrDefault(screen => GetScreenResetKey(screen!) == item.SelectionId);
+                if (savedScreen != null && currentScreen != null) savedScreen["IsEnabled"] = currentScreen["IsEnabled"]!.DeepClone();
+            }
+            else if (key.StartsWith("Profile.", StringComparison.Ordinal))
+            {
+                string property = key["Profile.".Length..];
+                var savedProfile = general["Profiles"]!.AsArray().FirstOrDefault(profile => profile!["Id"]!.GetValue<string>() == item.SelectionId);
+                var currentProfile = currentGeneral["Profiles"]!.AsArray().FirstOrDefault(profile => profile!["Id"]!.GetValue<string>() == item.SelectionId);
+                if (savedProfile != null && currentProfile != null) savedProfile[property] = currentProfile[property]!.DeepClone();
+            }
+            else if (currentVisual.ContainsKey(key)) visual[key] = currentVisual[key]?.DeepClone();
+            else if (currentGeneral.ContainsKey(key))
+            {
+                general[key] = currentGeneral[key]?.DeepClone();
+                if (key == "Profiles") general["ActiveProfileId"] = currentGeneral["ActiveProfileId"]?.DeepClone();
+            }
+        }
+        _savedSettingsState = new SettingsState(general.ToJsonString(), visual.ToJsonString(), screens.ToJsonString());
         UpdateApplySettingsState(SettingsSections.All);
     }
+
+    private static string GetScreenResetKey(System.Text.Json.Nodes.JsonNode screen) =>
+        screen["IdentityKey"]?.GetValue<string>() is { Length: > 0 } identity ? identity : screen["DeviceName"]!.GetValue<string>();
 
     private void QueueSettingsChangeCheck(SettingsSections sections)
     {
@@ -1373,7 +1406,7 @@ public sealed partial class ControlPanelWindow : UserControl
             return;
         }
 
-        ConfigManager.ParticleColor = ToRgbString(args.NewColor);
+        _particleColor = ToRgbString(args.NewColor);
         _effectOpacity = Math.Clamp((_colorAlphaSlider?.Value ?? args.NewColor.A / 255.0 * 100) / 100, 0.1, 1);
         _pendingPreviewColor = args.NewColor;
         _colorPreviewPending = true;
@@ -1445,8 +1478,8 @@ public sealed partial class ControlPanelWindow : UserControl
             return;
         }
 
-        ConfigManager.ParticleColor = ToRgbString(color);
-        UpdateColorPreview(ConfigManager.ParticleColor);
+        _particleColor = ToRgbString(color);
+        UpdateColorPreview(_particleColor);
     }
 
     private void EffectColorHexInput_LostFocus(object sender, RoutedEventArgs args) => CommitEffectColorHex();
@@ -1460,7 +1493,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         else if (args.Key == Windows.System.VirtualKey.Escape)
         {
-            UpdateColorPreview(ConfigManager.ParticleColor);
+            UpdateColorPreview(_particleColor);
             args.Handled = true;
         }
     }
@@ -1482,14 +1515,14 @@ public sealed partial class ControlPanelWindow : UserControl
 
         if (ColorPickerColorMath.TryParseHex(hex, out Color color))
         {
-            ConfigManager.ParticleColor = ToRgbString(color);
+            _particleColor = ToRgbString(color);
             if (hasAlpha)
             {
                 _effectOpacity = Math.Clamp(alpha / 255.0, 0.1, 1);
             }
         }
 
-        UpdateColorPreview(ConfigManager.ParticleColor);
+        UpdateColorPreview(_particleColor);
     }
 
     private void EffectColorExpander_Loaded(object sender, RoutedEventArgs args)
@@ -1988,6 +2021,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void LoadSettingsCore()
     {
+        _particleColor = ConfigManager.ParticleColor;
         CheckMasterSwitch.IsOn = ConfigManager.IsEffectEnabled;
         CheckAutoStart.IsOn = ConfigManager.AutoStart;
         CheckStartSilent.IsOn = ConfigManager.StartSilent;
@@ -2010,7 +2044,7 @@ public sealed partial class ControlPanelWindow : UserControl
             Profiles.Add(profile);
         }
 
-        ComboProfiles.SelectedItem = ConfigManager.GetActiveProfile();
+        ComboProfiles.SelectedItem = Profiles.FirstOrDefault(profile => profile.Id == ConfigManager.GetActiveProfile()?.Id);
 
         UpdateClickEffectPanelVisibility();
         UpdateEnvironmentFilterInterlock();
@@ -2029,7 +2063,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckFollowDisplayRefreshRate.IsOn = ConfigManager.FollowDisplayRefreshRate;
         SliderTrailRefresh.Value = ConfigManager.TrailRefreshRate;
         SyncSliderAndBoxValues();
-        UpdateColorPreview(ConfigManager.ParticleColor);
+        UpdateColorPreview(_particleColor);
 
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
@@ -2155,7 +2189,7 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (FrameworkElement element in section.Children.OfType<FrameworkElement>().Where(element => element.Visibility == Visibility.Visible))
         {
             bool existing = positions.TryGetValue(element, out double previousTop);
-            double offset = existing ? previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : 16;
+            double offset = existing ? previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : -16;
             if (Math.Abs(offset) > 0.1)
             {
                 var reposition = new RepositionThemeAnimation { FromHorizontalOffset = 0, FromVerticalOffset = offset };
@@ -2680,33 +2714,45 @@ public sealed partial class ControlPanelWindow : UserControl
         _ = SetModalOverlayVisibleAsync(VisualResetOverlay, visible: true);
     }
 
-    private void AddPageResetItem(string group, string title, string value, Action restore) =>
-        VisualResetItems.Add(new VisualResetItem(title, Localization.Format("Reset_DefaultValue", value), restore) { Group = group });
+    private void AddPageResetItem(string group, string title, string value, string key, Action restore, Action save, string? selectionId = null) =>
+        VisualResetItems.Add(new VisualResetItem(title, Localization.Format("Reset_DefaultValue", value), restore)
+        { Group = group, SettingKey = key, SelectionId = selectionId, Save = save });
 
-    private void AddToggleResetItem(string group, ToggleSwitch toggle, bool value) =>
+    private void AddToggleResetItem(string group, ToggleSwitch toggle, bool value, string key) =>
         AddPageResetItem(group, toggle.Header?.ToString() ?? string.Empty,
-            Localization.Get(value ? "Basic_DarkModeOn" : "Basic_DarkModeOff"), () => toggle.IsOn = value);
+            Localization.Get(value ? "Basic_DarkModeOn" : "Basic_DarkModeOff"), key, () => toggle.IsOn = value, () => SaveResetValue(key, value));
+
+    private static void SaveResetValue(string key, object value)
+    {
+        if (!ConfigManager.Save(key, value)) throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
+    }
 
     private void RebuildBasicResetItems()
     {
         string group = TxtBasicTitle.Text;
-        AddPageResetItem(group, TxtBasicLanguage.Text, Localization.Get("Basic_DarkModeSystem"), RestoreLanguageDefault);
-        AddPageResetItem(group, TxtDarkMode.Text, Localization.Get("Basic_DarkModeSystem"), () => SelectDarkMode(DarkModeOption.System));
-        AddToggleResetItem(group, CheckAlwaysTrailEffectSwitch, false);
-        AddToggleResetItem(group, CheckMasterSwitch, true);
-        AddPageResetItem(group, TxtClickType.Text, Localization.Get("Basic_LeftClick"), () => RadioClickType.SelectedIndex = 0);
-        foreach (ToggleSwitch toggle in new[] { CheckMiddleClickTrigger, CheckScreenshotCompatibilityMode, CheckAutoStart,
-                     CheckStartSilent, CheckHideTrayIcon, CheckRunAsAdmin, CheckTouchscreenMode })
-            AddToggleResetItem(group, toggle, false);
+        AddPageResetItem(group, TxtBasicLanguage.Text, Localization.Get("Basic_DarkModeSystem"), "UiLanguage", RestoreLanguageDefault,
+            () => SaveResetValue("UiLanguage", GetSelectedLanguage() ?? Localization.CurrentCultureName));
+        AddPageResetItem(group, TxtDarkMode.Text, Localization.Get("Basic_DarkModeSystem"), "DarkMode",
+            () => SelectDarkMode(DarkModeOption.System), () => SaveResetValue("DarkMode", DarkModeOption.System));
+        AddToggleResetItem(group, CheckAlwaysTrailEffectSwitch, false, "EnableAlwaysTrailEffect");
+        AddToggleResetItem(group, CheckMasterSwitch, true, "IsEffectEnabled");
+        AddPageResetItem(group, TxtClickType.Text, Localization.Get("Basic_LeftClick"), "ClickTriggerType",
+            () => RadioClickType.SelectedIndex = 0, () => SaveResetValue("ClickTriggerType", 0));
+        foreach (var setting in new[] { (CheckMiddleClickTrigger, "EnableMiddleClickTrigger"),
+                     (CheckScreenshotCompatibilityMode, "ScreenshotCompatibilityMode"), (CheckAutoStart, "AutoStart"),
+                     (CheckStartSilent, "StartSilent"), (CheckHideTrayIcon, "HideTrayIcon"), (CheckRunAsAdmin, "RunAsAdmin"),
+                     (CheckTouchscreenMode, "IsTouchscreenMode") })
+            AddToggleResetItem(group, setting.Item1, false, setting.Item2);
     }
 
     private void RebuildFilterResetItems()
     {
         string group = TxtFilterTitle.Text;
-        AddToggleResetItem(group, CheckEnvironmentFilter, false);
-        AddToggleResetItem(group, CheckHideInFullscreen, true);
-        AddToggleResetItem(group, CheckShowEffectOnDesktop, true);
-        AddPageResetItem(group, TxtFilterProfiles.Text, Localization.Get("Reset_DefaultProfile"), () =>
+        string? profileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id;
+        AddToggleResetItem(group, CheckEnvironmentFilter, false, "EnableEnvironmentFilter");
+        AddToggleResetItem(group, CheckHideInFullscreen, true, "HideInFullscreen");
+        AddToggleResetItem(group, CheckShowEffectOnDesktop, true, "ShowEffectOnDesktop");
+        AddPageResetItem(group, TxtFilterProfiles.Text, Localization.Get("Reset_DefaultProfile"), "Profiles", () =>
         {
             FilterProfile profile = Profiles.FirstOrDefault(item => item.Name == Localization.Get("Profile_Default"))
                 ?? Profiles.FirstOrDefault() ?? new FilterProfile();
@@ -2716,28 +2762,61 @@ public sealed partial class ControlPanelWindow : UserControl
             Profiles.Clear();
             Profiles.Add(profile);
             ComboProfiles.SelectedIndex = 0;
+        }, () =>
+        {
+            if (!ConfigManager.SaveProfiles(Profiles.ToList(), (ComboProfiles.SelectedItem as FilterProfile)?.Id ?? string.Empty))
+                throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
         });
-        AddPageResetItem(group, TxtFilterMode.Text, Localization.Get("Filter_Mode_Blacklist"), () =>
+        AddPageResetItem(group, TxtFilterMode.Text, Localization.Get("Filter_Mode_Blacklist"), "Profile.Mode", () =>
         {
             if (ComboProfiles.SelectedItem is FilterProfile active) active.Mode = ProcessFilterModeOption.Blacklist;
             SelectProcessFilterMode(ProcessFilterModeOption.Blacklist);
-        });
-        AddPageResetItem(group, TxtProcessList.Text, Localization.Get("Reset_EmptyList"), () =>
+        }, () => SaveResetProfileProperty(profileId, resetProcesses: false), profileId);
+        AddPageResetItem(group, TxtProcessList.Text, Localization.Get("Reset_EmptyList"), "Profile.Processes", () =>
         {
             if (ComboProfiles.SelectedItem is not FilterProfile active) return;
             active.Processes.Clear();
             RefreshCurrentProfileProcesses(active);
-        });
+        }, () => SaveResetProfileProperty(profileId, resetProcesses: true), profileId);
+    }
+
+    private void SaveResetProfileProperty(string? profileId, bool resetProcesses)
+    {
+        if (VisualResetItems.Any(item => item.SettingKey == "Profiles" && item.IsSelected)) return;
+        List<FilterProfile> profiles = ConfigManager.GetProfiles();
+        FilterProfile? profile = profiles.FirstOrDefault(item => item.Id == profileId);
+        if (profile == null) throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
+        if (resetProcesses) profile.Processes.Clear();
+        else profile.Mode = ProcessFilterModeOption.Blacklist;
+        if (!ConfigManager.SaveProfiles(profiles, ConfigManager.ActiveProfileId))
+            throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
     }
 
     private void RebuildScreenResetItems()
     {
         foreach (ScreenOptionItem screen in ScreenOptions)
-            AddPageResetItem(TxtMultiScreenTitle.Text, screen.Title, Localization.Get("Basic_DarkModeOn"), () =>
+            AddPageResetItem(TxtMultiScreenTitle.Text, screen.Title, Localization.Get("Basic_DarkModeOn"), "Screen", () =>
             {
                 screen.IsEnabled = true;
                 SyncScreenToggles();
-            });
+            }, () => SaveResetScreen(screen), string.IsNullOrEmpty(screen.IdentityKey) ? screen.DeviceName : screen.IdentityKey);
+    }
+
+    private void SaveResetScreen(ScreenOptionItem screen)
+    {
+        var screens = JsonSerializer.Deserialize<List<ScreenSelectionState>>(_savedSettingsState!.Screens)!;
+        ScreenSelectionState? saved = screens.FirstOrDefault(item => item.IdentityKey == screen.IdentityKey && item.DeviceName == screen.DeviceName);
+        if (saved == null) throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
+        saved.IsEnabled = true;
+        var persisted = ConfigManager.GetScreenSelections();
+        foreach (ScreenSelectionState current in screens)
+        {
+            persisted.RemoveAll(item => !string.IsNullOrEmpty(current.IdentityKey) ? item.IdentityKey == current.IdentityKey : item.DeviceName == current.DeviceName);
+            persisted.Add(current);
+        }
+        if (!ConfigManager.SaveScreenSelections(persisted)) throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
+        MarkResetSettingsSaved(VisualResetItems.Where(item => item.SettingKey == "Screen" && item.SelectionId ==
+            (string.IsNullOrEmpty(screen.IdentityKey) ? screen.DeviceName : screen.IdentityKey)));
     }
 
     private async void CloseVisualResetOverlay_Click(object sender, RoutedEventArgs args)
@@ -2756,7 +2835,7 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             Group = TxtVisualTitle.Text,
             Restore = restore,
-            Save = () => ConfigManager.Save(key, value),
+            Save = () => SaveResetValue(key, value),
             SettingKey = key
         };
         VisualResetItems.Add(item);
@@ -2782,13 +2861,13 @@ public sealed partial class ControlPanelWindow : UserControl
         AddVisualResetItem(VisualAppearanceResetFlags.EffectOpacity, Localization.Get("VisualReset_Opacity"), "EffectOpacity", 1.0, () =>
         {
             _effectOpacity = 1;
-            UpdateColorPreview(ConfigManager.ParticleColor);
+            UpdateColorPreview(_particleColor);
         });
         AddVisualResetItem(VisualAppearanceResetFlags.ParticleColor, Localization.Get("VisualReset_Color"), "ParticleColor", "76,167,255",
             () =>
             {
-                ConfigManager.ParticleColor = "76,167,255";
-                UpdateColorPreview(ConfigManager.ParticleColor);
+                _particleColor = "76,167,255";
+                UpdateColorPreview(_particleColor);
             });
     }
 
@@ -2854,22 +2933,37 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateAnimationSpeedPanelVisibility();
         UpdateTrailRefreshInterlock();
         if (!await SetModalOverlayVisibleAsync(VisualResetOverlay, visible: false) || _isClosed) return;
-        if (_resetScope == ResetScope.Visual)
+        try
         {
             foreach (VisualResetItem item in selected) item.Save?.Invoke();
-            MarkVisualSettingsSaved(selected);
+            MarkResetSettingsSaved(selected);
+            App.Tray?.SetHidden(ConfigManager.HideTrayIcon);
             ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSpeed, out double clickSpeed);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             App.Overlay?.UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSpeed, clickSpeed, ConfigManager.GlowIntensity);
             App.Overlay?.UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
             App.Overlay?.SetCurveDraw(ConfigManager.ApplyCurveDraw);
-            await ShowMessageAsync(Localization.Get("Msg_VisualResetDone"), string.Empty);
+            App.Overlay?.UpdateTouchMode(ConfigManager.IsTouchscreenMode);
+            App.Overlay?.UpdateScreenshotCompatibilityMode(ConfigManager.ScreenshotCompatibilityMode);
+            App.Overlay?.RefreshEnvironmentFilterState();
+            if (selected.Any(item => item.SettingKey == "Screen")) App.Overlay?.RefreshScreenSelection();
+            if (selected.Any(item => item.SettingKey is "AutoStart" or "RunAsAdmin")) ApplyAutoStartSettings(useSavedSettings: true);
+            if (selected.Any(item => item.SettingKey == "DarkMode")) ApplyDarkMode();
+            if (selected.Any(item => item.SettingKey == "UiLanguage"))
+            {
+                Localization.ApplyCulture(ConfigManager.UiLanguage);
+                _languageAtLoad = ConfigManager.UiLanguage;
+                ApplyLocalizedText();
+                App.Tray?.RefreshLocalization();
+            }
+            await ShowMessageAsync(Localization.Get(_resetScope == ResetScope.Visual ? "Msg_VisualResetDone" : "Msg_PageResetDone"), string.Empty);
         }
-        else
+        catch (Exception exception)
         {
+            AppLogger.Warn($"Failed to save selected reset settings: {exception.Message}");
             UpdateApplySettingsState(SettingsSections.All);
-            await ShowMessageAsync(Localization.Get("Msg_PageResetDone"), string.Empty);
+            await ShowMessageAsync(Localization.Get("Msg_SettingsSaveFailed"), Localization.Get("Msg_Error"));
         }
     }
 
@@ -3322,7 +3416,7 @@ public sealed partial class ControlPanelWindow : UserControl
         ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
         ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsOn);
         ConfigManager.Save("AutoStart", autoStartEnabled);
-        ConfigManager.Save("ParticleColor", ConfigManager.ParticleColor);
+        ConfigManager.Save("ParticleColor", _particleColor);
         ConfigManager.Save("EffectScale", effectScaleForRegistry);
         ConfigManager.Save("UseLinkedEffectScale", useLinkedEffectScale);
         ConfigManager.Save("TrailEffectScale", trailEffectScale);
@@ -3434,10 +3528,10 @@ public sealed partial class ControlPanelWindow : UserControl
     // 自启动
     // ==================================================================
 
-    private void ApplyAutoStartSettings()
+    private void ApplyAutoStartSettings(bool useSavedSettings = false)
     {
-        bool autoStart = CheckAutoStart.IsOn;
-        bool runAsAdmin = CheckRunAsAdmin.IsOn;
+        bool autoStart = useSavedSettings ? ConfigManager.AutoStart : CheckAutoStart.IsOn;
+        bool runAsAdmin = useSavedSettings ? ConfigManager.RunAsAdmin : CheckRunAsAdmin.IsOn;
 
         string? exePath = AutoStartManager.ResolveExecutablePath(
             Environment.ProcessPath,
@@ -3530,12 +3624,29 @@ public sealed partial class ControlPanelWindow : UserControl
         overlay.Visibility = Visibility.Visible;
         card.IsHitTestVisible = visible;
         overlay.UpdateLayout();
+        card.RenderTransformOrigin = new Point(0.5, 0.5);
+        if (card.RenderTransform is not ScaleTransform) card.RenderTransform = new ScaleTransform();
         var storyboard = new Storyboard();
-        Timeline popup = visible ? new PopInThemeAnimation { FromVerticalOffset = 16 } : new PopOutThemeAnimation();
-        Timeline fade = visible ? new FadeInThemeAnimation() : new FadeOutThemeAnimation();
-        Storyboard.SetTarget(popup, card);
+        TimeSpan scaleDuration = TimeSpan.Parse((string)Application.Current.Resources[visible ? "ControlNormalAnimationDuration" : "ControlFastAnimationDuration"], CultureInfo.InvariantCulture);
+        TimeSpan fadeDuration = TimeSpan.Parse((string)Application.Current.Resources["ControlFasterAnimationDuration"], CultureInfo.InvariantCulture);
+        foreach (string property in new[] { "ScaleX", "ScaleY" })
+        {
+            var scale = new DoubleAnimationUsingKeyFrames();
+            scale.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = TimeSpan.Zero, Value = visible ? 1.05 : 1 });
+            scale.KeyFrames.Add(new SplineDoubleKeyFrame
+            {
+                KeyTime = scaleDuration, Value = visible ? 1 : 1.05,
+                KeySpline = new KeySpline { ControlPoint1 = new Point(0, 0), ControlPoint2 = new Point(0, 1) }
+            });
+            Storyboard.SetTarget(scale, card.RenderTransform);
+            Storyboard.SetTargetProperty(scale, property);
+            storyboard.Children.Add(scale);
+        }
+        var fade = new DoubleAnimationUsingKeyFrames();
+        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = TimeSpan.Zero, Value = visible ? 0 : 1 });
+        fade.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = fadeDuration, Value = visible ? 1 : 0 });
         Storyboard.SetTarget(fade, overlay);
-        storyboard.Children.Add(popup);
+        Storyboard.SetTargetProperty(fade, "Opacity");
         storyboard.Children.Add(fade);
         var completion = new TaskCompletionSource<bool>();
         var state = new ModalAnimation(storyboard, completion, !visible);
@@ -3568,12 +3679,15 @@ public sealed partial class ControlPanelWindow : UserControl
     private void ConfigureContentDialog(ContentDialog dialog)
     {
         dialog.Style = (Style)Application.Current.Resources["BasContentDialogStyle"];
+        dialog.Resources["ContentDialogMinHeight"] = 0d;
         dialog.Resources["ContentDialogSmokeFill"] = VisualResetOverlay.Background;
         dialog.Resources["ContentDialogTopOverlay"] = ((Border)VisualResetOverlay.Children[0]).Background;
         dialog.Opened += (_, _) => UpdateDialogScrim(dialog);
         dialog.Loaded += (_, _) =>
         {
             UpdateDialogScrim(dialog);
+            if (FindVisualDescendant<ScrollViewer>(dialog, "ContentScrollViewer")?.Content is Grid content)
+                content.Padding = new Thickness(content.Padding.Left, content.Padding.Top, content.Padding.Right, 0);
             if (FindVisualDescendant<Grid>(dialog, "CommandSpace") is { } commands)
             {
                 commands.HorizontalAlignment = HorizontalAlignment.Right;
@@ -3596,7 +3710,11 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (Popup popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot))
         {
             if (popup.Child is Microsoft.UI.Xaml.Shapes.Rectangle { Name: "SmokeLayerBackground" } scrim)
+            {
                 scrim.Fill = VisualResetOverlay.Background;
+                Point origin = PanelBody.TransformToVisual(RootGrid).TransformPoint(new Point());
+                scrim.Clip = new RectangleGeometry { Rect = new Rect(origin.X, origin.Y, PanelBody.ActualWidth, PanelBody.ActualHeight) };
+            }
         }
     }
 

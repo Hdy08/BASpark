@@ -62,6 +62,7 @@ internal sealed class DcompPanelHost : IDisposable
     private readonly AppWindow _appWindow;
     private IntPtr _hwnd;
     private RectInt32 _captionButtonsBounds;
+    private bool _renderClockActive;
 
     private delegate IntPtr WndProcDelegate(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -158,6 +159,7 @@ internal sealed class DcompPanelHost : IDisposable
             return;
         }
 
+        SetRenderClockActive(true);
         _ = ShowWindow(_hwnd, IsIconic(_hwnd) ? SW_RESTORE : SW_SHOW);
         _ = SetForegroundWindow(_hwnd);
     }
@@ -167,6 +169,7 @@ internal sealed class DcompPanelHost : IDisposable
         if (AppWindow?.Presenter is OverlappedPresenter presenter)
         {
             presenter.Minimize();
+            SetRenderClockActive(false);
         }
     }
 
@@ -196,6 +199,7 @@ internal sealed class DcompPanelHost : IDisposable
         if (_hwnd != IntPtr.Zero)
         {
             _ = ShowWindow(_hwnd, SW_HIDE);
+            SetRenderClockActive(false);
         }
     }
 
@@ -402,8 +406,30 @@ internal sealed class DcompPanelHost : IDisposable
     private static DcompPanelHost? InstanceOf(IntPtr hwnd) =>
         Instances.TryGetValue(hwnd, out DcompPanelHost? host) ? host : null;
 
+    private void SetRenderClockActive(bool active)
+    {
+        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000) || _renderClockActive == active) return;
+        if (active) _renderClockActive = TimeBeginPeriod(1) == 0;
+        else
+        {
+            _ = TimeEndPeriod(1);
+            _renderClockActive = false;
+        }
+    }
+
+    [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+    private static extern uint TimeBeginPeriod(uint period);
+
+    [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+    private static extern uint TimeEndPeriod(uint period);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hwnd);
+
     private void OnWindowSizeChanged()
     {
+        SetRenderClockActive(IsWindowVisible(_hwnd) && !IsIconic(_hwnd));
         if (IsIconic(_hwnd))
         {
             return;
@@ -460,6 +486,7 @@ internal sealed class DcompPanelHost : IDisposable
             return;
         }
 
+        SetRenderClockActive(false);
         Instances.Remove(hwnd);
         _hwnd = IntPtr.Zero;
         try
