@@ -459,7 +459,7 @@
       <value>既定 RGB(76,167,255)</value>
     </data>
     <data name="VisualReset_Opacity" xml:space="preserve">
-      <value>全体の不透明度</value>
+      <value>不透明度</value>
     </data>
     <data name="VisualReset_Opacity_Sub" xml:space="preserve">
       <value>既定 100 %</value>
@@ -576,7 +576,7 @@
       <value>オンにすると、トレイル更新率はマウスがあるディスプレイの更新率に自動設定されます。</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
-      <value>全体の不透明度</value>
+      <value>不透明度</value>
     </data>
     <data name="Visual_ResetDefaults" xml:space="preserve">
       <value>既定値に戻す</value>

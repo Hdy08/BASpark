@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Security.Principal;
 using System.Text.Json;
 using System.Threading;
@@ -22,6 +23,7 @@ using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Text;
 using Microsoft.Win32;
 using Windows.Foundation;
@@ -31,6 +33,37 @@ using Windows.UI;
 using WinRT.Interop;
 
 namespace BASpark;
+
+public sealed class ColorPresetLayout : NonVirtualizingLayout
+{
+    private const int Columns = 6;
+    private const double Side = 28;
+    private const double Spacing = 6;
+
+    protected override Size MeasureOverride(NonVirtualizingLayoutContext context, Size availableSize)
+    {
+        foreach (UIElement child in context.Children)
+        {
+            child.Measure(new Size(Side, Side));
+        }
+
+        int rows = (context.Children.Count + Columns - 1) / Columns;
+        return new Size(Columns * Side + (Columns - 1) * Spacing, rows * (Side + Spacing) - (rows > 0 ? Spacing : 0));
+    }
+
+    protected override Size ArrangeOverride(NonVirtualizingLayoutContext context, Size finalSize)
+    {
+        double scale = context.Children.Count > 0 ? context.Children[0].XamlRoot?.RasterizationScale ?? 1 : 1;
+        for (int index = 0; index < context.Children.Count; index++)
+        {
+            double left = Math.Round(index % Columns * (Side + Spacing) * scale) / scale;
+            double top = Math.Round(index / Columns * (Side + Spacing) * scale) / scale;
+            context.Children[index].Arrange(new Rect(left, top, Side, Side));
+        }
+
+        return finalSize;
+    }
+}
 
 public sealed class SegmentedRadioLayout : NonVirtualizingLayout
 {
@@ -376,8 +409,15 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
-    private Storyboard? _colorCardAnimation;
+    private CompositionRoundedRectangleGeometry? _colorCardGeometry;
+    private Border? _colorContentHost;
+    private bool _colorCardAnimating;
     private int _colorCardAnimationGeneration;
+    private ColorPickerSlider? _colorAlphaSlider;
+    private double _effectOpacity = 1;
+    private bool _colorPreviewPending;
+    private Color _pendingPreviewColor;
+    private readonly SolidColorBrush _previewColorBrush = new();
     private Microsoft.UI.Xaml.Controls.Primitives.ColorSpectrum? _configuredColorSpectrum;
     private readonly Dictionary<Slider, NumberBox> _sliderToBox = new();
     private readonly Dictionary<NumberBox, Slider> _boxToSlider = new();
@@ -391,7 +431,6 @@ public sealed partial class ControlPanelWindow : UserControl
     private string _languageAtLoad = Localization.CultureZhCn;
     private string? _pendingLanguage;
 
-    private AppBackdrop? _solidBackdrop;
 
     // 首页「当前状态」的三种配色，复用实例（见 RefreshTimer_Tick 的说明）。
     private readonly SolidColorBrush _statusPausedBrush = new(Colors.Gray);
@@ -418,6 +457,9 @@ public sealed partial class ControlPanelWindow : UserControl
             BindCollections();
             SetupSliderPairs();
             ConfigureInputControls();
+            var checkerBrush = CreateColorCheckerBrush();
+            ColorPreviewCheckers.Fill = checkerBrush;
+            ExpandedColorPreviewCheckers.Fill = checkerBrush;
             RootGrid.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(RootGrid_PointerPressed), true);
 
             ComboProfiles.ItemsSource = Profiles;
@@ -478,10 +520,6 @@ public sealed partial class ControlPanelWindow : UserControl
         _host.SetTitle(Localization.Get("App_Title_ControlPanel"));
 
         RootGrid.RequestedTheme = App.ResolveElementTheme();
-        ApplySystemBackdrop();
-
-        // 深浅色切换后同步纯色回退背景（系统背景只挂一次处理器，避免重复订阅）。
-        RootGrid.ActualThemeChanged += (_, _) => _solidBackdrop?.SetTheme(RootGrid.ActualTheme);
 
         // 侧栏子导航的展开/收起：布局只改一次，「日志 / 关于」由独立平移动画让位，
         // 内容露出用合成器裁剪，整体按屏幕刷新率更新（不逐帧跑布局）。
@@ -504,34 +542,6 @@ public sealed partial class ControlPanelWindow : UserControl
         catch (Exception ex)
         {
             AppLogger.Warn($"Failed to size/center control panel: {ex.Message}");
-        }
-    }
-
-    private void ApplySystemBackdrop()
-    {
-        // Windows 11：原生 Mica。
-        try
-        {
-            if (Microsoft.UI.Composition.SystemBackdrops.MicaController.IsSupported())
-            {
-                _host.SetBackdrop(new MicaBackdrop());
-                return;
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug($"Mica backdrop unavailable: {ex.Message}");
-        }
-
-        try
-        {
-            _solidBackdrop = new AppBackdrop();
-            _solidBackdrop.SetTheme(RootGrid.ActualTheme);
-            _host.SetBackdrop(_solidBackdrop);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn($"Failed to apply the solid backdrop: {ex.Message}");
         }
     }
 
@@ -639,7 +649,6 @@ public sealed partial class ControlPanelWindow : UserControl
         RegisterSliderPair(SliderScale, TxtScaleValue);
         RegisterSliderPair(SliderTrailScale, TxtTrailScaleValue);
         RegisterSliderPair(SliderClickScale, TxtClickScaleValue);
-        RegisterSliderPair(SliderOpacity, TxtOpacityValue);
         RegisterSliderPair(SliderGlow, TxtGlowValue);
         RegisterSliderPair(SliderSpeed, TxtSpeedValue);
         RegisterSliderPair(SliderTrailAnimSpeed, TxtTrailSpeedValue);
@@ -701,10 +710,6 @@ public sealed partial class ControlPanelWindow : UserControl
             _suppressValueSync = false;
         }
 
-        if (slider == SliderOpacity && !_syncingColorControls)
-        {
-            UpdateColorPreview(ConfigManager.ParticleColor);
-        }
     }
 
     private void EffectNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
@@ -730,10 +735,6 @@ public sealed partial class ControlPanelWindow : UserControl
             _suppressValueSync = false;
         }
 
-        if (slider == SliderOpacity && !_syncingColorControls)
-        {
-            UpdateColorPreview(ConfigManager.ParticleColor);
-        }
     }
 
     private void ConfigureInputControls()
@@ -903,7 +904,6 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtVisualScale.Text = Localization.Get("Visual_Scale");
         TxtTrailScale.Text = Localization.Get("Visual_TrailScale");
         TxtClickScale.Text = Localization.Get("Visual_ClickScale");
-        TxtVisualOpacity.Text = Localization.Get("Visual_Opacity");
         TxtGlowIntensity.Text = Localization.Get("Visual_GlowIntensity");
         CheckLinkedAnimationSpeed.Header = Localization.Get("Visual_LinkedSpeed");
         TxtLinkedSpeedHint.Text = Localization.Get("Visual_LinkedSpeedHint");
@@ -1048,7 +1048,26 @@ public sealed partial class ControlPanelWindow : UserControl
             return;
         }
 
-        SetEffectColor(args.NewColor, updateOpacity: true);
+        ConfigManager.ParticleColor = ToRgbString(args.NewColor);
+        _effectOpacity = Math.Clamp((_colorAlphaSlider?.Value ?? args.NewColor.A / 255.0 * 100) / 100, 0.1, 1);
+        _pendingPreviewColor = args.NewColor;
+        if (!_colorPreviewPending)
+        {
+            _colorPreviewPending = true;
+            CompositionTarget.Rendering += ColorPreview_Rendering;
+        }
+    }
+
+    private void ColorPreview_Rendering(object? sender, object args)
+    {
+        CompositionTarget.Rendering -= ColorPreview_Rendering;
+        if (!_colorPreviewPending || _isClosed)
+        {
+            return;
+        }
+
+        _colorPreviewPending = false;
+        ApplyColorPreview(_pendingPreviewColor, updatePicker: false);
     }
 
     private void EffectColorPresets_SelectionChanged(object sender, SelectionChangedEventArgs args)
@@ -1066,7 +1085,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void EffectColorHexInput_LostFocus(object sender, RoutedEventArgs args) => CommitEffectColorHex();
 
-    private void EffectColorHexInput_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
+    private void EffectColorHexInput_KeyDown(object sender, KeyRoutedEventArgs args)
     {
         if (args.Key == Windows.System.VirtualKey.Enter)
         {
@@ -1097,29 +1116,11 @@ public sealed partial class ControlPanelWindow : UserControl
 
         if (ColorPickerColorMath.TryParseHex(hex, out Color color))
         {
-            SetEffectColor(Color.FromArgb(alpha, color.R, color.G, color.B), hasAlpha);
-        }
-        else
-        {
-            UpdateColorPreview(ConfigManager.ParticleColor);
-        }
-    }
-
-    private void SetEffectColor(Color color, bool updateOpacity)
-    {
-        _syncingColorControls = true;
-        try
-        {
             ConfigManager.ParticleColor = ToRgbString(color);
-            if (updateOpacity)
+            if (hasAlpha)
             {
-                SliderOpacity.Value = Math.Clamp(color.A / 255.0 * 100, SliderOpacity.Minimum, SliderOpacity.Maximum);
-                TxtOpacityValue.Value = Math.Round(SliderOpacity.Value, 4);
+                _effectOpacity = Math.Clamp(alpha / 255.0, 0.1, 1);
             }
-        }
-        finally
-        {
-            _syncingColorControls = false;
         }
 
         UpdateColorPreview(ConfigManager.ParticleColor);
@@ -1128,9 +1129,24 @@ public sealed partial class ControlPanelWindow : UserControl
     private void EffectColorExpander_Loaded(object sender, RoutedEventArgs args)
     {
         EffectColorExpander.ApplyTemplate();
-        if (FindVisualDescendant<ToggleButton>(EffectColorExpander, "ExpanderHeader") is { } header)
+        _colorContentHost = FindVisualDescendant<Border>(EffectColorExpander, "ExpanderContentHost");
+        Visual visual = ElementCompositionPreview.GetElementVisual(EffectColorCard);
+        _colorCardGeometry = visual.Compositor.CreateRoundedRectangleGeometry();
+        _colorCardGeometry.CornerRadius = new Vector2(6);
+        _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, 60);
+        visual.Clip = visual.Compositor.CreateGeometricClip(_colorCardGeometry);
+        if (EffectColorExpander.IsExpanded)
         {
-            header.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+            AnimateColorCard(expanding: true);
+        }
+    }
+
+    private void EffectColorCard_SizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (_colorCardGeometry != null)
+        {
+            _colorCardGeometry.Size = new Vector2((float)args.NewSize.Width,
+                _colorCardAnimating ? _colorCardGeometry.Size.Y : (float)args.NewSize.Height);
         }
     }
 
@@ -1140,67 +1156,91 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void AnimateColorCard(bool expanding)
     {
-        if (!EffectColorCard.IsLoaded)
+        if (_colorContentHost == null || _colorCardGeometry == null || !EffectColorCard.IsLoaded)
         {
             return;
         }
 
         int generation = ++_colorCardAnimationGeneration;
-        double fromHeight = EffectColorCard.ActualHeight;
-        _colorCardAnimation?.Stop();
-        EffectColorCard.Height = fromHeight;
-        App.DispatcherQueue.TryEnqueue(() =>
+        ColorPickerBody.Measure(new Size(Math.Max(0, EffectColorCard.ActualWidth - 34), double.PositiveInfinity));
+        double contentHeight = ColorPickerBody.DesiredSize.Height + _colorContentHost.Padding.Top + _colorContentHost.Padding.Bottom;
+        _colorContentHost.Height = contentHeight;
+        _colorContentHost.IsHitTestVisible = expanding;
+        _colorCardAnimating = true;
+        var compositor = _colorCardGeometry.Compositor;
+        var animation = compositor.CreateScalarKeyFrameAnimation();
+        animation.InsertKeyFrame(1, expanding ? (float)(60 + contentHeight) : 60,
+            compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0.7f), new Vector2(0.2f, 1)));
+        animation.Duration = TimeSpan.FromMilliseconds(expanding ? 220 : 180);
+        var batch = compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
+        _colorCardGeometry.StartAnimation("Size.Y", animation);
+        batch.Completed += (_, _) =>
         {
-            if (_isClosed || generation != _colorCardAnimationGeneration)
-            {
-                return;
-            }
-
-            EffectColorExpander.Measure(new Size(Math.Max(0, EffectColorCard.ActualWidth - 2), double.PositiveInfinity));
-            double toHeight = expanding ? EffectColorExpander.DesiredSize.Height + 2 : 60;
-            var animation = new DoubleAnimation
-            {
-                From = fromHeight,
-                To = Math.Max(60, toHeight),
-                Duration = new Duration(TimeSpan.FromMilliseconds(expanding ? 220 : 180)),
-                EnableDependentAnimation = true,
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            Storyboard.SetTarget(animation, EffectColorCard);
-            Storyboard.SetTargetProperty(animation, "Height");
-            var storyboard = new Storyboard();
-            storyboard.Children.Add(animation);
-            storyboard.Completed += (_, _) =>
+            batch.Dispose();
+            App.DispatcherQueue.TryEnqueue(() =>
             {
                 if (_isClosed || generation != _colorCardAnimationGeneration)
                 {
                     return;
                 }
 
-                storyboard.Stop();
-                EffectColorCard.Height = double.NaN;
-                _colorCardAnimation = null;
-            };
-            _colorCardAnimation = storyboard;
-            storyboard.Begin();
-        });
+                _colorCardAnimating = false;
+                if (!expanding)
+                {
+                    _colorContentHost.Height = 0;
+                }
+
+                _colorCardGeometry.StopAnimation("Size.Y");
+                _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, expanding ? (float)(60 + contentHeight) : 60);
+            });
+        };
+        batch.End();
     }
 
     private void EffectColorPicker_Loaded(object sender, RoutedEventArgs args)
     {
         EffectColorPicker.ApplyTemplate();
-        if (FindVisualDescendant<Microsoft.UI.Xaml.Controls.Primitives.ColorPickerSlider>(EffectColorPicker, "AlphaSlider") is { } alphaSlider)
+        var alphaSlider = FindVisualDescendant<ColorPickerSlider>(EffectColorPicker, "AlphaSlider");
+        if (_colorAlphaSlider != alphaSlider)
         {
-            alphaSlider.Minimum = SliderOpacity.Minimum;
+            if (_colorAlphaSlider != null)
+            {
+                _colorAlphaSlider.ValueChanged -= ColorAlphaSlider_ValueChanged;
+            }
+
+            _colorAlphaSlider = alphaSlider;
+            if (_colorAlphaSlider != null)
+            {
+                _colorAlphaSlider.Minimum = 0;
+                _colorAlphaSlider.ValueChanged += ColorAlphaSlider_ValueChanged;
+                bool previousSync = _syncingColorControls;
+                _syncingColorControls = true;
+                try
+                {
+                    _colorAlphaSlider.Value = Math.Clamp(_effectOpacity * 100, 10, 100);
+                }
+                finally
+                {
+                    _syncingColorControls = previousSync;
+                }
+            }
         }
 
-        if (FindVisualDescendant<Microsoft.UI.Xaml.Controls.Primitives.ColorSpectrum>(EffectColorPicker, "ColorSpectrum") is { } spectrum && spectrum != _configuredColorSpectrum)
+        if (FindVisualDescendant<ColorSpectrum>(EffectColorPicker, "ColorSpectrum") is { } spectrum && spectrum != _configuredColorSpectrum)
         {
             _configuredColorSpectrum = spectrum;
             spectrum.SizeChanged += (_, _) => UpdateSpectrumClip();
         }
 
         UpdateSpectrumClip();
+    }
+
+    private void ColorAlphaSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs args)
+    {
+        if (args.NewValue < 10 && _colorAlphaSlider != null)
+        {
+            _colorAlphaSlider.Value = 10;
+        }
     }
 
     private void UpdateSpectrumClip()
@@ -1211,23 +1251,61 @@ public sealed partial class ControlPanelWindow : UserControl
         }
     }
 
+    private static ImageBrush CreateColorCheckerBrush()
+    {
+        var bitmap = new WriteableBitmap(64, 64);
+        var pixels = new byte[64 * 64 * 4];
+        for (int row = 0; row < 64; row++)
+        {
+            for (int column = 0; column < 64; column++)
+            {
+                byte shade = (byte)((row / 8 + column / 8) % 2 == 0 ? 136 : 204);
+                int offset = (row * 64 + column) * 4;
+                pixels[offset] = shade;
+                pixels[offset + 1] = shade;
+                pixels[offset + 2] = shade;
+                pixels[offset + 3] = 255;
+            }
+        }
+
+        using (Stream stream = bitmap.PixelBuffer.AsStream())
+        {
+            stream.Write(pixels);
+        }
+
+        bitmap.Invalidate();
+        return new ImageBrush { ImageSource = bitmap, Stretch = Stretch.UniformToFill };
+    }
+
     private void UpdateColorPreview(string rgbString)
     {
         Color rgb = TryParseRgbString(rgbString, out Color parsed) ? parsed : Colors.Gray;
-        byte alpha = (byte)Math.Round(Math.Clamp(SliderOpacity.Value / 100, 0.1, 1) * 255);
-        Color color = Color.FromArgb(alpha, rgb.R, rgb.G, rgb.B);
-        var brush = new SolidColorBrush(color);
-        string hex = $"#{alpha:X2}{ColorPickerColorMath.ToHex(color)[1..]}";
+        byte alpha = (byte)Math.Round(Math.Clamp(_effectOpacity, 0.1, 1) * 255);
+        _colorPreviewPending = false;
+        CompositionTarget.Rendering -= ColorPreview_Rendering;
+        ApplyColorPreview(Color.FromArgb(alpha, rgb.R, rgb.G, rgb.B), updatePicker: true);
+    }
 
+    private void ApplyColorPreview(Color color, bool updatePicker)
+    {
+        string hex = $"#{color.A:X2}{ColorPickerColorMath.ToHex(color)[1..]}";
         _syncingColorControls = true;
         try
         {
-            ColorPreview.Background = brush;
-            ExpandedColorPreview.Background = brush;
-            EffectColorHexInput.Text = hex;
-            ExpandedColorHex.Text = hex;
-            ExpandedColorOpacity.Text = $"{Localization.Get("Visual_Opacity")} {SliderOpacity.Value:0.#}%";
-            EffectColorPicker.Color = color;
+            _previewColorBrush.Color = color;
+            ColorPreviewFill.Background = _previewColorBrush;
+            ExpandedColorPreviewFill.Background = _previewColorBrush;
+            if (EffectColorHexInput.Text != hex)
+            {
+                EffectColorHexInput.Text = hex;
+                ExpandedColorHex.Text = hex;
+            }
+
+            ExpandedColorOpacity.Text = $"{Localization.Get("Visual_Opacity")} {_effectOpacity * 100:0.#}%";
+            if (updatePicker && EffectColorPicker.Color != color)
+            {
+                EffectColorPicker.Color = color;
+            }
 
             int selectedIndex = -1;
             for (int index = 0; index < EffectColorPresets.Items.Count; index++)
@@ -1240,7 +1318,10 @@ public sealed partial class ControlPanelWindow : UserControl
                 }
             }
 
-            EffectColorPresets.SelectedIndex = selectedIndex;
+            if (EffectColorPresets.SelectedIndex != selectedIndex)
+            {
+                EffectColorPresets.SelectedIndex = selectedIndex;
+            }
         }
         finally
         {
@@ -1554,7 +1635,7 @@ public sealed partial class ControlPanelWindow : UserControl
         SliderScale.Value = ConfigManager.EffectScale;
         SliderTrailScale.Value = ConfigManager.TrailEffectScale;
         SliderClickScale.Value = ConfigManager.ClickEffectScale;
-        SliderOpacity.Value = ConfigManager.EffectOpacity * 100;
+        _effectOpacity = Math.Clamp(ConfigManager.EffectOpacity, 0.1, 1);
         SliderGlow.Value = ConfigManager.GlowIntensity;
         CheckLinkedAnimationSpeed.IsOn = ConfigManager.UseLinkedAnimationSpeed;
         CheckApplyCurveDraw.IsOn = ConfigManager.ApplyCurveDraw;
@@ -2280,7 +2361,7 @@ public sealed partial class ControlPanelWindow : UserControl
         bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsOn;
         ConfigManager.GetEffectScalesForOverlay(out double trailScale, out double clickScale);
         ConfigManager.GetAnimationSpeedsForOverlay(out double trailSpeed, out double clickSpeed);
-        double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
+        double effectOpacity = Math.Round(_effectOpacity, 2);
 
         App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
         App.Overlay?.UpdateEffectSettings(trailScale, clickScale, effectOpacity, trailSpeed, clickSpeed, ConfigManager.GlowIntensity);
@@ -2682,7 +2763,7 @@ public sealed partial class ControlPanelWindow : UserControl
             effectScaleForRegistry = clickEffectScale;
         }
 
-        double effectOpacity = Math.Round(SliderOpacity.Value / 100.0, 2);
+        double effectOpacity = Math.Round(_effectOpacity, 2);
         double glowIntensity = Math.Round(SliderGlow.Value, 2);
 
         bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsOn;
@@ -3074,6 +3155,12 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         _isClosed = true;
+        CompositionTarget.Rendering -= ColorPreview_Rendering;
+        _colorCardGeometry?.StopAnimation("Size.Y");
+        if (_colorAlphaSlider != null)
+        {
+            _colorAlphaSlider.ValueChanged -= ColorAlphaSlider_ValueChanged;
+        }
 
         if (!_skipSaveOnClosing)
         {

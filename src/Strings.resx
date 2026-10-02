@@ -459,7 +459,7 @@
       <value>默认 RGB(76,167,255)</value>
     </data>
     <data name="VisualReset_Opacity" xml:space="preserve">
-      <value>全局不透明度</value>
+      <value>不透明度</value>
     </data>
     <data name="VisualReset_Opacity_Sub" xml:space="preserve">
       <value>默认 100 %</value>
@@ -576,7 +576,7 @@
       <value>开启此项后拖尾刷新率自动设置为鼠标所在显示器的刷新率</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
-      <value>全局不透明度</value>
+      <value>不透明度</value>
     </data>
     <data name="Visual_ResetDefaults" xml:space="preserve">
       <value>恢复默认设置</value>

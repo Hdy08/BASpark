@@ -191,6 +191,7 @@
 
     <!-- 页面主标题：Title 层级 -->
     <Style x:Key="BasPageTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="FontSize" Value="{StaticResource BasFontSizeTitle}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -199,6 +200,7 @@
 
     <!-- 区块标题：BodyStrong 层级 -->
     <Style x:Key="BasSectionTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -207,6 +209,7 @@
 
     <!-- 说明文字：Caption 层级 -->
     <Style x:Key="BasCaptionStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="FontSize" Value="{StaticResource BasFontSizeCaption}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextSecondaryBrush}" />
@@ -214,6 +217,7 @@
 
     <!-- 页头副标题 -->
     <Style x:Key="BasPageSubtitleStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextSecondaryBrush}" />
@@ -221,6 +225,7 @@
 
     <!-- 设置项标签 -->
     <Style x:Key="BasFieldLabelStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
         <Setter Property="Margin" Value="0,0,0,6" />
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -259,6 +264,7 @@
 
     <!-- 危险操作按钮（基于 WinUI 默认 Button 模板，只改配色） -->
     <Style x:Key="BasDangerButtonStyle" TargetType="Button">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="Foreground" Value="{ThemeResource BasDangerousBrush}" />
         <Setter Property="Background" Value="{ThemeResource BasDangerousSubtleBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource BasDangerousBrush}" />
@@ -268,6 +274,7 @@
 
     <!-- 关于页外链按钮 -->
     <Style x:Key="BasLinkButtonStyle" TargetType="Button">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="CornerRadius" Value="{StaticResource BasControlCornerRadius}" />
@@ -276,14 +283,17 @@
     <!-- ==================== 侧边栏导航项 ==================== -->
 
     <Style x:Key="BasSettingsPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasPageTitleStyle}">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="FontSize" Value="24" />
     </Style>
 
     <Style x:Key="BasSettingsSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasSectionTitleStyle}">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="Margin" Value="0,20,0,8" />
     </Style>
 
     <Style x:Key="BasSettingTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasFieldLabelStyle}">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Margin" Value="0" />
     </Style>
@@ -299,6 +309,7 @@
     </Style>
 
     <Style x:Key="BasSettingToggleStyle" TargetType="ToggleSwitch">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="Width" Value="44" />
         <Setter Property="HorizontalAlignment" Value="Right" />
@@ -325,16 +336,77 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <Style x:Key="BasColorExpanderHeaderStyle" TargetType="ToggleButton">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
+        <Setter Property="MinHeight" Value="58" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="{ThemeResource BasSettingsCardBackgroundBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                        </Grid.ColumnDefinitions>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CheckStates">
+                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
+                                          FontFamily="{TemplateBinding FontFamily}" />
+                        <FontIcon x:Name="HeaderChevron" Grid.Column="1" Glyph="&#xE70D;" FontSize="12"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="BasSettingExpanderStyle" TargetType="Expander">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="MinHeight" Value="58" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="Background" Value="{ThemeResource BasSettingsCardBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{ThemeResource BasSettingsCardBorderBrush}" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Padding" Value="16,0,16,16" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="ExpandDirectionStates">
+                                <VisualState x:Name="ExpandDown" />
+                                <VisualState x:Name="CollapseDown" />
+                                <VisualState x:Name="ExpandUp" />
+                                <VisualState x:Name="CollapseUp" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ToggleButton x:Name="ExpanderHeader" Style="{StaticResource BasColorExpanderHeaderStyle}"
+                                      Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                      IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
+                        <Border x:Name="ExpanderContentHost" Grid.Row="1" Height="0" IsHitTestVisible="False"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top" />
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="BasColorPickerSliderStyle" TargetType="primitives:ColorPickerSlider">
@@ -365,7 +437,7 @@
                             <Rectangle x:Name="VerticalTrackRect" Grid.RowSpan="3" Width="18" Fill="Transparent" />
                             <Rectangle x:Name="VerticalDecreaseRect" Grid.Row="2" Fill="Transparent" />
                             <Thumb x:Name="VerticalThumb" Grid.Row="1" Width="20" Height="6"
-                                   Background="#666666" BorderBrush="White" BorderThickness="1"
+                                   Background="Transparent" BorderBrush="White" BorderThickness="1"
                                    DataContext="{TemplateBinding Value}" AutomationProperties.AccessibilityView="Raw">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
@@ -382,6 +454,7 @@
     </Style>
 
     <Style x:Key="BasColorPickerStyle" TargetType="ColorPicker">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="MinHeight" Value="0" />
         <Setter Property="HorizontalAlignment" Value="Left" />
@@ -426,7 +499,7 @@
                             </Rectangle>
                             <primitives:ColorPickerSlider x:Name="AlphaSlider" Orientation="Vertical"
                                 Style="{StaticResource BasColorPickerSliderStyle}" Margin="0,-3"
-                                Minimum="10" Maximum="100" Width="20" MinWidth="0" IsThumbToolTipEnabled="False" />
+                                Minimum="0" Maximum="100" Width="20" MinWidth="0" IsThumbToolTipEnabled="False" />
                         </Grid>
                     </Grid>
                 </ControlTemplate>
@@ -440,10 +513,7 @@
                 <ControlTemplate TargetType="RadioButtons">
                     <ItemsRepeater x:Name="InnerRepeater">
                         <ItemsRepeater.Layout>
-                            <UniformGridLayout Orientation="Horizontal" ItemsStretch="None"
-                                               MinItemWidth="28" MinItemHeight="28"
-                                               MinColumnSpacing="6" MinRowSpacing="6"
-                                               MaximumRowsOrColumns="6" />
+                            <local:ColorPresetLayout />
                         </ItemsRepeater.Layout>
                     </ItemsRepeater>
                 </ControlTemplate>
@@ -452,6 +522,7 @@
     </Style>
 
     <Style x:Key="BasColorSwatchStyle" TargetType="RadioButton">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="Width" Value="28" />
         <Setter Property="Height" Value="28" />
         <Setter Property="MinWidth" Value="0" />
@@ -515,6 +586,7 @@
     </Style>
 
     <Style x:Key="BasSegmentedRadioStyle" TargetType="RadioButton">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="MinHeight" Value="28" />
         <Setter Property="Padding" Value="8,4" />
@@ -584,6 +656,7 @@
         左侧 3px 强调色指示条与 WinUI NavigationView 的选中标记一致。
     -->
     <Style x:Key="BasNavRadioStyle" TargetType="RadioButton">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="Margin" Value="2,0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -700,6 +773,7 @@
 
     <!-- 设置子导航：更紧凑、次级文字色 -->
     <Style x:Key="BasSubNavRadioStyle" TargetType="RadioButton">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinHeight" Value="32" />
         <Setter Property="Margin" Value="30,0,2,0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />

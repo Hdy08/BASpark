@@ -725,47 +725,7 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="TxtVisualOpacity"
-                                            Text=""
-                                            Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <Grid ColumnSpacing="8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Slider
-                                                x:Name="SliderOpacity"
-                                                Grid.Column="0"
-                                                Minimum="10"
-                                                Maximum="100"
-                                                StepFrequency="5"
-                                                ValueChanged="EffectSlider_ValueChanged"
-                                                MinWidth="40"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtVisualOpacity}" />
-                                            <NumberBox
-                                                x:Name="TxtOpacityValue"
-                                                Grid.Column="1"
-                                                Minimum="10"
-                                                Maximum="100"
-                                                SmallChange="5"
-                                                SpinButtonPlacementMode="Compact"
-                                                Width="84"
-                                                ValueChanged="EffectNumberBox_ValueChanged"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtVisualOpacity}" />
-                                        </Grid>
-                                    </Grid>
-                                </Grid>
-                            </Border>
+
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1041,19 +1001,12 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <Border x:Name="EffectColorCard" Style="{StaticResource BasSettingCardStyle}" Padding="0">
+                            <Border x:Name="EffectColorCard" Style="{StaticResource BasSettingCardStyle}" Padding="0" SizeChanged="EffectColorCard_SizeChanged">
                                 <Expander x:Name="EffectColorExpander" Style="{StaticResource BasSettingExpanderStyle}"
                                           VerticalAlignment="Top" Loaded="EffectColorExpander_Loaded"
                                           Expanding="EffectColorExpander_Expanding" Collapsed="EffectColorExpander_Collapsed"
                                           AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}">
-                                    <Expander.Resources>
-                                        <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="{ThemeResource BasSettingsCardColor}" />
-                                        <Thickness x:Key="ExpanderHeaderBorderThickness">0</Thickness>
-                                        <Thickness x:Key="ExpanderContentDownBorderThickness">0</Thickness>
-                                        <Thickness x:Key="ExpanderHeaderPadding">16,12</Thickness>
-                                        <Thickness x:Key="ExpanderChevronMargin">8,0,0,0</Thickness>
-                                        <x:Double x:Key="ExpanderChevronButtonSize">16</x:Double>
-                                    </Expander.Resources>
+
                                     <Expander.Header>
                                         <Grid ColumnSpacing="12">
                                             <Grid.ColumnDefinitions>
@@ -1069,7 +1022,12 @@
                                                          AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}"
                                                          LostFocus="EffectColorHexInput_LostFocus" KeyDown="EffectColorHexInput_KeyDown" />
                                                 <Border x:Name="ColorPreview" Width="32" Height="32" CornerRadius="4"
-                                                        BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}" />
+                                                        VerticalAlignment="Top" BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}">
+                                                    <Grid>
+                                                        <Rectangle x:Name="ColorPreviewCheckers" RadiusX="3" RadiusY="3" />
+                                                        <Border x:Name="ColorPreviewFill" CornerRadius="3" />
+                                                    </Grid>
+                                                </Border>
                                             </StackPanel>
                                         </Grid>
                                     </Expander.Header>
@@ -1093,7 +1051,12 @@
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
                                                 <Border x:Name="ExpandedColorPreview" Width="64" Height="64" CornerRadius="6"
-                                                        BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}" />
+                                                        VerticalAlignment="Top" BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}">
+                                                    <Grid>
+                                                        <Rectangle x:Name="ExpandedColorPreviewCheckers" RadiusX="5" RadiusY="5" />
+                                                        <Border x:Name="ExpandedColorPreviewFill" CornerRadius="5" />
+                                                    </Grid>
+                                                </Border>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
                                                     <TextBlock x:Name="ExpandedColorHex" Style="{StaticResource BasSettingTitleStyle}" />
                                                     <TextBlock x:Name="ExpandedColorOpacity" Style="{StaticResource BasCaptionStyle}" />
@@ -1488,7 +1451,7 @@
                                  AcceptsReturn="True"
                                  BorderThickness="0"
                                  Background="Transparent"
-                                 FontSize="{StaticResource BasFontSizeCaption}"
+                                 FontSize="{StaticResource BasFontSizeCaption}" FontFamily="Consolas"
                                  ScrollViewer.VerticalScrollBarVisibility="Disabled" />
                     </ScrollViewer>
                 </Border>
@@ -1504,34 +1467,35 @@
                                Text=""
                                Style="{StaticResource BasSettingsPageTitleStyle}" />
 
-                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,16,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="BASpark"
-                                   FontSize="{StaticResource BasFontSizeSubtitle}"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center" />
-                        <TextBlock x:Name="AboutVersionText"
-                                   Text="—"
-                                   VerticalAlignment="Center"
-                                   Foreground="{ThemeResource BasTextSecondaryBrush}" />
-                    </StackPanel>
-
-                    <TextBlock x:Name="TxtAboutDescription"
-                               Text=""
-                               Margin="0,16,0,0"
-                               TextWrapping="Wrap"
-                               Foreground="{ThemeResource BasTextSecondaryBrush}" />
-
-                    <Border Style="{StaticResource BasDividerStyle}" Margin="0,24,0,12" />
-
-                    <TextBlock x:Name="TxtDevOptions"
-                               Text=""
-                               Style="{StaticResource BasFieldLabelStyle}"
-                               Foreground="{ThemeResource BasTextTertiaryBrush}" />
-                    <Button x:Name="BtnResetAll"
-                            Content=""
-                            Style="{StaticResource BasDangerButtonStyle}"
-                            HorizontalAlignment="Left"
-                            Click="ResetConfig_Click" />
+                    <Border Style="{StaticResource BasSettingCardStyle}" Margin="0,16,0,6">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="BASpark" Style="{StaticResource BasSettingTitleStyle}" />
+                                <TextBlock x:Name="TxtAboutDescription" Text="" Style="{StaticResource BasCaptionStyle}" />
+                            </StackPanel>
+                            <TextBlock x:Name="AboutVersionText" Grid.Column="1" Text="—"
+                                       Style="{StaticResource BasCaptionStyle}" VerticalAlignment="Center"
+                                       HorizontalAlignment="Right" />
+                        </Grid>
+                    </Border>
+                    <TextBlock x:Name="TxtDevOptions" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}"
+                               Margin="0,12,0,8" />
+                    <Border Style="{StaticResource BasSettingCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Content, ElementName=BtnResetAll}" Style="{StaticResource BasSettingTitleStyle}"
+                                       VerticalAlignment="Center" />
+                            <Button x:Name="BtnResetAll" Grid.Column="1" Content="" Style="{StaticResource BasDangerButtonStyle}"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center" Click="ResetConfig_Click" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Grid>
