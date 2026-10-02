@@ -849,7 +849,7 @@ public class WinUi3UiTests
     {
         XDocument document = LoadXaml("src", "DesignSystem.xaml");
         XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioButtonsStyle");
-        Assert.Equal("{StaticResource DefaultRadioButtonsStyle}", (string?)style.Attribute("BasedOn"));
+        Assert.Null(style.Attribute("BasedOn"));
         XElement repeater = Assert.Single(style.Descendants(), element => element.Name.LocalName == "ItemsRepeater");
         Assert.Equal("InnerRepeater", (string?)repeater.Attribute(Xaml + "Name"));
         XElement layout = Assert.Single(style.Descendants(), element => element.Name.LocalName == "UniformGridLayout");
@@ -1056,6 +1056,29 @@ public class WinUi3UiTests
         XElement layout = Assert.Single(style.Descendants(), element => element.Name.LocalName == "UniformGridLayout");
         Assert.Equal("6", (string?)layout.Attribute("MaximumRowsOrColumns"));
         Assert.Equal("6", (string?)layout.Attribute("MinRowSpacing"));
+    }
+
+    [Fact]
+    public void DesignSystem_StyleInheritanceResolvesWithinApplicationResources()
+    {
+        XDocument document = LoadXaml("src", "DesignSystem.xaml");
+        XElement[] styles = document.Descendants(Presentation + "Style").ToArray();
+        HashSet<string> styleKeys = styles
+            .Select(style => (string?)style.Attribute(Xaml + "Key"))
+            .OfType<string>()
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
+        {
+            string reference = style.Attribute("BasedOn")!.Value;
+            Assert.StartsWith("{StaticResource ", reference, StringComparison.Ordinal);
+            Assert.EndsWith("}", reference, StringComparison.Ordinal);
+            Assert.Contains(reference["{StaticResource ".Length..^1], styleKeys);
+        }
+
+        XElement expander = Assert.Single(styles, style => (string?)style.Attribute(Xaml + "Key") == "BasSettingExpanderStyle");
+        Assert.Null(expander.Attribute("BasedOn"));
+        Assert.DoesNotContain(expander.Elements(), setter => (string?)setter.Attribute("Property") == "Template");
     }
 
     private static XElement GetSettingCard(XElement control) =>

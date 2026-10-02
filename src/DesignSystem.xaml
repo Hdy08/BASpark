@@ -322,7 +322,7 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <Style x:Key="BasSettingExpanderStyle" TargetType="Expander" BasedOn="{StaticResource DefaultExpanderStyle}">
+    <Style x:Key="BasSettingExpanderStyle" TargetType="Expander">
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="MinHeight" Value="58" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -334,7 +334,7 @@
         <Setter Property="Padding" Value="16,0,16,16" />
     </Style>
 
-    <Style x:Key="BasColorPresetsStyle" TargetType="RadioButtons" BasedOn="{StaticResource DefaultRadioButtonsStyle}">
+    <Style x:Key="BasColorPresetsStyle" TargetType="RadioButtons">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButtons">
@@ -351,7 +351,7 @@
         </Setter>
     </Style>
 
-    <Style x:Key="BasColorSwatchStyle" TargetType="RadioButton" BasedOn="{StaticResource DefaultRadioButtonStyle}">
+    <Style x:Key="BasColorSwatchStyle" TargetType="RadioButton">
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="MinHeight" Value="28" />
         <Setter Property="Padding" Value="0" />
@@ -396,7 +396,7 @@
         </Setter>
     </Style>
 
-    <Style x:Key="BasSegmentedRadioButtonsStyle" TargetType="RadioButtons" BasedOn="{StaticResource DefaultRadioButtonsStyle}">
+    <Style x:Key="BasSegmentedRadioButtonsStyle" TargetType="RadioButtons">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButtons">
