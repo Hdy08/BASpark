@@ -1457,12 +1457,12 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void DependentSettings_RepositionFromMeasuredLocalOffsetsAndAnimateNewCardsTogether()
+    public void DependentSettings_RepositionExistingCardsAndFadeNewCardsAtTheirFinalLayoutSlots()
     {
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         string animate = source[source.IndexOf("private void SetSettingsVisibility", StringComparison.Ordinal)..source.IndexOf("private void StopSettingsAnimation(", StringComparison.Ordinal)];
         Assert.True(animate.IndexOf("var positions", StringComparison.Ordinal) < animate.IndexOf("foreach (var change in changes) change.Element.Visibility =", StringComparison.Ordinal));
-        Assert.Contains("previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : -16", animate, StringComparison.Ordinal);
+        Assert.Contains("previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : 0", animate, StringComparison.Ordinal);
         Assert.Contains("new RepositionThemeAnimation", animate, StringComparison.Ordinal);
         Assert.Contains("new FadeInThemeAnimation()", animate, StringComparison.Ordinal);
         Assert.Equal(1, animate.Split("storyboard.Begin()", StringSplitOptions.None).Length - 1);
@@ -1766,6 +1766,66 @@ public class WinUi3UiTests
         Assert.Contains("RootGrid.AddHandler(UIElement.PointerPressedEvent", source, StringComparison.Ordinal);
         Assert.Contains("FocusManager.GetFocusedElement(XamlRoot)", source, StringComparison.Ordinal);
         Assert.Contains("Focus(FocusState.Programmatic)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PanelHost_RestoresMaximizedClientBoundsUsingTheProposedRectangleMonitor()
+    {
+        string source = ReadSource("src", "DcompPanelHost.cs");
+        string calculate = source[source.IndexOf("case WmNcCalcSize:", StringComparison.Ordinal)..source.IndexOf("case WmGetMinMaxInfo:", StringComparison.Ordinal)];
+        Assert.Contains("RECT proposed = Marshal.PtrToStructure<RECT>(lParam)", calculate, StringComparison.Ordinal);
+        Assert.Contains("MonitorFromRect(ref proposed, MonitorDefaultToNearest)", calculate, StringComparison.Ordinal);
+        Assert.Contains("Marshal.StructureToPtr(info.rcWork, lParam", calculate, StringComparison.Ordinal);
+        Assert.DoesNotContain("MonitorFromWindow", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetWindowRect", calculate, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnvironmentFilter_DisablesProfileActionsAlongWithTheNativeSelectors()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string interlock = source[source.IndexOf("private void UpdateEnvironmentFilterInterlock()", StringComparison.Ordinal)..source.IndexOf("private void SelectProcessFilterMode", StringComparison.Ordinal)];
+        foreach (string name in new[] { "CheckHideInFullscreen", "CheckShowEffectOnDesktop", "ComboProfiles", "ComboProcessFilterMode", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile" })
+            Assert.Contains($"{name}.IsEnabled = environmentFilterEnabled", interlock, StringComparison.Ordinal);
+        foreach (string name in new[] { "ListConfiguredProcesses", "BtnBrowseProcess", "BtnSelectRunningProcess" })
+            Assert.Contains($"{name}.IsEnabled = processFilterEnabled", interlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProfileDeletion_UsesATitlelessNativeConfirmationWithCancelOnTheLeftAndAGap()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string delete = source[source.IndexOf("private async void DeleteProfile_Click", StringComparison.Ordinal)..source.IndexOf("private void RemoveProcess_Click", StringComparison.Ordinal)];
+        Assert.Contains("""title: null, confirmText: Localization.Get("Msg_ConfirmDelete_Title")""", delete, StringComparison.Ordinal);
+        Assert.Contains("""PrimaryButtonText = confirmText ?? Localization.Get("ColorPicker_Confirm")""", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetColumn(cancel, 0)", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetColumn(confirm, 4)", source, StringComparison.Ordinal);
+        Assert.Contains("commands.ColumnDefinitions[3].Width = new GridLength(8)", source, StringComparison.Ordinal);
+        Assert.Contains("return await dialog.ShowAsync() == ContentDialogResult.Primary", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProfileRename_KeepsOnlyTheTitleInputAndActionButtons()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement overlay = GetNamedElement(panel, "RenameProfileOverlay");
+        Assert.Single(overlay.Descendants(Presentation + "TextBlock"));
+        Assert.Same(GetNamedElement(panel, "TxtOverlayRename"), overlay.Descendants(Presentation + "TextBlock").Single());
+        Assert.Equal("0,12,0,0", (string?)GetNamedElement(panel, "NewProfileNameInput").Attribute("Margin"));
+        Assert.DoesNotContain("TxtOverlayRenamePrompt", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LogCard_UsesSelectableMonospaceDisplayTextInsteadOfAnInputTemplate()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement log = GetNamedElement(panel, "TxtAppLog");
+        Assert.Equal(Presentation + "TextBlock", log.Name);
+        Assert.Equal("True", (string?)log.Attribute("IsTextSelectionEnabled"));
+        Assert.Equal("Consolas", (string?)log.Attribute("FontFamily"));
+        Assert.Equal("Wrap", (string?)log.Attribute("TextWrapping"));
+        Assert.Same(GetNamedElement(panel, "LogScrollViewer"), log.Parent);
+        Assert.DoesNotContain(GetNamedElement(panel, "PageLog").Descendants(), element => element.Name == Presentation + "TextBox");
     }
 
     private static XElement GetSettingCard(XElement control) =>

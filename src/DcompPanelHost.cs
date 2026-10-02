@@ -319,19 +319,16 @@ internal sealed class DcompPanelHost : IDisposable
             case WmNcCalcSize:
                 // 客户区铺满整窗：非客户区（Windows 10 上是 9px 玻璃边框 + 顶部 1px）
                 // 因此完全消失。保持建议的窗口矩形不变并返回 0 即表示整窗为客户区。
-                if (IsZoomed(hwnd) && GetWindowRect(hwnd, out RECT zoomed))
+                if (IsZoomed(hwnd))
                 {
                     // 最大化时窗口矩形比工作区各方向大一圈（约 9px 的不可见边框），
                     // 客户区若照搬窗口矩形，内容会顶出工作区被裁掉。这里改用监视器工作区。
-                    IntPtr monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+                    RECT proposed = Marshal.PtrToStructure<RECT>(lParam);
+                    IntPtr monitor = MonitorFromRect(ref proposed, MonitorDefaultToNearest);
                     var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
                     if (monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref info))
                     {
                         Marshal.StructureToPtr(info.rcWork, lParam, fDeleteOld: false);
-                    }
-                    else
-                    {
-                        Marshal.StructureToPtr(zoomed, lParam, fDeleteOld: false);
                     }
                 }
 
@@ -583,9 +580,6 @@ internal sealed class DcompPanelHost : IDisposable
     [DllImport("user32.dll", EntryPoint = "SetWindowTextW", CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string text);
 
-    [DllImport("user32.dll")]
-    private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
-
     [StructLayout(LayoutKind.Sequential)]
     private struct MONITORINFO
     {
@@ -599,7 +593,7 @@ internal sealed class DcompPanelHost : IDisposable
     private static extern bool IsZoomed(IntPtr hwnd);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+    private static extern IntPtr MonitorFromRect(ref RECT rect, uint flags);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);

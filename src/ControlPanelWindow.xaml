@@ -1463,14 +1463,10 @@
 
                 <Border Grid.Row="1" Style="{StaticResource BasCardStyle}" Margin="0">
                     <ScrollViewer x:Name="LogScrollViewer" VerticalScrollBarVisibility="Auto">
-                        <TextBox x:Name="TxtAppLog"
-                                 IsReadOnly="True"
-                                 TextWrapping="Wrap"
-                                 AcceptsReturn="True"
-                                 BorderThickness="0"
-                                 Background="Transparent"
-                                 FontSize="{StaticResource BasFontSizeCaption}" FontFamily="Consolas"
-                                 ScrollViewer.VerticalScrollBarVisibility="Disabled" />
+                        <TextBlock x:Name="TxtAppLog"
+                                   IsTextSelectionEnabled="True"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource BasFontSizeCaption}" FontFamily="Consolas" />
                     </ScrollViewer>
                 </Border>
             </Grid>
@@ -1658,11 +1654,7 @@
                     <TextBlock x:Name="TxtOverlayRename"
                                Text=""
                                Style="{StaticResource BasSectionTitleStyle}" />
-                    <TextBlock x:Name="TxtOverlayRenamePrompt"
-                               Text=""
-                               Margin="0,8,0,12"
-                               Style="{StaticResource BasCaptionStyle}" />
-                    <TextBox x:Name="NewProfileNameInput" />
+                    <TextBox x:Name="NewProfileNameInput" Margin="0,12,0,0" />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" HorizontalAlignment="Right">
                         <Button x:Name="BtnOverlayRenameCancel"
                                 Content=""

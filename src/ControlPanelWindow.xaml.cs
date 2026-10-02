@@ -1306,7 +1306,6 @@ public sealed partial class ControlPanelWindow : UserControl
         BtnOverlayVisualConfirm.Content = Localization.Get("Overlay_ConfirmReset");
         SearchVisualReset.PlaceholderText = Localization.Get("Overlay_SearchSettings");
         TxtOverlayRename.Text = Localization.Get("Overlay_RenameProfile");
-        TxtOverlayRenamePrompt.Text = Localization.Get("Overlay_RenamePrompt");
         BtnOverlayRenameCancel.Content = Localization.Get("Overlay_Cancel");
         BtnOverlayRenameConfirm.Content = Localization.Get("Overlay_ConfirmRename");
 
@@ -1381,7 +1380,6 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ScrollLogToEnd()
     {
-        // 日志 TextBox 自身不滚动，靠外层 ScrollViewer。
         LogScrollViewer?.ChangeView(null, LogScrollViewer.ScrollableHeight, null);
     }
 
@@ -2189,7 +2187,7 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (FrameworkElement element in section.Children.OfType<FrameworkElement>().Where(element => element.Visibility == Visibility.Visible))
         {
             bool existing = positions.TryGetValue(element, out double previousTop);
-            double offset = existing ? previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : -16;
+            double offset = existing ? previousTop - element.TransformToVisual(section).TransformPoint(new Point()).Y : 0;
             if (Math.Abs(offset) > 0.1)
             {
                 var reposition = new RepositionThemeAnimation { FromHorizontalOffset = 0, FromVerticalOffset = offset };
@@ -2290,6 +2288,9 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckShowEffectOnDesktop.IsEnabled = environmentFilterEnabled;
         ComboProfiles.IsEnabled = environmentFilterEnabled;
         ComboProcessFilterMode.IsEnabled = environmentFilterEnabled;
+        BtnAddProfile.IsEnabled = environmentFilterEnabled;
+        BtnRenameProfile.IsEnabled = environmentFilterEnabled;
+        BtnDeleteProfile.IsEnabled = environmentFilterEnabled;
 
         // 旧版在深色下换用暗色禁用模板；WinUI 的禁用态由系统负责，这里只保留透明度的细微差别。
         ListConfiguredProcesses.IsEnabled = processFilterEnabled;
@@ -2450,7 +2451,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         bool confirmed = await ConfirmAsync(
             Localization.Format("Msg_ConfirmDeleteProfile", active.Name),
-            Localization.Get("Msg_ConfirmDelete_Title"));
+            title: null, confirmText: Localization.Get("Msg_ConfirmDelete_Title"));
 
         if (!confirmed)
         {
@@ -3692,6 +3693,15 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 commands.HorizontalAlignment = HorizontalAlignment.Right;
                 foreach (ColumnDefinition column in commands.ColumnDefinitions) column.Width = GridLength.Auto;
+                if (!string.IsNullOrEmpty(dialog.PrimaryButtonText) && !string.IsNullOrEmpty(dialog.CloseButtonText) &&
+                    string.IsNullOrEmpty(dialog.SecondaryButtonText) && commands.ColumnDefinitions.Count == 5 &&
+                    FindVisualDescendant<Button>(dialog, "CloseButton") is { } cancel &&
+                    FindVisualDescendant<Button>(dialog, "PrimaryButton") is { } confirm)
+                {
+                    Grid.SetColumn(cancel, 0);
+                    Grid.SetColumn(confirm, 4);
+                    commands.ColumnDefinitions[3].Width = new GridLength(8);
+                }
             }
             foreach (string name in new[] { "PrimaryButton", "SecondaryButton", "CloseButton" })
             {
@@ -3750,7 +3760,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
     }
 
-    private async Task<bool> ConfirmAsync(string message, string title)
+    private async Task<bool> ConfirmAsync(string message, string? title, string? confirmText = null)
     {
         bool gateHeld = false;
         try
@@ -3771,8 +3781,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 RequestedTheme = RootGrid.ActualTheme,
                 Title = title,
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-                // 通用文案里没有 Yes/No，沿用已有的本地化「确定 / 取消」。
-                PrimaryButtonText = Localization.Get("ColorPicker_Confirm"),
+                PrimaryButtonText = confirmText ?? Localization.Get("ColorPicker_Confirm"),
                 CloseButtonText = Localization.Get("Overlay_Cancel"),
                 DefaultButton = ContentDialogButton.Primary
             };
