@@ -10,8 +10,8 @@ namespace BASpark;
 /// </summary>
 public partial class LanguageSelectWindow : Window
 {
-    private const int DesignWidth = 460;
-    private const int DesignHeight = 468;
+    private const int DesignWidth = 560;
+    private const int DesignHeight = 260;
 
     private readonly TaskCompletionSource<string?> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -34,6 +34,7 @@ public partial class LanguageSelectWindow : Window
 
         // 去掉系统标题栏、改用原生 TitleBar 控件；必须在视觉树加载后执行。
         RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
+        RootGrid.SizeChanged += (_, _) => DispatcherQueue.TryEnqueue(() => StartupDialogHost.FitToContent(this, RootGrid));
 
         Title = Localization.Get("LangSelect_Title", _displayCulture);
         AppTitleBar.Title = Localization.Get("LangSelect_Title", _displayCulture);
@@ -58,7 +59,7 @@ public partial class LanguageSelectWindow : Window
         WindowChrome.ApplyAppIcon(this);
         ApplyTitleBarTheme(App.ResolveElementTheme());
 
-        SelectDefaultRadio();
+        SelectDefaultLanguage();
         _initializing = false;
     }
 
@@ -86,33 +87,25 @@ public partial class LanguageSelectWindow : Window
         Title = Localization.Get("LangSelect_Title", cultureName);
         AppTitleBar.Title = Localization.Get("LangSelect_Title", cultureName);
         TxtSubtitle.Text = Localization.Get("LangSelect_Subtitle", cultureName);
-        RadioChinese.Content = Localization.Get("LangSelect_Chinese", cultureName);
-        RadioEnglish.Content = Localization.Get("LangSelect_English", cultureName);
-        RadioJapanese.Content = Localization.Get("LangSelect_Japanese", cultureName);
+        TxtLanguageLabel.Text = Localization.Get("Basic_Language", cultureName);
+        LanguageChinese.Content = Localization.Get("LangSelect_Chinese", cultureName);
+        LanguageEnglish.Content = Localization.Get("LangSelect_English", cultureName);
+        LanguageJapanese.Content = Localization.Get("LangSelect_Japanese", cultureName);
         BtnContinue.Content = Localization.Get("LangSelect_Continue", cultureName);
+        if (RootGrid.IsLoaded) DispatcherQueue.TryEnqueue(() => StartupDialogHost.FitToContent(this, RootGrid));
     }
 
-    private void SelectDefaultRadio()
+    private void SelectDefaultLanguage()
     {
-        switch (_displayCulture)
-        {
-            case Localization.CultureJa:
-                RadioJapanese.IsChecked = true;
-                break;
-            case Localization.CultureEn:
-                RadioEnglish.IsChecked = true;
-                break;
-            default:
-                RadioChinese.IsChecked = true;
-                break;
-        }
+        ComboLanguage.SelectedItem = ComboLanguage.Items.OfType<ComboBoxItem>()
+            .First(item => item.Tag as string == _displayCulture);
     }
 
-    /// <summary>勾选即预览：立刻按目标语言刷新对话框文案；用户操作时同步全局语言。</summary>
-    private void LangOption_Checked(object sender, RoutedEventArgs e)
+    /// <summary>选择即预览：立刻按目标语言刷新对话框文案；用户操作时同步全局语言。</summary>
+    private void ComboLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _ = e;
-        if (sender is not RadioButton { Tag: string culture } || string.IsNullOrEmpty(culture))
+        if (ComboLanguage.SelectedItem is not ComboBoxItem { Tag: string culture } || string.IsNullOrEmpty(culture))
         {
             return;
         }
@@ -129,15 +122,7 @@ public partial class LanguageSelectWindow : Window
         _ = sender;
         _ = e;
 
-        string selected = Localization.CultureZhCn;
-        if (RadioEnglish.IsChecked == true)
-        {
-            selected = Localization.CultureEn;
-        }
-        else if (RadioJapanese.IsChecked == true)
-        {
-            selected = Localization.CultureJa;
-        }
+        string selected = (ComboLanguage.SelectedItem as ComboBoxItem)?.Tag as string ?? _displayCulture;
 
         ConfigManager.Save("UiLanguage", selected);
         Localization.ApplyCulture(selected);
@@ -158,6 +143,7 @@ public partial class LanguageSelectWindow : Window
         if (Content is FrameworkElement root)
         {
             ApplyTitleBarTheme(root.ActualTheme);
+            DispatcherQueue.TryEnqueue(() => StartupDialogHost.FitToContent(this, root));
         }
     }
 

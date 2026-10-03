@@ -15,6 +15,7 @@ namespace BASpark;
 /// </summary>
 internal sealed class KeeperWindow
 {
+    private const int WsExAppWindow = 0x00040000;
     private Window? _window;
 
     public void EnsureCreated()
@@ -41,13 +42,11 @@ internal sealed class KeeperWindow
             }
         }
 
-        _window.Activate();
-
-        // 移出屏幕，避免 1×1 窗口在桌面角落闪现。
-        if (_window.AppWindow != null)
-        {
-            _window.AppWindow.Move(new PointInt32 { X = -32000, Y = -32000 });
-        }
+        IntPtr handle = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        int style = NativeMethods.GetWindowLong(handle, NativeMethods.GWL_EXSTYLE);
+        NativeMethods.SetWindowLong(handle, NativeMethods.GWL_EXSTYLE,
+            (style | NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE) & ~WsExAppWindow);
+        _window.AppWindow?.Hide();
     }
 
     public void Destroy()

@@ -1,4 +1,7 @@
 using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Windows.Foundation;
+using Windows.Graphics;
 
 namespace BASpark;
 
@@ -11,6 +14,23 @@ namespace BASpark;
 /// </summary>
 internal static class StartupDialogHost
 {
+    public static void FitToContent(Window window, FrameworkElement root)
+    {
+        if (!root.IsLoaded || root.ActualWidth <= 0 || window.AppWindow is not { } appWindow) return;
+        double scale = root.XamlRoot.RasterizationScale;
+        SizeInt32 clientSize = appWindow.ClientSize;
+        int frameHeight = appWindow.Size.Height - clientSize.Height;
+        root.Measure(new Size(clientSize.Width / scale, double.PositiveInfinity));
+        int height = (int)Math.Ceiling(root.DesiredSize.Height * scale);
+        DisplayArea area = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest);
+        height = Math.Min(height, area.WorkArea.Height - frameHeight - (int)Math.Round(32 * scale));
+        if (height <= 0 || height == clientSize.Height) return;
+        appWindow.Resize(new SizeInt32(appWindow.Size.Width, height + frameHeight));
+        appWindow.Move(new PointInt32(
+            area.WorkArea.X + Math.Max(0, (area.WorkArea.Width - appWindow.Size.Width) / 2),
+            area.WorkArea.Y + Math.Max(0, (area.WorkArea.Height - appWindow.Size.Height) / 2)));
+    }
+
     public static async Task<string?> AskLanguageAsync()
     {
         var window = CreateDialog(() => new LanguageSelectWindow());

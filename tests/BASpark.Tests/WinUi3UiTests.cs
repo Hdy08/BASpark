@@ -675,8 +675,8 @@ public class WinUi3UiTests
                 Assert.Equal("#272727", colors["BasSettingsPageBackgroundBrush"]);
                 Assert.Equal("#323232", colors["BasSettingsCardBackgroundBrush"]);
                 Assert.Equal("#2D2D2D", colors["BasNavigationSelectedBrush"]);
-                XElement accent = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentColor");
-                Assert.Equal("#ADACF0", accent.Value);
+                XElement accent = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentBrush");
+                Assert.Equal("AccentFillColorDefaultBrush", (string?)accent.Attribute("ResourceKey"));
             }
             if ((string?)theme.Attribute(Xaml + "Key") == "HighContrast")
             {
@@ -1527,20 +1527,23 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void AccentButtons_KeepNativeTemplatesWithDistinctLightAndDarkInteractionColors()
+    public void AccentControls_UseSystemThemeResourcesWithoutOverridingNativeInteractionBrushes()
     {
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         foreach (XElement theme in styles.Root!.Element(Presentation + "ResourceDictionary.ThemeDictionaries")!.Elements().Where(element => (string?)element.Attribute(Xaml + "Key") is "Light" or "Dark"))
         {
-            string color = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentColor").Value;
-            string hover = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentHoverColor").Value;
-            string pressed = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentPressedColor").Value;
-            Assert.NotEqual(color, hover);
-            Assert.NotEqual(hover, pressed);
-            Assert.NotEqual(color, pressed);
+            XElement accent = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentBrush");
+            XElement foreground = Assert.Single(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingsAccentTextBrush");
+            Assert.Equal("AccentFillColorDefaultBrush", (string?)accent.Attribute("ResourceKey"));
+            Assert.Equal("TextOnAccentFillColorPrimaryBrush", (string?)foreground.Attribute("ResourceKey"));
+            foreach (XElement brush in theme.Elements().Where(element => ((string?)element.Attribute(Xaml + "Key"))?.StartsWith("BasAccentSubtle", StringComparison.Ordinal) == true))
+                Assert.Equal("{ThemeResource SystemAccentColor}", (string?)brush.Attribute("Color"));
         }
-        Assert.Contains(styles.Root!.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "AccentButtonBackgroundPointerOver" && (string?)element.Attribute("Color") == "{ThemeResource BasSettingsAccentHoverColor}");
-        Assert.Contains(styles.Root!.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "AccentButtonBackgroundPressed" && (string?)element.Attribute("Color") == "{ThemeResource BasSettingsAccentPressedColor}");
+        Assert.DoesNotContain(styles.Descendants(), element => ((string?)element.Attribute(Xaml + "Key"))?.StartsWith("AccentButton", StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(styles.Descendants(), element => ((string?)element.Attribute(Xaml + "Key"))?.StartsWith("BasSettingsAccent", StringComparison.Ordinal) == true && element.Name.LocalName == "Color");
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string prefix in new[] { "ToggleSwitchFillOn", "ToggleSwitchKnobFillOn", "SliderTrackValueFill" })
+            Assert.DoesNotContain(panel.Descendants(), element => ((string?)element.Attribute(Xaml + "Key"))?.StartsWith(prefix, StringComparison.Ordinal) == true);
     }
 
     [Fact]
@@ -1915,16 +1918,71 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void StartupDialogs_RemoveLargeHeadingsWithoutRemovingTheirNormalSizedContent()
+    public void StartupDialogs_ShareCompactCardSurfacesAndNativeRightAlignedActions()
     {
         XDocument language = LoadXaml("src", "LanguageSelectWindow.xaml");
         Assert.DoesNotContain(language.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "TxtTitle");
-        Assert.Equal("12", (string?)GetNamedElement(language, "TxtSubtitle").Attribute("FontSize"));
-        Assert.DoesNotContain("TxtTitle.Text", ReadSource("src", "LanguageSelectWindow.xaml.cs"), StringComparison.Ordinal);
+        Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)GetNamedElement(language, "TxtSubtitle").Attribute("Style"));
         XDocument privacy = LoadXaml("src", "PrivacyWindow.xaml");
-        Assert.DoesNotContain(privacy.Descendants(Presentation + "TextBlock"), element => (string?)element.Attribute("FontSize") == "28");
+        foreach (XDocument document in new[] { language, privacy })
+        {
+            Assert.Equal("{ThemeResource BasSidebarBackgroundBrush}", (string?)GetNamedElement(document, "RootGrid").Attribute("Background"));
+            Assert.Equal("{ThemeResource BasSidebarBackgroundBrush}", (string?)GetNamedElement(document, "AppTitleBar").Attribute("Background"));
+            XElement scroller = Assert.Single(document.Descendants(Presentation + "ScrollViewer"));
+            Assert.Equal("{StaticResource BasStartupContentMargin}", (string?)scroller.Attribute("Margin"));
+            XElement footer = Assert.Single(document.Descendants(Presentation + "Border"), element => (string?)element.Attribute("Style") == "{StaticResource BasStartupActionBarStyle}");
+            Assert.Equal("2", (string?)footer.Attribute("Grid.Row"));
+            Assert.Equal("Right", (string?)footer.Elements().Single().Attribute("HorizontalAlignment"));
+            foreach (XElement button in footer.Descendants(Presentation + "Button"))
+            {
+                Assert.Null(button.Attribute("MinWidth"));
+                Assert.Null(button.Attribute("MinHeight"));
+            }
+        }
+        Assert.Equal("{StaticResource BasPageTitleStyle}", (string?)GetNamedElement(privacy, "VersionText").Attribute("Style"));
+        Assert.Equal("{StaticResource BasCaptionStyle}", (string?)GetNamedElement(privacy, "TxtTagline").Attribute("Style"));
+        Assert.Equal(3, privacy.Descendants(Presentation + "Border").Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
         foreach (string name in new[] { "VersionText", "TxtTagline", "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
             Assert.Equal(Presentation + "TextBlock", GetNamedElement(privacy, name).Name);
+        Assert.Contains("Version {version.Major}.{version.Minor}.{version.Build}-release", ReadSource("src", "PrivacyWindow.xaml.cs"), StringComparison.Ordinal);
+        Assert.Contains("root.Measure(new Size(clientSize.Width / scale, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
+        Assert.Contains("appWindow.Resize(new SizeInt32(appWindow.Size.Width, height + frameHeight))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
+        foreach (string source in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs" })
+            Assert.Contains("StartupDialogHost.FitToContent(this, root)", ReadSource("src", source), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StartupLanguage_UsesTheSettingsLanguageCardWithAllThreeCulturesAndPreviewBeforeSave()
+    {
+        XDocument language = LoadXaml("src", "LanguageSelectWindow.xaml");
+        XElement combo = GetNamedElement(language, "ComboLanguage");
+        Assert.Equal(Presentation + "ComboBox", combo.Name);
+        Assert.Equal(new[] { "zh-CN", "en", "ja" }, combo.Elements().Select(element => (string?)element.Attribute("Tag")).ToArray());
+        XElement card = GetNamedElement(language, "LanguageCard");
+        Assert.Equal("{StaticResource BasSettingCardStyle}", (string?)card.Attribute("Style"));
+        Assert.Equal("{StaticResource BasSettingTitleStyle}", (string?)GetNamedElement(language, "TxtLanguageLabel").Attribute("Style"));
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement settings = GetNamedElement(panel, "ComboLanguage");
+        foreach (string attribute in new[] { "Background", "BorderBrush", "MinWidth", "HorizontalAlignment" })
+            Assert.Equal((string?)settings.Attribute(attribute), (string?)combo.Attribute(attribute));
+        string source = ReadSource("src", "LanguageSelectWindow.xaml.cs");
+        string preview = source[source.IndexOf("private void ComboLanguage_SelectionChanged", StringComparison.Ordinal)..source.IndexOf("private void BtnContinue_Click", StringComparison.Ordinal)];
+        Assert.Contains("Localization.ApplyCulture(culture)", preview, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfigManager.Save", preview, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.Save(\"UiLanguage\", selected)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SilentStartup_KeepsTheLifetimeWindowHiddenAndNonActivating()
+    {
+        string source = ReadSource("src", "KeeperWindow.cs");
+        Assert.Contains("_window.AppWindow?.Hide()", source, StringComparison.Ordinal);
+        Assert.Contains("NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE", source, StringComparison.Ordinal);
+        Assert.Contains("& ~WsExAppWindow", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_window.Activate()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("-32000", source, StringComparison.Ordinal);
+        Assert.Contains("_window?.Close()", source, StringComparison.Ordinal);
+        Assert.Contains("if (!ConfigManager.StartSilent)", ReadSource("src", "App.xaml.cs"), StringComparison.Ordinal);
     }
 
     [Fact]

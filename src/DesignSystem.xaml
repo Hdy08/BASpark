@@ -42,12 +42,8 @@
             <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="#D9D9D9" />
             <SolidColorBrush x:Key="BasNavigationSelectedBrush" Color="#E6E6E6" />
             <SolidColorBrush x:Key="BasNavigationSelectedTextBrush" Color="#111111" />
-            <Color x:Key="BasSettingsAccentColor">#5D5AB4</Color>
-            <Color x:Key="BasSettingsAccentHoverColor">#6C69BD</Color>
-            <Color x:Key="BasSettingsAccentPressedColor">#514E9E</Color>
-            <Color x:Key="BasSettingsAccentTextColor">#FFFFFF</Color>
-            <SolidColorBrush x:Key="BasSettingsAccentBrush" Color="{ThemeResource BasSettingsAccentColor}" />
-            <SolidColorBrush x:Key="BasSettingsAccentTextBrush" Color="{ThemeResource BasSettingsAccentTextColor}" />
+            <StaticResource x:Key="BasSettingsAccentBrush" ResourceKey="AccentFillColorDefaultBrush" />
+            <StaticResource x:Key="BasSettingsAccentTextBrush" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
             <SolidColorBrush x:Key="BasSidebarBorderBrush" Color="#0F000000" />
 
             <!-- 文字层级（对齐 WinUI TextFillColor*） -->
@@ -62,9 +58,9 @@
             <SolidColorBrush x:Key="BasControlStrokeBrush" Color="#19000000" />
 
             <!-- 强调色（跟随系统强调色，AccentTextFillColorPrimaryBrush 用于文字） -->
-            <SolidColorBrush x:Key="BasAccentSubtleBrush" Color="#0F45AFFF" />
-            <SolidColorBrush x:Key="BasAccentSubtleHoverBrush" Color="#2645AFFF" />
-            <SolidColorBrush x:Key="BasAccentSubtlePressedBrush" Color="#3D45AFFF" />
+            <SolidColorBrush x:Key="BasAccentSubtleBrush" Color="{ThemeResource SystemAccentColor}" Opacity="0.06" />
+            <SolidColorBrush x:Key="BasAccentSubtleHoverBrush" Color="{ThemeResource SystemAccentColor}" Opacity="0.15" />
+            <SolidColorBrush x:Key="BasAccentSubtlePressedBrush" Color="{ThemeResource SystemAccentColor}" Opacity="0.24" />
 
             <!-- 语义色 -->
             <SolidColorBrush x:Key="BasDangerousBrush" Color="#C42B1C" />
@@ -99,12 +95,8 @@
             <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="#505050" />
             <SolidColorBrush x:Key="BasNavigationSelectedBrush" Color="#2D2D2D" />
             <SolidColorBrush x:Key="BasNavigationSelectedTextBrush" Color="#FFFFFF" />
-            <Color x:Key="BasSettingsAccentColor">#ADACF0</Color>
-            <Color x:Key="BasSettingsAccentHoverColor">#9B9BDD</Color>
-            <Color x:Key="BasSettingsAccentPressedColor">#8888CC</Color>
-            <Color x:Key="BasSettingsAccentTextColor">#111111</Color>
-            <SolidColorBrush x:Key="BasSettingsAccentBrush" Color="{ThemeResource BasSettingsAccentColor}" />
-            <SolidColorBrush x:Key="BasSettingsAccentTextBrush" Color="{ThemeResource BasSettingsAccentTextColor}" />
+            <StaticResource x:Key="BasSettingsAccentBrush" ResourceKey="AccentFillColorDefaultBrush" />
+            <StaticResource x:Key="BasSettingsAccentTextBrush" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
             <SolidColorBrush x:Key="BasSidebarBorderBrush" Color="#12FFFFFF" />
 
             <SolidColorBrush x:Key="BasTextPrimaryBrush" Color="#FFFFFFFF" />
@@ -116,9 +108,9 @@
             <SolidColorBrush x:Key="BasDividerBrush" Color="#15FFFFFF" />
             <SolidColorBrush x:Key="BasControlStrokeBrush" Color="#18FFFFFF" />
 
-            <SolidColorBrush x:Key="BasAccentSubtleBrush" Color="#1F45AFFF" />
-            <SolidColorBrush x:Key="BasAccentSubtleHoverBrush" Color="#3345AFFF" />
-            <SolidColorBrush x:Key="BasAccentSubtlePressedBrush" Color="#4D45AFFF" />
+            <SolidColorBrush x:Key="BasAccentSubtleBrush" Color="{ThemeResource SystemAccentColor}" Opacity="0.12" />
+            <SolidColorBrush x:Key="BasAccentSubtleHoverBrush" Color="{ThemeResource SystemAccentColor}" Opacity="0.20" />
+            <SolidColorBrush x:Key="BasAccentSubtlePressedBrush" Color="{ThemeResource SystemAccentColor}" Opacity="0.30" />
 
             <SolidColorBrush x:Key="BasDangerousBrush" Color="#FF99A4" />
             <SolidColorBrush x:Key="BasDangerousSubtleBrush" Color="#1FC42B1C" />
@@ -150,12 +142,8 @@
             <SolidColorBrush x:Key="BasSettingsControlBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="BasNavigationSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="BasNavigationSelectedTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
-            <StaticResource x:Key="BasSettingsAccentColor" ResourceKey="SystemColorHighlightColor" />
-            <StaticResource x:Key="BasSettingsAccentHoverColor" ResourceKey="SystemColorHighlightColor" />
-            <StaticResource x:Key="BasSettingsAccentPressedColor" ResourceKey="SystemColorHighlightColor" />
-            <StaticResource x:Key="BasSettingsAccentTextColor" ResourceKey="SystemColorHighlightTextColor" />
-            <SolidColorBrush x:Key="BasSettingsAccentBrush" Color="{ThemeResource BasSettingsAccentColor}" />
-            <SolidColorBrush x:Key="BasSettingsAccentTextBrush" Color="{ThemeResource BasSettingsAccentTextColor}" />
+            <SolidColorBrush x:Key="BasSettingsAccentBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="BasSettingsAccentTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <SolidColorBrush x:Key="BasSidebarBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
 
             <SolidColorBrush x:Key="BasTextPrimaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
@@ -195,12 +183,7 @@
     <Thickness x:Key="BasCardMargin">0,0,0,12</Thickness>
     <Thickness x:Key="ContentDialogPadding">16</Thickness>
     <Thickness x:Key="ContentDialogSeparatorThickness">0</Thickness>
-    <SolidColorBrush x:Key="AccentButtonBackground" Color="{ThemeResource BasSettingsAccentColor}" />
-    <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="{ThemeResource BasSettingsAccentHoverColor}" />
-    <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="{ThemeResource BasSettingsAccentPressedColor}" />
-    <SolidColorBrush x:Key="AccentButtonForeground" Color="{ThemeResource BasSettingsAccentTextColor}" />
-    <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{ThemeResource BasSettingsAccentTextColor}" />
-    <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{ThemeResource BasSettingsAccentTextColor}" />
+    <Thickness x:Key="BasStartupContentMargin">24,20,24,0</Thickness>
 
     <x:Double x:Key="BasFontSizeCaption">12</x:Double>
     <x:Double x:Key="BasFontSizeBody">14</x:Double>
@@ -280,6 +263,10 @@
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource BasControlStrokeBrush}" />
         <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
+    </Style>
+
+    <Style x:Key="BasStartupActionBarStyle" TargetType="Border">
+        <Setter Property="Padding" Value="24,16,24,24" />
     </Style>
 
     <!-- 设置区块之间的细分隔线 -->

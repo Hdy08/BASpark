@@ -10,9 +10,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid x:Name="RootGrid" Background="{ThemeResource BasPageBackgroundBrush}">
+    <Grid x:Name="RootGrid" Background="{ThemeResource BasSidebarBackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -21,90 +20,59 @@
         <!-- 使用 WinUI 原生 TitleBar 控件；窗口已 ExtendsContentIntoTitleBar，系统标题栏不再绘制。 -->
         <TitleBar x:Name="AppTitleBar"
                   Grid.Row="0"
+                  Background="{ThemeResource BasSidebarBackgroundBrush}"
                   Title=""
                   Subtitle=""
                   IsBackButtonVisible="False"
                   IsPaneToggleButtonVisible="False" />
 
-        <Border Grid.Row="1"
-                Background="{ThemeResource AccentFillColorDefaultBrush}"
-                Padding="24,22">
-            <StackPanel Spacing="6">
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Center"
-                            Spacing="6">
-                    <TextBlock Text="Version"
-                               FontSize="11"
-                               VerticalAlignment="Bottom"
-                               Foreground="{ThemeResource TextOnAccentFillColorSecondaryBrush}" />
-                    <TextBlock x:Name="VersionText"
-                               Text="1.0.0-release"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+        <ScrollViewer Grid.Row="1" Margin="{StaticResource BasStartupContentMargin}"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="VersionText" Style="{StaticResource BasPageTitleStyle}" />
+                    <TextBlock x:Name="TxtTagline" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <TextBlock x:Name="TxtTagline"
-                           FontSize="11"
-                           HorizontalAlignment="Center"
-                           TextWrapping="Wrap"
-                           Foreground="{ThemeResource TextOnAccentFillColorSecondaryBrush}" />
-            </StackPanel>
-        </Border>
-
-        <ScrollViewer Grid.Row="2"
-                      Margin="24,20,24,0"
-                      VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="16" Margin="0,0,0,20">
                 <TextBlock x:Name="TxtIntro"
+                           Margin="0,8,0,0"
                            Style="{StaticResource BasSectionTitleStyle}" />
 
-                <StackPanel Spacing="4">
-                    <TextBlock x:Name="TxtOpenSourceTitle"
-                               Style="{StaticResource BasSectionTitleStyle}"
-                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                    <TextBlock x:Name="TxtOpenSourceBody"
-                               Style="{StaticResource BasPageSubtitleStyle}" />
-                </StackPanel>
-
-                <Border Background="{ThemeResource BasDangerousSubtleBrush}"
-                        BorderBrush="{ThemeResource BasDangerousBrush}"
-                        BorderThickness="1"
-                        CornerRadius="{StaticResource BasCardCornerRadius}"
-                        Padding="14">
+                <Border Style="{StaticResource BasSettingCardStyle}" Margin="0">
                     <StackPanel Spacing="4">
-                        <TextBlock x:Name="TxtSecurityTitle"
-                                   Style="{StaticResource BasSectionTitleStyle}"
-                                   Foreground="{ThemeResource BasDangerousBrush}" />
-                        <TextBlock x:Name="TxtSecurityBody"
-                                   Style="{StaticResource BasPageSubtitleStyle}" />
+                        <TextBlock x:Name="TxtOpenSourceTitle"
+                                   Style="{StaticResource BasSettingTitleStyle}" />
+                        <TextBlock x:Name="TxtOpenSourceBody"
+                                   Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
                 </Border>
 
-                <StackPanel Spacing="4">
-                    <TextBlock x:Name="TxtPrivacyTitle"
-                               Style="{StaticResource BasSectionTitleStyle}" />
-                    <TextBlock x:Name="TxtPrivacyBody"
-                               Style="{StaticResource BasPageSubtitleStyle}" />
-                </StackPanel>
+                <Border Style="{StaticResource BasSettingCardStyle}" Margin="0">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="TxtSecurityTitle"
+                                    Style="{StaticResource BasSettingTitleStyle}" />
+                        <TextBlock x:Name="TxtSecurityBody"
+                                    Style="{StaticResource BasCaptionStyle}" />
+                    </StackPanel>
+                </Border>
 
+                <Border Style="{StaticResource BasSettingCardStyle}" Margin="0">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="TxtPrivacyTitle"
+                                   Style="{StaticResource BasSettingTitleStyle}" />
+                        <TextBlock x:Name="TxtPrivacyBody"
+                                   Style="{StaticResource BasCaptionStyle}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
 
-        <Border Grid.Row="3"
-                BorderBrush="{ThemeResource BasDividerBrush}"
-                BorderThickness="0,1,0,0"
-                Padding="24,16">
+        <Border Grid.Row="2" Style="{StaticResource BasStartupActionBarStyle}">
             <StackPanel Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        Spacing="20">
+                        HorizontalAlignment="Right"
+                        Spacing="8">
                 <Button x:Name="BtnRefuse"
-                        MinWidth="140"
-                        MinHeight="40"
                         Click="BtnRefuse_Click" />
                 <Button x:Name="BtnAgree"
-                        MinWidth="140"
-                        MinHeight="40"
-                        FontWeight="SemiBold"
                         Style="{StaticResource AccentButtonStyle}"
                         Click="BtnAgree_Click" />
             </StackPanel>

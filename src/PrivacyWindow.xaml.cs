@@ -10,8 +10,8 @@ namespace BASpark;
 /// </summary>
 public partial class PrivacyWindow : Window
 {
-    private const int DesignWidth = 500;
-    private const int DesignHeight = 708;
+    private const int DesignWidth = 560;
+    private const int DesignHeight = 560;
 
     private readonly TaskCompletionSource<bool> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -28,6 +28,7 @@ public partial class PrivacyWindow : Window
 
         // 去掉系统标题栏、改用原生 TitleBar 控件；必须在视觉树加载后执行。
         RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
+        RootGrid.SizeChanged += (_, _) => DispatcherQueue.TryEnqueue(() => StartupDialogHost.FitToContent(this, RootGrid));
 
         ApplyLocalizedText();
 
@@ -96,7 +97,7 @@ public partial class PrivacyWindow : Window
 
             if (version != null)
             {
-                VersionText.Text = $"{version.Major}.{version.Minor}.{version.Build}-release";
+                VersionText.Text = $"Version {version.Major}.{version.Minor}.{version.Build}-release";
             }
         }
         catch
@@ -147,6 +148,7 @@ public partial class PrivacyWindow : Window
         if (Content is FrameworkElement root)
         {
             ApplyTitleBarTheme(root.ActualTheme);
+            DispatcherQueue.TryEnqueue(() => StartupDialogHost.FitToContent(this, root));
         }
     }
 
