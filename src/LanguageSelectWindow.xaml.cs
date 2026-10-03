@@ -55,6 +55,7 @@ public partial class LanguageSelectWindow : Window
         }
 
         AppWindow.IsShownInSwitchers = false;
+        StartupDialogHost.LockWindow(this);
 
         WindowChrome.ApplyAppIcon(this);
         ApplyTitleBarTheme(App.ResolveElementTheme());
@@ -178,6 +179,7 @@ public partial class LanguageSelectWindow : Window
         try
         {
             ExtendsContentIntoTitleBar = true;
+            StartupDialogHost.LockWindow(this);
         }
         catch (Exception ex)
         {

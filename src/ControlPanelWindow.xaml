@@ -198,6 +198,12 @@
                                          Click="SubTab_Click">
                                 <TextBlock x:Name="SubTabMultiScreenLabel" />
                             </RadioButton>
+                            <RadioButton x:Name="SubTabBackup"
+                                         GroupName="SettingsNav"
+                                         Style="{StaticResource BasSubNavRadioStyle}"
+                                         Click="SubTab_Click">
+                                <TextBlock x:Name="SubTabBackupLabel" Text="" />
+                            </RadioButton>
                         </StackPanel>
                     </Border>
 
@@ -255,9 +261,19 @@
                           Padding="28,20,28,28"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock x:Name="TxtWelcomeTitle"
-                               Text=""
-                               Style="{StaticResource BasSettingsPageTitleStyle}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="TxtWelcomeTitle" Text=""
+                                   Style="{StaticResource BasSettingsPageTitleStyle}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button x:Name="BtnExitApplication" Content="" Style="{StaticResource BasDangerButtonStyle}"
+                                    Click="ExitApplication_Click" />
+                            <Button x:Name="BtnRestartApplication" Content="" Click="RestartApplication_Click" />
+                        </StackPanel>
+                    </Grid>
                     <TextBlock x:Name="TxtWelcomeSubtitle"
                                Text=""
                                Margin="0,4,0,24"
@@ -1416,7 +1432,38 @@
                                 Spacing="0" />
                         </StackPanel>
 
-                        <!-- 「更多设置」已移除：仅有的侧边栏背景图功能不再提供。 -->
+                        <StackPanel x:Name="SectionBackup" Visibility="Collapsed">
+                            <TextBlock x:Name="TxtBackupTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}"
+                                       Margin="0,8,0,8" />
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtExportConfiguration" Text="" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock x:Name="TxtExportConfigurationHint" Text="" Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Button x:Name="BtnExportConfiguration" Grid.Column="1" Content=""
+                                            HorizontalAlignment="Right" VerticalAlignment="Center" Click="ExportConfiguration_Click" />
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtImportConfiguration" Text="" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock x:Name="TxtImportConfigurationHint" Text="" Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Button x:Name="BtnImportConfiguration" Grid.Column="1" Content=""
+                                            HorizontalAlignment="Right" VerticalAlignment="Center" Click="ImportConfiguration_Click" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
 
                     </StackPanel>
                 </ScrollViewer>
@@ -1440,11 +1487,11 @@
                                    Text=""
                                    Style="{StaticResource BasSettingsPageTitleStyle}"
                                    VerticalAlignment="Center" />
-                        <Button x:Name="BtnClearLog"
-                                Grid.Column="1"
-                                Content=""
-                                Click="ClearLog_Click"
-                                VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button x:Name="BtnClearLog" Content="" Click="ClearLog_Click"
+                                    Style="{StaticResource BasDangerButtonStyle}" />
+                            <Button x:Name="BtnCopyLog" Content="" Click="CopyLog_Click" />
+                        </StackPanel>
                     </Grid>
                     <TextBlock x:Name="TxtLogHint"
                                Text=""
@@ -1626,6 +1673,41 @@
                                 Content=""
                                 Style="{StaticResource AccentButtonStyle}"
                                 Click="ConfirmVisualReset_Click" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Grid x:Name="BackupOverlay" Grid.ColumnSpan="2" Visibility="Collapsed"
+              Background="{ThemeResource BasModalScrimBrush}">
+            <Border Style="{StaticResource BasModalCardStyle}" Width="420" MaxHeight="560"
+                    Margin="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock x:Name="TxtBackupSelectionTitle" Grid.Row="0" Text=""
+                               Style="{StaticResource BasSectionTitleStyle}" />
+                    <TextBox x:Name="SearchBackupItems" Grid.Row="1" Margin="0,12,0,12"
+                             TextChanged="SearchBackupItems_TextChanged" />
+                    <ListView x:Name="ListBackupItems" Grid.Row="2" SelectionMode="None" MinHeight="260"
+                              Margin="0,0,-16,0" HorizontalContentAlignment="Stretch"
+                              ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
+                              ItemContainerStyle="{StaticResource SelectionCardContainerStyle}"
+                              ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate><ItemsStackPanel CacheLength="2" /></ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemContainerTransitions><TransitionCollection /></ListView.ItemContainerTransitions>
+                    </ListView>
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0"
+                                HorizontalAlignment="Right">
+                        <Button x:Name="BtnBackupCancel" Content="" Click="CloseBackupOverlay_Click" />
+                        <Button x:Name="BtnBackupConfirm" Content="" Style="{StaticResource AccentButtonStyle}"
+                                Click="ConfirmBackup_Click" />
                     </StackPanel>
                 </Grid>
             </Border>

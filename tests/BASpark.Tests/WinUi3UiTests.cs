@@ -975,7 +975,7 @@ public class WinUi3UiTests
         Assert.Equal("3", (string?)indicatorColumn.Attribute("Width"));
         Assert.Equal(2 + 3 + 9 + 16 + 12, 30 + 12);
         XElement childNavigation = GetNamedElement(panel, "SettingsSubNav");
-        Assert.Equal(4, childNavigation.Elements().Count());
+        Assert.Equal(5, childNavigation.Elements().Count());
         Assert.All(childNavigation.Elements(), element => Assert.Equal("{StaticResource BasSubNavRadioStyle}", (string?)element.Attribute("Style")));
     }
 
@@ -1423,7 +1423,7 @@ public class WinUi3UiTests
         Assert.Contains(dangerResources.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "ButtonBackgroundPointerOver" && (string?)element.Attribute("Color") == "#C42B1C");
         Assert.Contains(dangerResources.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "ButtonForegroundPointerOver" && (string?)element.Attribute("Color") == "White");
         Assert.Contains(dangerResources.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "HighContrast");
-        Assert.Contains("new[] { BtnResetSettings, BtnDeleteProfile }", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        Assert.Contains("new[] { BtnResetSettings, BtnDeleteProfile, BtnExitApplication, BtnClearLog }", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1945,8 +1945,8 @@ public class WinUi3UiTests
         foreach (string name in new[] { "VersionText", "TxtTagline", "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
             Assert.Equal(Presentation + "TextBlock", GetNamedElement(privacy, name).Name);
         Assert.Contains("Version {version.Major}.{version.Minor}.{version.Build}-release", ReadSource("src", "PrivacyWindow.xaml.cs"), StringComparison.Ordinal);
-        Assert.Contains("root.Measure(new Size(clientSize.Width / scale, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
-        Assert.Contains("appWindow.Resize(new SizeInt32(appWindow.Size.Width, height + frameHeight))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
+        Assert.Contains("root.Measure(new Size(width / scale, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
+        Assert.Contains("appWindow.Resize(new SizeInt32(width + frameWidth, height + frameHeight))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
         foreach (string source in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs" })
             Assert.Contains("StartupDialogHost.FitToContent(this, root)", ReadSource("src", source), StringComparison.Ordinal);
     }
@@ -1983,6 +1983,80 @@ public class WinUi3UiTests
         Assert.DoesNotContain("-32000", source, StringComparison.Ordinal);
         Assert.Contains("_window?.Close()", source, StringComparison.Ordinal);
         Assert.Contains("if (!ConfigManager.StartSilent)", ReadSource("src", "App.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BackupPage_UsesTheExistingNavigationCardsAndSelectionDialog()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement navigation = GetNamedElement(panel, "SubTabBackup");
+        Assert.Equal("SettingsNav", (string?)navigation.Attribute("GroupName"));
+        Assert.Equal("{StaticResource BasSubNavRadioStyle}", (string?)navigation.Attribute("Style"));
+        XElement page = GetNamedElement(panel, "SectionBackup");
+        Assert.Equal(2, page.Descendants(Presentation + "Border").Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
+        XElement overlay = GetNamedElement(panel, "BackupOverlay");
+        Assert.Equal("{ThemeResource BasModalScrimBrush}", (string?)overlay.Attribute("Background"));
+        XElement list = GetNamedElement(panel, "ListBackupItems");
+        Assert.Equal("{StaticResource SelectionCardTemplates}", (string?)list.Attribute("ItemTemplateSelector"));
+        Assert.Equal("{StaticResource SelectionCardContainerStyle}", (string?)list.Attribute("ItemContainerStyle"));
+        Assert.Equal("None", (string?)list.Attribute("SelectionMode"));
+        foreach (string name in new[] { "BtnExportConfiguration", "BtnImportConfiguration" })
+        {
+            XElement button = GetNamedElement(panel, name);
+            Assert.Equal("1", (string?)button.Attribute("Grid.Column"));
+            Assert.Equal("Right", (string?)button.Attribute("HorizontalAlignment"));
+        }
+        string source = ReadSource("src", "ControlPanelWindow.Backup.cs");
+        Assert.Contains("new Microsoft.Windows.Storage.Pickers.FolderPicker(windowId)", source, StringComparison.Ordinal);
+        Assert.Contains("new Microsoft.Windows.Storage.Pickers.FileOpenPicker(windowId)", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigurationBackup.BuildImportValues(source, selected, saved)", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigurationBackup.BuildImportValues(source, selected, pending)", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.SaveBackupValues(persistedValues)", source, StringComparison.Ordinal);
+        Assert.Contains("MarkImportedSettingsSaved(selected)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HomeAndLogActions_UseNativeButtonsAndSharedDangerStyling()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string name in new[] { "BtnExitApplication", "BtnClearLog" })
+            Assert.Equal("{StaticResource BasDangerButtonStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
+        Assert.Same(GetNamedElement(panel, "BtnExitApplication").Parent, GetNamedElement(panel, "BtnRestartApplication").Parent);
+        Assert.Same(GetNamedElement(panel, "BtnClearLog").Parent, GetNamedElement(panel, "BtnCopyLog").Parent);
+        string source = ReadSource("src", "ControlPanelWindow.Backup.cs");
+        Assert.Contains("app.ExitApplication()", source, StringComparison.Ordinal);
+        Assert.Contains("app.RestartApplicationFromPanel()", source, StringComparison.Ordinal);
+        Assert.Contains("data.SetText(TxtAppLog.Text)", source, StringComparison.Ordinal);
+        Assert.Contains("Clipboard.Flush()", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StartupWindows_BlockDoubleClickMaximizeAndSizingCommandsWithoutChangingTheMainPanel()
+    {
+        string source = ReadSource("src", "StartupDialogHost.cs");
+        Assert.Contains("message == 0x00A3", source, StringComparison.Ordinal);
+        Assert.Contains("0xF000 or 0xF030", source, StringComparison.Ordinal);
+        Assert.Contains("RemoveWindowSubclass(handle, procedure", source, StringComparison.Ordinal);
+        Assert.Contains("style & ~(0x00040000 | 0x00010000 | 0x00020000)", source, StringComparison.Ordinal);
+        Assert.Contains("measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity))", source, StringComparison.Ordinal);
+        foreach (string file in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs" })
+            Assert.Contains("StartupDialogHost.LockWindow(this)", ReadSource("src", file), StringComparison.Ordinal);
+        Assert.DoesNotContain("StartupDialogHost.LockWindow", ReadSource("src", "DcompPanelHost.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PanelClose_ReleasesDispatcherAndXamlRootHandlersAndDetachesNativeContent()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("_refreshTimer.Tick += RefreshTimer_OnTick", source, StringComparison.Ordinal);
+        Assert.Contains("_refreshTimer.Tick -= RefreshTimer_OnTick", source, StringComparison.Ordinal);
+        Assert.Contains("root.Changed -= PanelXamlRoot_Changed", source, StringComparison.Ordinal);
+        Assert.Contains("_host.CloseRequested -= ControlPanelWindow_Closed", source, StringComparison.Ordinal);
+        Assert.Contains("_xamlSource.Content = null", ReadSource("src", "DcompPanelHost.cs"), StringComparison.Ordinal);
+        Assert.Contains("Content = null", source, StringComparison.Ordinal);
+        Assert.Contains("Resources.Clear()", source, StringComparison.Ordinal);
+        Assert.Contains("RootGrid.RemoveHandler(UIElement.PointerPressedEvent", source, StringComparison.Ordinal);
+        Assert.Contains("ExclusiveUserDataFolderAccess = true", ReadSource("src", "WebView2EnvironmentHolder.cs"), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -677,4 +677,82 @@
     <data name="Msg_SettingsSaveFailed" xml:space="preserve">
       <value>The selected settings could not be saved. Please check the logs and try again.</value>
     </data>
+    <data name="Backup_Title" xml:space="preserve">
+      <value>Backup and restore</value>
+    </data>
+    <data name="Backup_ExportTitle" xml:space="preserve">
+      <value>Export configuration data</value>
+    </data>
+    <data name="Backup_ExportHint" xml:space="preserve">
+      <value>Choose a directory to export.</value>
+    </data>
+    <data name="Backup_ImportTitle" xml:space="preserve">
+      <value>Import configuration data</value>
+    </data>
+    <data name="Backup_ImportHint" xml:space="preserve">
+      <value>Choose a file to import.</value>
+    </data>
+    <data name="Backup_Export" xml:space="preserve">
+      <value>Export</value>
+    </data>
+    <data name="Backup_Import" xml:space="preserve">
+      <value>Import</value>
+    </data>
+    <data name="Backup_SelectExport" xml:space="preserve">
+      <value>Select configuration data to export</value>
+    </data>
+    <data name="Backup_SelectImport" xml:space="preserve">
+      <value>Select configuration data to import</value>
+    </data>
+    <data name="Backup_Statistics" xml:space="preserve">
+      <value>Statistics</value>
+    </data>
+    <data name="Backup_TotalClicks" xml:space="preserve">
+      <value>Total clicks</value>
+    </data>
+    <data name="Backup_DataValue" xml:space="preserve">
+      <value>Data: {0}</value>
+    </data>
+    <data name="Backup_ProfileCount" xml:space="preserve">
+      <value>{0} profiles</value>
+    </data>
+    <data name="Backup_SelectData" xml:space="preserve">
+      <value>Select at least one configuration item.</value>
+    </data>
+    <data name="Backup_ExportDone" xml:space="preserve">
+      <value>The selected data has been exported.</value>
+    </data>
+    <data name="Backup_ImportDone" xml:space="preserve">
+      <value>The selected data has been imported and applied.</value>
+    </data>
+    <data name="Backup_ExportFailed" xml:space="preserve">
+      <value>Failed to export configuration data: {0}</value>
+    </data>
+    <data name="Backup_ImportFailed" xml:space="preserve">
+      <value>Failed to import configuration data: {0}</value>
+    </data>
+    <data name="Backup_InvalidFile" xml:space="preserve">
+      <value>This file does not contain valid BASpark configuration data.</value>
+    </data>
+    <data name="Backup_InvalidValue" xml:space="preserve">
+      <value>Invalid configuration data: {0}.</value>
+    </data>
+    <data name="Backup_ProfileMissing" xml:space="preserve">
+      <value>Profile {0} does not exist. Select the profile data as well.</value>
+    </data>
+    <data name="Backup_SaveFailed" xml:space="preserve">
+      <value>Unable to save the imported configuration data.</value>
+    </data>
+    <data name="Welcome_Exit" xml:space="preserve">
+      <value>Exit completely</value>
+    </data>
+    <data name="Welcome_Restart" xml:space="preserve">
+      <value>Restart app</value>
+    </data>
+    <data name="Log_Copy" xml:space="preserve">
+      <value>Copy log</value>
+    </data>
+    <data name="Log_CopyFailed" xml:space="preserve">
+      <value>Failed to copy log: {0}</value>
+    </data>
   </root>

@@ -97,12 +97,12 @@ internal sealed class DcompPanelHost : IDisposable
             xamlSource = new DesktopWindowXamlSource();
             xamlSource.Initialize(windowId);
             _xamlSource = xamlSource;
-            _xamlSource.TakeFocusRequested += (_, args) =>
+            _xamlSource.TakeFocusRequested += static (sender, args) =>
             {
                 XamlSourceFocusNavigationReason reason = args.Request.Reason;
                 if (reason is XamlSourceFocusNavigationReason.First or XamlSourceFocusNavigationReason.Last)
                 {
-                    _xamlSource.NavigateFocus(new XamlSourceFocusNavigationRequest(reason));
+                    sender.NavigateFocus(new XamlSourceFocusNavigationRequest(reason));
                 }
             };
         }
@@ -525,10 +525,13 @@ internal sealed class DcompPanelHost : IDisposable
 
         RestoreExternalForeground();
         SetRenderClockActive(false);
+        CloseRequested = null;
+        SizeChanged = null;
         Instances.Remove(hwnd);
         _hwnd = IntPtr.Zero;
         try
         {
+            _xamlSource.Content = null;
             _xamlSource.Dispose();
         }
         finally

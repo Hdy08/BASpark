@@ -452,6 +452,53 @@ namespace BASpark
             }
         }
 
+        internal static bool SaveBackupValues(IReadOnlyDictionary<string, object> values)
+        {
+            lock (_syncLock)
+            {
+                try
+                {
+                    var properties = values.Keys.ToDictionary(name => name,
+                        name => typeof(ConfigManager).GetProperty(name) ?? throw new InvalidOperationException(name));
+                    var previous = properties.ToDictionary(item => item.Key, item => item.Value.GetValue(null));
+                    var profiles = GetProfiles();
+                    using RegistryKey registry = Registry.CurrentUser.CreateSubKey(RegPath);
+                    var stored = values.Keys.ToDictionary(name => name, name =>
+                    {
+                        object? value = registry.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+                        return (Value: value, Kind: value == null ? RegistryValueKind.Unknown : registry.GetValueKind(name));
+                    });
+                    try
+                    {
+                        foreach (var item in values)
+                            if (!Save(item.Key, item.Value)) throw new IOException(item.Key);
+                        if (values.ContainsKey("FilterProfiles"))
+                            _profiles = System.Text.Json.JsonSerializer.Deserialize<List<FilterProfile>>(FilterProfiles)
+                                ?? throw new InvalidDataException();
+                        UpdateProcessFilterCache();
+                        return true;
+                    }
+                    catch
+                    {
+                        foreach (var item in stored)
+                        {
+                            if (item.Value.Value == null) registry.DeleteValue(item.Key, false);
+                            else registry.SetValue(item.Key, item.Value.Value, item.Value.Kind);
+                            properties[item.Key].SetValue(null, previous[item.Key]);
+                        }
+                        _profiles = profiles;
+                        UpdateProcessFilterCache();
+                        throw;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    AppLogger.Warn($"Failed to import configuration data: {exception.Message}");
+                    return false;
+                }
+            }
+        }
+
         public static IReadOnlySet<string> GetProcessFilterEntries()
         {
             return _cachedFilterEntries;

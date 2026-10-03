@@ -93,6 +93,7 @@ internal static class WebView2EnvironmentHolder
         // WinRT 投影的 CoreWebView2EnvironmentOptions 只提供无参构造 + 属性。
         var options = new CoreWebView2EnvironmentOptions
         {
+            ExclusiveUserDataFolderAccess = true,
             AdditionalBrowserArguments =
                 "--disable-background-timer-throttling " +
                 "--disable-features=CalculateNativeWinOcclusion " +

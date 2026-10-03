@@ -677,4 +677,82 @@
     <data name="Msg_SettingsSaveFailed" xml:space="preserve">
       <value>无法保存所选设置。请检查日志后重试。</value>
     </data>
+    <data name="Backup_Title" xml:space="preserve">
+      <value>备份恢复</value>
+    </data>
+    <data name="Backup_ExportTitle" xml:space="preserve">
+      <value>导出配置数据</value>
+    </data>
+    <data name="Backup_ExportHint" xml:space="preserve">
+      <value>选择一个目录以导出。</value>
+    </data>
+    <data name="Backup_ImportTitle" xml:space="preserve">
+      <value>导入配置数据</value>
+    </data>
+    <data name="Backup_ImportHint" xml:space="preserve">
+      <value>选择一个文件以导入。</value>
+    </data>
+    <data name="Backup_Export" xml:space="preserve">
+      <value>导出</value>
+    </data>
+    <data name="Backup_Import" xml:space="preserve">
+      <value>导入</value>
+    </data>
+    <data name="Backup_SelectExport" xml:space="preserve">
+      <value>选择要导出的配置数据</value>
+    </data>
+    <data name="Backup_SelectImport" xml:space="preserve">
+      <value>选择要导入的配置数据</value>
+    </data>
+    <data name="Backup_Statistics" xml:space="preserve">
+      <value>统计数据</value>
+    </data>
+    <data name="Backup_TotalClicks" xml:space="preserve">
+      <value>累计点击次数</value>
+    </data>
+    <data name="Backup_DataValue" xml:space="preserve">
+      <value>数据：{0}</value>
+    </data>
+    <data name="Backup_ProfileCount" xml:space="preserve">
+      <value>{0} 个配置组</value>
+    </data>
+    <data name="Backup_SelectData" xml:space="preserve">
+      <value>请选择至少一项配置数据。</value>
+    </data>
+    <data name="Backup_ExportDone" xml:space="preserve">
+      <value>所选数据已导出。</value>
+    </data>
+    <data name="Backup_ImportDone" xml:space="preserve">
+      <value>所选数据已导入并应用。</value>
+    </data>
+    <data name="Backup_ExportFailed" xml:space="preserve">
+      <value>导出配置数据失败：{0}</value>
+    </data>
+    <data name="Backup_ImportFailed" xml:space="preserve">
+      <value>导入配置数据失败：{0}</value>
+    </data>
+    <data name="Backup_InvalidFile" xml:space="preserve">
+      <value>该文件不是有效的 BASpark 配置数据文件。</value>
+    </data>
+    <data name="Backup_InvalidValue" xml:space="preserve">
+      <value>配置数据“{0}”无效。</value>
+    </data>
+    <data name="Backup_ProfileMissing" xml:space="preserve">
+      <value>配置组“{0}”不存在，请一同选择配置组数据。</value>
+    </data>
+    <data name="Backup_SaveFailed" xml:space="preserve">
+      <value>无法保存导入的配置数据。</value>
+    </data>
+    <data name="Welcome_Exit" xml:space="preserve">
+      <value>彻底退出</value>
+    </data>
+    <data name="Welcome_Restart" xml:space="preserve">
+      <value>重启应用</value>
+    </data>
+    <data name="Log_Copy" xml:space="preserve">
+      <value>复制日志</value>
+    </data>
+    <data name="Log_CopyFailed" xml:space="preserve">
+      <value>复制日志失败：{0}</value>
+    </data>
   </root>

@@ -644,7 +644,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
             ApplyWindowChrome();
             var dangerResources = (ResourceDictionary)Resources["DangerButtonResources"];
-            foreach (Button button in new[] { BtnResetSettings, BtnDeleteProfile })
+            foreach (Button button in new[] { BtnResetSettings, BtnDeleteProfile, BtnExitApplication, BtnClearLog })
                 foreach (var theme in dangerResources.ThemeDictionaries)
                 {
                     var resources = new ResourceDictionary();
@@ -701,7 +701,7 @@ public sealed partial class ControlPanelWindow : UserControl
             _refreshTimer = App.DispatcherQueue.CreateTimer();
             _refreshTimer.Interval = TimeSpan.FromMilliseconds(500);
             _refreshTimer.IsRepeating = true;
-            _refreshTimer.Tick += (_, _) => RefreshTimer_Tick();
+            _refreshTimer.Tick += RefreshTimer_OnTick;
 
             _host.SetContent(this);
             AppLogger.EntryAdded += OnAppLogEntryAdded;
@@ -744,7 +744,7 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (FrameworkElement page in new FrameworkElement[]
                  {
                      PageWelcome, PageSettings, PageLog, PageAbout,
-                     SectionBasic, SectionVisual, SectionFilter, SectionMultiScreen
+                     SectionBasic, SectionVisual, SectionFilter, SectionMultiScreen, SectionBackup
                  })
         {
             page.RenderTransform = new TranslateTransform();
@@ -801,7 +801,7 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         _ = sender;
         _ = e;
-        XamlRoot.Changed += (_, _) => UpdateCaptionButtonBounds();
+        XamlRoot.Changed += PanelXamlRoot_Changed;
         UpdateCaptionButtonBounds();
         UpdateCaptionButtonState();
         ApplyTitleBarTheme();
@@ -819,6 +819,9 @@ public sealed partial class ControlPanelWindow : UserControl
             AppLogger.Debug($"Title bar theming unavailable: {ex.Message}");
         }
     }
+
+    private void PanelXamlRoot_Changed(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateCaptionButtonBounds();
+    private void RefreshTimer_OnTick(DispatcherQueueTimer sender, object args) => RefreshTimer_Tick();
 
     private bool IsDarkThemeEffective()
     {
@@ -1240,6 +1243,7 @@ public sealed partial class ControlPanelWindow : UserControl
         SubTabVisualLabel.Text = Localization.Get("Nav_Visual");
         SubTabFilterLabel.Text = Localization.Get("Nav_Filter");
         SubTabMultiScreenLabel.Text = Localization.Get("Nav_MultiScreen");
+        ApplyBackupLocalizedText();
         TabLogLabel.Text = Localization.Get("Nav_Log");
         TabAboutLabel.Text = Localization.Get("Nav_About");
         AppTitleBar.Title = Localization.Get("App_Title_ControlPanel");
@@ -1984,12 +1988,15 @@ public sealed partial class ControlPanelWindow : UserControl
                     ? SectionFilter
                     : SubTabMultiScreen.IsChecked == true
                         ? SectionMultiScreen
-                        : null;
+                        : SubTabBackup.IsChecked == true
+                            ? SectionBackup
+                            : null;
 
         SetPageVisible(SectionBasic, ReferenceEquals(incoming, SectionBasic), incoming);
         SetPageVisible(SectionVisual, ReferenceEquals(incoming, SectionVisual), incoming);
         SetPageVisible(SectionFilter, ReferenceEquals(incoming, SectionFilter), incoming);
         SetPageVisible(SectionMultiScreen, ReferenceEquals(incoming, SectionMultiScreen), incoming);
+        SetPageVisible(SectionBackup, ReferenceEquals(incoming, SectionBackup), incoming);
     }
 
     // ==================================================================
@@ -3923,6 +3930,25 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         _isClosed = true;
+        RootGrid.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootGrid_PointerPressed));
+        RootGrid.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished));
+        RootGrid.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished));
+        EffectColorPicker.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(ColorPicker_PointerPressed));
+        EffectColorPicker.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished));
+        EffectColorPicker.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished));
+        EffectColorPicker.RemoveHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(ColorPicker_PointerFinished));
+        foreach (var pair in _sliderToBox)
+        {
+            pair.Key.ValueChanged -= EffectSlider_ValueChanged;
+            pair.Value.ValueChanged -= EffectNumberBox_ValueChanged;
+        }
+        CheckFollowDisplayRefreshRate.Toggled -= FollowDisplayRefreshRate_Toggled;
+        foreach (TextBox input in _numberInputs.Values) input.Loaded -= InputControl_Loaded;
+        EffectColorHexInput.Loaded -= InputControl_Loaded;
+        NewProfileNameInput.Loaded -= InputControl_Loaded;
+        if (RootGrid.XamlRoot is { } root) root.Changed -= PanelXamlRoot_Changed;
+        RootGrid.Loaded -= RootGrid_Loaded;
+        _host.CloseRequested -= ControlPanelWindow_Closed;
         _messageDialog?.Hide();
         StopSettingsAnimations();
         foreach (ModalAnimation animation in _modalAnimations.Values)
@@ -3954,6 +3980,7 @@ public sealed partial class ControlPanelWindow : UserControl
         try
         {
             _refreshTimer?.Stop();
+            if (_refreshTimer != null) _refreshTimer.Tick -= RefreshTimer_OnTick;
         }
         catch (Exception ex)
         {
@@ -3961,6 +3988,10 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         _host.Dispose();
+        Content = null;
+        Resources.Clear();
+        _backupSource = null;
+        _backupItems.Clear();
         Closed?.Invoke(this, EventArgs.Empty);
     }
 }

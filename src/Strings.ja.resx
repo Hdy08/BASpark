@@ -677,4 +677,82 @@
     <data name="Msg_SettingsSaveFailed" xml:space="preserve">
       <value>選択した設定を保存できませんでした。ログを確認して再試行してください。</value>
     </data>
+    <data name="Backup_Title" xml:space="preserve">
+      <value>バックアップと復元</value>
+    </data>
+    <data name="Backup_ExportTitle" xml:space="preserve">
+      <value>設定データをエクスポート</value>
+    </data>
+    <data name="Backup_ExportHint" xml:space="preserve">
+      <value>エクスポート先のフォルダーを選択してください。</value>
+    </data>
+    <data name="Backup_ImportTitle" xml:space="preserve">
+      <value>設定データをインポート</value>
+    </data>
+    <data name="Backup_ImportHint" xml:space="preserve">
+      <value>インポートするファイルを選択してください。</value>
+    </data>
+    <data name="Backup_Export" xml:space="preserve">
+      <value>エクスポート</value>
+    </data>
+    <data name="Backup_Import" xml:space="preserve">
+      <value>インポート</value>
+    </data>
+    <data name="Backup_SelectExport" xml:space="preserve">
+      <value>エクスポートする設定データを選択</value>
+    </data>
+    <data name="Backup_SelectImport" xml:space="preserve">
+      <value>インポートする設定データを選択</value>
+    </data>
+    <data name="Backup_Statistics" xml:space="preserve">
+      <value>統計データ</value>
+    </data>
+    <data name="Backup_TotalClicks" xml:space="preserve">
+      <value>累計クリック数</value>
+    </data>
+    <data name="Backup_DataValue" xml:space="preserve">
+      <value>データ：{0}</value>
+    </data>
+    <data name="Backup_ProfileCount" xml:space="preserve">
+      <value>{0} 個のプロファイル</value>
+    </data>
+    <data name="Backup_SelectData" xml:space="preserve">
+      <value>設定データを少なくとも1つ選択してください。</value>
+    </data>
+    <data name="Backup_ExportDone" xml:space="preserve">
+      <value>選択したデータをエクスポートしました。</value>
+    </data>
+    <data name="Backup_ImportDone" xml:space="preserve">
+      <value>選択したデータをインポートして適用しました。</value>
+    </data>
+    <data name="Backup_ExportFailed" xml:space="preserve">
+      <value>設定データのエクスポートに失敗しました：{0}</value>
+    </data>
+    <data name="Backup_ImportFailed" xml:space="preserve">
+      <value>設定データのインポートに失敗しました：{0}</value>
+    </data>
+    <data name="Backup_InvalidFile" xml:space="preserve">
+      <value>有効な BASpark 設定データファイルではありません。</value>
+    </data>
+    <data name="Backup_InvalidValue" xml:space="preserve">
+      <value>設定データ「{0}」が無効です。</value>
+    </data>
+    <data name="Backup_ProfileMissing" xml:space="preserve">
+      <value>プロファイル「{0}」が存在しません。プロファイルデータも選択してください。</value>
+    </data>
+    <data name="Backup_SaveFailed" xml:space="preserve">
+      <value>インポートした設定データを保存できません。</value>
+    </data>
+    <data name="Welcome_Exit" xml:space="preserve">
+      <value>完全に終了</value>
+    </data>
+    <data name="Welcome_Restart" xml:space="preserve">
+      <value>アプリを再起動</value>
+    </data>
+    <data name="Log_Copy" xml:space="preserve">
+      <value>ログをコピー</value>
+    </data>
+    <data name="Log_CopyFailed" xml:space="preserve">
+      <value>ログのコピーに失敗しました：{0}</value>
+    </data>
   </root>
