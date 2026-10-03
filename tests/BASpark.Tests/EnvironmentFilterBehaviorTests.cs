@@ -1,9 +1,38 @@
 using System.Text;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace BASpark.Tests;
 
 public sealed class EnvironmentFilterBehaviorTests
 {
+    [DllImport("user32.dll")]
+    private static extern IntPtr CreateCursor(IntPtr instance, int hotspotHorizontal, int hotspotVertical, int width, int height, byte[] andMask, byte[] xorMask);
+    [DllImport("user32.dll")]
+    private static extern bool DestroyCursor(IntPtr cursor);
+
+    [Theory]
+    [InlineData(255, 0, false)]
+    [InlineData(0, 0, true)]
+    [InlineData(255, 255, true)]
+    [InlineData(0, 255, true)]
+    public void CursorVisibility_DistinguishesTransparentBlackWhiteAndInvertingShapes(byte andValue, byte xorValue, bool expected)
+    {
+        IntPtr cursor = CreateCursor(IntPtr.Zero, 0, 0, 32, 32,
+            Enumerable.Repeat(andValue, 128).ToArray(), Enumerable.Repeat(xorValue, 128).ToArray());
+        Assert.NotEqual(IntPtr.Zero, cursor);
+        try
+        {
+            MethodInfo visibility = typeof(OverlayManager).Assembly.GetType("BASpark.NativeMethods")!
+                .GetMethod("HasVisibleCursorShape", BindingFlags.Static | BindingFlags.NonPublic)!;
+            Assert.Equal(expected, visibility.Invoke(null, [cursor]));
+        }
+        finally
+        {
+            Assert.True(DestroyCursor(cursor));
+        }
+    }
+
     [Fact]
     public void EnvironmentSuppression_LeavesExistingEffectsRunning()
     {

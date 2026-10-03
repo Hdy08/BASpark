@@ -49,6 +49,10 @@ internal static class NativeMethods
     internal const uint GA_ROOT = 2;
     internal const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
     internal const int CURSOR_SHOWING = 0x0001;
+    private static readonly object CursorShapeGate = new();
+    private static IntPtr _cachedCursorShape;
+    private static bool _cachedCursorShapeVisible;
+    private static long _cursorShapeCacheUntil;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct POINT
@@ -268,7 +272,55 @@ internal static class NativeMethods
     internal static bool IsCursorVisible()
     {
         var pci = new CURSORINFO { cbSize = Marshal.SizeOf<CURSORINFO>() };
-        return GetCursorInfo(out pci) && (pci.flags & CURSOR_SHOWING) != 0;
+        if (!GetCursorInfo(out pci) || (pci.flags & CURSOR_SHOWING) == 0 || pci.hCursor == IntPtr.Zero)
+        {
+            lock (CursorShapeGate) _cachedCursorShape = IntPtr.Zero;
+            return false;
+        }
+        lock (CursorShapeGate)
+        {
+            long now = Environment.TickCount64;
+            if (_cachedCursorShape == pci.hCursor && now < _cursorShapeCacheUntil) return _cachedCursorShapeVisible;
+            _cachedCursorShapeVisible = HasVisibleCursorShape(pci.hCursor);
+            _cachedCursorShape = pci.hCursor;
+            _cursorShapeCacheUntil = now + 100;
+            return _cachedCursorShapeVisible;
+        }
+    }
+
+    private static bool HasVisibleCursorShape(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero) return false;
+        try
+        {
+            using var cursor = new System.Windows.Forms.Cursor(handle);
+            using var bitmap = new System.Drawing.Bitmap(cursor.Size.Width, cursor.Size.Height,
+                System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using var graphics = System.Drawing.Graphics.FromImage(bitmap);
+            var bounds = new System.Drawing.Rectangle(System.Drawing.Point.Empty, bitmap.Size);
+            foreach (System.Drawing.Color background in new[] { System.Drawing.Color.Black, System.Drawing.Color.White })
+            {
+                graphics.Clear(background);
+                cursor.Draw(graphics, bounds);
+                var data = bitmap.LockBits(bounds, System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                try
+                {
+                    var pixels = new int[bitmap.Width * bitmap.Height];
+                    Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
+                    if (pixels.Any(pixel => (pixel & 0x00FFFFFF) != (background.ToArgb() & 0x00FFFFFF))) return true;
+                }
+                finally
+                {
+                    bitmap.UnlockBits(data);
+                }
+            }
+            return false;
+        }
+        catch (Exception exception) when (exception is ArgumentException or System.ComponentModel.Win32Exception or ExternalException)
+        {
+            return true;
+        }
     }
 
     internal static bool TryGetCursorPosition(out int x, out int y)
