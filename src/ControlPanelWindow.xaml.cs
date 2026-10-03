@@ -76,11 +76,24 @@ public sealed class SegmentedRadioLayout : NonVirtualizingLayout
             return new Size();
         }
 
-        double width = double.IsFinite(availableSize.Width) ? availableSize.Width : 240;
-        double height = 0;
-        foreach (UIElement child in context.Children)
+        double scale = context.Children[0].XamlRoot?.RasterizationScale ?? 1;
+        var desiredWidths = new double[count];
+        for (int index = 0; index < count; index++)
         {
-            child.Measure(new Size(width / count, availableSize.Height));
+            UIElement child = context.Children[index];
+            child.Measure(new Size(double.PositiveInfinity, availableSize.Height));
+            desiredWidths[index] = Math.Ceiling(child.DesiredSize.Width * scale) / scale;
+        }
+        context.LayoutState = desiredWidths;
+        double minimumWidth = desiredWidths.Sum();
+        double width = double.IsFinite(availableSize.Width) ? Math.Max(availableSize.Width, minimumWidth) : minimumWidth;
+        bool equal = desiredWidths.Max() <= width / count;
+        double extra = Math.Max(0, width - minimumWidth) / count;
+        double height = 0;
+        for (int index = 0; index < count; index++)
+        {
+            UIElement child = context.Children[index];
+            child.Measure(new Size(equal ? width / count : desiredWidths[index] + extra, availableSize.Height));
             height = Math.Max(height, child.DesiredSize.Height);
         }
 
@@ -90,11 +103,17 @@ public sealed class SegmentedRadioLayout : NonVirtualizingLayout
     protected override Size ArrangeOverride(NonVirtualizingLayoutContext context, Size finalSize)
     {
         int count = context.Children.Count;
+        if (count == 0) return finalSize;
         double scale = count > 0 ? context.Children[0].XamlRoot?.RasterizationScale ?? 1 : 1;
+        var desiredWidths = (double[])context.LayoutState;
+        bool equal = desiredWidths.Max() <= finalSize.Width / count;
+        double extra = Math.Max(0, finalSize.Width - desiredWidths.Sum()) / count;
         double left = 0;
+        double position = 0;
         for (int index = 0; index < count; index++)
         {
-            double right = index == count - 1 ? finalSize.Width : Math.Round(finalSize.Width * (index + 1) / count * scale) / scale;
+            position += equal ? finalSize.Width / count : desiredWidths[index] + extra;
+            double right = index == count - 1 ? finalSize.Width : Math.Round(position * scale) / scale;
             context.Children[index].Arrange(new Rect(left, 0, right - left, finalSize.Height));
             left = right;
         }
@@ -230,6 +249,13 @@ public sealed partial class ControlPanelWindow : UserControl
         private void Selector_SizeChanged(object sender, SizeChangedEventArgs args) => QueueUpdate(false);
         private void Selector_SelectionChanged(object sender, SelectionChangedEventArgs args) => QueueUpdate(true);
 
+        public void RefreshLayout()
+        {
+            _repeater?.InvalidateMeasure();
+            _selector.InvalidateMeasure();
+            QueueUpdate(false);
+        }
+
         private void QueueUpdate(bool animate)
         {
             if (_disposed) return;
@@ -248,6 +274,7 @@ public sealed partial class ControlPanelWindow : UserControl
         private void Update(bool animate)
         {
             if (!_selector.IsLoaded || _selection == null || _repeater == null || _translation == null) return;
+            _selector.UpdateLayout();
             double scale = _selector.XamlRoot.RasterizationScale;
             if (_selector.Parent is Border frame)
             {
@@ -1324,6 +1351,7 @@ public sealed partial class ControlPanelWindow : UserControl
             SetComboItemContent(ComboProcessFilterMode, 1, "Filter_Mode_Blacklist");
             SetComboItemContent(ComboProcessFilterMode, 2, "Filter_Mode_Whitelist");
         }
+        foreach (var selector in _segmentedSelectors) selector.RefreshLayout();
     }
 
     private static void SetRadioContent(RadioButtons container, int index, string key)
@@ -2440,7 +2468,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         if (Profiles.Count <= 1)
         {
-            await ShowMessageAsync(Localization.Get("Msg_KeepOneProfile"), string.Empty);
+            await ShowMessageAsync(Localization.Get("Msg_KeepOneProfile"));
             return;
         }
 
@@ -2451,7 +2479,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         bool confirmed = await ConfirmAsync(
             Localization.Format("Msg_ConfirmDeleteProfile", active.Name),
-            title: null, confirmText: Localization.Get("Msg_ConfirmDelete_Title"));
+            confirmText: Localization.Get("Msg_ConfirmDelete_Title"));
 
         if (!confirmed)
         {
@@ -2912,7 +2940,7 @@ public sealed partial class ControlPanelWindow : UserControl
         VisualResetItem[] selected = VisualResetItems.Where(item => item.IsSelected).ToArray();
         if (selected.Length == 0)
         {
-            await ShowMessageAsync(Localization.Get("Msg_SelectVisualReset"), Localization.Get("Msg_VisualReset_Title"));
+            await ShowMessageAsync(Localization.Get("Msg_SelectVisualReset"));
             return;
         }
         Focus(FocusState.Programmatic);
@@ -2958,13 +2986,13 @@ public sealed partial class ControlPanelWindow : UserControl
                 ApplyLocalizedText();
                 App.Tray?.RefreshLocalization();
             }
-            await ShowMessageAsync(Localization.Get(_resetScope == ResetScope.Visual ? "Msg_VisualResetDone" : "Msg_PageResetDone"), string.Empty);
+            await ShowMessageAsync(Localization.Get(_resetScope == ResetScope.Visual ? "Msg_VisualResetDone" : "Msg_PageResetDone"));
         }
         catch (Exception exception)
         {
             AppLogger.Warn($"Failed to save selected reset settings: {exception.Message}");
             UpdateApplySettingsState(SettingsSections.All);
-            await ShowMessageAsync(Localization.Get("Msg_SettingsSaveFailed"), Localization.Get("Msg_Error"));
+            await ShowMessageAsync(Localization.Get("Msg_SettingsSaveFailed"));
         }
     }
 
@@ -3454,7 +3482,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         if (selectedIds.Count == 0)
         {
-            await ShowMessageAsync(Localization.Get("Msg_MinOneScreen"), Localization.Get("Msg_MultiScreen_Title"));
+            await ShowMessageAsync(Localization.Get("Msg_MinOneScreen"));
             return;
         }
 
@@ -3490,8 +3518,7 @@ public sealed partial class ControlPanelWindow : UserControl
             if (runAsAdminEnabled && !isCurrentAdmin)
             {
                 bool restartAsAdmin = await ConfirmAsync(
-                    Localization.Get("Msg_AdminRestart"),
-                    Localization.Get("Msg_AdminRestart_Title"));
+                    Localization.Get("Msg_AdminRestart"));
 
                 if (restartAsAdmin)
                 {
@@ -3510,8 +3537,7 @@ public sealed partial class ControlPanelWindow : UserControl
             _languageAtLoad = selectedLanguage!;
 
             bool restart = await ConfirmAsync(
-                Localization.Get("Msg_LanguageRestart"),
-                Localization.Get("Msg_LanguageRestart_Title"));
+                Localization.Get("Msg_LanguageRestart"));
 
             if (restart)
             {
@@ -3679,6 +3705,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ConfigureContentDialog(ContentDialog dialog)
     {
+        dialog.Title = null;
         dialog.Style = (Style)Application.Current.Resources["BasContentDialogStyle"];
         dialog.Resources["ContentDialogMinHeight"] = 0d;
         dialog.Resources["ContentDialogSmokeFill"] = VisualResetOverlay.Background;
@@ -3728,7 +3755,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
     }
 
-    private async Task ShowMessageAsync(string message, string? title = null)
+    private async Task ShowMessageAsync(string message)
     {
         bool gateHeld = false;
         try
@@ -3741,7 +3768,6 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 XamlRoot = root,
                 RequestedTheme = RootGrid.ActualTheme,
-                Title = title == string.Empty ? null : title ?? Localization.Get("Msg_Info"),
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
                 CloseButtonText = Localization.Get("ColorPicker_Confirm"),
                 DefaultButton = ContentDialogButton.Close
@@ -3760,7 +3786,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
     }
 
-    private async Task<bool> ConfirmAsync(string message, string? title, string? confirmText = null)
+    private async Task<bool> ConfirmAsync(string message, string? confirmText = null)
     {
         bool gateHeld = false;
         try
@@ -3779,7 +3805,6 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 XamlRoot = root,
                 RequestedTheme = RootGrid.ActualTheme,
-                Title = title,
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
                 PrimaryButtonText = confirmText ?? Localization.Get("ColorPicker_Confirm"),
                 CloseButtonText = Localization.Get("Overlay_Cancel"),

@@ -85,7 +85,6 @@ public partial class LanguageSelectWindow : Window
     {
         Title = Localization.Get("LangSelect_Title", cultureName);
         AppTitleBar.Title = Localization.Get("LangSelect_Title", cultureName);
-        TxtTitle.Text = Localization.Get("LangSelect_Title", cultureName);
         TxtSubtitle.Text = Localization.Get("LangSelect_Subtitle", cultureName);
         RadioChinese.Content = Localization.Get("LangSelect_Chinese", cultureName);
         RadioEnglish.Content = Localization.Get("LangSelect_English", cultureName);

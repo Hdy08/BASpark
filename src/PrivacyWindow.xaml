@@ -30,11 +30,6 @@
                 Background="{ThemeResource AccentFillColorDefaultBrush}"
                 Padding="24,22">
             <StackPanel Spacing="6">
-                <TextBlock Text="✨ BASpark"
-                           FontSize="28"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Center"
-                           Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Center"
                             Spacing="6">

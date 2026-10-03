@@ -725,7 +725,13 @@ public class WinUi3UiTests
             Assert.Null(controls.Attribute("MaxWidth"));
             XElement columns = Assert.Single(layout.Elements(), element => element.Name.LocalName == "Grid.ColumnDefinitions");
             XElement controlColumn = columns.Elements().Last();
-            if (control.Name.LocalName != "ToggleSwitch")
+            if (control.Name.LocalName == "RadioButtons")
+            {
+                Assert.Equal("Auto", (string?)controlColumn.Attribute("Width"));
+                Assert.Null(controlColumn.Attribute("MaxWidth"));
+                Assert.Equal("140", (string?)controlColumn.Attribute("MinWidth"));
+            }
+            else if (control.Name.LocalName != "ToggleSwitch")
             {
                 Assert.Equal("*", (string?)controlColumn.Attribute("Width"));
                 Assert.Equal("240", (string?)controlColumn.Attribute("MaxWidth"));
@@ -846,7 +852,7 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void SegmentedSelectors_FillEqualCellsWithoutHeaderOrColumnGaps()
+    public void SegmentedSelectors_FillMeasuredCellsWithoutHeaderOrColumnGaps()
     {
         XDocument document = LoadXaml("src", "DesignSystem.xaml");
         XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioButtonsStyle");
@@ -1507,8 +1513,8 @@ public class WinUi3UiTests
             Assert.Contains(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "ContentDialogTopOverlay" && (string?)element.Attribute("ResourceKey") == "BasLayerBrush");
         }
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        Assert.Contains("Title = title == string.Empty ? null : title ?? Localization.Get(\"Msg_Info\")", source, StringComparison.Ordinal);
-        Assert.Contains("ShowMessageAsync(Localization.Get(_resetScope == ResetScope.Visual ? \"Msg_VisualResetDone\" : \"Msg_PageResetDone\"), string.Empty)", source, StringComparison.Ordinal);
+        Assert.Contains("dialog.Title = null", source, StringComparison.Ordinal);
+        Assert.Contains("ShowMessageAsync(Localization.Get(_resetScope == ResetScope.Visual ? \"Msg_VisualResetDone\" : \"Msg_PageResetDone\"))", source, StringComparison.Ordinal);
         Assert.Contains("dialog.Resources[\"ContentDialogMinHeight\"] = 0d", source, StringComparison.Ordinal);
         Assert.Contains("PanelBody.TransformToVisual(RootGrid)", source, StringComparison.Ordinal);
         Assert.Contains("scrim.Clip = new RectangleGeometry", source, StringComparison.Ordinal);
@@ -1796,7 +1802,7 @@ public class WinUi3UiTests
     {
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         string delete = source[source.IndexOf("private async void DeleteProfile_Click", StringComparison.Ordinal)..source.IndexOf("private void RemoveProcess_Click", StringComparison.Ordinal)];
-        Assert.Contains("""title: null, confirmText: Localization.Get("Msg_ConfirmDelete_Title")""", delete, StringComparison.Ordinal);
+        Assert.Contains("""confirmText: Localization.Get("Msg_ConfirmDelete_Title")""", delete, StringComparison.Ordinal);
         Assert.Contains("""PrimaryButtonText = confirmText ?? Localization.Get("ColorPicker_Confirm")""", source, StringComparison.Ordinal);
         Assert.Contains("Grid.SetColumn(cancel, 0)", source, StringComparison.Ordinal);
         Assert.Contains("Grid.SetColumn(confirm, 4)", source, StringComparison.Ordinal);
@@ -1805,12 +1811,59 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void SegmentedSelectors_MeasureFullLocalizedLabelsAndRefreshTheirSelectionAfterLanguageChanges()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string layout = source[source.IndexOf("public sealed class SegmentedRadioLayout", StringComparison.Ordinal)..source.IndexOf("public abstract class SelectionCardItem", StringComparison.Ordinal)];
+        Assert.Contains("child.Measure(new Size(double.PositiveInfinity, availableSize.Height))", layout, StringComparison.Ordinal);
+        Assert.Contains("Math.Ceiling(child.DesiredSize.Width * scale) / scale", layout, StringComparison.Ordinal);
+        Assert.Contains("context.LayoutState = desiredWidths", layout, StringComparison.Ordinal);
+        Assert.Contains("desiredWidths.Max() <= finalSize.Width / count", layout, StringComparison.Ordinal);
+        Assert.Contains("desiredWidths[index] + extra", layout, StringComparison.Ordinal);
+        Assert.Contains("Math.Max(availableSize.Width, minimumWidth)", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain(": 240", layout, StringComparison.Ordinal);
+        Assert.Contains("_repeater?.InvalidateMeasure()", source, StringComparison.Ordinal);
+        Assert.Contains("_selector.InvalidateMeasure()", source, StringComparison.Ordinal);
+        string localized = source[source.IndexOf("private void ApplyLocalizedText()", StringComparison.Ordinal)..source.IndexOf("private static void SetRadioContent", StringComparison.Ordinal)];
+        Assert.Contains("foreach (var selector in _segmentedSelectors) selector.RefreshLayout()", localized, StringComparison.Ordinal);
+        string update = source[source.IndexOf("private void Update(bool animate)", StringComparison.Ordinal)..source.IndexOf("private const string UserAgent", StringComparison.Ordinal)];
+        Assert.True(update.IndexOf("_selector.UpdateLayout()", StringComparison.Ordinal) < update.IndexOf("_selection.Width = cell.ActualWidth", StringComparison.Ordinal));
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement frame = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedSelectorStyle");
+        Assert.Contains(frame.Elements(), element => (string?)element.Attribute("Property") == "MinWidth" && (string?)element.Attribute("Value") == "240");
+        Assert.DoesNotContain(frame.Elements(), element => (string?)element.Attribute("Property") == "MaxWidth");
+        XElement segment = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioStyle");
+        XElement label = Assert.Single(segment.Descendants(), element => element.Name == Presentation + "TextBlock");
+        Assert.Equal("NoWrap", (string?)label.Attribute("TextWrapping"));
+        Assert.Null(label.Attribute("TextTrimming"));
+    }
+
+    [Fact]
+    public void PanelHost_ClosingReturnsForegroundToAnExternalWindowWithoutStealingFromAnotherApplication()
+    {
+        string source = ReadSource("src", "DcompPanelHost.cs");
+        Assert.Contains("if (CanActivateExternalWindow(foreground)) _previousForegroundWindow = foreground", source, StringComparison.Ordinal);
+        string hide = source[source.IndexOf("public void Hide()", StringComparison.Ordinal)..source.IndexOf("private static bool CanActivateExternalWindow", StringComparison.Ordinal)];
+        Assert.True(hide.IndexOf("RestoreExternalForeground()", StringComparison.Ordinal) < hide.IndexOf("ShowWindow(_hwnd, SW_HIDE)", StringComparison.Ordinal));
+        Assert.Contains("IsIconic(window) || !IsWindowEnabled(window)", source, StringComparison.Ordinal);
+        Assert.Contains("NativeMethods.WS_EX_NOACTIVATE", source, StringComparison.Ordinal);
+        Assert.Contains("cloaked == 0", source, StringComparison.Ordinal);
+        Assert.Contains("processId == 0 || processId == Environment.ProcessId", source, StringComparison.Ordinal);
+        Assert.Contains("if (processId != Environment.ProcessId) return", source, StringComparison.Ordinal);
+        Assert.Contains("SetForegroundWindow(target)", source, StringComparison.Ordinal);
+        string dispose = source[source.IndexOf("public void Dispose()", StringComparison.Ordinal)..];
+        Assert.True(dispose.IndexOf("RestoreExternalForeground()", StringComparison.Ordinal) < dispose.IndexOf("_xamlSource.Dispose()", StringComparison.Ordinal));
+        Assert.DoesNotContain("AttachThreadInput", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SwitchToThisWindow", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LastProfileDeletion_ShowsTheNativeMessageWithoutAnInformationHeading()
     {
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         string delete = source[source.IndexOf("private async void DeleteProfile_Click", StringComparison.Ordinal)..source.IndexOf("private void RemoveProcess_Click", StringComparison.Ordinal)];
-        Assert.Contains("""await ShowMessageAsync(Localization.Get("Msg_KeepOneProfile"), string.Empty);""", delete, StringComparison.Ordinal);
-        Assert.Contains("Title = title == string.Empty ? null", source, StringComparison.Ordinal);
+        Assert.Contains("""await ShowMessageAsync(Localization.Get("Msg_KeepOneProfile"));""", delete, StringComparison.Ordinal);
+        Assert.Contains("dialog.Title = null", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Msg_Info", delete, StringComparison.Ordinal);
     }
 
@@ -1823,6 +1876,55 @@ public class WinUi3UiTests
         Assert.Same(GetNamedElement(panel, "TxtOverlayRename"), overlay.Descendants(Presentation + "TextBlock").Single());
         Assert.Equal("0,12,0,0", (string?)GetNamedElement(panel, "NewProfileNameInput").Attribute("Margin"));
         Assert.DoesNotContain("TxtOverlayRenamePrompt", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PanelDialogs_RemoveOnlyLargeHeadingsAndKeepNormalSizedTitlesAndTheNativeModalStyle()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string name in new[] { "RunningProcessOverlay", "VisualResetOverlay", "RenameProfileOverlay" })
+        {
+            XElement overlay = GetNamedElement(panel, name);
+            XElement heading = Assert.Single(overlay.Descendants(Presentation + "TextBlock"));
+            Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)heading.Attribute("Style"));
+            Assert.Null(heading.Attribute("FontSize"));
+            Assert.Equal("{ThemeResource BasModalScrimBrush}", (string?)overlay.Attribute("Background"));
+            Assert.Equal("{StaticResource BasModalCardStyle}", (string?)overlay.Elements().Single().Attribute("Style"));
+            XElement buttons = overlay.Descendants(Presentation + "StackPanel").Single(element => (string?)element.Attribute("Orientation") == "Horizontal");
+            Assert.Equal("8", (string?)buttons.Attribute("Spacing"));
+            Assert.Equal("0,16,0,0", (string?)buttons.Attribute("Margin"));
+            Assert.Equal("Right", (string?)buttons.Attribute("HorizontalAlignment"));
+        }
+        foreach (string name in new[] { "SearchRunningProcess", "SearchVisualReset" })
+        {
+            XElement search = GetNamedElement(panel, name);
+            Assert.Equal("1", (string?)search.Attribute("Grid.Row"));
+            Assert.Equal("0,12,0,12", (string?)search.Attribute("Margin"));
+            Assert.Equal(4, search.Parent!.Elements(Presentation + "Grid.RowDefinitions").Single().Elements().Count());
+        }
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("dialog.Title = null", source, StringComparison.Ordinal);
+        Assert.Contains("dialog.Style = (Style)Application.Current.Resources[\"BasContentDialogStyle\"]", source, StringComparison.Ordinal);
+        string dialogs = source[source.IndexOf("private void ConfigureContentDialog", StringComparison.Ordinal)..source.IndexOf("private async Task<XamlRoot?> EnsureXamlRootAsync", StringComparison.Ordinal)];
+        Assert.DoesNotContain("Title = title", dialogs, StringComparison.Ordinal);
+        foreach (string name in new[] { "TxtOverlayRunning", "TxtOverlayVisualReset", "TxtOverlayRename" })
+            Assert.Contains(name + ".Text = Localization.Get", source, StringComparison.Ordinal);
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement sectionTitle = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSectionTitleStyle");
+        Assert.Contains(sectionTitle.Elements(), element => (string?)element.Attribute("Property") == "FontSize" && (string?)element.Attribute("Value") == "{StaticResource BasFontSizeBody}");
+    }
+
+    [Fact]
+    public void StartupDialogs_RemoveLargeHeadingsWithoutRemovingTheirNormalSizedContent()
+    {
+        XDocument language = LoadXaml("src", "LanguageSelectWindow.xaml");
+        Assert.DoesNotContain(language.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "TxtTitle");
+        Assert.Equal("12", (string?)GetNamedElement(language, "TxtSubtitle").Attribute("FontSize"));
+        Assert.DoesNotContain("TxtTitle.Text", ReadSource("src", "LanguageSelectWindow.xaml.cs"), StringComparison.Ordinal);
+        XDocument privacy = LoadXaml("src", "PrivacyWindow.xaml");
+        Assert.DoesNotContain(privacy.Descendants(Presentation + "TextBlock"), element => (string?)element.Attribute("FontSize") == "28");
+        foreach (string name in new[] { "VersionText", "TxtTagline", "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
+            Assert.Equal(Presentation + "TextBlock", GetNamedElement(privacy, name).Name);
     }
 
     [Fact]

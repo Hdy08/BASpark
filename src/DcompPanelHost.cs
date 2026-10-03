@@ -46,6 +46,7 @@ internal sealed class DcompPanelHost : IDisposable
     private const int WmNcCalcSize = 0x0083;
     private const int WmGetMinMaxInfo = 0x0024;
     private const int WmDpiChanged = 0x02E0;
+    private const int DwmwaCloaked = 14;
 
     /// <summary>标题栏拖拽带高度（逻辑像素）与四边缩放抓取宽度。</summary>
     private const int CaptionHeight = 32;
@@ -63,6 +64,7 @@ internal sealed class DcompPanelHost : IDisposable
     private IntPtr _hwnd;
     private RectInt32 _captionButtonsBounds;
     private bool _renderClockActive;
+    private IntPtr _previousForegroundWindow;
 
     private delegate IntPtr WndProcDelegate(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -159,6 +161,9 @@ internal sealed class DcompPanelHost : IDisposable
             return;
         }
 
+        IntPtr foreground = NativeMethods.GetForegroundWindow();
+        if (CanActivateExternalWindow(foreground)) _previousForegroundWindow = foreground;
+        else if (!CanActivateExternalWindow(_previousForegroundWindow)) _previousForegroundWindow = FindExternalWindow();
         SetRenderClockActive(true);
         _ = ShowWindow(_hwnd, IsIconic(_hwnd) ? SW_RESTORE : SW_SHOW);
         _ = SetForegroundWindow(_hwnd);
@@ -198,9 +203,44 @@ internal sealed class DcompPanelHost : IDisposable
     {
         if (_hwnd != IntPtr.Zero)
         {
+            RestoreExternalForeground();
             _ = ShowWindow(_hwnd, SW_HIDE);
             SetRenderClockActive(false);
+            RestoreExternalForeground();
         }
+    }
+
+    private static bool CanActivateExternalWindow(IntPtr window)
+    {
+        if (window == IntPtr.Zero || !NativeMethods.IsWindow(window) || !IsWindowVisible(window) ||
+            IsIconic(window) || !IsWindowEnabled(window) ||
+            (NativeMethods.GetWindowLong(window, NativeMethods.GWL_EXSTYLE) & NativeMethods.WS_EX_NOACTIVATE) != 0)
+            return false;
+        _ = NativeMethods.GetWindowThreadProcessId(window, out uint processId);
+        if (processId == 0 || processId == Environment.ProcessId) return false;
+        return DwmGetWindowAttribute(window, DwmwaCloaked, out int cloaked, sizeof(int)) != 0 || cloaked == 0;
+    }
+
+    private static IntPtr FindExternalWindow()
+    {
+        IntPtr target = IntPtr.Zero;
+        EnumWindows((window, _) =>
+        {
+            if (!CanActivateExternalWindow(window) ||
+                (NativeMethods.GetWindowLong(window, NativeMethods.GWL_EXSTYLE) & NativeMethods.WS_EX_TOOLWINDOW) != 0)
+                return true;
+            target = window;
+            return false;
+        }, IntPtr.Zero);
+        return target;
+    }
+
+    private void RestoreExternalForeground()
+    {
+        _ = NativeMethods.GetWindowThreadProcessId(NativeMethods.GetForegroundWindow(), out uint processId);
+        if (processId != Environment.ProcessId) return;
+        IntPtr target = CanActivateExternalWindow(_previousForegroundWindow) ? _previousForegroundWindow : FindExternalWindow();
+        if (target != IntPtr.Zero) _ = SetForegroundWindow(target);
     }
 
     /// <summary>按 DPI 把窗口居中到当前显示器。</summary>
@@ -483,6 +523,7 @@ internal sealed class DcompPanelHost : IDisposable
             return;
         }
 
+        RestoreExternalForeground();
         SetRenderClockActive(false);
         Instances.Remove(hwnd);
         _hwnd = IntPtr.Zero;
@@ -493,6 +534,7 @@ internal sealed class DcompPanelHost : IDisposable
         finally
         {
             _ = DestroyWindow(hwnd);
+            RestoreExternalForeground();
         }
     }
 
@@ -575,7 +617,18 @@ internal sealed class DcompPanelHost : IDisposable
     private static extern bool IsIconic(IntPtr hwnd);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr SetForegroundWindow(IntPtr hwnd);
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    private delegate bool EnumWindowsDelegate(IntPtr window, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsDelegate callback, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr window);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowTextW", CharSet = CharSet.Unicode)]
     private static extern bool SetWindowText(IntPtr hwnd, string text);

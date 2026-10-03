@@ -358,7 +358,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="4" />
         <Setter Property="Padding" Value="2" />
-        <Setter Property="MaxWidth" Value="240" />
+        <Setter Property="MinWidth" Value="240" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -660,7 +660,7 @@
         <Setter Property="ContentTemplate">
             <Setter.Value>
                 <DataTemplate>
-                    <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis"
+                    <TextBlock Text="{Binding}" TextWrapping="NoWrap"
                                ToolTipService.ToolTip="{Binding}" />
                 </DataTemplate>
             </Setter.Value>

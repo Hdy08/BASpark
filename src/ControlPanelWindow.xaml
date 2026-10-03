@@ -381,7 +381,7 @@
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
+                                        <ColumnDefinition Width="Auto" MinWidth="140" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
                                         <TextBlock
@@ -448,7 +448,7 @@
                                     <Grid ColumnSpacing="16">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="1.15*" />
-                                            <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
+                                            <ColumnDefinition Width="Auto" MinWidth="140" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
                                             <TextBlock

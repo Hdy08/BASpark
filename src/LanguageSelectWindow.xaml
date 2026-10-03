@@ -30,11 +30,6 @@
                 Background="{ThemeResource AccentFillColorDefaultBrush}"
                 Padding="24,22">
             <StackPanel Spacing="8">
-                <TextBlock x:Name="TxtTitle"
-                           FontSize="22"
-                           FontWeight="SemiBold"
-                           TextWrapping="Wrap"
-                           Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
                 <TextBlock x:Name="TxtSubtitle"
                            FontSize="12"
                            TextWrapping="Wrap"
