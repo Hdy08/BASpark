@@ -73,8 +73,6 @@
 
             <!-- 模态遮罩：必须是明确的暗化层，不能依赖 SystemControl* 系统画刷
                  （其深色取值接近不透明黑，会让遮罩后的主界面整片全黑）。 -->
-            <SolidColorBrush x:Key="BasModalScrimBrush" Color="#8C000000" />
-            <StaticResource x:Key="ContentDialogSmokeFill" ResourceKey="BasModalScrimBrush" />
             <StaticResource x:Key="ContentDialogTopOverlay" ResourceKey="BasLayerBrush" />
         </ResourceDictionary>
 
@@ -120,8 +118,6 @@
             <SolidColorBrush x:Key="BasCodeBackgroundBrush" Color="#FF1F1F1F" />
 
             <!-- 模态遮罩：深色主题下同样使用半透明暗化，而非不透明黑。 -->
-            <SolidColorBrush x:Key="BasModalScrimBrush" Color="#B3000000" />
-            <StaticResource x:Key="ContentDialogSmokeFill" ResourceKey="BasModalScrimBrush" />
             <StaticResource x:Key="ContentDialogTopOverlay" ResourceKey="BasLayerBrush" />
         </ResourceDictionary>
 
@@ -167,8 +163,6 @@
             <SolidColorBrush x:Key="BasCodeBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
 
             <!-- 高对比度下不使用半透明遮罩。 -->
-            <SolidColorBrush x:Key="BasModalScrimBrush" Color="{ThemeResource SystemColorWindowColor}" />
-            <StaticResource x:Key="ContentDialogSmokeFill" ResourceKey="BasModalScrimBrush" />
             <StaticResource x:Key="ContentDialogTopOverlay" ResourceKey="BasLayerBrush" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
@@ -265,6 +259,14 @@
         <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
     </Style>
 
+    <Style x:Key="BasStartupInfoBarStyle" TargetType="InfoBar">
+        <Setter Property="IsOpen" Value="True" />
+        <Setter Property="IsClosable" Value="False" />
+        <Setter Property="IsIconVisible" Value="False" />
+        <Setter Property="MinHeight" Value="60" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
     <Style x:Key="BasStartupActionBarStyle" TargetType="Border">
         <Setter Property="Padding" Value="24,16,24,24" />
     </Style>
@@ -350,76 +352,6 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <Style x:Key="BasColorExpanderHeaderStyle" TargetType="ToggleButton">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="MinHeight" Value="58" />
-        <Setter Property="Padding" Value="16,12" />
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="Background" Value="{ThemeResource BasSettingsCardBackgroundBrush}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ToggleButton">
-                    <Grid Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="16" />
-                        </Grid.ColumnDefinitions>
-                        <VisualStateManager.VisualStateGroups>
-                            <VisualStateGroup x:Name="CommonStates">
-                                <VisualState x:Name="Normal">
-                                    <VisualState.Setters>
-                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70D;" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="PointerOver">
-                                    <VisualState.Setters>
-                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70D;" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="Pressed">
-                                    <VisualState.Setters>
-                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70D;" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="Disabled">
-                                    <VisualState.Setters>
-                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70D;" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="Checked">
-                                    <VisualState.Setters>
-                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="CheckedPointerOver">
-                                    <VisualState.Setters>
-                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="CheckedPressed">
-                                    <VisualState.Setters>
-                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="CheckedDisabled">
-                                    <VisualState.Setters>
-                                        <Setter Target="HeaderChevron.Glyph" Value="&#xE70E;" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                            </VisualStateGroup>
-                        </VisualStateManager.VisualStateGroups>
-                        <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
-                                          HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
-                                          FontFamily="{TemplateBinding FontFamily}" />
-                        <FontIcon x:Name="HeaderChevron" Grid.Column="1" Glyph="&#xE70D;" FontSize="12"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Grid>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <Style x:Key="BasSettingExpanderStyle" TargetType="Expander">
         <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
@@ -443,7 +375,9 @@
                                 <VisualState x:Name="CollapseUp" />
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
-                        <ToggleButton x:Name="ExpanderHeader" Style="{StaticResource BasColorExpanderHeaderStyle}"
+                        <ToggleButton x:Name="ExpanderHeader" Style="{StaticResource ExpanderHeaderDownStyle}"
+                                      Background="{ThemeResource BasSettingsCardBackgroundBrush}" BorderThickness="0"
+                                      MinHeight="{TemplateBinding MinHeight}" HorizontalContentAlignment="Stretch"
                                       Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
                                       IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
                         <Border x:Name="ExpanderContentHost" Grid.Row="1" Height="0" IsHitTestVisible="False"
@@ -636,281 +570,26 @@
         </Setter>
     </Style>
 
-    <Style x:Key="BasSegmentedRadioStyle" TargetType="RadioButton">
+    <Style x:Key="BasSegmentedRadioStyle" TargetType="RadioButton" BasedOn="{StaticResource DefaultToggleButtonStyle}">
         <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="MinHeight" Value="28" />
         <Setter Property="Padding" Value="8,4" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
-        <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="3" />
         <Setter Property="ContentTemplate">
             <Setter.Value>
                 <DataTemplate>
-                    <TextBlock Text="{Binding}" TextWrapping="NoWrap"
-                               ToolTipService.ToolTip="{Binding}" />
+                    <TextBlock Text="{Binding}" TextWrapping="NoWrap" ToolTipService.ToolTip="{Binding}" />
                 </DataTemplate>
             </Setter.Value>
         </Setter>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
-                    <Grid x:Name="SegmentRoot" Background="Transparent" CornerRadius="3">
-                        <VisualStateManager.VisualStateGroups>
-                            <VisualStateGroup x:Name="CommonStates">
-                                <VisualState x:Name="Normal" />
-                                <VisualState x:Name="PointerOver">
-                                    <VisualState.Setters>
-                                        <Setter Target="SegmentHover.Opacity" Value="1" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="Pressed">
-                                    <VisualState.Setters>
-                                        <Setter Target="SegmentRoot.Opacity" Value="0.8" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="Disabled">
-                                    <VisualState.Setters>
-                                        <Setter Target="SegmentRoot.Opacity" Value="0.4" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                            </VisualStateGroup>
-                            <VisualStateGroup x:Name="CheckStates">
-                                <VisualState x:Name="Checked">
-                                    <VisualState.Setters>
-                                        <Setter Target="SegmentContent.Foreground" Value="{ThemeResource BasSettingsAccentTextBrush}" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="Unchecked" />
-                                <VisualState x:Name="Indeterminate" />
-                            </VisualStateGroup>
-                        </VisualStateManager.VisualStateGroups>
-                        <Border x:Name="SegmentHover" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                                CornerRadius="3" Opacity="0" />
-                        <ContentPresenter x:Name="SegmentContent" Content="{TemplateBinding Content}"
-                                          Margin="{TemplateBinding Padding}"
-                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                          Foreground="{TemplateBinding Foreground}"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Grid>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 
-    <!--
-        导航使用 RadioButton 以复用 WinUI 的单选分组与键盘导航语义。
-        模板去掉单选圆点，改为一整行可点击区域；选中态使用系统强调色底纹
-        （AccentFillColorSecondaryBrush / SubtleHover / SubtlePressed），
-        左侧 3px 强调色指示条与 WinUI NavigationView 的选中标记一致。
-    -->
-    <Style x:Key="BasNavRadioStyle" TargetType="RadioButton">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="MinHeight" Value="40" />
-        <Setter Property="Margin" Value="2,0" />
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="HorizontalContentAlignment" Value="Left" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
-        <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
-                    <Grid x:Name="LayoutRoot" Background="Transparent" CornerRadius="4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="3" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border x:Name="SelectionBackground" Grid.ColumnSpan="2" Background="Transparent" CornerRadius="4" />
-                        <Border x:Name="SelectionIndicator"
-                                Grid.Column="0"
-                                Width="3"
-                                Height="20"
-                                CornerRadius="2"
-                                Background="{ThemeResource BasSettingsAccentBrush}"
-                                Opacity="0"
-                                RenderTransformOrigin="0.5,0.5">
-                            <Border.RenderTransform>
-                                <ScaleTransform x:Name="IndicatorScale" ScaleX="1" ScaleY="0.35" />
-                            </Border.RenderTransform>
-                        </Border>
-                        <ContentPresenter x:Name="ContentPresenter"
-                                          Grid.Column="1"
-                                          Margin="9,0,12,0"
-                                          Content="{TemplateBinding Content}"
-                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                          VerticalAlignment="Center" />
-                        <VisualStateManager.VisualStateGroups>
-                            <VisualStateGroup x:Name="CommonStates">
-                                <VisualState x:Name="Normal" />
-                                <VisualState x:Name="PointerOver">
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="LayoutRoot"
-                                                                       Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Pressed">
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="LayoutRoot"
-                                                                       Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Disabled">
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
-                                                                       Storyboard.TargetProperty="Foreground">
-                                            <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource BasTextDisabledBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </VisualState>
-                            </VisualStateGroup>
-                            <VisualStateGroup x:Name="CheckStates">
-                                <VisualState x:Name="Checked">
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SelectionBackground"
-                                                                       Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource BasNavigationSelectedBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                        <!-- 左侧强调色小条以原生动画「长出来」：
-                                             透明度淡入 + 纵向缩放，而不是瞬间显隐。 -->
-                                        <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="1"
-                                                         Duration="0:0:0.15" />
-                                        <DoubleAnimation Storyboard.TargetName="IndicatorScale"
-                                                         Storyboard.TargetProperty="ScaleY"
-                                                         To="1"
-                                                         Duration="0:0:0.22">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut" />
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
-                                                                       Storyboard.TargetProperty="Foreground">
-                                            <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource BasNavigationSelectedTextBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Unchecked">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="0"
-                                                         Duration="0:0:0.12" />
-                                        <DoubleAnimation Storyboard.TargetName="IndicatorScale"
-                                                         Storyboard.TargetProperty="ScaleY"
-                                                         To="0.35"
-                                                         Duration="0:0:0.12" />
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Indeterminate" />
-                            </VisualStateGroup>
-                        </VisualStateManager.VisualStateGroups>
-                    </Grid>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- 设置子导航：更紧凑、次级文字色 -->
-    <Style x:Key="BasSubNavRadioStyle" TargetType="RadioButton">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Margin" Value="30,0,2,0" />
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="HorizontalContentAlignment" Value="Left" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="FontSize" Value="{StaticResource BasFontSizeCaption}" />
-        <Setter Property="Foreground" Value="{ThemeResource BasTextSecondaryBrush}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
-                    <Grid x:Name="LayoutRoot" Background="Transparent" CornerRadius="4">
-                        <Border x:Name="SelectionBackground" Background="Transparent" CornerRadius="4" />
-                        <Border x:Name="SelectionIndicator" Width="3" Height="16" CornerRadius="2"
-                                HorizontalAlignment="Left" Background="{ThemeResource BasSettingsAccentBrush}" Opacity="0"
-                                RenderTransformOrigin="0.5,0.5">
-                            <Border.RenderTransform>
-                                <ScaleTransform x:Name="IndicatorScale" ScaleX="1" ScaleY="0.35" />
-                            </Border.RenderTransform>
-                        </Border>
-                        <ContentPresenter x:Name="ContentPresenter"
-                                          Margin="12,0,12,0"
-                                          Content="{TemplateBinding Content}"
-                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                          VerticalAlignment="Center" />
-                        <VisualStateManager.VisualStateGroups>
-                            <VisualStateGroup x:Name="CommonStates">
-                                <VisualState x:Name="Normal" />
-                                <VisualState x:Name="PointerOver">
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="LayoutRoot"
-                                                                       Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Pressed">
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="LayoutRoot"
-                                                                       Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Disabled" />
-                            </VisualStateGroup>
-                            <VisualStateGroup x:Name="CheckStates">
-                                <VisualState x:Name="Checked">
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="SelectionBackground"
-                                                                       Storyboard.TargetProperty="Background">
-                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource BasNavigationSelectedBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                        <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="1" Duration="0:0:0.15" />
-                                        <DoubleAnimation Storyboard.TargetName="IndicatorScale"
-                                                         Storyboard.TargetProperty="ScaleY"
-                                                         To="1" Duration="0:0:0.22">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut" />
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
-                                                                       Storyboard.TargetProperty="Foreground">
-                                            <DiscreteObjectKeyFrame KeyTime="0"
-                                                                    Value="{ThemeResource BasNavigationSelectedTextBrush}" />
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Unchecked">
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="SelectionIndicator"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="0" Duration="0:0:0.12" />
-                                        <DoubleAnimation Storyboard.TargetName="IndicatorScale"
-                                                         Storyboard.TargetProperty="ScaleY"
-                                                         To="0.35" Duration="0:0:0.12" />
-                                    </Storyboard>
-                                </VisualState>
-                                <VisualState x:Name="Indeterminate" />
-                            </VisualStateGroup>
-                        </VisualStateManager.VisualStateGroups>
-                    </Grid>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
 
 </ResourceDictionary>

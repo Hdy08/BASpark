@@ -218,11 +218,9 @@ internal static class StartupDialogHost
                 }
                 if (message == 0x0083 && window.ExtendsContentIntoTitleBar)
                 {
-                    int top = Marshal.PtrToStructure<NativeMethods.RECT>(data).Top;
+                    NativeMethods.RECT bounds = Marshal.PtrToStructure<NativeMethods.RECT>(data);
                     _ = DefSubclassProc(target, message, parameter, data);
-                    NativeMethods.RECT client = Marshal.PtrToStructure<NativeMethods.RECT>(data);
-                    client.Top = top;
-                    Marshal.StructureToPtr(client, data, false);
+                    Marshal.StructureToPtr(bounds, data, false);
                     return IntPtr.Zero;
                 }
                 if (message == 0x00A3 || (message == 0x0112 && ((long)parameter & 0xFFF0) is 0xF000 or 0xF030))

@@ -38,7 +38,8 @@
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
         <DataTemplate x:Key="SelectionCardTemplate">
-            <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" MinHeight="0" Tapped="SelectionCard_Tapped">
+            <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" MinHeight="0"
+                    PointerPressed="SelectionCard_PointerPressed" PointerReleased="SelectionCard_PointerReleased">
                 <Grid ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -55,7 +56,7 @@
             </Border>
         </DataTemplate>
         <DataTemplate x:Key="SelectionHeadingTemplate">
-            <TextBlock Text="{Binding}" Style="{StaticResource BasSettingsSectionTitleStyle}" IsHitTestVisible="False" />
+            <TextBlock Text="{Binding}" Style="{StaticResource BasSectionTitleStyle}" Margin="0,0,16,8" IsHitTestVisible="False" />
         </DataTemplate>
         <local:SelectionCardTemplateSelector x:Key="SelectionCardTemplates"
             CardTemplate="{StaticResource SelectionCardTemplate}" HeadingTemplate="{StaticResource SelectionHeadingTemplate}" />
@@ -130,111 +131,44 @@
             <!-- 自定义背景图铺在最底层 -->
             <Border x:Name="SidebarBackgroundHost" Grid.RowSpan="2" />
 
-            <!--
-                所有主标签放在同一个 StackPanel 内，子导航作为「设置」的直接后继。
-                这样折叠时不会在「设置」与「日志」之间留下跨容器的固定间距。
-            -->
-            <ScrollViewer Grid.Row="0"
-                          VerticalScrollBarVisibility="Auto"
-                          Padding="8,12,8,8">
-                <StackPanel Spacing="0">
-                    <StackPanel x:Name="NavBeforeSettings" Spacing="4">
-                        <RadioButton x:Name="TabWelcome"
-                                     GroupName="MainNav"
-                                     IsChecked="True"
-                                     Style="{StaticResource BasNavRadioStyle}"
-                                     Click="Tab_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE80F;" FontSize="16" />
-                                <TextBlock x:Name="TabWelcomeLabel" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <RadioButton x:Name="TabSettings"
-                                     GroupName="MainNav"
-                                     Style="{StaticResource BasNavRadioStyle}"
-                                     Click="Tab_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE713;" FontSize="16" Width="16" />
-                                <TextBlock x:Name="TabSettingsLabel" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-                    </StackPanel>
-
-                    <!--
-                        设置子导航：容器高度由 SubNavAnimator 做「依赖动画」+ 裁剪，
-                        高度逐帧变化，下面的「日志 / 关于」贴着展开边缘被连续推开。
-                        不用原生 Expander：实测它不做布局动画（下方导航项在一帧内整段
-                        位移 168px），而在它外面套高度动画会破坏它自己的内容定位与裁剪
-                        （动画中途子项会跳到错误的行、甚至整段消失）。
-                    -->
-                    <Border x:Name="SettingsSubNavHost"
-                            Margin="0"
-                            VerticalAlignment="Top"
-                            IsHitTestVisible="False">
-                        <StackPanel x:Name="SettingsSubNav" Spacing="2" Margin="0,2,0,0">
-                            <RadioButton x:Name="SubTabBasic"
-                                         GroupName="SettingsNav"
-                                         IsChecked="True"
-                                         Style="{StaticResource BasSubNavRadioStyle}"
-                                         Click="SubTab_Click">
-                                <TextBlock x:Name="SubTabBasicLabel" />
-                            </RadioButton>
-                            <RadioButton x:Name="SubTabVisual"
-                                         GroupName="SettingsNav"
-                                         Style="{StaticResource BasSubNavRadioStyle}"
-                                         Click="SubTab_Click">
-                                <TextBlock x:Name="SubTabVisualLabel" />
-                            </RadioButton>
-                            <RadioButton x:Name="SubTabFilter"
-                                         GroupName="SettingsNav"
-                                         Style="{StaticResource BasSubNavRadioStyle}"
-                                         Click="SubTab_Click">
-                                <TextBlock x:Name="SubTabFilterLabel" />
-                            </RadioButton>
-                            <RadioButton x:Name="SubTabMultiScreen"
-                                         GroupName="SettingsNav"
-                                         Style="{StaticResource BasSubNavRadioStyle}"
-                                         Click="SubTab_Click">
-                                <TextBlock x:Name="SubTabMultiScreenLabel" />
-                            </RadioButton>
-                            <RadioButton x:Name="SubTabBackup"
-                                         GroupName="SettingsNav"
-                                         Style="{StaticResource BasSubNavRadioStyle}"
-                                         Click="SubTab_Click">
-                                <TextBlock x:Name="SubTabBackupLabel" Text="" />
-                            </RadioButton>
-                        </StackPanel>
-                    </Border>
-
-                    <!--
-                        「日志 / 关于」单独成组：设置子导航展开/收起时，这一组靠独立的
-                        平移动画（合成器线程插值，按屏幕刷新率更新）被连续推开，
-                        容器自身的布局高度只在切换的那一刻改一次，因此不会掉帧。
-                    -->
-                    <StackPanel x:Name="NavAfterSettings" Spacing="4" Margin="0,4,0,0">
-                        <RadioButton x:Name="TabLog"
-                                     GroupName="MainNav"
-                                     Style="{StaticResource BasNavRadioStyle}"
-                                     Click="Tab_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE9D9;" FontSize="16" />
-                                <TextBlock x:Name="TabLogLabel" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <RadioButton x:Name="TabAbout"
-                                     GroupName="MainNav"
-                                     Style="{StaticResource BasNavRadioStyle}"
-                                     Click="Tab_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE946;" FontSize="16" />
-                                <TextBlock x:Name="TabAboutLabel" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-                    </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
+            <NavigationView x:Name="SidebarNavigation" Grid.Row="0" Margin="0,8,0,0"
+                            PaneDisplayMode="Left" IsPaneOpen="True" OpenPaneLength="212" CompactPaneLength="48"
+                            CompactModeThresholdWidth="0" ExpandedModeThresholdWidth="0"
+                            IsPaneToggleButtonVisible="False" IsBackButtonVisible="Collapsed"
+                            IsSettingsVisible="False" IsTitleBarAutoPaddingEnabled="False"
+                            SelectedItem="{Binding ElementName=TabWelcome}"
+                            SelectionChanged="SidebarNavigation_SelectionChanged">
+                <NavigationView.Resources>
+                    <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                </NavigationView.Resources>
+                <NavigationView.MenuItems>
+                    <NavigationViewItem x:Name="TabWelcome">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE80F;" /></NavigationViewItem.Icon>
+                        <TextBlock x:Name="TabWelcomeLabel" />
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="TabSettings">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
+                        <TextBlock x:Name="TabSettingsLabel" />
+                        <NavigationViewItem.MenuItems>
+                            <NavigationViewItem x:Name="SubTabBasic"><TextBlock x:Name="SubTabBasicLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabVisual"><TextBlock x:Name="SubTabVisualLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabFilter"><TextBlock x:Name="SubTabFilterLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabMultiScreen"><TextBlock x:Name="SubTabMultiScreenLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabBackup"><TextBlock x:Name="SubTabBackupLabel" /></NavigationViewItem>
+                        </NavigationViewItem.MenuItems>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="TabLog">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D9;" /></NavigationViewItem.Icon>
+                        <TextBlock x:Name="TabLogLabel" />
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="TabAbout">
+                        <NavigationViewItem.Icon><FontIcon Glyph="&#xE946;" /></NavigationViewItem.Icon>
+                        <TextBlock x:Name="TabAboutLabel" />
+                    </NavigationViewItem>
+                </NavigationView.MenuItems>
+            </NavigationView>
 
             <StackPanel Grid.Row="1" Margin="12,8,12,14" Spacing="2">
                 <TextBlock x:Name="TxtSidebarVersion"
@@ -404,6 +338,14 @@
                                                 MaxColumns="3"
                                                 HorizontalAlignment="Stretch"
                                                 AutomationProperties.Name="{Binding Text, ElementName=TxtDarkMode}" >
+                                                <RadioButtons.Resources>
+                                                    <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="Transparent" />
+                                                    <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="Transparent" />
+                                                    <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="Transparent" />
+                                                    <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPressed" Color="Transparent" />
+                                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                                </RadioButtons.Resources>
                                                 <RadioButton x:Name="RadioDarkModeOff" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
                                                 <RadioButton x:Name="RadioDarkModeOn" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
                                                 <RadioButton x:Name="RadioDarkModeSystem" Content="" IsChecked="True" Style="{StaticResource BasSegmentedRadioStyle}" />
@@ -471,6 +413,14 @@
                                                     MaxColumns="3"
                                                     HorizontalAlignment="Stretch"
                                                     AutomationProperties.Name="{Binding Text, ElementName=TxtClickType}" >
+                                                <RadioButtons.Resources>
+                                                    <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="Transparent" />
+                                                    <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="Transparent" />
+                                                    <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="Transparent" />
+                                                    <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPressed" Color="Transparent" />
+                                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                                </RadioButtons.Resources>
                                                     <RadioButton Name="RadioLeftClick" Content="" IsChecked="True" Style="{StaticResource BasSegmentedRadioStyle}" />
                                                     <RadioButton Name="RadioRightClick" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
                                                     <RadioButton Name="RadioBothClick" Content="" Style="{StaticResource BasSegmentedRadioStyle}" />
@@ -1540,8 +1490,9 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Tag, ElementName=BtnRepoDoomVoss}" Style="{StaticResource BasSettingTitleStyle}"
-                                       VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" TextWrapping="Wrap">
+                                <Hyperlink NavigateUri="https://github.com/DoomVoss/BASpark"><Run Text="{Binding Tag, ElementName=BtnRepoDoomVoss}" /></Hyperlink>
+                            </TextBlock>
                             <Button x:Name="BtnRepoDoomVoss" Grid.Column="1" Content="" Tag="https://github.com/DoomVoss/BASpark"
                                     HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
                         </Grid>
@@ -1552,8 +1503,9 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Tag, ElementName=BtnRepoCialloKing}" Style="{StaticResource BasSettingTitleStyle}"
-                                       VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" TextWrapping="Wrap">
+                                <Hyperlink NavigateUri="https://github.com/CialloKing/BASpark"><Run Text="{Binding Tag, ElementName=BtnRepoCialloKing}" /></Hyperlink>
+                            </TextBlock>
                             <Button x:Name="BtnRepoCialloKing" Grid.Column="1" Content="" Tag="https://github.com/CialloKing/BASpark"
                                     HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
                         </Grid>
@@ -1564,8 +1516,9 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Tag, ElementName=BtnRepoWinUI}" Style="{StaticResource BasSettingTitleStyle}"
-                                       VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" TextWrapping="Wrap">
+                                <Hyperlink NavigateUri="https://github.com/Hdy08/BASpark/tree/WinUI3"><Run Text="{Binding Tag, ElementName=BtnRepoWinUI}" /></Hyperlink>
+                            </TextBlock>
                             <Button x:Name="BtnRepoWinUI" Grid.Column="1" Content="" Tag="https://github.com/Hdy08/BASpark/tree/WinUI3"
                                     HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
                         </Grid>
@@ -1578,17 +1531,14 @@
         <!-- ==================== 模态层 ==================== -->
 
         <!-- 运行中进程选择 -->
-        <Grid x:Name="RunningProcessOverlay"
-              Grid.ColumnSpan="2"
-              Visibility="Collapsed"
-              Background="{ThemeResource BasModalScrimBrush}">
-            <Border Style="{StaticResource BasModalCardStyle}"
-                    Width="420"
-                    MaxHeight="520"
-                    Margin="0"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-                <Grid>
+        <ContentDialog x:Name="RunningProcessOverlay" Style="{StaticResource BasContentDialogStyle}">
+            <ContentDialog.Resources>
+                <x:Double x:Key="ContentDialogMinWidth">420</x:Double>
+                <x:Double x:Key="ContentDialogMaxWidth">420</x:Double>
+                <x:Double x:Key="ContentDialogMinHeight">0</x:Double>
+                <x:Double x:Key="ContentDialogMaxHeight">520</x:Double>
+            </ContentDialog.Resources>
+            <Grid MaxHeight="486">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -1625,21 +1575,17 @@
                                 Click="ConfirmAddRunningProcesses_Click" />
                     </StackPanel>
                 </Grid>
-            </Border>
-        </Grid>
+        </ContentDialog>
 
         <!-- 视觉表现恢复默认 -->
-        <Grid x:Name="VisualResetOverlay"
-              Grid.ColumnSpan="2"
-              Visibility="Collapsed"
-              Background="{ThemeResource BasModalScrimBrush}">
-            <Border Style="{StaticResource BasModalCardStyle}"
-                    Width="420"
-                    MaxHeight="560"
-                    Margin="0"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-                <Grid>
+        <ContentDialog x:Name="VisualResetOverlay" Style="{StaticResource BasContentDialogStyle}">
+            <ContentDialog.Resources>
+                <x:Double x:Key="ContentDialogMinWidth">420</x:Double>
+                <x:Double x:Key="ContentDialogMaxWidth">420</x:Double>
+                <x:Double x:Key="ContentDialogMinHeight">0</x:Double>
+                <x:Double x:Key="ContentDialogMaxHeight">560</x:Double>
+            </ContentDialog.Resources>
+            <Grid MaxHeight="526">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -1675,14 +1621,16 @@
                                 Click="ConfirmVisualReset_Click" />
                     </StackPanel>
                 </Grid>
-            </Border>
-        </Grid>
+        </ContentDialog>
 
-        <Grid x:Name="BackupOverlay" Grid.ColumnSpan="2" Visibility="Collapsed"
-              Background="{ThemeResource BasModalScrimBrush}">
-            <Border Style="{StaticResource BasModalCardStyle}" Width="420" MaxHeight="560"
-                    Margin="0" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Grid>
+        <ContentDialog x:Name="BackupOverlay" Style="{StaticResource BasContentDialogStyle}">
+            <ContentDialog.Resources>
+                <x:Double x:Key="ContentDialogMinWidth">420</x:Double>
+                <x:Double x:Key="ContentDialogMaxWidth">420</x:Double>
+                <x:Double x:Key="ContentDialogMinHeight">0</x:Double>
+                <x:Double x:Key="ContentDialogMaxHeight">560</x:Double>
+            </ContentDialog.Resources>
+            <Grid MaxHeight="526">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -1710,20 +1658,16 @@
                                 Click="ConfirmBackup_Click" />
                     </StackPanel>
                 </Grid>
-            </Border>
-        </Grid>
+        </ContentDialog>
 
         <!-- 配置组重命名 -->
-        <Grid x:Name="RenameProfileOverlay"
-              Grid.ColumnSpan="2"
-              Visibility="Collapsed"
-              Background="{ThemeResource BasModalScrimBrush}">
-            <Border Style="{StaticResource BasModalCardStyle}"
-                    Width="380"
-                    Margin="0"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-                <StackPanel>
+        <ContentDialog x:Name="RenameProfileOverlay" Style="{StaticResource BasContentDialogStyle}">
+            <ContentDialog.Resources>
+                <x:Double x:Key="ContentDialogMinWidth">380</x:Double>
+                <x:Double x:Key="ContentDialogMaxWidth">380</x:Double>
+                <x:Double x:Key="ContentDialogMinHeight">0</x:Double>
+            </ContentDialog.Resources>
+            <StackPanel>
                     <TextBlock x:Name="TxtOverlayRename"
                                Text=""
                                Style="{StaticResource BasSectionTitleStyle}" />
@@ -1738,8 +1682,7 @@
                                 Click="ConfirmRenameProfile_Click" />
                     </StackPanel>
                 </StackPanel>
-            </Border>
-        </Grid>
+        </ContentDialog>
 
         </Grid>
     </Grid>

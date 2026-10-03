@@ -37,32 +37,41 @@
                            Margin="0,8,0,0"
                            Style="{StaticResource BasSectionTitleStyle}" />
 
-                <Border Style="{StaticResource BasSettingCardStyle}" Margin="0">
+                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Informational">
+                    <InfoBar.Resources>
+                        <Thickness x:Key="InfoBarContentRootPadding">16,12,16,12</Thickness>
+                    </InfoBar.Resources>
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="TxtOpenSourceTitle"
                                    Style="{StaticResource BasSettingTitleStyle}" />
                         <TextBlock x:Name="TxtOpenSourceBody"
                                    Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
-                </Border>
+                </InfoBar>
 
-                <Border Style="{StaticResource BasSettingCardStyle}" Margin="0">
+                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Warning">
+                    <InfoBar.Resources>
+                        <Thickness x:Key="InfoBarContentRootPadding">16,12,16,12</Thickness>
+                    </InfoBar.Resources>
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="TxtSecurityTitle"
                                     Style="{StaticResource BasSettingTitleStyle}" />
                         <TextBlock x:Name="TxtSecurityBody"
                                     Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
-                </Border>
+                </InfoBar>
 
-                <Border Style="{StaticResource BasSettingCardStyle}" Margin="0">
+                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Success">
+                    <InfoBar.Resources>
+                        <Thickness x:Key="InfoBarContentRootPadding">16,12,16,12</Thickness>
+                    </InfoBar.Resources>
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="TxtPrivacyTitle"
                                    Style="{StaticResource BasSettingTitleStyle}" />
                         <TextBlock x:Name="TxtPrivacyBody"
                                    Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
-                </Border>
+                </InfoBar>
             </StackPanel>
         </ScrollViewer>
 

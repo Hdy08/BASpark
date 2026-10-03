@@ -18,6 +18,30 @@ public class WinUi3UiTests
     private static readonly XNamespace Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
     private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
+    [Fact]
+    public void UiFonts_UseMicrosoftYaHeiUiWhileLogsKeepConsolas()
+    {
+        XDocument application = LoadXaml("src", "App.xaml");
+        foreach (string name in new[] { "ContentControlThemeFontFamily", "TextControlThemeFontFamily" })
+        {
+            XElement family = Assert.Single(application.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == name);
+            Assert.Equal("Microsoft YaHei UI", family.Value);
+        }
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        Assert.Equal("Consolas", (string?)GetNamedElement(panel, "TxtAppLog").Attribute("FontFamily"));
+        Assert.DoesNotContain(application.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SymbolThemeFontFamily");
+    }
+
+    [Fact]
+    public void SelectionHeading_UsesCompactSpacingWithoutPageHeadingMargins()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement template = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionHeadingTemplate");
+        XElement title = Assert.Single(template.Elements());
+        Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)title.Attribute("Style"));
+        Assert.Equal("0,0,16,8", (string?)title.Attribute("Margin"));
+    }
+
     [Theory]
     [InlineData("Off", DarkModeOption.Off)]
     [InlineData("off", DarkModeOption.Off)]
@@ -472,63 +496,18 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void SettingsSubNav_AnimatesOnCompositorThreadWithoutLayoutAnimation()
+    public void SettingsSubNav_UsesNativeHierarchicalNavigationAndItsSubtreeTransitions()
     {
-        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
-        string xaml = ReadSource("src", "ControlPanelWindow.xaml");
-        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-
-        // 容器与被推开的「日志 / 关于」分组都必须存在，且由导航选中状态驱动。
-        Assert.NotNull(GetNamedElement(document, "SettingsSubNavHost"));
-        Assert.NotNull(GetNamedElement(document, "SettingsSubNav"));
-        Assert.NotNull(GetNamedElement(document, "NavAfterSettings"));
-        Assert.Contains("new SubNavAnimator(SettingsSubNavHost, SettingsSubNav, NavAfterSettings)", source, StringComparison.Ordinal);
-        Assert.Contains("_subNav?.SetExpanded(settings);", source, StringComparison.Ordinal);
-
-        int animatorIndex = source.IndexOf("private sealed class SubNavAnimator", StringComparison.Ordinal);
-        Assert.True(animatorIndex >= 0, "SubNavAnimator is missing.");
-        int animatorEnd = source.IndexOf("private SubNavAnimator? _subNav;", animatorIndex, StringComparison.Ordinal);
-        Assert.True(animatorEnd > animatorIndex, "SubNavAnimator structure changed unexpectedly.");
-        string animator = source[animatorIndex..animatorEnd];
-
-        // 关键：不得再用布局属性做动画。对 Height 的依赖动画每帧都要在 UI 线程跑
-        // measure/arrange，实测只有约 30Hz，在 180Hz 屏上就是掉帧。
-        Assert.DoesNotContain("EnableDependentAnimation", animator, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"Height\"", animator, StringComparison.Ordinal);
-        Assert.DoesNotContain("_host.Clip", animator, StringComparison.Ordinal);
-
-        // 露出改用合成器 InsetClip（合成器线程按屏幕刷新率插值）。
-        Assert.Contains("ElementCompositionPreview.GetElementVisual", animator, StringComparison.Ordinal);
-        Assert.Contains("CreateInsetClip", animator, StringComparison.Ordinal);
-        Assert.Contains("StartAnimation(\"BottomInset\"", animator, StringComparison.Ordinal);
-
-        // 「日志 / 关于」靠独立平移动画让位，布局只在切换那一刻改一次。
-        Assert.Contains("_belowShift.Y = -height;", animator, StringComparison.Ordinal);
-        Assert.Contains("_host.Height = height;", animator, StringComparison.Ordinal);
-        Assert.Contains("_host.Height = 0;", animator, StringComparison.Ordinal);
-
-        // 独立动画不写 From：被打断时从当前值继续，不会跳回起点。
-        Assert.Contains("To = shiftTo,", animator, StringComparison.Ordinal);
-        Assert.DoesNotContain("From = ", animator, StringComparison.Ordinal);
-
-        // 不得给内容本身加平移动画：展开时会让 4 个子项先下沉几像素再回位。
-        Assert.DoesNotContain("_content.RenderTransform", animator, StringComparison.Ordinal);
-        Assert.DoesNotContain("SettingsSubNav.RenderTransform", source, StringComparison.Ordinal);
-
-        // Completed 是异步回调，必须有代次号忽略过期回调。
-        Assert.Contains("generation != _generation", animator, StringComparison.Ordinal);
-
-        // 动画对象每次新建，不得跨 Storyboard 复用。
-        Assert.Contains("new DoubleAnimation", animator, StringComparison.Ordinal);
-        Assert.DoesNotContain("private readonly DoubleAnimation", animator, StringComparison.Ordinal);
-
-        // 不得改用原生 Expander 承载：逐帧实测它不做布局动画（下方导航项在一帧内
-        // 整段位移 168px），而在它外面套高度动画会破坏它自己的内容定位与裁剪。
-        Assert.DoesNotContain(GetNamedElement(document, "SettingsSubNavHost").DescendantsAndSelf(),
-            element => element.Name.LocalName == "Expander");
-        Assert.DoesNotContain("NavExpander", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("NavExpander", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("IsExpanded", animator, StringComparison.Ordinal);
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement navigation = GetNamedElement(panel, "SidebarNavigation");
+        Assert.Equal("NavigationView", navigation.Name.LocalName);
+        Assert.Equal("Left", (string?)navigation.Attribute("PaneDisplayMode"));
+        Assert.Equal("False", (string?)navigation.Attribute("IsPaneToggleButtonVisible"));
+        Assert.Equal("False", (string?)navigation.Attribute("IsTitleBarAutoPaddingEnabled"));
+        XElement items = navigation.Element(Presentation + "NavigationView.MenuItems")!;
+        Assert.Equal(new[] { "TabWelcome", "TabSettings", "TabLog", "TabAbout" }, items.Elements().Select(item => (string?)item.Attribute(Xaml + "Name")));
+        Assert.DoesNotContain("SubNavAnimator", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        Assert.DoesNotContain(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "SettingsSubNavHost");
     }
 
     [Fact]
@@ -777,8 +756,8 @@ public class WinUi3UiTests
         Assert.Equal("{StaticResource BasSegmentedRadioButtonsStyle}", (string?)container.Attribute("Style"));
         Assert.Equal(count.ToString(), (string?)container.Attribute("MaxColumns"));
         Assert.Equal("{StaticResource BasSegmentedSelectorStyle}", (string?)container.Parent?.Attribute("Style"));
-        Assert.Equal(count, container.Elements().Count());
-        Assert.All(container.Elements(), item =>
+        Assert.Equal(count, container.Elements(Presentation + "RadioButton").Count());
+        Assert.All(container.Elements(Presentation + "RadioButton"), item =>
         {
             Assert.Equal("RadioButton", item.Name.LocalName);
             Assert.Equal("{StaticResource BasSegmentedRadioStyle}", (string?)item.Attribute("Style"));
@@ -808,20 +787,14 @@ public class WinUi3UiTests
     [Fact]
     public void SelectedNavigationAndSegments_KeepTheirFillWhileHovering()
     {
-        XDocument document = LoadXaml("src", "DesignSystem.xaml");
-        foreach (string key in new[] { "BasNavRadioStyle", "BasSubNavRadioStyle" })
-        {
-            XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
-            XElement selected = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "Checked");
-            Assert.Contains(selected.Descendants(), element => (string?)element.Attribute("Storyboard.TargetName") == "SelectionBackground");
-            XElement common = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "CommonStates");
-            Assert.DoesNotContain(common.Descendants(), element => (string?)element.Attribute("Storyboard.TargetName") == "SelectionBackground");
-        }
-        XElement segmentStyle = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioStyle");
-        XElement selection = GetNamedElement(document, "SegmentedSelection");
-        Assert.Equal("{ThemeResource BasSettingsAccentBrush}", (string?)selection.Attribute("Background"));
-        Assert.DoesNotContain(segmentStyle.Descendants(), element => ((string?)element.Attribute("Target"))?.EndsWith(".Background", StringComparison.Ordinal) == true);
-        Assert.Contains(segmentStyle.Descendants(), element => (string?)element.Attribute("Target") == "SegmentHover.Opacity");
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement segment = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioStyle");
+        Assert.Equal("{StaticResource DefaultToggleButtonStyle}", (string?)segment.Attribute("BasedOn"));
+        Assert.DoesNotContain(segment.Descendants(), element => element.Name.LocalName == "ControlTemplate");
+        Assert.Equal("{ThemeResource BasSettingsAccentBrush}", (string?)GetNamedElement(styles, "SegmentedSelection").Attribute("Background"));
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string name in new[] { "RadioDarkMode", "RadioClickType" })
+            Assert.Contains(GetNamedElement(panel, name).Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "ToggleButtonBackgroundChecked" && (string?)element.Attribute("Color") == "Transparent");
     }
 
     [Fact]
@@ -958,48 +931,26 @@ public class WinUi3UiTests
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement parent = GetNamedElement(panel, "TabSettings");
-        XElement parentContent = Assert.Single(parent.Elements());
-        XElement icon = Assert.Single(parentContent.Elements(), element => element.Name.LocalName == "FontIcon");
-        Assert.Equal("16", (string?)icon.Attribute("Width"));
-        Assert.Equal("12", (string?)parentContent.Attribute("Spacing"));
-        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
-        XElement parentStyle = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasNavRadioStyle");
-        XElement childStyle = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSubNavRadioStyle");
-        Assert.Contains(parentStyle.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "2,0");
-        Assert.Contains(childStyle.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "30,0,2,0");
-        XElement parentPresenter = Assert.Single(parentStyle.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "ContentPresenter");
-        XElement childPresenter = Assert.Single(childStyle.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "ContentPresenter");
-        Assert.Equal("9,0,12,0", (string?)parentPresenter.Attribute("Margin"));
-        Assert.Equal("12,0,12,0", (string?)childPresenter.Attribute("Margin"));
-        XElement indicatorColumn = Assert.Single(parentStyle.Descendants(), element => element.Name.LocalName == "Grid.ColumnDefinitions").Elements().First();
-        Assert.Equal("3", (string?)indicatorColumn.Attribute("Width"));
-        Assert.Equal(2 + 3 + 9 + 16 + 12, 30 + 12);
-        XElement childNavigation = GetNamedElement(panel, "SettingsSubNav");
-        Assert.Equal(5, childNavigation.Elements().Count());
-        Assert.All(childNavigation.Elements(), element => Assert.Equal("{StaticResource BasSubNavRadioStyle}", (string?)element.Attribute("Style")));
+        Assert.Equal("NavigationViewItem", parent.Name.LocalName);
+        XElement children = parent.Element(Presentation + "NavigationViewItem.MenuItems")!;
+        Assert.Equal(new[] { "SubTabBasic", "SubTabVisual", "SubTabFilter", "SubTabMultiScreen", "SubTabBackup" }, children.Elements().Select(item => (string?)item.Attribute(Xaml + "Name")));
+        foreach (XElement item in children.Elements().Prepend(parent))
+        {
+            Assert.Null(item.Attribute("Style"));
+            Assert.Null(item.Attribute("Margin"));
+            Assert.Equal("NavigationViewItem", item.Name.LocalName);
+        }
     }
 
     [Fact]
     public void SettingsSubNavigation_AnimatesItsAccentLikeTheParent()
     {
-        XDocument document = LoadXaml("src", "DesignSystem.xaml");
-        foreach (string key in new[] { "BasNavRadioStyle", "BasSubNavRadioStyle" })
-        {
-            XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
-            XElement indicator = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "SelectionIndicator");
-            Assert.Equal("0.5,0.5", (string?)indicator.Attribute("RenderTransformOrigin"));
-            XElement scale = Assert.Single(indicator.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "IndicatorScale");
-            Assert.Equal("0.35", (string?)scale.Attribute("ScaleY"));
-            XElement selected = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "Checked");
-            XElement grow = Assert.Single(selected.Descendants(), element => element.Name.LocalName == "DoubleAnimation" && (string?)element.Attribute("Storyboard.TargetName") == "IndicatorScale");
-            Assert.Equal("ScaleY", (string?)grow.Attribute("Storyboard.TargetProperty"));
-            Assert.Equal("1", (string?)grow.Attribute("To"));
-            Assert.Equal("0:0:0.22", (string?)grow.Attribute("Duration"));
-            Assert.Contains(grow.Descendants(), element => element.Name.LocalName == "CubicEase");
-            XElement uncheckedState = Assert.Single(style.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "Unchecked");
-            Assert.Contains(uncheckedState.Descendants(), element => (string?)element.Attribute("Storyboard.TargetName") == "IndicatorScale" && (string?)element.Attribute("To") == "0.35");
-            Assert.DoesNotContain(style.Descendants(), element => (string?)element.Attribute("EnableDependentAnimation") == "True");
-        }
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement navigation = GetNamedElement(panel, "SidebarNavigation");
+        Assert.Null(navigation.Attribute("Style"));
+        Assert.DoesNotContain(navigation.Descendants(), element => element.Name.LocalName == "ControlTemplate");
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        Assert.DoesNotContain(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") is "BasNavRadioStyle" or "BasSubNavRadioStyle");
     }
 
     [Fact]
@@ -1076,7 +1027,7 @@ public class WinUi3UiTests
             .Select(style => (string?)style.Attribute(Xaml + "Key"))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
-        styleKeys.Add("DefaultContentDialogStyle");
+        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle" });
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
         {
@@ -1096,12 +1047,9 @@ public class WinUi3UiTests
     public void MainNavigation_UsesEqualCollapsedGapsAndARedCloseHover()
     {
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
-        XElement before = GetNamedElement(document, "NavBeforeSettings");
-        XElement after = GetNamedElement(document, "NavAfterSettings");
-        Assert.Equal("4", (string?)before.Attribute("Spacing"));
-        Assert.Equal("4", (string?)after.Attribute("Spacing"));
-        Assert.Equal("4", (string?)after.Attribute("Margin")?.Value.Split(',')[1]);
-        Assert.Equal("0", (string?)before.Parent?.Attribute("Spacing"));
+        XElement navigation = GetNamedElement(document, "SidebarNavigation");
+        Assert.Equal(4, navigation.Element(Presentation + "NavigationView.MenuItems")!.Elements().Count());
+        Assert.All(navigation.Element(Presentation + "NavigationView.MenuItems")!.Elements(), item => Assert.Null(item.Attribute("Margin")));
         XElement close = GetNamedElement(document, "BtnCaptionClose");
         Assert.Contains(close.Descendants(), resource => (string?)resource.Attribute(Xaml + "Key") == "ButtonBackgroundPointerOver" && (string?)resource.Attribute("Color") == "#C42B1C");
         Assert.Contains(close.Descendants(), resource => (string?)resource.Attribute(Xaml + "Key") == "ButtonForegroundPointerOver" && (string?)resource.Attribute("Color") == "White");
@@ -1159,8 +1107,9 @@ public class WinUi3UiTests
     public void EffectColor_UsesCompactNativeSlidersWithUnclippedSpectrumAndSquareSwatches()
     {
         XDocument document = LoadXaml("src", "DesignSystem.xaml");
-        XElement headerStyle = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorExpanderHeaderStyle");
-        Assert.Contains(headerStyle.Elements(), setter => (string?)setter.Attribute("Property") == "HorizontalAlignment" && (string?)setter.Attribute("Value") == "Stretch");
+        XElement header = GetNamedElement(document, "ExpanderHeader");
+        Assert.Equal("{StaticResource ExpanderHeaderDownStyle}", (string?)header.Attribute("Style"));
+        Assert.Equal("Stretch", (string?)header.Attribute("HorizontalContentAlignment"));
         XElement picker = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorPickerStyle");
         XElement spectrum = Assert.Single(picker.Descendants(), element => element.Name.LocalName == "ColorSpectrum");
         Assert.Equal("148", (string?)spectrum.Attribute("Width"));
@@ -1262,7 +1211,9 @@ public class WinUi3UiTests
             XElement card = GetSettingCard(button);
             Assert.Contains(about, card.Ancestors());
             XElement title = Assert.Single(card.Descendants(), element => element.Name.LocalName == "TextBlock");
-            Assert.Equal("{Binding Tag, ElementName=" + name + "}", (string?)title.Attribute("Text"));
+            XElement link = Assert.Single(title.Elements(Presentation + "Hyperlink"));
+            Assert.Equal(url, (string?)link.Attribute("NavigateUri"));
+            Assert.Equal("{Binding Tag, ElementName=" + name + "}", (string?)Assert.Single(link.Elements(Presentation + "Run")).Attribute("Text"));
             Assert.Equal("{StaticResource BasSettingTitleStyle}", (string?)title.Attribute("Style"));
             Assert.Contains(name + ".Content = Localization.Get(\"About_OpenRepository\")", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
         }
@@ -1332,7 +1283,8 @@ public class WinUi3UiTests
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement overlay = GetNamedElement(panel, "VisualResetOverlay");
-        Assert.Equal("{StaticResource BasModalCardStyle}", (string?)overlay.Elements().Single().Attribute("Style"));
+        Assert.Equal("ContentDialog", overlay.Name.LocalName);
+        Assert.Equal("{StaticResource BasContentDialogStyle}", (string?)overlay.Attribute("Style"));
         foreach (string name in new[] { "TxtOverlayVisualReset", "SearchVisualReset", "ListVisualResetItems", "BtnOverlayVisualCancel", "BtnOverlayVisualConfirm" })
             Assert.Contains(overlay, GetNamedElement(panel, name).Ancestors());
         Assert.Equal("{StaticResource AccentButtonStyle}", (string?)GetNamedElement(panel, "BtnOverlayVisualConfirm").Attribute("Style"));
@@ -1391,7 +1343,9 @@ public class WinUi3UiTests
         XElement container = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionCardContainerStyle");
         Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,16,0");
         XElement card = GetNamedElement(panel, "SelectionCard");
-        Assert.Equal("SelectionCard_Tapped", (string?)card.Attribute("Tapped"));
+        Assert.Equal("SelectionCard_PointerPressed", (string?)card.Attribute("PointerPressed"));
+        Assert.Equal("SelectionCard_PointerReleased", (string?)card.Attribute("PointerReleased"));
+        Assert.Null(card.Attribute("Tapped"));
         Assert.Equal("0", (string?)card.Attribute("MinHeight"));
         Assert.Null(card.Attribute("Height"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
@@ -1478,23 +1432,18 @@ public class WinUi3UiTests
     [Fact]
     public void ModalOverlays_UseNativeOpenAndCloseAnimationsAndWaitBeforeHidingContent()
     {
-        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        Assert.Contains("card.RenderTransformOrigin = new Point(0.5, 0.5)", source, StringComparison.Ordinal);
-        Assert.Contains("new SplineDoubleKeyFrame", source, StringComparison.Ordinal);
-        Assert.Contains("Value = visible ? 1.05 : 1", source, StringComparison.Ordinal);
-        Assert.Contains("ControlNormalAnimationDuration", source, StringComparison.Ordinal);
-        Assert.Contains("ControlFasterAnimationDuration", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("PopInThemeAnimation", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("PopOutThemeAnimation", source, StringComparison.Ordinal);
-        Assert.Contains("previous.Completion.TrySetResult(false)", source, StringComparison.Ordinal);
-        Assert.Contains("!ReferenceEquals(current, state)", source, StringComparison.Ordinal);
-        Assert.Contains("animation.Completion.TrySetResult(false)", source, StringComparison.Ordinal);
-        foreach (string name in new[] { "RunningProcessOverlay", "VisualResetOverlay", "RenameProfileOverlay" })
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string name in new[] { "RunningProcessOverlay", "VisualResetOverlay", "BackupOverlay", "RenameProfileOverlay" })
         {
-            Assert.Contains($"SetModalOverlayVisibleAsync({name}, visible: true)", source, StringComparison.Ordinal);
-            Assert.Contains($"SetModalOverlayVisibleAsync({name}, visible: false)", source, StringComparison.Ordinal);
-            Assert.DoesNotContain($"{name}.Visibility =", source, StringComparison.Ordinal);
+            XElement dialog = GetNamedElement(panel, name);
+            Assert.Equal("ContentDialog", dialog.Name.LocalName);
+            Assert.Equal("{StaticResource BasContentDialogStyle}", (string?)dialog.Attribute("Style"));
+            Assert.Null(dialog.Attribute("Background"));
+            Assert.DoesNotContain(dialog.Descendants(), element => element.Name.LocalName is "Storyboard" or "ControlTemplate");
         }
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("await dialog.ShowAsync(ContentDialogPlacement.Popup)", source, StringComparison.Ordinal);
+        Assert.Contains("SuspendSelectionDialogAsync()", source, StringComparison.Ordinal);
         string close = source[source.IndexOf("private async void CloseVisualResetOverlay_Click", StringComparison.Ordinal)..source.IndexOf("private void SearchVisualReset_TextChanged", StringComparison.Ordinal)];
         Assert.True(close.IndexOf("await SetModalOverlayVisibleAsync", StringComparison.Ordinal) < close.IndexOf("VisualResetItems.Clear()", StringComparison.Ordinal));
     }
@@ -1509,7 +1458,7 @@ public class WinUi3UiTests
         Assert.Contains(style.Elements(), element => (string?)element.Attribute("Property") == "Background" && (string?)element.Attribute("Value") == "{ThemeResource BasLayerBrush}");
         foreach (XElement theme in styles.Root!.Element(Presentation + "ResourceDictionary.ThemeDictionaries")!.Elements())
         {
-            Assert.Contains(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "ContentDialogSmokeFill" && (string?)element.Attribute("ResourceKey") == "BasModalScrimBrush");
+            Assert.DoesNotContain(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") is "ContentDialogSmokeFill" or "BasModalScrimBrush");
             Assert.Contains(theme.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "ContentDialogTopOverlay" && (string?)element.Attribute("ResourceKey") == "BasLayerBrush");
         }
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
@@ -1520,10 +1469,10 @@ public class WinUi3UiTests
         Assert.Contains("scrim.Clip = new RectangleGeometry", source, StringComparison.Ordinal);
         Assert.Contains("column.Width = GridLength.Auto", source, StringComparison.Ordinal);
         Assert.Contains("button.MinWidth = 0", source, StringComparison.Ordinal);
-        Assert.Contains("dialog.Resources[\"ContentDialogSmokeFill\"] = VisualResetOverlay.Background", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("dialog.Resources[\"ContentDialogSmokeFill\"] = VisualResetOverlay.Background", source, StringComparison.Ordinal);
         Assert.Contains("VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot)", source, StringComparison.Ordinal);
-        Assert.Contains("scrim.Fill = VisualResetOverlay.Background", source, StringComparison.Ordinal);
-        Assert.Contains("dialog.Resources[\"ContentDialogTopOverlay\"] = ((Border)VisualResetOverlay.Children[0]).Background", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("scrim.Fill = VisualResetOverlay.Background", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("dialog.Resources[\"ContentDialogTopOverlay\"] = ((Border)VisualResetOverlay.Children[0]).Background", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1736,15 +1685,11 @@ public class WinUi3UiTests
     public void ColorExpander_ChevronTracksEveryNativeToggleState()
     {
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
-        XElement header = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorExpanderHeaderStyle");
-        XElement states = Assert.Single(header.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "CommonStates");
-        foreach (string name in new[] { "Normal", "PointerOver", "Pressed", "Disabled", "Checked", "CheckedPointerOver", "CheckedPressed", "CheckedDisabled" })
-        {
-            XElement state = Assert.Single(states.Elements(), element => (string?)element.Attribute(Xaml + "Name") == name);
-            XElement glyph = Assert.Single(state.Descendants(), element => (string?)element.Attribute("Target") == "HeaderChevron.Glyph");
-            Assert.Equal(name.StartsWith("Checked", StringComparison.Ordinal) ? "\uE70E" : "\uE70D", (string?)glyph.Attribute("Value"));
-        }
-        Assert.DoesNotContain(header.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "CheckStates");
+        XElement header = GetNamedElement(styles, "ExpanderHeader");
+        Assert.Equal("{StaticResource ExpanderHeaderDownStyle}", (string?)header.Attribute("Style"));
+        Assert.Equal("{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}", (string?)header.Attribute("IsChecked"));
+        Assert.DoesNotContain(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "HeaderChevron");
+        Assert.DoesNotContain(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorExpanderHeaderStyle");
     }
 
     [Fact]
@@ -1891,8 +1836,9 @@ public class WinUi3UiTests
             XElement heading = Assert.Single(overlay.Descendants(Presentation + "TextBlock"));
             Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)heading.Attribute("Style"));
             Assert.Null(heading.Attribute("FontSize"));
-            Assert.Equal("{ThemeResource BasModalScrimBrush}", (string?)overlay.Attribute("Background"));
-            Assert.Equal("{StaticResource BasModalCardStyle}", (string?)overlay.Elements().Single().Attribute("Style"));
+            Assert.Null(overlay.Attribute("Background"));
+            Assert.Equal("ContentDialog", overlay.Name.LocalName);
+            Assert.Equal("{StaticResource BasContentDialogStyle}", (string?)overlay.Attribute("Style"));
             XElement buttons = overlay.Descendants(Presentation + "StackPanel").Single(element => (string?)element.Attribute("Orientation") == "Horizontal");
             Assert.Equal("8", (string?)buttons.Attribute("Spacing"));
             Assert.Equal("0,16,0,0", (string?)buttons.Attribute("Margin"));
@@ -1941,7 +1887,7 @@ public class WinUi3UiTests
         }
         Assert.Equal("{StaticResource BasPageTitleStyle}", (string?)GetNamedElement(privacy, "VersionText").Attribute("Style"));
         Assert.Equal("{StaticResource BasCaptionStyle}", (string?)GetNamedElement(privacy, "TxtTagline").Attribute("Style"));
-        Assert.Equal(3, privacy.Descendants(Presentation + "Border").Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
+        Assert.Equal(new[] { "Informational", "Warning", "Success" }, privacy.Descendants(Presentation + "InfoBar").Select(element => (string?)element.Attribute("Severity")));
         foreach (string name in new[] { "VersionText", "TxtTagline", "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
             Assert.Equal(Presentation + "TextBlock", GetNamedElement(privacy, name).Name);
         Assert.Contains("Version {version.Major}.{version.Minor}.{version.Build}-release", ReadSource("src", "PrivacyWindow.xaml.cs"), StringComparison.Ordinal);
@@ -1990,12 +1936,12 @@ public class WinUi3UiTests
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement navigation = GetNamedElement(panel, "SubTabBackup");
-        Assert.Equal("SettingsNav", (string?)navigation.Attribute("GroupName"));
-        Assert.Equal("{StaticResource BasSubNavRadioStyle}", (string?)navigation.Attribute("Style"));
+        Assert.Equal("NavigationViewItem", navigation.Name.LocalName);
+        Assert.Contains(GetNamedElement(panel, "TabSettings"), navigation.Ancestors());
         XElement page = GetNamedElement(panel, "SectionBackup");
         Assert.Equal(2, page.Descendants(Presentation + "Border").Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
         XElement overlay = GetNamedElement(panel, "BackupOverlay");
-        Assert.Equal("{ThemeResource BasModalScrimBrush}", (string?)overlay.Attribute("Background"));
+        Assert.Null(overlay.Attribute("Background"));
         XElement list = GetNamedElement(panel, "ListBackupItems");
         Assert.Equal("{StaticResource SelectionCardTemplates}", (string?)list.Attribute("ItemTemplateSelector"));
         Assert.Equal("{StaticResource SelectionCardContainerStyle}", (string?)list.Attribute("ItemContainerStyle"));

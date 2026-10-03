@@ -221,6 +221,7 @@ public sealed partial class ControlPanelWindow : UserControl
         private ItemsRepeater? _repeater;
         private CompositionPropertySet? _translation;
         private int _selectedIndex = -1;
+        private double _targetX = double.NaN;
         private bool _queued;
         private bool _animatePending;
         private bool _disposed;
@@ -293,17 +294,18 @@ public sealed partial class ControlPanelWindow : UserControl
                 return;
             }
             Point position = cell.TransformToVisual(_repeater).TransformPoint(new Point());
-            _selection.Width = cell.ActualWidth;
-            _selection.Height = _repeater.ActualHeight;
+            if (_selection.Width != cell.ActualWidth) _selection.Width = cell.ActualWidth;
+            if (_selection.Height != _repeater.ActualHeight) _selection.Height = _repeater.ActualHeight;
             _selection.Opacity = 1;
-            if (animate && _selectedIndex >= 0 && _selectedIndex != index)
+            if (_selectedIndex == index && Math.Abs(_targetX - position.X) < 0.01) return;
+            if (animate && _selectedIndex >= 0)
             {
                 var compositor = _translation.Compositor;
                 var animation = compositor.CreateScalarKeyFrameAnimation();
                 animation.InsertExpressionKeyFrame(0, "this.StartingValue");
                 animation.InsertKeyFrame(1, (float)position.X,
                     compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0.7f), new Vector2(0.2f, 1)));
-                animation.Duration = TimeSpan.FromMilliseconds(160);
+                animation.Duration = TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], CultureInfo.InvariantCulture);
                 _translation.StartAnimation("Translation.X", animation);
             }
             else
@@ -312,6 +314,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 _translation.InsertVector3("Translation", new Vector3((float)position.X, 0, 0));
             }
             _selectedIndex = index;
+            _targetX = position.X;
         }
 
         public void Dispose()
@@ -331,230 +334,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private const int DesignWidth = 800;
     private const int DesignHeight = 710;
 
-    /// <summary>
-    /// 侧栏设置子导航的展开/收起。
-    ///
-    /// 两个要求：
-    ///   1. 下方的「日志 / 关于」要贴着展开边缘**连续**移动；
-    ///   2. 动画要按屏幕刷新率更新（本机屏幕 180Hz），不能一卡一卡。
-    ///
-    /// 因此这里**不用布局属性做动画**。实测：对 <c>Height</c> 做依赖动画时每帧都要在
-    /// UI 线程跑一遍 measure/arrange，实际只有约 30Hz，在 180Hz 屏上就是掉帧。改为：
-    ///   * 布局只在切换的那一帧改一次：展开时容器直接拿到内容自然高度、收起时归 0；
-    ///   * 「日志 / 关于」的位移用独立的 <see cref="TranslateTransform"/> 动画
-    ///     （独立动画由合成器线程插值，按屏幕刷新率更新）；
-    ///   * 内容区的「露出」用合成器 <see cref="InsetClip"/> 的 BottomInset 动画，同样
-    ///     跑在合成器线程；
-    ///   * 收起动画结束后再提交布局（容器高度归 0、平移归 0，视觉净位置不变）。
-    ///
-    /// 实测踩过的坑：
-    ///   1. **不要给内容本身加平移动画**：展开时它会让 4 个子项先下沉几像素再回位。
-    ///   2. 独立动画（变换 / 不透明度）与合成器动画不受 <c>EnableDependentAnimation</c>
-    ///      限制；布局属性动画不显式开启该标志会被 WinUI 静默丢弃，直到 Completed
-    ///      回调才瞬间设到终值。
-    ///   3. <c>Storyboard.Completed</c> 是异步回调，**不在**调用方 try/catch 的栈上，
-    ///      其中抛出的异常会直接终结进程；必须用代次号忽略过期回调，否则快速点击时
-    ///      旧回调会把状态改回去。
-    ///   4. 平移与裁剪必须用「当前值 → 目标值」的单关键帧动画（不写 From），这样动画
-    ///      被打断时不会从 0 重新开始跳一下。
-    /// </summary>
-    private sealed class SubNavAnimator
-    {
-        // 展开略慢于收起：展开需要被看清，收起只需干净利落。
-        private static readonly TimeSpan ExpandDuration = TimeSpan.FromMilliseconds(300);
-        private static readonly TimeSpan CollapseDuration = TimeSpan.FromMilliseconds(220);
-
-        private readonly Border _host;
-        private readonly FrameworkElement _content;
-        private readonly FrameworkElement _below;
-        private readonly TranslateTransform _belowShift = new();
-
-        private InsetClip? _revealClip;
-        private bool _expanded;
-        private int _generation;
-
-        public SubNavAnimator(Border host, FrameworkElement content, FrameworkElement below)
-        {
-            _host = host;
-            _content = content;
-            _below = below;
-
-            // 「日志 / 关于」整组靠平移让位，布局本身不参与动画。
-            _below.RenderTransform = _belowShift;
-
-            // 初始为收起状态：容器高度 0，内容不参与命中测试。
-            _host.Height = 0;
-            _host.IsHitTestVisible = false;
-        }
-
-        public void SetExpanded(bool expanded)
-        {
-            if (_expanded == expanded)
-            {
-                return;
-            }
-
-            _expanded = expanded;
-            _generation++;
-
-            try
-            {
-                Animate(expanded, _generation);
-            }
-            catch (Exception ex)
-            {
-                // 动画失败不能拖垮界面：直接落到目标状态。
-                AppLogger.Warn($"Sub-nav animation failed: {ex.Message}");
-                ApplyFinalState(expanded);
-            }
-        }
-
-        private void Animate(bool expanded, int generation)
-        {
-            double height = MeasureContentHeight();
-            if (height <= 0)
-            {
-                // 尚未布局出可用尺寸：直接到位，下次交互再动画。
-                ApplyFinalState(expanded);
-                return;
-            }
-
-            EnsureRevealClip(height);
-
-            if (expanded)
-            {
-                // 布局一次性到位：容器直接拿到自然高度，「日志 / 关于」在布局里立刻
-                // 下移 height；紧接着用平移把它们按回原位 —— 两者发生在同一帧，
-                // 视觉上没有跳变，之后由合成器把它们连续推到新位置。
-                _host.Height = height;
-                _belowShift.Y = -height;
-            }
-
-            _host.IsHitTestVisible = expanded;
-            StartAnimations(
-                expanded ? ExpandDuration : CollapseDuration,
-                expanded ? EasingMode.EaseOut : EasingMode.EaseIn,
-                shiftTo: expanded ? 0 : -height,
-                revealTo: expanded ? 0f : (float)height,
-                onCompleted: () => ApplyFinalState(expanded),
-                generation: generation);
-        }
-
-        /// <summary>
-        /// 播放两条动画：
-        ///   * 内容露出——合成器 <see cref="InsetClip"/> 的 BottomInset；
-        ///   * 「日志 / 关于」位移——独立的 <see cref="TranslateTransform"/> 动画。
-        /// 两者都由合成器线程插值，按屏幕刷新率更新，不经过 UI 线程布局。
-        /// 都不写 From（单关键帧 / 只写 To）→ 从当前值开始，被打断时不会跳。
-        /// </summary>
-        private void StartAnimations(
-            TimeSpan duration,
-            EasingMode easingMode,
-            double shiftTo,
-            float revealTo,
-            Action onCompleted,
-            int generation)
-        {
-            var compositor = _revealClip!.Compositor;
-            var reveal = compositor.CreateScalarKeyFrameAnimation();
-            reveal.InsertKeyFrame(1f, revealTo, CreateEasing(compositor, easingMode));
-            reveal.Duration = duration;
-            _revealClip.StartAnimation("BottomInset", reveal);
-
-            var shift = new DoubleAnimation
-            {
-                To = shiftTo,
-                Duration = new Duration(duration),
-                EasingFunction = new CubicEase { EasingMode = easingMode }
-            };
-            Storyboard.SetTarget(shift, _belowShift);
-            Storyboard.SetTargetProperty(shift, "Y");
-
-            var storyboard = new Storyboard();
-            storyboard.Children.Add(shift);
-            storyboard.Completed += (_, _) =>
-            {
-                // 过期回调直接忽略，否则快速点击时旧状态会覆盖新状态。
-                if (generation != _generation)
-                {
-                    return;
-                }
-
-                onCompleted();
-            };
-            storyboard.Begin();
-        }
-
-        private static CompositionEasingFunction CreateEasing(Compositor compositor, EasingMode mode) =>
-            mode == EasingMode.EaseIn
-                ? compositor.CreateCubicBezierEasingFunction(new Vector2(0.55f, 0.055f), new Vector2(0.675f, 0.19f))
-                : compositor.CreateCubicBezierEasingFunction(new Vector2(0.215f, 0.61f), new Vector2(0.355f, 1f));
-
-        /// <summary>
-        /// 懒创建内容区的合成器裁剪。收起态容器高度为 0，内容本来就不显示，
-        /// 因此这里把下沿裁到内容高度即可（展开动画从当前值插值，不会跳）。
-        /// </summary>
-        private void EnsureRevealClip(double height)
-        {
-            if (_revealClip != null)
-            {
-                return;
-            }
-
-            Visual visual = ElementCompositionPreview.GetElementVisual(_host);
-            InsetClip clip = visual.Compositor.CreateInsetClip();
-            clip.BottomInset = (float)height;
-            visual.Clip = clip;
-            _revealClip = clip;
-        }
-
-        /// <summary>
-        /// 量出内容自然高度。用 <see cref="UIElement.Measure"/> 而非常量：语言切换或
-        /// 字号变化都会改变高度。首次布局前宽度不可用（此时测量会让 XAML 递归），
-        /// 返回 0 由调用方走「不做动画、直接到位」的兜底。
-        /// </summary>
-        private double MeasureContentHeight()
-        {
-            double width = _host.ActualWidth > 0 ? _host.ActualWidth : _content.ActualWidth;
-            if (width <= 0)
-            {
-                return 0;
-            }
-
-            _content.Measure(new Windows.Foundation.Size(width, double.PositiveInfinity));
-            return _content.DesiredSize.Height;
-        }
-
-        /// <summary>直接落到目标状态。只做无异常风险的赋值。</summary>
-        private void ApplyFinalState(bool expanded)
-        {
-            if (expanded)
-            {
-                _host.IsHitTestVisible = true;
-                _belowShift.Y = 0;
-                if (_revealClip != null)
-                {
-                    _revealClip.BottomInset = 0;
-                }
-
-                // 交还高度约束，让布局接管（语言切换等改变内容高度时自动跟随）。
-                _host.Height = double.NaN;
-            }
-            else
-            {
-                _host.IsHitTestVisible = false;
-                // 布局收回 0 与平移归零必须在同一帧发生，视觉净位置才不变。
-                _host.Height = 0;
-                _belowShift.Y = 0;
-                if (_revealClip != null)
-                {
-                    _revealClip.BottomInset = (float)Math.Max(1, MeasureContentHeight());
-                }
-            }
-        }
-    }
-
-    private SubNavAnimator? _subNav;
+    private NavigationViewItem? _selectedSettingsItem;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -574,8 +354,13 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
     private readonly Dictionary<Panel, Storyboard> _settingsAnimations = new();
-    private sealed record ModalAnimation(Storyboard Storyboard, TaskCompletionSource<bool> Completion, bool Closing);
-    private readonly Dictionary<Grid, ModalAnimation> _modalAnimations = new();
+    private sealed class ModalDialogState
+    {
+        public TaskCompletionSource<bool> Opened { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> Closed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool CloseRequested { get; set; }
+    }
+    private readonly Dictionary<ContentDialog, ModalDialogState> _modalDialogs = new();
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
@@ -695,6 +480,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 StopSettingsAnimations();
                 UpdateCaptionButtonBounds();
                 if (_messageDialog != null) UpdateDialogScrim(_messageDialog);
+                foreach (ContentDialog dialog in _modalDialogs.Keys) UpdateDialogScrim(dialog);
             };
             CaptionButtons.SizeChanged += (_, _) => UpdateCaptionButtonBounds();
 
@@ -736,9 +522,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         RootGrid.RequestedTheme = App.ResolveElementTheme();
 
-        // 侧栏子导航的展开/收起：布局只改一次，「日志 / 关于」由独立平移动画让位，
-        // 内容露出用合成器裁剪，整体按屏幕刷新率更新（不逐帧跑布局）。
-        _subNav = new SubNavAnimator(SettingsSubNavHost, SettingsSubNav, NavAfterSettings);
+        _selectedSettingsItem = SubTabBasic;
 
         // 页面切换动画需要在不透明变换上做位移。
         foreach (FrameworkElement page in new FrameworkElement[]
@@ -1863,27 +1647,14 @@ public sealed partial class ControlPanelWindow : UserControl
     // 导航
     // ==================================================================
 
-    private void Tab_Click(object sender, RoutedEventArgs e)
+    private void SidebarNavigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (PageWelcome == null)
-        {
-            return;
-        }
-
-        UpdatePageVisibility();
+        if (args.SelectedItem is NavigationViewItem item && TabSettings.MenuItems.Contains(item))
+            _selectedSettingsItem = item;
+        if (PageWelcome != null && !_isClosed) UpdatePageVisibility();
     }
 
-    private void SubTab_Click(object sender, RoutedEventArgs e)
-    {
-        if (SectionBasic == null)
-        {
-            return;
-        }
-
-        // 子标签本身同组互斥；这里只需保证「设置」处于选中态。
-        TabSettings.IsChecked = true;
-        UpdatePageVisibility();
-    }
+    private bool IsSettingsNavigation(NavigationViewItem item) => item == TabSettings || TabSettings.MenuItems.Contains(item);
 
     /// <summary>页面切换动画：进入的页面淡入 + 轻微上移。</summary>
     private static readonly TimeSpan PageTransitionDuration = TimeSpan.FromMilliseconds(180);
@@ -1891,10 +1662,11 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdatePageVisibility()
     {
         StopSettingsAnimations();
-        bool welcome = TabWelcome.IsChecked == true;
-        bool settings = TabSettings.IsChecked == true;
-        bool log = TabLog.IsChecked == true;
-        bool about = TabAbout.IsChecked == true;
+        var selected = SidebarNavigation.SelectedItem as NavigationViewItem ?? TabWelcome;
+        bool welcome = selected == TabWelcome;
+        bool settings = IsSettingsNavigation(selected);
+        bool log = selected == TabLog;
+        bool about = selected == TabAbout;
 
         FrameworkElement? incoming = settings
             ? PageSettings
@@ -1910,10 +1682,6 @@ public sealed partial class ControlPanelWindow : UserControl
         SetPageVisible(PageSettings, settings, incoming);
         SetPageVisible(PageLog, log, incoming);
         SetPageVisible(PageAbout, about, incoming);
-
-        // 子导航展开/收起：原生 Expander 的内容动画 + 容器高度依赖动画，
-        // 下面的「日志 / 关于」因此被连续推开，而不是等动画结束才瞬移。
-        _subNav?.SetExpanded(settings);
 
         if (settings)
         {
@@ -1980,15 +1748,15 @@ public sealed partial class ControlPanelWindow : UserControl
         StopSettingsAnimations();
         // 四个子项之间切换同样需要过渡动画，因此逐个走 SetPageVisible（它会对
         // 「本次新进入」的那一项播放动画），而不是直接赋 Visibility。
-        FrameworkElement? incoming = SubTabBasic.IsChecked == true
+        FrameworkElement? incoming = _selectedSettingsItem == SubTabBasic
             ? SectionBasic
-            : SubTabVisual.IsChecked == true
+            : _selectedSettingsItem == SubTabVisual
                 ? SectionVisual
-                : SubTabFilter.IsChecked == true
+                : _selectedSettingsItem == SubTabFilter
                     ? SectionFilter
-                    : SubTabMultiScreen.IsChecked == true
+                    : _selectedSettingsItem == SubTabMultiScreen
                         ? SectionMultiScreen
-                        : SubTabBackup.IsChecked == true
+                        : _selectedSettingsItem == SubTabBackup
                             ? SectionBackup
                             : null;
 
@@ -2927,10 +2695,23 @@ public sealed partial class ControlPanelWindow : UserControl
         ListVisualResetItems.ItemsSource = rows;
     }
 
-    private void SelectionCard_Tapped(object sender, TappedRoutedEventArgs args)
+    private void SelectionCard_PointerPressed(object sender, PointerRoutedEventArgs args)
     {
-        if (sender is FrameworkElement card && TryToggleSelectionCard(card, args.OriginalSource as DependencyObject))
-            args.Handled = true;
+        if (sender is not FrameworkElement card) return;
+        var point = args.GetCurrentPoint(card);
+        if (args.Pointer.PointerDeviceType != Microsoft.UI.Input.PointerDeviceType.Mouse || point.Properties.IsLeftButtonPressed)
+            card.Tag = point.Position;
+    }
+
+    private void SelectionCard_PointerReleased(object sender, PointerRoutedEventArgs args)
+    {
+        if (sender is not FrameworkElement card || card.Tag is not Point start) return;
+        card.Tag = null;
+        var point = args.GetCurrentPoint(card);
+        if (args.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse &&
+            point.Properties.PointerUpdateKind != Microsoft.UI.Input.PointerUpdateKind.LeftButtonReleased) return;
+        if (Math.Abs(point.Position.X - start.X) > 8 || Math.Abs(point.Position.Y - start.Y) > 8) return;
+        if (TryToggleSelectionCard(card, args.OriginalSource as DependencyObject)) args.Handled = true;
     }
 
     private static bool TryToggleSelectionCard(FrameworkElement card, DependencyObject? source)
@@ -3651,83 +3432,102 @@ public sealed partial class ControlPanelWindow : UserControl
     // 对话框 / UI 线程
     // ==================================================================
 
-    private Task<bool> SetModalOverlayVisibleAsync(Grid overlay, bool visible)
+    private Task<bool> SetModalOverlayVisibleAsync(ContentDialog dialog, bool visible)
     {
         if (_isClosed) return Task.FromResult(false);
-        if (_modalAnimations.TryGetValue(overlay, out ModalAnimation? previous))
+        if (_modalDialogs.TryGetValue(dialog, out ModalDialogState? state))
         {
-            if (previous.Closing == !visible) return previous.Completion.Task;
-            _modalAnimations.Remove(overlay);
-            previous.Storyboard.Stop();
-            previous.Completion.TrySetResult(false);
+            if (visible) return state.Opened.Task;
+            state.CloseRequested = true;
+            dialog.Hide();
+            return state.Closed.Task;
         }
-        else if ((overlay.Visibility == Visibility.Visible) == visible)
+        if (!visible) return Task.FromResult(true);
+        state = new ModalDialogState();
+        _modalDialogs.Add(dialog, state);
+        _ = ShowSelectionDialogAsync(dialog, state);
+        return state.Opened.Task;
+    }
+
+    private async Task ShowSelectionDialogAsync(ContentDialog dialog, ModalDialogState state)
+    {
+        bool gateHeld = false;
+        void Opened(ContentDialog sender, ContentDialogOpenedEventArgs args)
         {
-            return Task.FromResult(true);
-        }
-        var card = (Border)overlay.Children[0];
-        overlay.Visibility = Visibility.Visible;
-        card.IsHitTestVisible = visible;
-        overlay.UpdateLayout();
-        card.RenderTransformOrigin = new Point(0.5, 0.5);
-        if (card.RenderTransform is not ScaleTransform) card.RenderTransform = new ScaleTransform();
-        var storyboard = new Storyboard();
-        TimeSpan scaleDuration = TimeSpan.Parse((string)Application.Current.Resources[visible ? "ControlNormalAnimationDuration" : "ControlFastAnimationDuration"], CultureInfo.InvariantCulture);
-        TimeSpan fadeDuration = TimeSpan.Parse((string)Application.Current.Resources["ControlFasterAnimationDuration"], CultureInfo.InvariantCulture);
-        foreach (string property in new[] { "ScaleX", "ScaleY" })
-        {
-            var scale = new DoubleAnimationUsingKeyFrames();
-            scale.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = TimeSpan.Zero, Value = visible ? 1.05 : 1 });
-            scale.KeyFrames.Add(new SplineDoubleKeyFrame
+            if (state.CloseRequested) sender.Hide();
+            else
             {
-                KeyTime = scaleDuration, Value = visible ? 1 : 1.05,
-                KeySpline = new KeySpline { ControlPoint1 = new Point(0, 0), ControlPoint2 = new Point(0, 1) }
-            });
-            Storyboard.SetTarget(scale, card.RenderTransform);
-            Storyboard.SetTargetProperty(scale, property);
-            storyboard.Children.Add(scale);
+                state.Opened.TrySetResult(true);
+                if (sender == RenameProfileOverlay)
+                {
+                    NewProfileNameInput.Focus(FocusState.Programmatic);
+                    NewProfileNameInput.SelectAll();
+                }
+            }
         }
-        var fade = new DoubleAnimationUsingKeyFrames();
-        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = TimeSpan.Zero, Value = visible ? 0 : 1 });
-        fade.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = fadeDuration, Value = visible ? 1 : 0 });
-        Storyboard.SetTarget(fade, overlay);
-        Storyboard.SetTargetProperty(fade, "Opacity");
-        storyboard.Children.Add(fade);
-        var completion = new TaskCompletionSource<bool>();
-        var state = new ModalAnimation(storyboard, completion, !visible);
-        _modalAnimations[overlay] = state;
-        storyboard.Completed += (_, _) =>
+        void Closing(ContentDialog sender, ContentDialogClosingEventArgs args)
         {
-            if (_isClosed || !_modalAnimations.TryGetValue(overlay, out ModalAnimation? current) || !ReferenceEquals(current, state)) return;
-            _modalAnimations.Remove(overlay);
-            storyboard.Stop();
-            overlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            card.IsHitTestVisible = true;
-            completion.TrySetResult(true);
-        };
+            if (sender == BackupOverlay && _backupBusy && !state.CloseRequested) args.Cancel = true;
+        }
         try
         {
-            storyboard.Begin();
+            await _dialogGate.WaitAsync();
+            gateHeld = true;
+            if (_isClosed || state.CloseRequested) return;
+            XamlRoot? root = await EnsureXamlRootAsync();
+            if (root == null || _isClosed) return;
+            if (dialog.XamlRoot != root) dialog.XamlRoot = root;
+            dialog.RequestedTheme = RootGrid.ActualTheme;
+            ConfigureContentDialog(dialog);
+            dialog.Opened += Opened;
+            dialog.Closing += Closing;
+            await dialog.ShowAsync(ContentDialogPlacement.Popup);
+            if (!state.CloseRequested && !_isClosed)
+            {
+                if (dialog == VisualResetOverlay)
+                {
+                    VisualResetItems.Clear();
+                    ListVisualResetItems.ItemsSource = null;
+                }
+                else if (dialog == BackupOverlay)
+                {
+                    _backupSource = null;
+                    _backupItems.Clear();
+                    ListBackupItems.ItemsSource = null;
+                }
+            }
         }
         catch (Exception exception)
         {
-            _modalAnimations.Remove(overlay);
-            storyboard.Stop();
-            overlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            card.IsHitTestVisible = true;
-            completion.TrySetResult(true);
-            AppLogger.Warn($"Failed to animate modal overlay: {exception.Message}");
+            AppLogger.Warn($"Failed to show native selection dialog: {exception.Message}");
         }
-        return completion.Task;
+        finally
+        {
+            dialog.Opened -= Opened;
+            dialog.Closing -= Closing;
+            if (_modalDialogs.TryGetValue(dialog, out ModalDialogState? current) && ReferenceEquals(state, current))
+                _modalDialogs.Remove(dialog);
+            if (gateHeld) _dialogGate.Release();
+            state.Opened.TrySetResult(false);
+            state.Closed.TrySetResult(!_isClosed);
+        }
+    }
+
+    private async Task<ContentDialog?> SuspendSelectionDialogAsync()
+    {
+        ContentDialog? dialog = _modalDialogs.FirstOrDefault(pair =>
+            pair.Value.Opened.Task.IsCompletedSuccessfully && pair.Value.Opened.Task.Result && !pair.Value.CloseRequested).Key;
+        if (dialog != null) await SetModalOverlayVisibleAsync(dialog, visible: false);
+        return dialog;
     }
 
     private void ConfigureContentDialog(ContentDialog dialog)
     {
+        if (dialog.Resources.ContainsKey("BasNativeDialogConfigured")) return;
+        dialog.Resources["BasNativeDialogConfigured"] = true;
         dialog.Title = null;
         dialog.Style = (Style)Application.Current.Resources["BasContentDialogStyle"];
         dialog.Resources["ContentDialogMinHeight"] = 0d;
-        dialog.Resources["ContentDialogSmokeFill"] = VisualResetOverlay.Background;
-        dialog.Resources["ContentDialogTopOverlay"] = ((Border)VisualResetOverlay.Children[0]).Background;
         dialog.Opened += (_, _) => UpdateDialogScrim(dialog);
         dialog.Loaded += (_, _) =>
         {
@@ -3764,9 +3564,8 @@ public sealed partial class ControlPanelWindow : UserControl
         if (dialog.XamlRoot == null || _isClosed) return;
         foreach (Popup popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot))
         {
-            if (popup.Child is Microsoft.UI.Xaml.Shapes.Rectangle { Name: "SmokeLayerBackground" } scrim)
+            if (popup.Child is Microsoft.UI.Xaml.Shapes.Rectangle scrim)
             {
-                scrim.Fill = VisualResetOverlay.Background;
                 Point origin = PanelBody.TransformToVisual(RootGrid).TransformPoint(new Point());
                 scrim.Clip = new RectangleGeometry { Rect = new Rect(origin.X, origin.Y, PanelBody.ActualWidth, PanelBody.ActualHeight) };
             }
@@ -3776,8 +3575,10 @@ public sealed partial class ControlPanelWindow : UserControl
     private async Task ShowMessageAsync(string message)
     {
         bool gateHeld = false;
+        ContentDialog? suspended = null;
         try
         {
+            suspended = await SuspendSelectionDialogAsync();
             await _dialogGate.WaitAsync();
             gateHeld = true;
             XamlRoot? root = await EnsureXamlRootAsync();
@@ -3801,14 +3602,17 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             _messageDialog = null;
             if (gateHeld) _dialogGate.Release();
+            if (suspended != null && !_isClosed) await SetModalOverlayVisibleAsync(suspended, visible: true);
         }
     }
 
     private async Task<bool> ConfirmAsync(string message, string? confirmText = null)
     {
         bool gateHeld = false;
+        ContentDialog? suspended = null;
         try
         {
+            suspended = await SuspendSelectionDialogAsync();
             await _dialogGate.WaitAsync();
             gateHeld = true;
 
@@ -3845,6 +3649,7 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 _dialogGate.Release();
             }
+            if (suspended != null && !_isClosed) await SetModalOverlayVisibleAsync(suspended, visible: true);
         }
     }
 
@@ -3962,12 +3767,14 @@ public sealed partial class ControlPanelWindow : UserControl
         _host.CloseRequested -= ControlPanelWindow_Closed;
         _messageDialog?.Hide();
         StopSettingsAnimations();
-        foreach (ModalAnimation animation in _modalAnimations.Values)
+        foreach (var pair in _modalDialogs)
         {
-            animation.Storyboard.Stop();
-            animation.Completion.TrySetResult(false);
+            pair.Value.CloseRequested = true;
+            pair.Key.Hide();
+            pair.Value.Opened.TrySetResult(false);
+            pair.Value.Closed.TrySetResult(false);
         }
-        _modalAnimations.Clear();
+        _modalDialogs.Clear();
         foreach (var callback in _settingsCallbacks) callback.Control.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
         Profiles.CollectionChanged -= GeneralSettingsCollectionChanged;
         CurrentProfileProcesses.CollectionChanged -= GeneralSettingsCollectionChanged;
