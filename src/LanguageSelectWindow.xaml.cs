@@ -75,7 +75,7 @@ public partial class LanguageSelectWindow : Window
         WindowChrome.SetInitialSize(this, DesignWidth, DesignHeight);
 
         Closed += LanguageSelectWindow_Closed;
-        Activate();
+        StartupDialogHost.ShowWhenReady(this, RootGrid);
         return _completion.Task;
     }
 
@@ -128,8 +128,7 @@ public partial class LanguageSelectWindow : Window
         ConfigManager.Save("UiLanguage", selected);
         Localization.ApplyCulture(selected);
         SelectedCulture = selected;
-        _completion.TrySetResult(selected);
-        Close();
+        _ = StartupDialogHost.CloseAsync(this);
     }
 
     // ------------------------------------------------------------------
@@ -153,7 +152,7 @@ public partial class LanguageSelectWindow : Window
         _ = sender;
         _ = args;
         _closed = true;
-        _completion.TrySetResult(null);
+        _completion.TrySetResult(SelectedCulture);
     }
 
     /// <summary>

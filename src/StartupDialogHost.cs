@@ -1,6 +1,7 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices;
 using Windows.Foundation;
@@ -19,6 +20,24 @@ internal static class StartupDialogHost
 {
     private delegate IntPtr StartupWindowProcedure(IntPtr window, uint message, IntPtr parameter, IntPtr data, UIntPtr identity, UIntPtr reference);
     private static readonly Dictionary<IntPtr, StartupWindowProcedure> WindowProcedures = [];
+    private static readonly Dictionary<IntPtr, Task> ClosingWindows = [];
+    private static readonly TimeSpan CloseAnimationRetention = TimeSpan.FromMilliseconds(300);
+    private const int DwmwaTransitionsForcedDisabled = 3;
+    private const int DwmwaCloak = 13;
+    private const int DwmwaCloaked = 14;
+    private const int WsExNoRedirectionBitmap = 0x00200000;
+    private const uint AwActivate = 0x00020000;
+    private const uint AwBlend = 0x00080000;
+    private const uint ShowAnimationMilliseconds = 200;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmFlush();
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool AnimateWindow(IntPtr window, uint duration, uint flags);
 
     [DllImport("comctl32.dll")]
     private static extern bool SetWindowSubclass(IntPtr window, StartupWindowProcedure procedure, UIntPtr identity, UIntPtr reference);
@@ -32,6 +51,137 @@ internal static class StartupDialogHost
     private static extern bool GetClientRect(IntPtr window, out NativeMethods.RECT rectangle);
     [DllImport("user32.dll")]
     private static extern bool ClientToScreen(IntPtr window, ref NativeMethods.POINT point);
+
+    private static void SetDwmFlag(IntPtr handle, int attribute, bool enabled)
+    {
+        int value = enabled ? 1 : 0;
+        Marshal.ThrowExceptionForHR(DwmSetWindowAttribute(handle, attribute, ref value, sizeof(int)));
+    }
+
+    public static void ShowWhenReady(Window window, FrameworkElement root)
+    {
+        IntPtr handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        bool closed = false;
+        bool rendering = false;
+        bool cleaned = false;
+
+        void Cleanup()
+        {
+            if (cleaned) return;
+            cleaned = true;
+            root.Loaded -= Loaded;
+            CompositionTarget.Rendering -= Rendered;
+            window.Closed -= Closed;
+        }
+
+        void Closed(object sender, WindowEventArgs args)
+        {
+            closed = true;
+            Cleanup();
+        }
+
+        void Loaded(object sender, RoutedEventArgs args)
+        {
+            root.UpdateLayout();
+            FitToContent(window, root);
+            root.UpdateLayout();
+            if (!rendering)
+            {
+                rendering = true;
+                CompositionTarget.Rendering += Rendered;
+            }
+        }
+
+        void Rendered(object? sender, object args)
+        {
+            CompositionTarget.Rendering -= Rendered;
+            window.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
+            {
+                try
+                {
+                    if (closed || ClosingWindows.ContainsKey(handle)) return;
+                    await ElementCompositionPreview.GetElementVisual(root).Compositor.RequestCommitAsync();
+                    if (closed || ClosingWindows.ContainsKey(handle) || !NativeMethods.IsWindow(handle)) return;
+                    _ = DwmFlush();
+                    window.AppWindow.Hide();
+                    _ = DwmFlush();
+                    SetDwmFlag(handle, DwmwaCloak, false);
+                    SetDwmFlag(handle, DwmwaTransitionsForcedDisabled, false);
+                    _ = DwmFlush();
+                    if (new Windows.UI.ViewManagement.UISettings().AnimationsEnabled &&
+                        !AnimateWindow(handle, ShowAnimationMilliseconds, AwActivate | AwBlend))
+                        AppLogger.Debug($"Failed to animate the startup window: {Marshal.GetLastWin32Error()}.");
+                    if (!closed && !ClosingWindows.ContainsKey(handle) && NativeMethods.IsWindow(handle)) window.Activate();
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn($"Failed to present the startup window: {ex.Message}");
+                    if (!closed && !ClosingWindows.ContainsKey(handle) && NativeMethods.IsWindow(handle))
+                    {
+                        int disabled = 0;
+                        _ = DwmSetWindowAttribute(handle, DwmwaCloak, ref disabled, sizeof(int));
+                        _ = DwmSetWindowAttribute(handle, DwmwaTransitionsForcedDisabled, ref disabled, sizeof(int));
+                        window.Activate();
+                    }
+                }
+                finally
+                {
+                    Cleanup();
+                }
+            });
+        }
+
+        int style = NativeMethods.GetWindowLong(handle, NativeMethods.GWL_EXSTYLE);
+        NativeMethods.SetWindowLong(handle, NativeMethods.GWL_EXSTYLE, style | WsExNoRedirectionBitmap);
+        SetDwmFlag(handle, DwmwaTransitionsForcedDisabled, true);
+        SetDwmFlag(handle, DwmwaCloak, true);
+        window.Closed += Closed;
+        root.Loaded += Loaded;
+        try
+        {
+            window.Activate();
+            if (root.IsLoaded) Loaded(root, new RoutedEventArgs());
+        }
+        catch
+        {
+            Cleanup();
+            throw;
+        }
+    }
+
+    public static Task CloseAsync(Window window)
+    {
+        IntPtr handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        if (ClosingWindows.TryGetValue(handle, out Task? closing)) return closing;
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ClosingWindows.Add(handle, completion.Task);
+
+        async Task FinishCloseAsync()
+        {
+            try
+            {
+                bool animate = NativeMethods.IsWindowVisible(handle) &&
+                    DwmGetWindowAttribute(handle, DwmwaCloaked, out int cloaked, sizeof(int)) == 0 && cloaked == 0 &&
+                    new Windows.UI.ViewManagement.UISettings().AnimationsEnabled;
+                window.AppWindow.Hide();
+                if (animate) await Task.Delay(CloseAnimationRetention);
+                if (NativeMethods.IsWindow(handle)) window.Close();
+                completion.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Failed to close the startup window.", ex);
+                completion.TrySetException(ex);
+            }
+            finally
+            {
+                ClosingWindows.Remove(handle);
+            }
+        }
+
+        _ = FinishCloseAsync();
+        return completion.Task;
+    }
 
     private static void AlignContent(Window window, IntPtr handle)
     {
@@ -61,6 +211,11 @@ internal static class StartupDialogHost
         {
             StartupWindowProcedure procedure = (target, message, parameter, data, identity, reference) =>
             {
+                if (message == 0x0010)
+                {
+                    _ = CloseAsync(window);
+                    return IntPtr.Zero;
+                }
                 if (message == 0x0083 && window.ExtendsContentIntoTitleBar)
                 {
                     int top = Marshal.PtrToStructure<NativeMethods.RECT>(data).Top;

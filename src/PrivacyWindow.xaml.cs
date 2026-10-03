@@ -66,7 +66,7 @@ public partial class PrivacyWindow : Window
         WindowChrome.SetInitialSize(this, DesignWidth, DesignHeight);
 
         Closed += PrivacyWindow_Closed;
-        Activate();
+        StartupDialogHost.ShowWhenReady(this, RootGrid);
         return _completion.Task;
     }
 
@@ -133,8 +133,8 @@ public partial class PrivacyWindow : Window
 
     private void Complete(bool result)
     {
-        _completion.TrySetResult(result);
-        Close();
+        Agreed = result;
+        _ = StartupDialogHost.CloseAsync(this);
     }
 
     // ------------------------------------------------------------------
@@ -158,7 +158,7 @@ public partial class PrivacyWindow : Window
         _ = sender;
         _ = args;
         _closed = true;
-        _completion.TrySetResult(false);
+        _completion.TrySetResult(Agreed);
     }
 
     /// <summary>
