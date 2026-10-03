@@ -26,6 +26,25 @@ internal static class StartupDialogHost
     private static extern bool RemoveWindowSubclass(IntPtr window, StartupWindowProcedure procedure, UIntPtr identity);
     [DllImport("comctl32.dll")]
     private static extern IntPtr DefSubclassProc(IntPtr window, uint message, IntPtr parameter, IntPtr data);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string? title);
+    [DllImport("user32.dll")]
+    private static extern bool GetClientRect(IntPtr window, out NativeMethods.RECT rectangle);
+    [DllImport("user32.dll")]
+    private static extern bool ClientToScreen(IntPtr window, ref NativeMethods.POINT point);
+
+    private static void AlignContent(Window window, IntPtr handle)
+    {
+        if (!window.ExtendsContentIntoTitleBar || !GetClientRect(handle, out NativeMethods.RECT client) ||
+            client.Width <= 0 || client.Height <= 0) return;
+        IntPtr content = FindWindowEx(handle, IntPtr.Zero, "Microsoft.UI.Content.DesktopChildSiteBridge", null);
+        if (content == IntPtr.Zero) return;
+        var origin = new NativeMethods.POINT();
+        if (ClientToScreen(handle, ref origin) && NativeMethods.GetWindowRect(content, out NativeMethods.RECT bounds) &&
+            bounds.Left == origin.x && bounds.Top == origin.y && bounds.Width == client.Width && bounds.Height == client.Height) return;
+        _ = NativeMethods.SetWindowPos(content, IntPtr.Zero, 0, 0, client.Width, client.Height,
+            NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
+    }
 
     public static void LockWindow(Window window)
     {
@@ -38,21 +57,37 @@ internal static class StartupDialogHost
         IntPtr handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
         int style = NativeMethods.GetWindowLong(handle, -16);
         NativeMethods.SetWindowLong(handle, -16, style & ~(0x00040000 | 0x00010000 | 0x00020000));
-        if (WindowProcedures.ContainsKey(handle)) return;
-        StartupWindowProcedure procedure = (target, message, parameter, data, identity, reference) =>
+        if (!WindowProcedures.ContainsKey(handle))
         {
-            if (message == 0x00A3 || (message == 0x0112 && ((long)parameter & 0xFFF0) is 0xF000 or 0xF030))
-                return IntPtr.Zero;
-            return DefSubclassProc(target, message, parameter, data);
-        };
-        if (!SetWindowSubclass(handle, procedure, new UIntPtr(1), UIntPtr.Zero))
-            throw new InvalidOperationException("Cannot lock startup window commands.");
-        WindowProcedures.Add(handle, procedure);
-        window.Closed += (_, _) =>
-        {
-            _ = RemoveWindowSubclass(handle, procedure, new UIntPtr(1));
-            WindowProcedures.Remove(handle);
-        };
+            StartupWindowProcedure procedure = (target, message, parameter, data, identity, reference) =>
+            {
+                if (message == 0x0083 && window.ExtendsContentIntoTitleBar)
+                {
+                    int top = Marshal.PtrToStructure<NativeMethods.RECT>(data).Top;
+                    _ = DefSubclassProc(target, message, parameter, data);
+                    NativeMethods.RECT client = Marshal.PtrToStructure<NativeMethods.RECT>(data);
+                    client.Top = top;
+                    Marshal.StructureToPtr(client, data, false);
+                    return IntPtr.Zero;
+                }
+                if (message == 0x00A3 || (message == 0x0112 && ((long)parameter & 0xFFF0) is 0xF000 or 0xF030))
+                    return IntPtr.Zero;
+                IntPtr result = DefSubclassProc(target, message, parameter, data);
+                if (message is 0x0005 or 0x0047) AlignContent(window, target);
+                return result;
+            };
+            if (!SetWindowSubclass(handle, procedure, new UIntPtr(1), UIntPtr.Zero))
+                throw new InvalidOperationException("Cannot lock startup window commands.");
+            WindowProcedures.Add(handle, procedure);
+            window.Closed += (_, _) =>
+            {
+                _ = RemoveWindowSubclass(handle, procedure, new UIntPtr(1));
+                WindowProcedures.Remove(handle);
+            };
+        }
+        _ = NativeMethods.SetWindowPos(handle, IntPtr.Zero, 0, 0, 0, 0,
+            NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE | 0x0020);
+        AlignContent(window, handle);
     }
 
     private static IEnumerable<TextBlock> TextBlocks(DependencyObject root)

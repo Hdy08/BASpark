@@ -3611,10 +3611,18 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private static void ManageTaskScheduler(string taskName, string exePath, bool create)
     {
+        string? taskFile = null;
         try
         {
+            if (create)
+            {
+                string userId = WindowsIdentity.GetCurrent().User?.Value
+                    ?? throw new InvalidOperationException("Cannot resolve the auto-start task user.");
+                taskFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"BASpark-autostart-{Guid.NewGuid():N}.xml");
+                System.IO.File.WriteAllText(taskFile, AutoStartManager.BuildScheduledTaskXml(exePath, userId));
+            }
             string arguments = create
-                ? $"/create /tn \"{taskName}\" /tr \"\\\"{exePath}\\\" --autostart\" /sc onlogon /rl highest /f"
+                ? $"/create /tn \"{taskName}\" /xml \"{taskFile}\" /f"
                 : $"/delete /tn \"{taskName}\" /f";
 
             var startInfo = new ProcessStartInfo
@@ -3627,12 +3635,15 @@ public sealed partial class ControlPanelWindow : UserControl
                 Verb = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator) ? string.Empty : "runas"
             };
 
-            using Process? process = Process.Start(startInfo);
-            process?.WaitForExit();
+            using Process process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("Cannot start the task scheduler configuration process.");
+            process.WaitForExit();
+            if (create && process.ExitCode != 0)
+                throw new InvalidOperationException($"Task scheduler configuration failed (exit code {process.ExitCode}).");
         }
-        catch (Exception ex)
+        finally
         {
-            Debug.WriteLine("任务计划程序配置失败: " + ex.Message);
+            if (taskFile != null) System.IO.File.Delete(taskFile);
         }
     }
 
