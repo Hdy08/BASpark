@@ -378,13 +378,13 @@
       <value>This software is free and open source. Reselling is prohibited. If you paid for it, report the seller and request a refund.</value>
     </data>
     <data name="Privacy_OpenSource_Title" xml:space="preserve">
-      <value>● Open Source</value>
+      <value>Open Source</value>
     </data>
     <data name="Privacy_Privacy_Body" xml:space="preserve">
       <value>We never collect keystrokes, files, or private data. All effects render locally.</value>
     </data>
     <data name="Privacy_Privacy_Title" xml:space="preserve">
-      <value>● Privacy</value>
+      <value>Privacy</value>
     </data>
     <data name="Privacy_Refuse" xml:space="preserve">
       <value>Decline and Exit</value>
@@ -393,7 +393,7 @@
       <value>Download only from official channels. Third-party builds may be tampered with or flagged as malware.</value>
     </data>
     <data name="Privacy_Security_Title" xml:space="preserve">
-      <value>● Security Warning (Important)</value>
+      <value>Security Warning</value>
     </data>
     <data name="Privacy_Tagline" xml:space="preserve">
       <value>Sensei, welcome back to Schale.</value>
@@ -567,7 +567,7 @@
       <value>Use curved trail lines</value>
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
-      <value>Recommended for 60Hz and above</value>
+      <value>Recommended for 60Hz and above.</value>
     </data>
     <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
       <value>Match trail refresh rate to display</value>
@@ -672,7 +672,7 @@
       <value>Choose display settings to reset</value>
     </data>
     <data name="Msg_PageResetDone" xml:space="preserve">
-      <value>Selected settings were restored to their defaults and saved.</value>
+      <value>Selected settings were restored to their defaults and applied.</value>
     </data>
     <data name="Msg_SettingsSaveFailed" xml:space="preserve">
       <value>The selected settings could not be saved. Please check the logs and try again.</value>

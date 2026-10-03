@@ -1662,7 +1662,7 @@ public class WinUi3UiTests
         Assert.Contains("public static bool Save(string name, object value)", config, StringComparison.Ordinal);
         Assert.Contains("public static bool SaveProfiles", config, StringComparison.Ordinal);
         XDocument resources = LoadXaml("src", "Strings.resx");
-        Assert.Equal("所选设置项已恢复为默认值并已保存。", resources.Descendants("data").Single(item => (string?)item.Attribute("name") == "Msg_PageResetDone").Element("value")!.Value);
+        Assert.Equal("所选设置项已恢复为默认值并应用。", resources.Descendants("data").Single(item => (string?)item.Attribute("name") == "Msg_PageResetDone").Element("value")!.Value);
     }
 
     [Fact]

@@ -378,13 +378,13 @@
       <value>本软件完全开源且免费。严禁商业倒卖，若您是付费取得，请立即向平台举报并申请退款。</value>
     </data>
     <data name="Privacy_OpenSource_Title" xml:space="preserve">
-      <value>● 开源声明</value>
+      <value>开源声明</value>
     </data>
     <data name="Privacy_Privacy_Body" xml:space="preserve">
       <value>绝不收集您的按键内容、文件或任何私密信息。所有特效渲染均在本地完成。</value>
     </data>
     <data name="Privacy_Privacy_Title" xml:space="preserve">
-      <value>● 隐私保障</value>
+      <value>隐私保障</value>
     </data>
     <data name="Privacy_Refuse" xml:space="preserve">
       <value>拒绝并退出</value>
@@ -393,7 +393,7 @@
       <value>请确保从官方渠道下载。第三方渠道提供的版本可能存在被篡改或报毒的风险。</value>
     </data>
     <data name="Privacy_Security_Title" xml:space="preserve">
-      <value>● 安全预警 (重要)</value>
+      <value>安全预警</value>
     </data>
     <data name="Privacy_Tagline" xml:space="preserve">
       <value>Sensei, welcome back to Schale.</value>
@@ -567,13 +567,13 @@
       <value>采用曲线拖尾</value>
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
-      <value>建议在60Hz及以上刷新率开启</value>
+      <value>建议在60Hz及以上刷新率开启。</value>
     </data>
     <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
       <value>拖尾刷新率跟随显示器</value>
     </data>
     <data name="Visual_FollowDisplayRefreshRateHint" xml:space="preserve">
-      <value>开启此项后拖尾刷新率自动设置为鼠标所在显示器的刷新率</value>
+      <value>开启此项后拖尾刷新率自动设置为鼠标所在显示器的刷新率。</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
       <value>不透明度</value>
@@ -672,7 +672,7 @@
       <value>选择要重置的多屏设置项</value>
     </data>
     <data name="Msg_PageResetDone" xml:space="preserve">
-      <value>所选设置项已恢复为默认值并已保存。</value>
+      <value>所选设置项已恢复为默认值并应用。</value>
     </data>
     <data name="Msg_SettingsSaveFailed" xml:space="preserve">
       <value>无法保存所选设置。请检查日志后重试。</value>

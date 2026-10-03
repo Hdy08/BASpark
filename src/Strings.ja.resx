@@ -378,13 +378,13 @@
       <value>本ソフトは無料のオープンソースです。転売は禁止です。有料で入手した場合はプラットフォームに通報し返金を請求してください。</value>
     </data>
     <data name="Privacy_OpenSource_Title" xml:space="preserve">
-      <value>● オープンソース</value>
+      <value>オープンソース</value>
     </data>
     <data name="Privacy_Privacy_Body" xml:space="preserve">
       <value>キー入力・ファイル・個人情報は収集しません。エフェクトはすべてローカルで描画されます。</value>
     </data>
     <data name="Privacy_Privacy_Title" xml:space="preserve">
-      <value>● プライバシー</value>
+      <value>プライバシー</value>
     </data>
     <data name="Privacy_Refuse" xml:space="preserve">
       <value>拒否して終了</value>
@@ -393,7 +393,7 @@
       <value>必ず公式チャネルからダウンロードしてください。第三者配布版は改ざんやマルウェアの可能性があります。</value>
     </data>
     <data name="Privacy_Security_Title" xml:space="preserve">
-      <value>● セキュリティ警告（重要）</value>
+      <value>セキュリティ警告</value>
     </data>
     <data name="Privacy_Tagline" xml:space="preserve">
       <value>Sensei, welcome back to Schale.</value>
@@ -567,7 +567,7 @@
       <value>曲線トレイルを使用</value>
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
-      <value>60Hz以上のリフレッシュレートでの使用を推奨します</value>
+      <value>60Hz以上のリフレッシュレートでの使用を推奨します。</value>
     </data>
     <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
       <value>トレイル更新率をディスプレイに合わせる</value>
@@ -672,7 +672,7 @@
       <value>リセットするディスプレイ設定を選択</value>
     </data>
     <data name="Msg_PageResetDone" xml:space="preserve">
-      <value>選択した設定項目を既定値に戻して保存しました。</value>
+      <value>選択した設定項目を既定値に戻して適用しました。</value>
     </data>
     <data name="Msg_SettingsSaveFailed" xml:space="preserve">
       <value>選択した設定を保存できませんでした。ログを確認して再試行してください。</value>
