@@ -26,7 +26,14 @@ internal static class WindowChrome
         return _appIcon = new System.Drawing.Icon(stream, 32, 32);
     }
 
-    public static ImageIconSource? CreateAppIconSource()
+    public static void ApplyTitleBarIcon(TitleBar titleBar)
+    {
+        titleBar.Resources["TitleBarLeftHeaderPaddingWidth"] = 8d;
+        titleBar.Resources["TitleBarIconMargin"] = new Thickness(0, 0, 4, 0);
+        titleBar.IconSource = CreateAppIconSource();
+    }
+
+    private static ImageIconSource? CreateAppIconSource()
     {
         try
         {

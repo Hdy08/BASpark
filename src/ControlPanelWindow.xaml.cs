@@ -418,7 +418,7 @@ public sealed partial class ControlPanelWindow : UserControl
     public ControlPanelWindow()
     {
         InitializeComponent();
-        AppTitleBar.IconSource = WindowChrome.CreateAppIconSource();
+        WindowChrome.ApplyTitleBarIcon(AppTitleBar);
         _host = new DcompPanelHost();
 
         try

@@ -31,7 +31,7 @@ public partial class LanguageSelectWindow : Window
     {
         _displayCulture = Localization.DetectCultureFromSystem();
         InitializeComponent();
-        AppTitleBar.IconSource = WindowChrome.CreateAppIconSource();
+        WindowChrome.ApplyTitleBarIcon(AppTitleBar);
         StartupDialogHost.ConfigureCaptionButton(this, RootGrid, BtnCaptionClose);
 
         // 去掉系统标题栏、改用原生 TitleBar 控件；必须在视觉树加载后执行。
