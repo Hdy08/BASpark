@@ -19,6 +19,67 @@ public class WinUi3UiTests
     private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
     [Fact]
+    public void PauseActions_ShareOneRuntimeStateWithoutChangingSavedEffectPreferences()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement action = GetNamedElement(panel, "BtnToggleEffectsPause");
+        Assert.Equal("ToggleButton", action.Name.LocalName);
+        Assert.Equal("Right", (string?)action.Attribute("HorizontalAlignment"));
+        Assert.Equal("1", (string?)action.Attribute("Grid.Column"));
+        string application = ReadSource("src", "App.xaml.cs");
+        string toggle = application[application.IndexOf("public static void ToggleEffectsPaused()", StringComparison.Ordinal)..application.IndexOf("private ControlPanelWindow?", StringComparison.Ordinal)];
+        Assert.Contains("Overlay?.RefreshPauseState()", toggle, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfigManager.Save", toggle, StringComparison.Ordinal);
+        string tray = ReadSource("src", "TrayIconController.cs");
+        Assert.True(tray.IndexOf("Localization.Get(App.IsEffectsPaused", StringComparison.Ordinal) < tray.IndexOf("Localization.Get(\"Tray_Restart\")", StringComparison.Ordinal));
+        Assert.Contains("4 => App.ToggleEffectsPaused", tray, StringComparison.Ordinal);
+        Assert.Contains("App.IsEffectsPaused || _overlays.Count == 0", ReadSource("src", "OverlayManager.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RepositoryLinks_UseNativeHyperlinkButtonsWithoutTextDecorations()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        Assert.Equal(3, GetNamedElement(panel, "PageAbout").Descendants(Presentation + "HyperlinkButton").Count());
+        Assert.DoesNotContain(panel.Descendants(), element => element.Name == Presentation + "Hyperlink");
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasRepositoryLinkStyle");
+        Assert.Equal("{StaticResource DefaultHyperlinkButtonStyle}", (string?)style.Attribute("BasedOn"));
+        Assert.Equal("None", (string?)Assert.Single(style.Descendants(Presentation + "TextBlock")).Attribute("TextDecorations"));
+    }
+
+    [Fact]
+    public void NumericInputs_KeepTwoDecimalPlacesAndAnIntegerRefreshRateWithTenUnitSteps()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        Assert.Equal("10", (string?)GetNamedElement(panel, "SliderTrailRefresh").Attribute("StepFrequency"));
+        Assert.Equal("10", (string?)GetNamedElement(panel, "TxtTrailRefreshValue").Attribute("SmallChange"));
+        foreach (XElement input in panel.Descendants(Presentation + "NumberBox").Where(element => (string?)element.Attribute(Xaml + "Name") != "TxtTrailRefreshValue"))
+            Assert.Equal("0.1", (string?)input.Attribute("SmallChange"));
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("FractionDigits = precision", source, StringComparison.Ordinal);
+        Assert.Contains("slider.StepFrequency >= 1 ? 0 : 2", source, StringComparison.Ordinal);
+        Assert.Contains("IncrementNumberRounder", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WelcomeInfoBars_ShowNativeIconsAndRemoveTheUnusedHeaderRow()
+    {
+        XDocument welcome = LoadXaml("src", "PrivacyWindow.xaml");
+        foreach (XElement info in welcome.Descendants(Presentation + "InfoBar"))
+        {
+            Assert.Equal("WelcomeInfoBar_Loaded", (string?)info.Attribute("Loaded"));
+            Assert.Equal("0,12,16,12", (string?)info.Element(Presentation + "StackPanel")!.Attribute("Margin"));
+        }
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasStartupInfoBarStyle");
+        Assert.Contains(style.Elements(), setter => (string?)setter.Attribute("Property") == "IsIconVisible" && (string?)setter.Attribute("Value") == "True");
+        string source = ReadSource("src", "PrivacyWindow.xaml.cs");
+        Assert.Contains("Grid.SetRow(content, 0)", source, StringComparison.Ordinal);
+        Assert.Contains("panel.Visibility = Visibility.Collapsed", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UiFonts_UseMicrosoftYaHeiUiWhileLogsKeepConsolas()
     {
         XDocument application = LoadXaml("src", "App.xaml");
@@ -845,7 +906,8 @@ public class WinUi3UiTests
     {
         XDocument document = LoadXaml("src", "DesignSystem.xaml");
         XElement style = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingToggleStyle");
-        Assert.Contains(style.Elements(), element => (string?)element.Attribute("Property") == "Width" && (string?)element.Attribute("Value") == "44");
+        Assert.Contains(style.Elements(), element => (string?)element.Attribute("Property") == "Width" && (string?)element.Attribute("Value") == "40");
+        Assert.Equal("{StaticResource DefaultToggleSwitchStyle}", (string?)style.Attribute("BasedOn"));
         Assert.Contains(style.Elements(), element => (string?)element.Attribute("Property") == "HorizontalAlignment" && (string?)element.Attribute("Value") == "Right");
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         foreach (string key in new[] { "ToggleSwitchTopHeaderMargin", "ToggleSwitchPreContentMargin", "ToggleSwitchPostContentMargin" })
@@ -1027,7 +1089,7 @@ public class WinUi3UiTests
             .Select(style => (string?)style.Attribute(Xaml + "Key"))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
-        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle" });
+        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle" });
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
         {
@@ -1210,11 +1272,10 @@ public class WinUi3UiTests
             Assert.Equal("Right", (string?)button.Attribute("HorizontalAlignment"));
             XElement card = GetSettingCard(button);
             Assert.Contains(about, card.Ancestors());
-            XElement title = Assert.Single(card.Descendants(), element => element.Name.LocalName == "TextBlock");
-            XElement link = Assert.Single(title.Elements(Presentation + "Hyperlink"));
+            XElement link = Assert.Single(card.Descendants(Presentation + "HyperlinkButton"));
             Assert.Equal(url, (string?)link.Attribute("NavigateUri"));
-            Assert.Equal("{Binding Tag, ElementName=" + name + "}", (string?)Assert.Single(link.Elements(Presentation + "Run")).Attribute("Text"));
-            Assert.Equal("{StaticResource BasSettingTitleStyle}", (string?)title.Attribute("Style"));
+            Assert.Equal("{Binding Tag, ElementName=" + name + "}", (string?)link.Attribute("Content"));
+            Assert.Equal("{StaticResource BasRepositoryLinkStyle}", (string?)link.Attribute("Style"));
             Assert.Contains(name + ".Content = Localization.Get(\"About_OpenRepository\")", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
         }
         foreach (string file in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })

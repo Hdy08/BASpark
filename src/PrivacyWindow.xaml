@@ -37,11 +37,8 @@
                            Margin="0,8,0,0"
                            Style="{StaticResource BasSectionTitleStyle}" />
 
-                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Informational">
-                    <InfoBar.Resources>
-                        <Thickness x:Key="InfoBarContentRootPadding">16,12,16,12</Thickness>
-                    </InfoBar.Resources>
-                    <StackPanel Spacing="4">
+                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Informational" Loaded="WelcomeInfoBar_Loaded">
+                    <StackPanel Spacing="4" Margin="0,12,16,12">
                         <TextBlock x:Name="TxtOpenSourceTitle"
                                    Style="{StaticResource BasSettingTitleStyle}" />
                         <TextBlock x:Name="TxtOpenSourceBody"
@@ -49,11 +46,8 @@
                     </StackPanel>
                 </InfoBar>
 
-                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Warning">
-                    <InfoBar.Resources>
-                        <Thickness x:Key="InfoBarContentRootPadding">16,12,16,12</Thickness>
-                    </InfoBar.Resources>
-                    <StackPanel Spacing="4">
+                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Warning" Loaded="WelcomeInfoBar_Loaded">
+                    <StackPanel Spacing="4" Margin="0,12,16,12">
                         <TextBlock x:Name="TxtSecurityTitle"
                                     Style="{StaticResource BasSettingTitleStyle}" />
                         <TextBlock x:Name="TxtSecurityBody"
@@ -61,11 +55,8 @@
                     </StackPanel>
                 </InfoBar>
 
-                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Success">
-                    <InfoBar.Resources>
-                        <Thickness x:Key="InfoBarContentRootPadding">16,12,16,12</Thickness>
-                    </InfoBar.Resources>
-                    <StackPanel Spacing="4">
+                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Success" Loaded="WelcomeInfoBar_Loaded">
+                    <StackPanel Spacing="4" Margin="0,12,16,12">
                         <TextBlock x:Name="TxtPrivacyTitle"
                                    Style="{StaticResource BasSettingTitleStyle}" />
                         <TextBlock x:Name="TxtPrivacyBody"

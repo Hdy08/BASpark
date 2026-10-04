@@ -755,4 +755,6 @@
     <data name="Log_CopyFailed" xml:space="preserve">
       <value>ログのコピーに失敗しました：{0}</value>
     </data>
+    <data name="Effects_Pause" xml:space="preserve"><value>エフェクトを一時停止</value></data>
+    <data name="Effects_Enable" xml:space="preserve"><value>エフェクトを有効化</value></data>
   </root>

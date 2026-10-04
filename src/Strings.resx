@@ -755,4 +755,6 @@
     <data name="Log_CopyFailed" xml:space="preserve">
       <value>复制日志失败：{0}</value>
     </data>
+    <data name="Effects_Pause" xml:space="preserve"><value>暂停特效</value></data>
+    <data name="Effects_Enable" xml:space="preserve"><value>启用特效</value></data>
   </root>

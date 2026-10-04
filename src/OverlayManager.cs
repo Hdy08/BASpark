@@ -94,6 +94,11 @@ namespace BASpark
         }
         public void SetCurveDraw(bool enabled) => ForEachOverlay(w => w.SetCurveDraw(enabled));
         public bool IsEffectSuppressedByEnvironment() => _isSuppressedByEnvironment;
+        public void RefreshPauseState()
+        {
+            if (App.IsEffectsPaused) ReleasePointerState();
+            ForEachOverlay(window => window.RefreshPauseState());
+        }
         public void RefreshEnvironmentFilterState()
         {
             _suppressionCacheValidUntilTicks = 0;
@@ -615,7 +620,7 @@ namespace BASpark
         /// </summary>
         private bool CanRenderEffects(bool skipSuppressionCheck = false)
         {
-            if (_overlays.Count == 0)
+            if (App.IsEffectsPaused || _overlays.Count == 0)
             {
                 ReleasePointerStateSilent();
                 return false;
@@ -754,6 +759,7 @@ namespace BASpark
                     : _manualTrailRefreshRate;
                 var win = new OverlayWindow(pair.Value, refreshRate);
                 _overlays[pair.Key] = win;
+                if (App.IsEffectsPaused) win.RefreshPauseState();
             }
         }
 

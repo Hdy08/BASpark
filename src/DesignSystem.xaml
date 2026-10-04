@@ -262,9 +262,34 @@
     <Style x:Key="BasStartupInfoBarStyle" TargetType="InfoBar">
         <Setter Property="IsOpen" Value="True" />
         <Setter Property="IsClosable" Value="False" />
-        <Setter Property="IsIconVisible" Value="False" />
-        <Setter Property="MinHeight" Value="60" />
+        <Setter Property="IsIconVisible" Value="True" />
+        <Setter Property="MinHeight" Value="0" />
         <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <Style x:Key="BasRepositoryLinkStyle" TargetType="HyperlinkButton" BasedOn="{StaticResource DefaultHyperlinkButtonStyle}">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" TextDecorations="None" /></DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="BasNavigationIndicatorStyle" TargetType="Rectangle">
+        <Setter Property="Width" Value="3" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="RadiusX" Value="2" />
+        <Setter Property="RadiusY" Value="2" />
+        <Setter Property="Fill" Value="{ThemeResource BasSettingsAccentBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
 
     <Style x:Key="BasStartupActionBarStyle" TargetType="Border">
@@ -324,10 +349,10 @@
         <Setter Property="MinHeight" Value="60" />
     </Style>
 
-    <Style x:Key="BasSettingToggleStyle" TargetType="ToggleSwitch">
+    <Style x:Key="BasSettingToggleStyle" TargetType="ToggleSwitch" BasedOn="{StaticResource DefaultToggleSwitchStyle}">
         <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
-        <Setter Property="Width" Value="44" />
+        <Setter Property="Width" Value="40" />
         <Setter Property="HorizontalAlignment" Value="Right" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="OnContent" Value="" />
@@ -377,7 +402,7 @@
                         </VisualStateManager.VisualStateGroups>
                         <ToggleButton x:Name="ExpanderHeader" Style="{StaticResource ExpanderHeaderDownStyle}"
                                       Background="{ThemeResource BasSettingsCardBackgroundBrush}" BorderThickness="0"
-                                      MinHeight="{TemplateBinding MinHeight}" HorizontalContentAlignment="Stretch"
+                                      MinHeight="{TemplateBinding MinHeight}" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
                                       Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
                                       IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
                         <Border x:Name="ExpanderContentHost" Grid.Row="1" Height="0" IsHitTestVisible="False"

@@ -335,6 +335,15 @@ public sealed partial class ControlPanelWindow : UserControl
     private const int DesignHeight = 710;
 
     private NavigationViewItem? _selectedSettingsItem;
+    private readonly Dictionary<NavigationViewItem, (FrameworkElement Indicator, bool Active)> _navigationIndicators = new();
+    private readonly SolidColorBrush _navigationIndicatorPlaceholderBrush = new(Colors.Transparent);
+    private readonly List<(NavigationViewItem Item, DependencyProperty Property, long Token)> _navigationIndicatorCallbacks = new();
+    private bool _navigationIndicatorQueued;
+    private bool _animateNavigationIndicator;
+    private ToggleSwitch? _pressedToggleSwitch;
+    private bool _toggleDoubleTapPending;
+    private uint _togglePointerId;
+    private Point _togglePressPosition;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -428,6 +437,9 @@ public sealed partial class ControlPanelWindow : UserControl
                 : ConfigManager.UiLanguage;
 
             ApplyWindowChrome();
+            foreach (NavigationViewItem item in new[] { TabWelcome, TabSettings, SubTabBasic, SubTabVisual, SubTabFilter, SubTabMultiScreen, SubTabBackup, TabLog, TabAbout })
+                foreach (DependencyProperty property in new[] { NavigationViewItem.IsExpandedProperty, NavigationViewItem.IsChildSelectedProperty })
+                    _navigationIndicatorCallbacks.Add((item, property, item.RegisterPropertyChangedCallback(property, (_, _) => QueueNavigationIndicatorUpdate(true))));
             var dangerResources = (ResourceDictionary)Resources["DangerButtonResources"];
             foreach (Button button in new[] { BtnResetSettings, BtnDeleteProfile, BtnExitApplication, BtnClearLog })
                 foreach (var theme in dangerResources.ThemeDictionaries)
@@ -455,6 +467,9 @@ public sealed partial class ControlPanelWindow : UserControl
             RootGrid.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(RootGrid_PointerPressed), true);
             RootGrid.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished), true);
             RootGrid.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished), true);
+            RootGrid.AddHandler(UIElement.DoubleTappedEvent, new DoubleTappedEventHandler(ToggleSwitch_DoubleTapped), true);
+            RootGrid.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ToggleSwitch_PointerReleased), true);
+            RootGrid.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ToggleSwitch_PointerCanceled), true);
 
             ComboProfiles.ItemsSource = Profiles;
             ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses;
@@ -491,6 +506,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
             _host.SetContent(this);
             AppLogger.EntryAdded += OnAppLogEntryAdded;
+            App.EffectsPauseChanged += EffectsPauseChanged;
             SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
             _refreshTimer.Start();
         }
@@ -825,6 +841,17 @@ public sealed partial class ControlPanelWindow : UserControl
         _boxToSlider[box] = slider;
         slider.ValueChanged += EffectSlider_ValueChanged;
         box.ValueChanged += EffectNumberBox_ValueChanged;
+        int precision = slider.StepFrequency >= 1 ? 0 : 2;
+        box.NumberFormatter = new Windows.Globalization.NumberFormatting.DecimalFormatter
+        {
+            IntegerDigits = 1,
+            FractionDigits = precision,
+            NumberRounder = new Windows.Globalization.NumberFormatting.IncrementNumberRounder
+            {
+                Increment = Math.Pow(10, -precision),
+                RoundingAlgorithm = Windows.Globalization.NumberFormatting.RoundingAlgorithm.RoundHalfUp
+            }
+        };
     }
 
     private void SyncSliderAndBoxValues()
@@ -863,7 +890,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _suppressValueSync = true;
         try
         {
-            box.Value = Math.Round(slider.Value, 4);
+            box.Value = Math.Round(slider.Value, slider.StepFrequency >= 1 ? 0 : 2);
         }
         finally
         {
@@ -888,7 +915,9 @@ public sealed partial class ControlPanelWindow : UserControl
         _suppressValueSync = true;
         try
         {
-            slider.Value = sender.Value;
+            double value = Math.Round(sender.Value, slider.StepFrequency >= 1 ? 0 : 2);
+            if (sender.Value != value) sender.Value = value;
+            slider.Value = value;
         }
         finally
         {
@@ -955,6 +984,19 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void RootGrid_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
     {
+        for (DependencyObject? source = args.OriginalSource as DependencyObject; source != null; source = VisualTreeHelper.GetParent(source))
+        {
+            if (source is not ToggleSwitch toggle) continue;
+            var point = args.GetCurrentPoint(toggle);
+            if (args.Pointer.PointerDeviceType != Microsoft.UI.Input.PointerDeviceType.Mouse || point.Properties.IsLeftButtonPressed)
+            {
+                _pressedToggleSwitch = toggle;
+                _togglePointerId = args.Pointer.PointerId;
+                _togglePressPosition = point.Position;
+                _toggleDoubleTapPending = false;
+            }
+            break;
+        }
         if (FocusManager.GetFocusedElement(XamlRoot) is not TextBox focusedInput)
         {
             return;
@@ -969,6 +1011,40 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         Focus(FocusState.Programmatic);
+    }
+
+    private void ToggleSwitch_DoubleTapped(object sender, DoubleTappedRoutedEventArgs args)
+    {
+        for (DependencyObject? source = args.OriginalSource as DependencyObject; source != null; source = VisualTreeHelper.GetParent(source))
+        {
+            if (source is not ToggleSwitch toggle) continue;
+            if (toggle.IsEnabled)
+            {
+                if (_pressedToggleSwitch == toggle) _toggleDoubleTapPending = true;
+                else toggle.IsOn = !toggle.IsOn;
+            }
+            args.Handled = true;
+            return;
+        }
+    }
+
+    private void ToggleSwitch_PointerReleased(object sender, PointerRoutedEventArgs args)
+    {
+        if (_pressedToggleSwitch is not { } toggle || args.Pointer.PointerId != _togglePointerId) return;
+        bool pending = _toggleDoubleTapPending;
+        _pressedToggleSwitch = null;
+        _toggleDoubleTapPending = false;
+        Point position = args.GetCurrentPoint(toggle).Position;
+        if (pending && toggle.IsEnabled && position.X >= 0 && position.Y >= 0 && position.X <= toggle.ActualWidth && position.Y <= toggle.ActualHeight &&
+            Math.Abs(position.X - _togglePressPosition.X) < 8 && Math.Abs(position.Y - _togglePressPosition.Y) < 8)
+            toggle.IsOn = !toggle.IsOn;
+    }
+
+    private void ToggleSwitch_PointerCanceled(object sender, PointerRoutedEventArgs args)
+    {
+        if (args.Pointer.PointerId != _togglePointerId) return;
+        _pressedToggleSwitch = null;
+        _toggleDoubleTapPending = false;
     }
 
     private static T? FindVisualDescendant<T>(DependencyObject parent, string? name = null) where T : DependencyObject
@@ -1039,6 +1115,7 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtWelcomeTitle.Text = Localization.Get("Welcome_Title");
         TxtWelcomeSubtitle.Text = Localization.Get("Welcome_Subtitle");
         TxtStatsTitle.Text = Localization.Get("Welcome_StatsTitle");
+        UpdateEffectsPauseButton();
         TxtStatusLabel.Text = Localization.Get("Welcome_StatusLabel");
         TxtClicksLabel.Text = Localization.Get("Welcome_ClicksLabel");
         TxtSettingsTitle.Text = Localization.Get("Settings_Title");
@@ -1652,6 +1729,80 @@ public sealed partial class ControlPanelWindow : UserControl
         if (args.SelectedItem is NavigationViewItem item && TabSettings.MenuItems.Contains(item))
             _selectedSettingsItem = item;
         if (PageWelcome != null && !_isClosed) UpdatePageVisibility();
+        QueueNavigationIndicatorUpdate(true);
+    }
+
+    private void NavigationItem_Loaded(object sender, RoutedEventArgs args)
+    {
+        _navigationIndicators.Remove((NavigationViewItem)sender);
+        QueueNavigationIndicatorUpdate(false);
+    }
+
+    private void QueueNavigationIndicatorUpdate(bool animate)
+    {
+        if (_isClosed) return;
+        _animateNavigationIndicator |= animate;
+        if (_navigationIndicatorQueued) return;
+        _navigationIndicatorQueued = true;
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            _navigationIndicatorQueued = false;
+            bool playAnimation = _animateNavigationIndicator && new Windows.UI.ViewManagement.UISettings().AnimationsEnabled;
+            _animateNavigationIndicator = false;
+            if (_isClosed || !SidebarNavigation.IsLoaded) return;
+            try
+            {
+                foreach (NavigationViewItem item in new[] { TabWelcome, TabSettings, SubTabBasic, SubTabVisual, SubTabFilter, SubTabMultiScreen, SubTabBackup, TabLog, TabAbout })
+                {
+                    if (!item.IsLoaded || FindVisualDescendant<Microsoft.UI.Xaml.Shapes.Rectangle>(item, "SelectionIndicator") is not { Parent: Grid indicatorHost } nativeIndicator) continue;
+                    nativeIndicator.Fill = _navigationIndicatorPlaceholderBrush;
+                    FrameworkElement? indicator = indicatorHost.Children.OfType<FrameworkElement>().FirstOrDefault(child => child.Name == "LocalSelectionIndicator");
+                    if (indicator == null)
+                    {
+                        indicator = new Microsoft.UI.Xaml.Shapes.Rectangle
+                        {
+                            Name = "LocalSelectionIndicator",
+                            Style = (Style)Application.Current.Resources["BasNavigationIndicatorStyle"]
+                        };
+                        indicatorHost.Children.Add(indicator);
+                        indicatorHost.UpdateLayout();
+                    }
+                    bool active = item.IsSelected || item.IsChildSelected && !item.IsExpanded;
+                    bool tracked = _navigationIndicators.TryGetValue(item, out var previous) && previous.Indicator == indicator;
+                    if (tracked && previous.Active == active) continue;
+                    _navigationIndicators[item] = (indicator, active);
+                    Visual visual = ElementCompositionPreview.GetElementVisual(indicator);
+                    visual.StopAnimation("Offset");
+                    visual.StopAnimation("Scale");
+                    visual.StopAnimation("Opacity");
+                    visual.CenterPoint = new Vector3((float)indicator.ActualWidth / 2, (float)indicator.ActualHeight / 2, 0);
+                    if (!playAnimation || !tracked && !active)
+                    {
+                        visual.Scale = new Vector3(1, active ? 1 : 0.35f, 1);
+                        visual.Opacity = active ? 1 : 0;
+                        continue;
+                    }
+                    Compositor compositor = visual.Compositor;
+                    var scale = compositor.CreateVector3KeyFrameAnimation();
+                    if (active) scale.InsertKeyFrame(0, new Vector3(1, 0.35f, 1));
+                    else scale.InsertExpressionKeyFrame(0, "this.StartingValue");
+                    scale.InsertKeyFrame(1, new Vector3(1, active ? 1 : 0.35f, 1),
+                        compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0.7f), new Vector2(0.2f, 1)));
+                    scale.Duration = TimeSpan.FromMilliseconds(active ? 220 : 120);
+                    visual.StartAnimation("Scale", scale);
+                    var opacity = compositor.CreateScalarKeyFrameAnimation();
+                    if (active) opacity.InsertKeyFrame(0, 0);
+                    else opacity.InsertExpressionKeyFrame(0, "this.StartingValue");
+                    opacity.InsertKeyFrame(1, active ? 1 : 0);
+                    opacity.Duration = TimeSpan.FromMilliseconds(active ? 150 : 120);
+                    visual.StartAnimation("Opacity", opacity);
+                }
+            }
+            catch (Exception exception)
+            {
+                AppLogger.Error("Failed to animate the navigation indicator.", exception);
+            }
+        });
     }
 
     private bool IsSettingsNavigation(NavigationViewItem item) => item == TabSettings || TabSettings.MenuItems.Contains(item);
@@ -1780,13 +1931,13 @@ public sealed partial class ControlPanelWindow : UserControl
 
         ClickCountText.Text = Localization.Format("Welcome_ClicksUnit", ConfigManager.TotalClicks);
 
-        bool suppressedByEnvironment = ConfigManager.IsEffectEnabled &&
+        bool suppressedByEnvironment = (ConfigManager.IsEffectEnabled || ConfigManager.EnableAlwaysTrailEffect) &&
             App.Overlay?.IsEffectSuppressedByEnvironment() == true;
 
         // 状态画刷复用实例：每 500ms 新建一个 SolidColorBrush 并重新赋给
         // Foreground，会让该文本块每次都被判定为「变了」而重绘，长期挂机时白白
         // 制造 GC 压力与无谓的重绘（拖动窗口时正好撞上就是一次卡顿）。
-        if (!ConfigManager.IsEffectEnabled)
+        if (App.IsEffectsPaused || !ConfigManager.IsEffectEnabled && !ConfigManager.EnableAlwaysTrailEffect)
         {
             StatusText.Text = Localization.Get("Status_Paused");
             StatusText.Foreground = _statusPausedBrush;
@@ -1801,6 +1952,20 @@ public sealed partial class ControlPanelWindow : UserControl
             StatusText.Text = Localization.Get("Status_Active");
             StatusText.Foreground = _statusActiveBrush;
         }
+    }
+
+    private void ToggleEffectsPause_Click(object sender, RoutedEventArgs args) => App.ToggleEffectsPaused();
+
+    private void EffectsPauseChanged(object? sender, EventArgs args)
+    {
+        UpdateEffectsPauseButton();
+        RefreshTimer_Tick();
+    }
+
+    private void UpdateEffectsPauseButton()
+    {
+        BtnToggleEffectsPause.IsChecked = App.IsEffectsPaused;
+        BtnToggleEffectsPause.Content = Localization.Get(App.IsEffectsPaused ? "Effects_Enable" : "Effects_Pause");
     }
 
     // ==================================================================
@@ -3528,7 +3693,72 @@ public sealed partial class ControlPanelWindow : UserControl
         dialog.Title = null;
         dialog.Style = (Style)Application.Current.Resources["BasContentDialogStyle"];
         dialog.Resources["ContentDialogMinHeight"] = 0d;
-        dialog.Opened += (_, _) => UpdateDialogScrim(dialog);
+        int animationVersion = 0;
+        EventHandler<object>? readyHandler = null;
+        dialog.Opened += (_, _) =>
+        {
+            UpdateDialogScrim(dialog);
+            if (!new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) return;
+            int version = ++animationVersion;
+            if (readyHandler != null) CompositionTarget.Rendering -= readyHandler;
+            FrameworkElement? layout = VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot)
+                .Select(popup => popup.Child is Grid { Name: "LayoutRoot" } root ? root : FindVisualDescendant<Grid>(popup.Child, "LayoutRoot"))
+                .FirstOrDefault(root => root != null);
+            if (layout != null) layout.Opacity = 0;
+            readyHandler = (_, _) =>
+            {
+                CompositionTarget.Rendering -= readyHandler;
+                readyHandler = null;
+                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+                {
+                    if (_isClosed || version != animationVersion) return;
+                    if (layout != null) layout.ClearValue(OpacityProperty);
+                    _ = VisualStateManager.GoToState(dialog, "DialogHidden", false);
+                    _ = VisualStateManager.GoToState(dialog, "DialogShowing", true);
+                    if (dialog == RenameProfileOverlay)
+                    {
+                        NewProfileNameInput.Focus(FocusState.Programmatic);
+                        NewProfileNameInput.SelectAll();
+                    }
+                    else if (layout != null)
+                    {
+                        string? button = dialog.DefaultButton switch
+                        {
+                            ContentDialogButton.Primary => "PrimaryButton",
+                            ContentDialogButton.Secondary => "SecondaryButton",
+                            ContentDialogButton.Close => "CloseButton",
+                            _ => null
+                        };
+                        Control? focus = button != null ? FindVisualDescendant<Button>(layout, button) : FindVisualDescendant<TextBox>(layout);
+                        focus?.Focus(FocusState.Programmatic);
+                    }
+                });
+            };
+            CompositionTarget.Rendering += readyHandler;
+        };
+        dialog.Closing += async (_, args) =>
+        {
+            animationVersion++;
+            if (readyHandler != null) CompositionTarget.Rendering -= readyHandler;
+            readyHandler = null;
+            if (_isClosed || args.Cancel || !new Windows.UI.ViewManagement.UISettings().AnimationsEnabled ||
+                dialog == BackupOverlay && _backupBusy && (!_modalDialogs.TryGetValue(dialog, out ModalDialogState? state) || !state.CloseRequested)) return;
+            var deferral = args.GetDeferral();
+            try
+            {
+                if (VisualStateManager.GoToState(dialog, "DialogHidden", true))
+                    await Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], CultureInfo.InvariantCulture));
+            }
+            catch (Exception exception)
+            {
+                AppLogger.Warn($"Failed to animate native dialog closing: {exception.Message}");
+            }
+            finally
+            {
+                try { deferral.Complete(); }
+                catch (Exception exception) { AppLogger.Debug($"Native dialog already closed: {exception.Message}"); }
+            }
+        };
         dialog.Loaded += (_, _) =>
         {
             UpdateDialogScrim(dialog);
@@ -3749,6 +3979,9 @@ public sealed partial class ControlPanelWindow : UserControl
         RootGrid.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootGrid_PointerPressed));
         RootGrid.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished));
         RootGrid.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished));
+        RootGrid.RemoveHandler(UIElement.DoubleTappedEvent, new DoubleTappedEventHandler(ToggleSwitch_DoubleTapped));
+        RootGrid.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ToggleSwitch_PointerReleased));
+        RootGrid.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ToggleSwitch_PointerCanceled));
         EffectColorPicker.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(ColorPicker_PointerPressed));
         EffectColorPicker.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished));
         EffectColorPicker.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished));
@@ -3775,6 +4008,14 @@ public sealed partial class ControlPanelWindow : UserControl
             pair.Value.Closed.TrySetResult(false);
         }
         _modalDialogs.Clear();
+        foreach (var callback in _navigationIndicatorCallbacks) callback.Item.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
+        foreach (var state in _navigationIndicators.Values)
+        {
+            Visual visual = ElementCompositionPreview.GetElementVisual(state.Indicator);
+            visual.StopAnimation("Scale");
+            visual.StopAnimation("Opacity");
+        }
+        _navigationIndicators.Clear();
         foreach (var callback in _settingsCallbacks) callback.Control.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
         Profiles.CollectionChanged -= GeneralSettingsCollectionChanged;
         CurrentProfileProcesses.CollectionChanged -= GeneralSettingsCollectionChanged;
@@ -3794,6 +4035,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
         AppLogger.EntryAdded -= OnAppLogEntryAdded;
+        App.EffectsPauseChanged -= EffectsPauseChanged;
 
         try
         {

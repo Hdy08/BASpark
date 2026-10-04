@@ -1,6 +1,9 @@
 using System.Reflection;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
 
 namespace BASpark;
 
@@ -105,6 +108,21 @@ public partial class PrivacyWindow : Window
         {
             VersionText.Text = Localization.Get("Privacy_VersionFailed");
         }
+    }
+
+    private void WelcomeInfoBar_Loaded(object sender, RoutedEventArgs args)
+    {
+        void AlignContent(DependencyObject parent)
+        {
+            for (int index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(parent, index);
+                if (child is ContentPresenter { Name: "ContentArea" } content) Grid.SetRow(content, 0);
+                else if (child is InfoBarPanel panel) panel.Visibility = Visibility.Collapsed;
+                AlignContent(child);
+            }
+        }
+        AlignContent((InfoBar)sender);
     }
 
     // ------------------------------------------------------------------

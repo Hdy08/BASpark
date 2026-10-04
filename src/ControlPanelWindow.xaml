@@ -131,7 +131,7 @@
             <!-- 自定义背景图铺在最底层 -->
             <Border x:Name="SidebarBackgroundHost" Grid.RowSpan="2" />
 
-            <NavigationView x:Name="SidebarNavigation" Grid.Row="0" Margin="0,8,0,0"
+            <NavigationView x:Name="SidebarNavigation" Grid.Row="0"
                             PaneDisplayMode="Left" IsPaneOpen="True" OpenPaneLength="212" CompactPaneLength="48"
                             CompactModeThresholdWidth="0" ExpandedModeThresholdWidth="0"
                             IsPaneToggleButtonVisible="False" IsBackButtonVisible="Collapsed"
@@ -139,31 +139,34 @@
                             SelectedItem="{Binding ElementName=TabWelcome}"
                             SelectionChanged="SidebarNavigation_SelectionChanged">
                 <NavigationView.Resources>
+                    <Thickness x:Key="NavigationViewPaneContentGridMargin">-1,0</Thickness>
+                    <x:Double x:Key="NavigationViewPaneHeaderRowMinHeight">0</x:Double>
+                    <x:Double x:Key="NavigationViewSelectionIndicatorHeight">20</x:Double>
                     <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
                     <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
                     <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
                 </NavigationView.Resources>
                 <NavigationView.MenuItems>
-                    <NavigationViewItem x:Name="TabWelcome">
+                    <NavigationViewItem x:Name="TabWelcome" Loaded="NavigationItem_Loaded">
                         <NavigationViewItem.Icon><FontIcon Glyph="&#xE80F;" /></NavigationViewItem.Icon>
                         <TextBlock x:Name="TabWelcomeLabel" />
                     </NavigationViewItem>
-                    <NavigationViewItem x:Name="TabSettings">
+                    <NavigationViewItem x:Name="TabSettings" Loaded="NavigationItem_Loaded">
                         <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
                         <TextBlock x:Name="TabSettingsLabel" />
                         <NavigationViewItem.MenuItems>
-                            <NavigationViewItem x:Name="SubTabBasic"><TextBlock x:Name="SubTabBasicLabel" /></NavigationViewItem>
-                            <NavigationViewItem x:Name="SubTabVisual"><TextBlock x:Name="SubTabVisualLabel" /></NavigationViewItem>
-                            <NavigationViewItem x:Name="SubTabFilter"><TextBlock x:Name="SubTabFilterLabel" /></NavigationViewItem>
-                            <NavigationViewItem x:Name="SubTabMultiScreen"><TextBlock x:Name="SubTabMultiScreenLabel" /></NavigationViewItem>
-                            <NavigationViewItem x:Name="SubTabBackup"><TextBlock x:Name="SubTabBackupLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabBasic" Loaded="NavigationItem_Loaded"><TextBlock x:Name="SubTabBasicLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabVisual" Loaded="NavigationItem_Loaded"><TextBlock x:Name="SubTabVisualLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabFilter" Loaded="NavigationItem_Loaded"><TextBlock x:Name="SubTabFilterLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabMultiScreen" Loaded="NavigationItem_Loaded"><TextBlock x:Name="SubTabMultiScreenLabel" /></NavigationViewItem>
+                            <NavigationViewItem x:Name="SubTabBackup" Loaded="NavigationItem_Loaded"><TextBlock x:Name="SubTabBackupLabel" /></NavigationViewItem>
                         </NavigationViewItem.MenuItems>
                     </NavigationViewItem>
-                    <NavigationViewItem x:Name="TabLog">
+                    <NavigationViewItem x:Name="TabLog" Loaded="NavigationItem_Loaded">
                         <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D9;" /></NavigationViewItem.Icon>
                         <TextBlock x:Name="TabLogLabel" />
                     </NavigationViewItem>
-                    <NavigationViewItem x:Name="TabAbout">
+                    <NavigationViewItem x:Name="TabAbout" Loaded="NavigationItem_Loaded">
                         <NavigationViewItem.Icon><FontIcon Glyph="&#xE946;" /></NavigationViewItem.Icon>
                         <TextBlock x:Name="TabAboutLabel" />
                     </NavigationViewItem>
@@ -214,9 +217,24 @@
                                Style="{StaticResource BasPageSubtitleStyle}" />
 
                     <!-- 实时统计 -->
-                    <TextBlock x:Name="TxtStatsTitle" Text=""
-                               Style="{StaticResource BasSettingsSectionTitleStyle}"
-                               Margin="0,8,0,8" />
+                    <Grid x:Name="StatsHeader" Margin="0,8,0,8" ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="TxtStatsTitle" Text="" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
+                        <ToggleButton x:Name="BtnToggleEffectsPause" Grid.Column="1" Content="" Click="ToggleEffectsPause_Click"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <ToggleButton.Resources>
+                                <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="AccentFillColorDefaultBrush" />
+                                <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="AccentFillColorSecondaryBrush" />
+                                <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="AccentFillColorTertiaryBrush" />
+                                <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
+                                <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
+                                <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
+                            </ToggleButton.Resources>
+                        </ToggleButton>
+                    </Grid>
                     <Border Style="{StaticResource BasSettingCardStyle}">
                         <Grid ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
@@ -1000,7 +1018,7 @@
                                                 Grid.Column="0"
                                                 Minimum="30"
                                                 Maximum="360"
-                                                StepFrequency="1"
+                                                StepFrequency="10"
                                                 MinWidth="40"
                                                 AutomationProperties.Name="{Binding Text, ElementName=TxtTrailRefresh}" />
                                             <NumberBox
@@ -1008,7 +1026,7 @@
                                                 Grid.Column="1"
                                                 Minimum="30"
                                                 Maximum="360"
-                                                SmallChange="1"
+                                                SmallChange="10"
                                                 SpinButtonPlacementMode="Compact"
                                                 Width="84"
                                                 AutomationProperties.Name="{Binding Text, ElementName=TxtTrailRefresh}" />
@@ -1021,6 +1039,9 @@
                                           VerticalAlignment="Top" Loaded="EffectColorExpander_Loaded"
                                           Expanding="EffectColorExpander_Expanding" Collapsed="EffectColorExpander_Collapsed"
                                           AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}">
+                                    <Expander.Resources>
+                                        <Thickness x:Key="ExpanderChevronMargin">8,0,16,0</Thickness>
+                                    </Expander.Resources>
 
                                     <Expander.Header>
                                         <Grid ColumnSpacing="12">
@@ -1490,9 +1511,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" TextWrapping="Wrap">
-                                <Hyperlink NavigateUri="https://github.com/DoomVoss/BASpark"><Run Text="{Binding Tag, ElementName=BtnRepoDoomVoss}" /></Hyperlink>
-                            </TextBlock>
+                            <HyperlinkButton x:Name="LinkRepoDoomVoss" Content="{Binding Tag, ElementName=BtnRepoDoomVoss}"
+                                             NavigateUri="https://github.com/DoomVoss/BASpark" Style="{StaticResource BasRepositoryLinkStyle}" />
                             <Button x:Name="BtnRepoDoomVoss" Grid.Column="1" Content="" Tag="https://github.com/DoomVoss/BASpark"
                                     HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
                         </Grid>
@@ -1503,9 +1523,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" TextWrapping="Wrap">
-                                <Hyperlink NavigateUri="https://github.com/CialloKing/BASpark"><Run Text="{Binding Tag, ElementName=BtnRepoCialloKing}" /></Hyperlink>
-                            </TextBlock>
+                            <HyperlinkButton x:Name="LinkRepoCialloKing" Content="{Binding Tag, ElementName=BtnRepoCialloKing}"
+                                             NavigateUri="https://github.com/CialloKing/BASpark" Style="{StaticResource BasRepositoryLinkStyle}" />
                             <Button x:Name="BtnRepoCialloKing" Grid.Column="1" Content="" Tag="https://github.com/CialloKing/BASpark"
                                     HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
                         </Grid>
@@ -1516,9 +1535,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" TextWrapping="Wrap">
-                                <Hyperlink NavigateUri="https://github.com/Hdy08/BASpark/tree/WinUI3"><Run Text="{Binding Tag, ElementName=BtnRepoWinUI}" /></Hyperlink>
-                            </TextBlock>
+                            <HyperlinkButton x:Name="LinkRepoWinUI" Content="{Binding Tag, ElementName=BtnRepoWinUI}"
+                                             NavigateUri="https://github.com/Hdy08/BASpark/tree/WinUI3" Style="{StaticResource BasRepositoryLinkStyle}" />
                             <Button x:Name="BtnRepoWinUI" Grid.Column="1" Content="" Tag="https://github.com/Hdy08/BASpark/tree/WinUI3"
                                     HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
                         </Grid>

@@ -1077,6 +1077,8 @@ internal sealed class OverlayWindow : IDisposable
         SyncOverlayPresentationState();
     }
 
+    public void RefreshPauseState() => SyncOverlayPresentationState();
+
     /// <summary>环境过滤期间终止当前输入并阻止后续输入，已创建的动画自然结束。</summary>
     public void SetEnvironmentSuppressed(bool suppressed)
     {
@@ -1089,7 +1091,7 @@ internal sealed class OverlayWindow : IDisposable
         ApplyEnvironmentInputSuppression();
     }
 
-    private bool ShouldOverlayBeVisible => !_hiddenForExternalScreenshotCapture;
+    private bool ShouldOverlayBeVisible => !_hiddenForExternalScreenshotCapture && !App.IsEffectsPaused;
 
     private void SyncOverlayPresentationState()
     {
@@ -1146,6 +1148,7 @@ internal sealed class OverlayWindow : IDisposable
         try
         {
             await coreWebView.TrySuspendAsync().AsTask().ConfigureAwait(true);
+            if (!_overlayRuntimePaused && !_isClosing && _coreWebView == coreWebView) coreWebView.Resume();
         }
         catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
         {

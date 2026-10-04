@@ -273,7 +273,10 @@ internal static class StartupDialogHost
                     FontWeight = text.FontWeight, CharacterSpacing = text.CharacterSpacing, TextWrapping = TextWrapping.NoWrap
                 };
                 measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                naturalWidth = Math.Max(naturalWidth, measurement.DesiredSize.Width + 84);
+                double iconWidth = 0;
+                for (DependencyObject? parent = VisualTreeHelper.GetParent(text); parent != null; parent = VisualTreeHelper.GetParent(parent))
+                    if (parent is InfoBar { IsIconVisible: true }) { iconWidth = 30; break; }
+                naturalWidth = Math.Max(naturalWidth, measurement.DesiredSize.Width + 84 + iconWidth);
             }
         }
         int width = Math.Min((int)Math.Ceiling(naturalWidth * scale), area.WorkArea.Width - frameWidth - (int)Math.Round(48 * scale));

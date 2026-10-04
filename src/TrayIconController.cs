@@ -91,6 +91,7 @@ public sealed class TrayIconController : IDisposable
         if (menu == 0) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         if (!AppendMenu(menu, 0, 1, Localization.Get("Tray_OpenPanel")) ||
             !AppendMenu(menu, 0x800, 0, null) ||
+            !AppendMenu(menu, 0, 4, Localization.Get(App.IsEffectsPaused ? "Effects_Enable" : "Effects_Pause")) ||
             !AppendMenu(menu, 0, 2, Localization.Get("Tray_Restart")) ||
             !AppendMenu(menu, 0, 3, Localization.Get("Tray_Exit")))
         {
@@ -112,7 +113,7 @@ public sealed class TrayIconController : IDisposable
             SetForegroundWindow(_messageWindow.Handle);
             uint command = TrackPopupMenuEx(menu, 0x102, cursor.Left, cursor.Top, _messageWindow.Handle, 0);
             PostMessage(_messageWindow.Handle, 0, 0, 0);
-            Dispatch(command switch { 1 => _openPanel, 2 => _restart, 3 => _exit, _ => null });
+            Dispatch(command switch { 1 => _openPanel, 2 => _restart, 3 => _exit, 4 => App.ToggleEffectsPaused, _ => null });
         }
         catch (Exception exception)
         {

@@ -26,6 +26,16 @@ public partial class App : Application
     public static OverlayManager? Overlay { get; private set; }
 
     public static TrayIconController? Tray { get; private set; }
+    private static bool _effectsPaused;
+    public static bool IsEffectsPaused => Volatile.Read(ref _effectsPaused);
+    public static event EventHandler? EffectsPauseChanged;
+
+    public static void ToggleEffectsPaused()
+    {
+        Volatile.Write(ref _effectsPaused, !IsEffectsPaused);
+        Overlay?.RefreshPauseState();
+        EffectsPauseChanged?.Invoke(null, EventArgs.Empty);
+    }
 
     private ControlPanelWindow? _controlPanel;
     private readonly KeeperWindow _keeper = new();
