@@ -373,6 +373,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private bool _colorPreviewPending;
     private Color _pendingPreviewColor;
     private bool _colorPreviewSubscribed;
+    private readonly HashSet<Slider> _pendingSliderFeedback = new();
     private bool _isColorDragging;
     private long _lastColorLabelUpdate;
     private readonly Dictionary<int, int> _presetColorIndices = new();
@@ -788,12 +789,17 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         if (_isLoading || !IsUiReady || _savedSettingsState == null) return;
         _pendingSettingsSections |= sections;
-        if (_isColorDragging && sections == SettingsSections.Visual) return;
+        if ((_isColorDragging || _pendingSliderFeedback.Count != 0) && sections == SettingsSections.Visual) return;
         if (_settingsCheckQueued) return;
         _settingsCheckQueued = true;
         App.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
         {
             _settingsCheckQueued = false;
+            if (_pendingSliderFeedback.Count != 0)
+            {
+                EnsureColorPreviewRendering();
+                return;
+            }
             SettingsSections pending = _pendingSettingsSections;
             _pendingSettingsSections = 0;
             if (!_isClosed) UpdateApplySettingsState(pending);
@@ -878,15 +884,29 @@ public sealed partial class ControlPanelWindow : UserControl
             return;
         }
 
-        if (sender is not Slider slider || !_sliderToBox.TryGetValue(slider, out NumberBox? box))
+        if (sender is not Slider slider || !_sliderToBox.ContainsKey(slider))
         {
             return;
         }
 
+        _pendingSliderFeedback.Add(slider);
+        EnsureColorPreviewRendering();
+    }
+
+    private void FlushSliderFeedback()
+    {
+        if (_pendingSliderFeedback.Count == 0) return;
+
         _suppressValueSync = true;
         try
         {
-            box.Value = Math.Round(slider.Value, slider.StepFrequency >= 1 ? 0 : 2);
+            foreach (Slider slider in _pendingSliderFeedback)
+            {
+                NumberBox box = _sliderToBox[slider];
+                double value = Math.Round(slider.Value, slider.StepFrequency >= 1 ? 0 : 2);
+                if (box.Value != value) box.Value = value;
+            }
+            _pendingSliderFeedback.Clear();
         }
         finally
         {
@@ -1343,18 +1363,20 @@ public sealed partial class ControlPanelWindow : UserControl
             StopColorPreviewRendering();
             return;
         }
+        bool sliderFeedbackPending = _pendingSliderFeedback.Count != 0;
+        FlushSliderFeedback();
         if (_colorPreviewPending)
         {
             _colorPreviewPending = false;
             ApplyColorPreview(_pendingPreviewColor, updatePicker: false);
         }
-        if (_isColorDragging && _pendingSettingsSections != 0)
+        if ((_isColorDragging || sliderFeedbackPending) && _pendingSettingsSections != 0)
         {
             SettingsSections pending = _pendingSettingsSections;
             _pendingSettingsSections = 0;
             UpdateApplySettingsState(pending);
         }
-        if (!_isColorDragging) StopColorPreviewRendering();
+        if (!_isColorDragging && _pendingSliderFeedback.Count == 0) StopColorPreviewRendering();
     }
 
     private void EffectColorPresets_SelectionChanged(object sender, SelectionChangedEventArgs args)
@@ -1573,7 +1595,7 @@ public sealed partial class ControlPanelWindow : UserControl
         byte alpha = (byte)Math.Round(Math.Clamp(_effectOpacity, 0.1, 1) * 255);
         _colorPreviewPending = false;
         _pendingPreviewColor = Color.FromArgb(alpha, rgb.R, rgb.G, rgb.B);
-        if (!_isColorDragging) StopColorPreviewRendering();
+        if (!_isColorDragging && _pendingSliderFeedback.Count == 0) StopColorPreviewRendering();
         ApplyColorPreview(_pendingPreviewColor, updatePicker: true);
         QueueSettingsChangeCheck(SettingsSections.Visual);
     }
@@ -4094,6 +4116,7 @@ public sealed partial class ControlPanelWindow : UserControl
         ScreenOptions.CollectionChanged -= ScreenSettingsCollectionChanged;
         foreach (var selector in _segmentedSelectors) selector.Dispose();
         StopColorPreviewRendering();
+        _pendingSliderFeedback.Clear();
         _colorCardGeometry?.StopAnimation("Size.Y");
         if (_colorAlphaSlider != null)
         {

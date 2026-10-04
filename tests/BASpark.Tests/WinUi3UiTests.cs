@@ -1574,14 +1574,14 @@ public class WinUi3UiTests
     public void ColorDragging_CoalescesSnapshotsAndLimitsOnlyTextLayoutWork()
     {
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        Assert.Contains("if (_isColorDragging && sections == SettingsSections.Visual) return", source, StringComparison.Ordinal);
+        Assert.Contains("if ((_isColorDragging || _pendingSliderFeedback.Count != 0) && sections == SettingsSections.Visual) return", source, StringComparison.Ordinal);
         Assert.Contains("if (_colorPreviewSubscribed) return", source, StringComparison.Ordinal);
-        Assert.Contains("if (!_isColorDragging) StopColorPreviewRendering()", source, StringComparison.Ordinal);
+        Assert.Contains("if (!_isColorDragging && _pendingSliderFeedback.Count == 0) StopColorPreviewRendering()", source, StringComparison.Ordinal);
         Assert.Contains("now - _lastColorLabelUpdate >= Stopwatch.Frequency / 20", source, StringComparison.Ordinal);
         Assert.Contains("if (_previewColorBrush.Color != color) _previewColorBrush.Color = color", source, StringComparison.Ordinal);
         Assert.Contains("_presetColorIndices.TryGetValue", source, StringComparison.Ordinal);
         Assert.Contains("UIElement.PointerCaptureLostEvent", source, StringComparison.Ordinal);
-        Assert.Contains("if (_isColorDragging && _pendingSettingsSections != 0)", source, StringComparison.Ordinal);
+        Assert.Contains("if ((_isColorDragging || sliderFeedbackPending) && _pendingSettingsSections != 0)", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1700,15 +1700,59 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void PanelRenderClock_UsesBalancedWin10PrecisionRequestsWithoutFixedFrameRateTimers()
+    public void UiRenderClock_CoversAllWindowsAndUsesSupportedNativeRefreshRequests()
     {
         string source = ReadSource("src", "DcompPanelHost.cs");
-        Assert.Contains("OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)", source, StringComparison.Ordinal);
-        Assert.Contains("TimeBeginPeriod(1) == 0", source, StringComparison.Ordinal);
-        Assert.Contains("TimeEndPeriod(1)", source, StringComparison.Ordinal);
+        string chrome = ReadSource("src", "WindowChrome.cs");
+        Assert.Contains("OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)", chrome, StringComparison.Ordinal);
+        Assert.Contains("DCompositionBoostCompositorClock(true)", chrome, StringComparison.Ordinal);
+        Assert.Contains("DCompositionBoostCompositorClock(false)", chrome, StringComparison.Ordinal);
+        Assert.Contains("TimeBeginPeriod(1) == 0", chrome, StringComparison.Ordinal);
+        Assert.Contains("TimeEndPeriod(1)", chrome, StringComparison.Ordinal);
+        Assert.Contains("new RenderClock(window)", chrome, StringComparison.Ordinal);
+        foreach (string window in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs", "ColorPickerWindow.xaml.cs" })
+            Assert.Contains("WindowChrome.ApplyAppIcon(this)", ReadSource("src", window), StringComparison.Ordinal);
         Assert.Contains("SetRenderClockActive(IsWindowVisible(_hwnd) && !IsIconic(_hwnd))", source, StringComparison.Ordinal);
+        Assert.Contains("case WmShowWindow:", source, StringComparison.Ordinal);
+        Assert.Contains("case WmWindowPosChanged:", source, StringComparison.Ordinal);
         Assert.Equal(3, source.Split("SetRenderClockActive(false);", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("TimeSpan.FromMilliseconds", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TimeSpan.FromMilliseconds", chrome, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UiRenderClock_KeepsSharedRequestsUntilTheLastVisibleWindowIsReleased()
+    {
+        T ReadShared<T>(string name) => (T)typeof(WindowChrome.RenderClock)
+            .GetField(name, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.GetValue(null)!;
+
+        int initial = ReadShared<int>("_activeWindows");
+        using var first = new WindowChrome.RenderClock();
+        using var second = new WindowChrome.RenderClock();
+        first.SetActive(true);
+        first.SetActive(true);
+        second.SetActive(true);
+        Assert.True(first.IsActive);
+        Assert.True(second.IsActive);
+        Assert.Equal(initial + 2, ReadShared<int>("_activeWindows"));
+        Assert.True(ReadShared<bool>("_precisionRequested"));
+        first.SetActive(false);
+        first.SetActive(false);
+        Assert.False(first.IsActive);
+        Assert.True(ReadShared<bool>("_precisionRequested"));
+        Assert.Equal(initial + 1, ReadShared<int>("_activeWindows"));
+        first.SetActive(true);
+        second.Dispose();
+        second.SetActive(true);
+        Assert.False(second.IsActive);
+        Assert.Equal(initial + 1, ReadShared<int>("_activeWindows"));
+        first.Dispose();
+        Assert.Equal(initial, ReadShared<int>("_activeWindows"));
+        if (initial == 0)
+        {
+            Assert.False(ReadShared<bool>("_precisionRequested"));
+            Assert.False(ReadShared<bool>("_boostRequested"));
+        }
     }
 
     [Fact]

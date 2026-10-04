@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -12,6 +13,102 @@ namespace BASpark;
 /// </summary>
 internal static class WindowChrome
 {
+    internal sealed class RenderClock : IDisposable
+    {
+        private static readonly object ClockLock = new();
+        private static int _activeWindows;
+        private static bool _precisionRequested;
+        private static bool _boostRequested;
+        private readonly Window? _window;
+        private bool _disposed;
+
+        public bool IsActive { get; private set; }
+
+        public RenderClock(Window? window = null)
+        {
+            _window = window;
+            if (window == null) return;
+            window.Activated += Window_Activated;
+            window.AppWindow.Changed += Window_Changed;
+            window.Closed += Window_Closed;
+            RefreshWindowState();
+        }
+
+        public void SetActive(bool active)
+        {
+            lock (ClockLock)
+            {
+                if (_disposed || IsActive == active) return;
+                IsActive = active;
+                if (active)
+                {
+                    if (_activeWindows++ != 0) return;
+                    _precisionRequested = TimeBeginPeriod(1) == 0;
+                    if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+                    {
+                        int result = DCompositionBoostCompositorClock(true);
+                        _boostRequested = result >= 0;
+                        if (!_boostRequested) AppLogger.Debug($"Failed to boost the UI compositor clock: 0x{result:X8}.");
+                    }
+                }
+                else if (--_activeWindows == 0)
+                {
+                    if (_boostRequested)
+                    {
+                        _ = DCompositionBoostCompositorClock(false);
+                        _boostRequested = false;
+                    }
+                    if (_precisionRequested)
+                    {
+                        _ = TimeEndPeriod(1);
+                        _precisionRequested = false;
+                    }
+                }
+            }
+        }
+
+        private void RefreshWindowState()
+        {
+            if (_window != null && !_disposed)
+                SetActive(_window.AppWindow.IsVisible && !IsIconic(WinRT.Interop.WindowNative.GetWindowHandle(_window)));
+        }
+
+        private void Window_Activated(object sender, WindowActivatedEventArgs args) => RefreshWindowState();
+
+        private void Window_Changed(AppWindow sender, AppWindowChangedEventArgs args) => RefreshWindowState();
+
+        private void Window_Closed(object sender, WindowEventArgs args) => Dispose();
+
+        public void Dispose()
+        {
+            lock (ClockLock)
+            {
+                if (_disposed) return;
+                if (_window != null)
+                {
+                    _window.Activated -= Window_Activated;
+                    _window.AppWindow.Changed -= Window_Changed;
+                    _window.Closed -= Window_Closed;
+                }
+                SetActive(false);
+                _disposed = true;
+            }
+        }
+
+        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+        private static extern uint TimeBeginPeriod(uint period);
+
+        [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+        private static extern uint TimeEndPeriod(uint period);
+
+        [DllImport("dcomp.dll")]
+        private static extern int DCompositionBoostCompositorClock([MarshalAs(UnmanagedType.Bool)] bool enable);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsIconic(IntPtr window);
+    }
+
     private const int WM_SETICON = 0x0080;
     private const int ICON_SMALL = 0;
     private const int ICON_BIG = 1;
@@ -60,6 +157,7 @@ internal static class WindowChrome
     public static void ApplyAppIcon(Window window)
     {
         ApplyAppIcon(WinRT.Interop.WindowNative.GetWindowHandle(window));
+        _ = new RenderClock(window);
     }
 
     public static void ApplyAppIcon(IntPtr hwnd)

@@ -38,6 +38,8 @@ internal sealed class DcompPanelHost : IDisposable
     private const int WsExNoRedirectionBitmap = 0x00200000;
 
     private const int WmSize = 0x0005;
+    private const int WmShowWindow = 0x0018;
+    private const int WmWindowPosChanged = 0x0047;
     private const int WmSetFocus = 0x0007;
     private const int WmClose = 0x0010;
     private const int WmDestroy = 0x0002;
@@ -64,6 +66,7 @@ internal sealed class DcompPanelHost : IDisposable
     private IntPtr _hwnd;
     private RectInt32 _captionButtonsBounds;
     private bool _renderClockActive;
+    private readonly WindowChrome.RenderClock _renderClock = new();
     private IntPtr _previousForegroundWindow;
 
     private delegate IntPtr WndProcDelegate(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
@@ -382,6 +385,14 @@ internal sealed class DcompPanelHost : IDisposable
                 InstanceOf(hwnd)?.OnWindowSizeChanged();
                 return IntPtr.Zero;
 
+            case WmShowWindow:
+                InstanceOf(hwnd)?.SetRenderClockActive(wParam != IntPtr.Zero && !IsIconic(hwnd));
+                break;
+
+            case WmWindowPosChanged:
+                InstanceOf(hwnd)?.SetRenderClockActive(IsWindowVisible(hwnd) && !IsIconic(hwnd));
+                break;
+
             case WmSetFocus:
                 InstanceOf(hwnd)?._xamlSource.NavigateFocus(
                     new XamlSourceFocusNavigationRequest(XamlSourceFocusNavigationReason.Restore));
@@ -445,20 +456,10 @@ internal sealed class DcompPanelHost : IDisposable
 
     private void SetRenderClockActive(bool active)
     {
-        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000) || _renderClockActive == active) return;
-        if (active) _renderClockActive = TimeBeginPeriod(1) == 0;
-        else
-        {
-            _ = TimeEndPeriod(1);
-            _renderClockActive = false;
-        }
+        if (_renderClockActive == active) return;
+        _renderClock.SetActive(active);
+        _renderClockActive = _renderClock.IsActive;
     }
-
-    [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
-    private static extern uint TimeBeginPeriod(uint period);
-
-    [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
-    private static extern uint TimeEndPeriod(uint period);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -525,6 +526,7 @@ internal sealed class DcompPanelHost : IDisposable
 
         RestoreExternalForeground();
         SetRenderClockActive(false);
+        _renderClock.Dispose();
         CloseRequested = null;
         SizeChanged = null;
         Instances.Remove(hwnd);
