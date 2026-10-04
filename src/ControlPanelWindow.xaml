@@ -68,7 +68,8 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid x:Name="RootGrid" Background="{ThemeResource BasPageBackgroundBrush}">
+    <Grid>
+    <Grid x:Name="RootGrid" x:Load="True" Background="{ThemeResource BasPageBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -1725,5 +1726,6 @@
         </ContentDialog>
 
         </Grid>
+    </Grid>
     </Grid>
 </UserControl>

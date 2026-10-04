@@ -347,6 +347,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
 
     private readonly DcompPanelHost _host;
+    private readonly WindowChrome.ScrollbarAutoHide _scrollbars = new();
     private readonly DispatcherQueueTimer? _refreshTimer;
 
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
@@ -465,7 +466,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
             ComboProfiles.ItemsSource = Profiles;
             ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses;
-            CurrentProfileProcesses.CollectionChanged += (_, _) => UpdateConfiguredProcessSummary();
+            CurrentProfileProcesses.CollectionChanged += ConfiguredProcesses_CollectionChanged;
             ListRunningProcesses.ItemsSource = RunningProcessList;
 
             ApplyLocalizedText();
@@ -527,7 +528,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ApplyWindowChrome()
     {
-        _host.SetTitle(Localization.Get("App_Title_ControlPanel"));
+        _host.SetTitle("BASpark");
 
         RootGrid.RequestedTheme = App.ResolveElementTheme();
 
@@ -595,6 +596,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _ = sender;
         _ = e;
         XamlRoot.Changed += PanelXamlRoot_Changed;
+        _scrollbars.Watch(RootGrid);
         UpdateCaptionButtonBounds();
         UpdateCaptionButtonState();
         ApplyTitleBarTheme();
@@ -1123,7 +1125,7 @@ public sealed partial class ControlPanelWindow : UserControl
         TabLogLabel.Text = Localization.Get("Nav_Log");
         TabAboutLabel.Text = Localization.Get("Nav_About");
         AppTitleBar.Title = Localization.Get("App_Title_ControlPanel");
-        _host.SetTitle(AppTitleBar.Title);
+        _host.SetTitle("BASpark");
         SetCaptionButtonLabel(BtnCaptionMinimize, "Window_Minimize");
         SetCaptionButtonLabel(BtnCaptionClose, "Window_Close");
         UpdateCaptionButtonState();
@@ -1276,6 +1278,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void AppendLogLine(string line)
     {
+        if (_isClosed) return;
         if (string.IsNullOrEmpty(TxtAppLog.Text))
         {
             TxtAppLog.Text = line;
@@ -2318,6 +2321,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ComboProfiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_isClosed) return;
         _ = sender;
         _ = e;
 
@@ -2458,12 +2462,16 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void UpdateConfiguredProcessSummary()
     {
+        if (_isClosed) return;
         ListConfiguredProcesses.PlaceholderText = Localization.Format("Filter_SelectedProcesses", CurrentProfileProcesses.Count);
         UpdateEnvironmentFilterInterlock();
     }
 
+    private void ConfiguredProcesses_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args) => UpdateConfiguredProcessSummary();
+
     private void ConfiguredProcesses_SelectionChanged(object sender, SelectionChangedEventArgs args)
     {
+        if (_isClosed) return;
         if (ListConfiguredProcesses.SelectedIndex >= 0) ListConfiguredProcesses.SelectedIndex = -1;
     }
 
@@ -3826,6 +3834,7 @@ public sealed partial class ControlPanelWindow : UserControl
         dialog.Loading += (_, _) => UpdateDialogScrim(dialog);
         dialog.Loaded += (_, _) =>
         {
+            _scrollbars.Watch(dialog);
             UpdateDialogScrim(dialog);
             if ((!string.IsNullOrEmpty(dialog.PrimaryButtonText) || !string.IsNullOrEmpty(dialog.SecondaryButtonText) ||
                  !string.IsNullOrEmpty(dialog.CloseButtonText)) &&
@@ -3977,25 +3986,27 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private async Task<XamlRoot?> EnsureXamlRootAsync()
     {
-        if (RootGrid.XamlRoot != null)
+        if (_isClosed) return null;
+        Grid rootGrid = RootGrid;
+        if (rootGrid.XamlRoot != null)
         {
-            return RootGrid.XamlRoot;
+            return rootGrid.XamlRoot;
         }
 
         var completion = new TaskCompletionSource();
         void OnLoaded(object sender, RoutedEventArgs e) => completion.TrySetResult();
 
-        RootGrid.Loaded += OnLoaded;
+        rootGrid.Loaded += OnLoaded;
         try
         {
             await Task.WhenAny(completion.Task, Task.Delay(TimeSpan.FromSeconds(3)));
         }
         finally
         {
-            RootGrid.Loaded -= OnLoaded;
+            rootGrid.Loaded -= OnLoaded;
         }
 
-        return RootGrid.XamlRoot;
+        return _isClosed ? null : rootGrid.XamlRoot;
     }
 
     /// <summary>网络回调可能落在任意线程，统一回到 UI 线程再碰控件。</summary>
@@ -4068,6 +4079,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         _isClosed = true;
+        _scrollbars.Dispose();
         RootGrid.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootGrid_PointerPressed));
         RootGrid.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished));
         RootGrid.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished));
@@ -4113,6 +4125,7 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (var callback in _settingsCallbacks) callback.Control.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
         Profiles.CollectionChanged -= GeneralSettingsCollectionChanged;
         CurrentProfileProcesses.CollectionChanged -= GeneralSettingsCollectionChanged;
+        CurrentProfileProcesses.CollectionChanged -= ConfiguredProcesses_CollectionChanged;
         ScreenOptions.CollectionChanged -= ScreenSettingsCollectionChanged;
         foreach (var selector in _segmentedSelectors) selector.Dispose();
         StopColorPreviewRendering();
@@ -4142,11 +4155,37 @@ public sealed partial class ControlPanelWindow : UserControl
             AppLogger.Warn($"Failed to stop panel timers during close: {ex.Message}");
         }
 
+        ComboProfiles.ItemsSource = null;
+        ListConfiguredProcesses.ItemsSource = null;
+        ListRunningProcesses.ItemsSource = null;
+        ListVisualResetItems.ItemsSource = null;
+        ListBackupItems.ItemsSource = null;
+        UnloadObject(RootGrid);
+        _numberInputs.Clear();
+        _sliderToBox.Clear();
+        _boxToSlider.Clear();
+        _screenToggles.Clear();
+        _segmentedSelectors.Clear();
+        _navigationIndicatorCallbacks.Clear();
+        _settingsCallbacks.Clear();
+        _configuredColorSpectrum = null;
+        _colorAlphaSlider = null;
+        _colorContentHost = null;
+        _colorCardGeometry = null;
+        _pressedToggleSwitch = null;
+        _selectedSettingsItem = null;
+        _allRunningProcesses.Clear();
+        RunningProcessList.Clear();
+        VisualResetItems.Clear();
+        CurrentProfileProcesses.Clear();
+        Profiles.Clear();
+        ScreenOptions.Clear();
         _host.Dispose();
         Content = null;
         Resources.Clear();
         _backupSource = null;
         _backupItems.Clear();
         Closed?.Invoke(this, EventArgs.Empty);
+        Closed = null;
     }
 }

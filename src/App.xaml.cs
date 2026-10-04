@@ -38,6 +38,7 @@ public partial class App : Application
     }
 
     private ControlPanelWindow? _controlPanel;
+    private int _backgroundMemoryGeneration;
     private readonly KeeperWindow _keeper = new();
 
     public App()
@@ -152,6 +153,10 @@ public partial class App : Application
         {
             ShowControlPanel();
         }
+        else
+        {
+            ReclaimBackgroundMemory();
+        }
     }
 
     /// <summary>按配置解析当前应使用的 WinUI 元素主题。</summary>
@@ -171,12 +176,13 @@ public partial class App : Application
     {
         DispatcherQueue.TryEnqueue(() =>
         {
+            Interlocked.Increment(ref _backgroundMemoryGeneration);
             if (_controlPanel == null)
             {
                 try
                 {
                     _controlPanel = new ControlPanelWindow();
-                    _controlPanel.Closed += (_, _) => _controlPanel = null;
+                    _controlPanel.Closed += ControlPanel_Closed;
                     WindowChrome.ApplyAppIcon(_controlPanel.Handle);
                     _controlPanel.Activate();
 
@@ -200,6 +206,36 @@ public partial class App : Application
             {
                 _controlPanel.Activate();
             }
+        });
+    }
+
+    private void ControlPanel_Closed(object? sender, EventArgs args)
+    {
+        if (sender is ControlPanelWindow panel) panel.Closed -= ControlPanel_Closed;
+        if (!ReferenceEquals(sender, _controlPanel)) return;
+        _controlPanel = null;
+        ReclaimBackgroundMemory();
+    }
+
+    private void ReclaimBackgroundMemory()
+    {
+        if (_controlPanel != null || Volatile.Read(ref _isExiting) != 0) return;
+        _ = ReclaimBackgroundMemoryAsync(Interlocked.Increment(ref _backgroundMemoryGeneration));
+    }
+
+    private async Task ReclaimBackgroundMemoryAsync(int generation)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+        if (generation != Volatile.Read(ref _backgroundMemoryGeneration) || Volatile.Read(ref _isExiting) != 0) return;
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: false);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: false);
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            if (generation != _backgroundMemoryGeneration || _controlPanel != null || _isExiting != 0) return;
+            SidebarBackgroundHelper.ClearCache();
+            if (!NativeMethods.EmptyWorkingSet(NativeMethods.GetCurrentProcess()))
+                AppLogger.Debug("Failed to reclaim idle application memory.");
         });
     }
 

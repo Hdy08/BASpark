@@ -3,6 +3,9 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace BASpark;
@@ -13,6 +16,139 @@ namespace BASpark;
 /// </summary>
 internal static class WindowChrome
 {
+    internal sealed class ScrollbarAutoHide : IDisposable
+    {
+        private readonly HashSet<FrameworkElement> _roots = new();
+        private readonly HashSet<ScrollBar> _scrollbars = new();
+        private readonly HashSet<ScrollViewer> _scrollers = new();
+        private readonly HashSet<ComboBox> _combos = new();
+        private bool _disposed;
+
+        public void Watch(FrameworkElement root)
+        {
+            if (_disposed) return;
+            if (_roots.Add(root))
+            {
+                root.Loaded += Root_Loaded;
+                root.Unloaded += Root_Unloaded;
+            }
+            if (root.IsLoaded) WatchDescendants(root);
+        }
+
+        private void WatchDescendants(DependencyObject element)
+        {
+            if (element is ScrollViewer scroller && scroller.VerticalScrollBarVisibility is ScrollBarVisibility.Auto or ScrollBarVisibility.Visible && _scrollers.Add(scroller))
+            {
+                scroller.Loaded += Scroller_Loaded;
+                scroller.SizeChanged += Scroller_SizeChanged;
+                scroller.Unloaded += Scroller_Unloaded;
+            }
+            if (element is ScrollBar scrollbar && _scrollbars.Add(scrollbar))
+            {
+                scrollbar.Scroll += Scrollbar_Scroll;
+                scrollbar.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(Scrollbar_PointerReleased), true);
+                scrollbar.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(Scrollbar_PointerReleased), true);
+                scrollbar.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(Scrollbar_PointerReleased), true);
+                scrollbar.Unloaded += Scrollbar_Unloaded;
+            }
+            if (element is ComboBox combo && _combos.Add(combo))
+            {
+                combo.DropDownOpened += Combo_DropDownOpened;
+                combo.Unloaded += Combo_Unloaded;
+            }
+            for (int index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
+                WatchDescendants(VisualTreeHelper.GetChild(element, index));
+        }
+
+        private void Root_Loaded(object sender, RoutedEventArgs args) => WatchDescendants((DependencyObject)sender);
+
+        private void Scroller_Loaded(object sender, RoutedEventArgs args) => WatchDescendants((DependencyObject)sender);
+
+        private void Scroller_SizeChanged(object sender, SizeChangedEventArgs args) => WatchDescendants((DependencyObject)sender);
+
+        private void Scroller_Unloaded(object sender, RoutedEventArgs args)
+        {
+            var scroller = (ScrollViewer)sender;
+            scroller.Loaded -= Scroller_Loaded;
+            scroller.SizeChanged -= Scroller_SizeChanged;
+            scroller.Unloaded -= Scroller_Unloaded;
+            _scrollers.Remove(scroller);
+        }
+
+        private void Root_Unloaded(object sender, RoutedEventArgs args)
+        {
+            var root = (FrameworkElement)sender;
+            root.Loaded -= Root_Loaded;
+            root.Unloaded -= Root_Unloaded;
+            _roots.Remove(root);
+        }
+
+        private void Combo_DropDownOpened(object? sender, object args)
+        {
+            if (sender is not ComboBox combo) return;
+            combo.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (_disposed || !combo.IsDropDownOpen || combo.XamlRoot == null) return;
+                foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(combo.XamlRoot))
+                    if (popup.Child is FrameworkElement root) Watch(root);
+            });
+        }
+
+        private void Scrollbar_Scroll(object sender, ScrollEventArgs args)
+        {
+            if (args.ScrollEventType == ScrollEventType.EndScroll) HideScrollbar((ScrollBar)sender);
+        }
+
+        private void Scrollbar_PointerReleased(object sender, PointerRoutedEventArgs args)
+        {
+            var scrollbar = (ScrollBar)sender;
+            if (!args.GetCurrentPoint(scrollbar).Properties.IsLeftButtonPressed) HideScrollbar(scrollbar);
+        }
+
+        private void HideScrollbar(ScrollBar scrollbar)
+        {
+            if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 18362) && !new Windows.UI.ViewManagement.UISettings().AutoHideScrollBars) return;
+            for (DependencyObject? parent = VisualTreeHelper.GetParent(scrollbar); parent != null; parent = VisualTreeHelper.GetParent(parent))
+            {
+                if (parent is not ScrollViewer scroller) continue;
+                scroller.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    if (!_disposed && scroller.IsLoaded) VisualStateManager.GoToState(scroller, "NoIndicator", true);
+                });
+                break;
+            }
+        }
+
+        private void Scrollbar_Unloaded(object sender, RoutedEventArgs args)
+        {
+            var scrollbar = (ScrollBar)sender;
+            scrollbar.Scroll -= Scrollbar_Scroll;
+            scrollbar.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(Scrollbar_PointerReleased));
+            scrollbar.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(Scrollbar_PointerReleased));
+            scrollbar.RemoveHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(Scrollbar_PointerReleased));
+            scrollbar.Unloaded -= Scrollbar_Unloaded;
+            _scrollbars.Remove(scrollbar);
+        }
+
+        private void Combo_Unloaded(object sender, RoutedEventArgs args)
+        {
+            var combo = (ComboBox)sender;
+            combo.DropDownOpened -= Combo_DropDownOpened;
+            combo.Unloaded -= Combo_Unloaded;
+            _combos.Remove(combo);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            foreach (var root in _roots.ToArray()) Root_Unloaded(root, null!);
+            foreach (var scrollbar in _scrollbars.ToArray()) Scrollbar_Unloaded(scrollbar, null!);
+            foreach (var scroller in _scrollers.ToArray()) Scroller_Unloaded(scroller, null!);
+            foreach (var combo in _combos.ToArray()) Combo_Unloaded(combo, null!);
+        }
+    }
+
     internal sealed class RenderClock : IDisposable
     {
         private static readonly object ClockLock = new();
@@ -158,6 +294,12 @@ internal static class WindowChrome
     {
         ApplyAppIcon(WinRT.Interop.WindowNative.GetWindowHandle(window));
         _ = new RenderClock(window);
+        if (window.Content is FrameworkElement root)
+        {
+            var scrollbars = new ScrollbarAutoHide();
+            scrollbars.Watch(root);
+            window.Closed += (_, _) => scrollbars.Dispose();
+        }
     }
 
     public static void ApplyAppIcon(IntPtr hwnd)

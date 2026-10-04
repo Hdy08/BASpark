@@ -216,6 +216,13 @@ internal static class NativeMethods
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     internal static extern IntPtr GetModuleHandle(string? lpModuleName);
 
+    [DllImport("kernel32.dll")]
+    internal static extern IntPtr GetCurrentProcess();
+
+    [DllImport("psapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EmptyWorkingSet(IntPtr process);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
     internal static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
 
