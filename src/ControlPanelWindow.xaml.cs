@@ -3709,12 +3709,16 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 CompositionTarget.Rendering -= readyHandler;
                 readyHandler = null;
-                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, async () =>
                 {
                     if (_isClosed || version != animationVersion) return;
                     if (layout != null) layout.ClearValue(OpacityProperty);
                     _ = VisualStateManager.GoToState(dialog, "DialogHidden", false);
                     _ = VisualStateManager.GoToState(dialog, "DialogShowing", true);
+                    await Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlNormalAnimationDuration"], CultureInfo.InvariantCulture));
+                    if (_isClosed || version != animationVersion) return;
+                    for (DependencyObject? source = FocusManager.GetFocusedElement(dialog.XamlRoot) as DependencyObject; source != null; source = VisualTreeHelper.GetParent(source))
+                        if (source == layout || source == dialog) return;
                     if (dialog == RenameProfileOverlay)
                     {
                         NewProfileNameInput.Focus(FocusState.Programmatic);
