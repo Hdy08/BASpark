@@ -46,6 +46,7 @@
 
   <ItemGroup>
     <Resource Include="app.ico" />
+    <EmbeddedResource Include="app.ico" LogicalName="BASpark.app.ico" />
   </ItemGroup>
 
   <!-- The effect renderer payloads stay byte-identical to the previous WPF build.

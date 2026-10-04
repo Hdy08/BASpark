@@ -28,6 +28,8 @@ public partial class PrivacyWindow : Window
     public PrivacyWindow()
     {
         InitializeComponent();
+        AppTitleBar.IconSource = WindowChrome.CreateAppIconSource();
+        StartupDialogHost.ConfigureCaptionButton(this, RootGrid, BtnCaptionClose);
 
         // 去掉系统标题栏、改用原生 TitleBar 控件；必须在视觉树加载后执行。
         RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
@@ -81,6 +83,8 @@ public partial class PrivacyWindow : Window
     {
         Title = Localization.Get("Privacy_Title");
         AppTitleBar.Title = Localization.Get("Privacy_Title");
+        ToolTipService.SetToolTip(BtnCaptionClose, Localization.Get("Window_Close"));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(BtnCaptionClose, Localization.Get("Window_Close"));
         TxtTagline.Text = Localization.Get("Privacy_Tagline");
         TxtIntro.Text = Localization.Get("Privacy_Intro");
         TxtOpenSourceTitle.Text = Localization.Get("Privacy_OpenSource_Title");
@@ -139,6 +143,8 @@ public partial class PrivacyWindow : Window
         Agreed = true;
         Complete(true);
     }
+
+    private void CaptionClose_Click(object sender, RoutedEventArgs args) => _ = StartupDialogHost.CloseAsync(this);
 
     private void BtnRefuse_Click(object sender, RoutedEventArgs e)
     {
@@ -202,6 +208,7 @@ public partial class PrivacyWindow : Window
         try
         {
             ExtendsContentIntoTitleBar = true;
+            AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Collapsed;
             StartupDialogHost.LockWindow(this);
         }
         catch (Exception ex)

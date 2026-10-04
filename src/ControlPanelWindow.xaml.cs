@@ -359,6 +359,7 @@ public sealed partial class ControlPanelWindow : UserControl
     }
     private readonly Dictionary<ContentDialog, ModalDialogState> _modalDialogs = new();
     private readonly Dictionary<ContentDialog, Border> _dialogPresentationGuards = new();
+    private readonly HashSet<ContentDialog> _dialogPresentationsPending = new();
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
@@ -417,6 +418,7 @@ public sealed partial class ControlPanelWindow : UserControl
     public ControlPanelWindow()
     {
         InitializeComponent();
+        AppTitleBar.IconSource = WindowChrome.CreateAppIconSource();
         _host = new DcompPanelHost();
 
         try
@@ -462,6 +464,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
             ComboProfiles.ItemsSource = Profiles;
             ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses;
+            CurrentProfileProcesses.CollectionChanged += (_, _) => UpdateConfiguredProcessSummary();
             ListRunningProcesses.ItemsSource = RunningProcessList;
 
             ApplyLocalizedText();
@@ -1210,6 +1213,7 @@ public sealed partial class ControlPanelWindow : UserControl
             SetComboItemContent(ComboProcessFilterMode, 2, "Filter_Mode_Whitelist");
         }
         foreach (var selector in _segmentedSelectors) selector.RefreshLayout();
+        UpdateConfiguredProcessSummary();
     }
 
     private static void SetRadioContent(RadioButtons container, int index, string key)
@@ -2254,8 +2258,8 @@ public sealed partial class ControlPanelWindow : UserControl
         BtnDeleteProfile.IsEnabled = environmentFilterEnabled;
 
         // 旧版在深色下换用暗色禁用模板；WinUI 的禁用态由系统负责，这里只保留透明度的细微差别。
-        ListConfiguredProcesses.IsEnabled = processFilterEnabled;
-        ListConfiguredProcesses.Opacity = processFilterEnabled ? 1.0 : 0.65;
+        ListConfiguredProcesses.IsEnabled = processFilterEnabled && CurrentProfileProcesses.Count > 0;
+        ListConfiguredProcesses.Opacity = ListConfiguredProcesses.IsEnabled ? 1.0 : 0.65;
         BtnBrowseProcess.IsEnabled = processFilterEnabled;
         BtnSelectRunningProcess.IsEnabled = processFilterEnabled;
     }
@@ -2314,7 +2318,7 @@ public sealed partial class ControlPanelWindow : UserControl
             CurrentProfileProcesses.Add(name);
         }
 
-        ListConfiguredProcesses.SelectedIndex = CurrentProfileProcesses.Count > 0 ? 0 : -1;
+        UpdateConfiguredProcessSummary();
     }
 
     private static IEnumerable<string> NormalizeProcessNames(IEnumerable<string> processes) =>
@@ -2427,19 +2431,15 @@ public sealed partial class ControlPanelWindow : UserControl
     // 进程列表
     // ==================================================================
 
-    private void ConfiguredProcessRow_Loaded(object sender, RoutedEventArgs args) => UpdateConfiguredProcessRow((Grid)sender);
-
-    private void ConfiguredProcesses_SizeChanged(object sender, SizeChangedEventArgs args)
+    private void UpdateConfiguredProcessSummary()
     {
-        if (FindVisualDescendant<Grid>(ListConfiguredProcesses, "ConfiguredProcessItemRoot") is { } row) UpdateConfiguredProcessRow(row);
+        ListConfiguredProcesses.PlaceholderText = Localization.Format("Filter_SelectedProcesses", CurrentProfileProcesses.Count);
+        UpdateEnvironmentFilterInterlock();
     }
 
-    private void UpdateConfiguredProcessRow(Grid row)
+    private void ConfiguredProcesses_SelectionChanged(object sender, SelectionChangedEventArgs args)
     {
-        for (DependencyObject? parent = VisualTreeHelper.GetParent(row); parent != null; parent = VisualTreeHelper.GetParent(parent))
-            if (parent is ComboBoxItem) { row.ClearValue(WidthProperty); return; }
-        row.Width = Math.Max(0, ListConfiguredProcesses.ActualWidth - ListConfiguredProcesses.Padding.Left - ListConfiguredProcesses.Padding.Right -
-            ListConfiguredProcesses.BorderThickness.Left - ListConfiguredProcesses.BorderThickness.Right);
+        if (ListConfiguredProcesses.SelectedIndex >= 0) ListConfiguredProcesses.SelectedIndex = -1;
     }
 
     private void RemoveProcess_Click(object sender, RoutedEventArgs e)
@@ -2468,7 +2468,6 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             CurrentProfileProcesses.Remove(processName);
         }
-        if (ListConfiguredProcesses.SelectedIndex < 0 && CurrentProfileProcesses.Count > 0) ListConfiguredProcesses.SelectedIndex = 0;
         if (wasOpen && CurrentProfileProcesses.Count > 0)
         {
             ListConfiguredProcesses.IsDropDownOpen = true;
@@ -2735,11 +2734,10 @@ public sealed partial class ControlPanelWindow : UserControl
     private void RebuildFilterResetItems()
     {
         string group = TxtFilterTitle.Text;
-        string? profileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id;
         AddToggleResetItem(group, CheckEnvironmentFilter, false, "EnableEnvironmentFilter");
         AddToggleResetItem(group, CheckHideInFullscreen, true, "HideInFullscreen");
         AddToggleResetItem(group, CheckShowEffectOnDesktop, true, "ShowEffectOnDesktop");
-        AddPageResetItem(group, TxtFilterProfiles.Text, Localization.Get("Reset_DefaultProfile"), "Profiles", () =>
+        AddPageResetItem(group, Localization.Get("Filter_ProfileGroup"), Localization.Get("Reset_DefaultProfile"), "Profiles", () =>
         {
             FilterProfile profile = Profiles.FirstOrDefault(item => item.Name == Localization.Get("Profile_Default"))
                 ?? Profiles.FirstOrDefault() ?? new FilterProfile();
@@ -2754,29 +2752,6 @@ public sealed partial class ControlPanelWindow : UserControl
             if (!ConfigManager.SaveProfiles(Profiles.ToList(), (ComboProfiles.SelectedItem as FilterProfile)?.Id ?? string.Empty))
                 throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
         });
-        AddPageResetItem(group, TxtFilterMode.Text, Localization.Get("Filter_Mode_Blacklist"), "Profile.Mode", () =>
-        {
-            if (ComboProfiles.SelectedItem is FilterProfile active) active.Mode = ProcessFilterModeOption.Blacklist;
-            SelectProcessFilterMode(ProcessFilterModeOption.Blacklist);
-        }, () => SaveResetProfileProperty(profileId, resetProcesses: false), profileId);
-        AddPageResetItem(group, TxtProcessList.Text, Localization.Get("Reset_EmptyList"), "Profile.Processes", () =>
-        {
-            if (ComboProfiles.SelectedItem is not FilterProfile active) return;
-            active.Processes.Clear();
-            RefreshCurrentProfileProcesses(active);
-        }, () => SaveResetProfileProperty(profileId, resetProcesses: true), profileId);
-    }
-
-    private void SaveResetProfileProperty(string? profileId, bool resetProcesses)
-    {
-        if (VisualResetItems.Any(item => item.SettingKey == "Profiles" && item.IsSelected)) return;
-        List<FilterProfile> profiles = ConfigManager.GetProfiles();
-        FilterProfile? profile = profiles.FirstOrDefault(item => item.Id == profileId);
-        if (profile == null) throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
-        if (resetProcesses) profile.Processes.Clear();
-        else profile.Mode = ProcessFilterModeOption.Blacklist;
-        if (!ConfigManager.SaveProfiles(profiles, ConfigManager.ActiveProfileId))
-            throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
     }
 
     private void RebuildScreenResetItems()
@@ -3650,6 +3625,7 @@ public sealed partial class ControlPanelWindow : UserControl
             if (_isClosed || state.CloseRequested) return;
             XamlRoot? root = await EnsureXamlRootAsync();
             if (root == null || _isClosed) return;
+            if (dialog.Parent is Panel parent) parent.Children.Remove(dialog);
             if (dialog.XamlRoot != root) dialog.XamlRoot = root;
             dialog.RequestedTheme = RootGrid.ActualTheme;
             ConfigureContentDialog(dialog);
@@ -3710,12 +3686,13 @@ public sealed partial class ControlPanelWindow : UserControl
         Task AnimateScrim(bool visible)
         {
             if (scrim == null) return Task.CompletedTask;
+            double opacity = scrim.Opacity;
             scrimAnimation?.Stop();
             scrim.Opacity = 1;
             var completed = new TaskCompletionSource();
             scrimAnimation = new Storyboard();
             var fade = new DoubleAnimationUsingKeyFrames();
-            fade.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = visible ? 0 : 1 });
+            fade.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = visible ? 0 : opacity });
             fade.KeyFrames.Add(new LinearDoubleKeyFrame
             {
                 KeyTime = KeyTime.FromTimeSpan(TimeSpan.Parse((string)Application.Current.Resources["ControlFasterAnimationDuration"], CultureInfo.InvariantCulture)),
@@ -3753,6 +3730,7 @@ public sealed partial class ControlPanelWindow : UserControl
                         layout.ClearValue(OpacityProperty);
                         FindVisualDescendant<Border>(layout, "BackgroundElement")?.ClearValue(OpacityProperty);
                     }
+                    _dialogPresentationsPending.Remove(dialog);
                     _ = AnimateScrim(true);
                     await Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlNormalAnimationDuration"], CultureInfo.InvariantCulture));
                     if (_isClosed || version != animationVersion) return;
@@ -3787,6 +3765,7 @@ public sealed partial class ControlPanelWindow : UserControl
             if (_isClosed || args.Cancel || !new Windows.UI.ViewManagement.UISettings().AnimationsEnabled ||
                 dialog == BackupOverlay && _backupBusy && (!_modalDialogs.TryGetValue(dialog, out ModalDialogState? state) || !state.CloseRequested)) return;
             var deferral = args.GetDeferral();
+            _dialogPresentationsPending.Remove(dialog);
             try
             {
                 var ready = new TaskCompletionSource();
@@ -3813,11 +3792,13 @@ public sealed partial class ControlPanelWindow : UserControl
         };
         dialog.Closed += (_, _) =>
         {
+            _dialogPresentationsPending.Remove(dialog);
             scrimAnimation?.Stop();
             scrimAnimation = null;
             scrim = null;
             if (string.IsNullOrEmpty(dialog.Name)) _dialogPresentationGuards.Remove(dialog);
         };
+        dialog.Loading += (_, _) => UpdateDialogScrim(dialog);
         dialog.Loaded += (_, _) =>
         {
             UpdateDialogScrim(dialog);
@@ -3850,6 +3831,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void PrepareContentDialogPresentation(ContentDialog dialog)
     {
+        if (new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) _dialogPresentationsPending.Add(dialog);
         dialog.ApplyTemplate();
         Border? background = FindVisualDescendant<Border>(dialog, "BackgroundElement") ??
             (_dialogPresentationGuards.TryGetValue(dialog, out Border? saved) ? saved : null);
@@ -3861,6 +3843,11 @@ public sealed partial class ControlPanelWindow : UserControl
     private Microsoft.UI.Xaml.Shapes.Rectangle? UpdateDialogScrim(ContentDialog dialog)
     {
         if (dialog.XamlRoot == null || _isClosed) return null;
+        if (FindVisualDescendant<Grid>(dialog, "LayoutRoot") is { } layout)
+        {
+            layout.Width = RootGrid.ActualWidth;
+            layout.Height = RootGrid.ActualHeight;
+        }
         Microsoft.UI.Xaml.Shapes.Rectangle? mask = null;
         foreach (Popup popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot))
         {
@@ -3871,6 +3858,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 scrim.ClearValue(Microsoft.UI.Xaml.Shapes.Shape.FillProperty);
                 Point origin = PanelBody.TransformToVisual(RootGrid).TransformPoint(new Point());
                 scrim.Clip = new RectangleGeometry { Rect = new Rect(origin.X, origin.Y, PanelBody.ActualWidth, PanelBody.ActualHeight) };
+                if (_dialogPresentationsPending.Contains(dialog)) scrim.Opacity = 0;
                 mask = scrim;
             }
         }
@@ -4086,6 +4074,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         _modalDialogs.Clear();
         _dialogPresentationGuards.Clear();
+        _dialogPresentationsPending.Clear();
         foreach (var callback in _navigationIndicatorCallbacks) callback.Item.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
         foreach (var state in _navigationIndicators.Values)
         {

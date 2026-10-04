@@ -31,6 +31,8 @@ public partial class LanguageSelectWindow : Window
     {
         _displayCulture = Localization.DetectCultureFromSystem();
         InitializeComponent();
+        AppTitleBar.IconSource = WindowChrome.CreateAppIconSource();
+        StartupDialogHost.ConfigureCaptionButton(this, RootGrid, BtnCaptionClose);
 
         // 去掉系统标题栏、改用原生 TitleBar 控件；必须在视觉树加载后执行。
         RootGrid.Loaded += (_, _) => ApplyCustomTitleBar();
@@ -87,6 +89,8 @@ public partial class LanguageSelectWindow : Window
     {
         Title = Localization.Get("LangSelect_Title", cultureName);
         AppTitleBar.Title = Localization.Get("LangSelect_Title", cultureName);
+        ToolTipService.SetToolTip(BtnCaptionClose, Localization.Get("Window_Close", cultureName));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(BtnCaptionClose, Localization.Get("Window_Close", cultureName));
         TxtSubtitle.Text = Localization.Get("LangSelect_Subtitle", cultureName);
         TxtLanguageLabel.Text = Localization.Get("Basic_Language", cultureName);
         LanguageChinese.Content = Localization.Get("LangSelect_Chinese", cultureName);
@@ -130,6 +134,8 @@ public partial class LanguageSelectWindow : Window
         SelectedCulture = selected;
         _ = StartupDialogHost.CloseAsync(this);
     }
+
+    private void CaptionClose_Click(object sender, RoutedEventArgs args) => _ = StartupDialogHost.CloseAsync(this);
 
     // ------------------------------------------------------------------
     // 窗口生命周期
@@ -178,6 +184,7 @@ public partial class LanguageSelectWindow : Window
         try
         {
             ExtendsContentIntoTitleBar = true;
+            AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Collapsed;
             StartupDialogHost.LockWindow(this);
         }
         catch (Exception ex)

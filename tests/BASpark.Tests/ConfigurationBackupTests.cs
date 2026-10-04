@@ -58,15 +58,32 @@ public sealed class ConfigurationBackupTests
     }
 
     [Fact]
-    public void Import_AProfilesSelectionKeepsUncheckedPropertiesOfMatchingProfiles()
+    public void Import_AProfilesSelectionIncludesNamesModesAndProcessesTogether()
     {
         ConfigurationBackupDocument source = CreateFixture("profile-a", "Renamed", ProcessFilterModeOption.Whitelist, "incoming.exe");
         ConfigurationBackupDocument current = CreateFixture(processes: ["keep.exe"]);
         Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(source, ["Profiles"], current);
         FilterProfile profile = Assert.Single(JsonSerializer.Deserialize<List<FilterProfile>>((string)values["FilterProfiles"])!);
         Assert.Equal("Renamed", profile.Name);
-        Assert.Equal(ProcessFilterModeOption.Blacklist, profile.Mode);
-        Assert.Equal(["keep.exe"], profile.Processes);
+        Assert.Equal(ProcessFilterModeOption.Whitelist, profile.Mode);
+        Assert.Equal(["incoming.exe"], profile.Processes);
+        Assert.DoesNotContain("GlowIntensity", values.Keys);
+    }
+
+    [Fact]
+    public void Select_ProfilesIncludesAllThreeFieldsAndSupportsLegacyPartialGroups()
+    {
+        ConfigurationBackupDocument source = CreateFixture(mode: ProcessFilterModeOption.Whitelist, processes: ["incoming.exe"]);
+        ConfigurationBackupDocument selected = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(ConfigurationBackup.Select(source, ["Profiles"])));
+        Assert.Equal(new[] { "Profile.Mode", "Profile.Processes", "Profiles" }, selected.Data.Keys.Order(StringComparer.Ordinal).ToArray());
+        Assert.DoesNotContain("TotalClicks", selected.Data.Keys);
+        source.Data.Remove("Profiles");
+        ConfigurationBackupDocument legacy = ConfigurationBackup.Select(source, ["Profiles"]);
+        Assert.Equal(new[] { "Profile.Mode", "Profile.Processes" }, legacy.Data.Keys.Order(StringComparer.Ordinal).ToArray());
+        Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(legacy, ["Profiles"], CreateFixture(processes: ["keep.exe"]));
+        FilterProfile profile = Assert.Single(JsonSerializer.Deserialize<List<FilterProfile>>((string)values["FilterProfiles"])!);
+        Assert.Equal(ProcessFilterModeOption.Whitelist, profile.Mode);
+        Assert.Equal(["incoming.exe"], profile.Processes);
     }
 
     [Fact]
@@ -154,6 +171,8 @@ public sealed class ConfigurationBackupTests
             string original = await File.ReadAllTextAsync(first);
             string second = await ConfigurationBackup.WriteAsync(directory, source, ["GlowIntensity"]);
             Assert.NotEqual(first, second);
+            Assert.Matches(@"^BASpark_Config_\d{8}-\d{6}\.json$", Path.GetFileName(first));
+            Assert.Matches(@"^BASpark_Config_\d{8}-\d{6}\.json$", Path.GetFileName(second));
             Assert.Equal(original, await File.ReadAllTextAsync(first));
             Assert.Equal(1250, (await ConfigurationBackup.ReadAsync(first)).Data["TotalClicks"].GetInt32());
             Assert.Equal(1.25, (await ConfigurationBackup.ReadAsync(second)).Data["GlowIntensity"].GetDouble());
@@ -170,13 +189,15 @@ public sealed class ConfigurationBackupTests
     [Fact]
     public void SettingCatalog_CoversAllEditableSettingsAndStatisticsWithUniqueKeys()
     {
-        Assert.Equal(32, ConfigurationBackup.Settings.Count);
+        Assert.Equal(30, ConfigurationBackup.Settings.Count);
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
         Assert.Contains(ConfigurationBackup.Settings, item => item.Key == "TotalClicks");
-        foreach (string key in new[] { "Profiles", "Profile.Mode", "Profile.Processes", "ParticleColor",
+        foreach (string key in new[] { "Profiles", "ParticleColor",
                      "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode" })
             Assert.Contains(ConfigurationBackup.Settings, item => item.Key == key);
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key == "EffectOpacity");
+        Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key is "Profile.Mode" or "Profile.Processes");
+        Assert.Equal("Filter_ProfileGroup", Assert.Single(ConfigurationBackup.Settings, item => item.Key == "Profiles").TitleKey);
         foreach (BackupSettingDefinition item in ConfigurationBackup.Settings)
         {
             Assert.NotEqual(item.GroupKey, Localization.Get(item.GroupKey));

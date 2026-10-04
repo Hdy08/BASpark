@@ -18,13 +18,27 @@
         </Grid.RowDefinitions>
 
         <!-- 使用 WinUI 原生 TitleBar 控件；窗口已 ExtendsContentIntoTitleBar，系统标题栏不再绘制。 -->
-        <TitleBar x:Name="AppTitleBar"
-                  Grid.Row="0"
-                  Background="{ThemeResource BasSidebarBackgroundBrush}"
-                  Title=""
-                  Subtitle=""
-                  IsBackButtonVisible="False"
-                  IsPaneToggleButtonVisible="False" />
+        <Grid Grid.Row="0" Height="32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TitleBar x:Name="AppTitleBar" Grid.Column="0"
+                      Background="{ThemeResource BasSidebarBackgroundBrush}"
+                      Title="" Subtitle=""
+                      IsBackButtonVisible="False" IsPaneToggleButtonVisible="False" />
+            <Button x:Name="BtnCaptionClose" Grid.Column="1" Width="46" Height="32" Padding="0"
+                    Background="#00E81123" BorderThickness="0" CornerRadius="0"
+                    VerticalAlignment="Top" Click="CaptionClose_Click">
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#E81123" />
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#A2231A" />
+                    <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White" />
+                    <SolidColorBrush x:Key="ButtonForegroundPressed" Color="White" />
+                </Button.Resources>
+                <FontIcon Glyph="&#xE8BB;" FontSize="10" />
+            </Button>
+        </Grid>
 
         <ScrollViewer Grid.Row="1" Margin="{StaticResource BasStartupContentMargin}"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">

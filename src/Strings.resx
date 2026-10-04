@@ -162,6 +162,12 @@
     <data name="Filter_ProcessList" xml:space="preserve">
       <value>已配置进程列表</value>
     </data>
+    <data name="Filter_SelectedProcesses" xml:space="preserve">
+      <value>已选择 {0} 个进程</value>
+    </data>
+    <data name="Filter_ProfileGroup" xml:space="preserve">
+      <value>配置组</value>
+    </data>
     <data name="Filter_Profiles" xml:space="preserve">
       <value>配置组管理</value>
     </data>

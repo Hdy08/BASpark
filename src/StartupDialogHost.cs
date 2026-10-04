@@ -196,6 +196,30 @@ internal static class StartupDialogHost
             NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
     }
 
+    public static void ConfigureCaptionButton(Window window, FrameworkElement root, Button close)
+    {
+        bool closed = false;
+        window.Closed += (_, _) => closed = true;
+        void UpdateBounds()
+        {
+            if (closed || !root.IsLoaded || close.ActualWidth <= 0) return;
+            Rect bounds = close.TransformToVisual(root).TransformBounds(new Rect(0, 0, close.ActualWidth, close.ActualHeight));
+            double scale = root.XamlRoot.RasterizationScale;
+            int left = (int)Math.Round(bounds.Left * scale);
+            int top = (int)Math.Round(bounds.Top * scale);
+            int right = (int)Math.Round(bounds.Right * scale);
+            int bottom = (int)Math.Round(bounds.Bottom * scale);
+            var input = Microsoft.UI.Input.InputNonClientPointerSource.GetForWindowId(window.AppWindow.Id);
+            input.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.Caption, [new RectInt32(0, 0, left, bottom)]);
+            input.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.Passthrough,
+                [new RectInt32(left, top, right - left, bottom - top)]);
+        }
+        root.Loaded += (_, _) => window.DispatcherQueue.TryEnqueue(UpdateBounds);
+        root.SizeChanged += (_, _) => window.DispatcherQueue.TryEnqueue(UpdateBounds);
+        close.SizeChanged += (_, _) => window.DispatcherQueue.TryEnqueue(UpdateBounds);
+        window.AppWindow.Changed += (_, _) => window.DispatcherQueue.TryEnqueue(UpdateBounds);
+    }
+
     public static void LockWindow(Window window)
     {
         if (window.AppWindow.Presenter is OverlappedPresenter presenter)

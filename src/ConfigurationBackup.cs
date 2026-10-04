@@ -61,9 +61,7 @@ public static class ConfigurationBackup
         new("EnableEnvironmentFilter", "Filter_Title", "Filter_Enable"),
         new("HideInFullscreen", "Filter_Title", "Filter_Fullscreen"),
         new("ShowEffectOnDesktop", "Filter_Title", "Filter_Desktop"),
-        new("Profiles", "Filter_Title", "Filter_Profiles"),
-        new("Profile.Mode", "Filter_Title", "Filter_Mode"),
-        new("Profile.Processes", "Filter_Title", "Filter_ProcessList")
+        new("Profiles", "Filter_Title", "Filter_ProfileGroup")
     ];
 
     private static readonly IReadOnlyDictionary<string, (double Minimum, double Maximum)> NumericRanges =
@@ -135,9 +133,16 @@ public static class ConfigurationBackup
         var document = new ConfigurationBackupDocument();
         foreach (string key in selected)
         {
-            if (!source.Data.TryGetValue(key, out JsonElement value)) throw InvalidValue(key);
-            ValidateValue(key, value);
-            document.Data.Add(key, value.Clone());
+            string[] included = key == "Profiles"
+                ? new[] { "Profiles", "Profile.Mode", "Profile.Processes" }.Where(source.Data.ContainsKey).ToArray()
+                : [key];
+            if (included.Length == 0) throw InvalidValue(key);
+            foreach (string field in included)
+            {
+                if (!source.Data.TryGetValue(field, out JsonElement value)) throw InvalidValue(field);
+                ValidateValue(field, value);
+                document.Data.TryAdd(field, value.Clone());
+            }
         }
         return document;
     }
@@ -198,25 +203,33 @@ public static class ConfigurationBackup
     public static async Task<string> WriteAsync(string directory, ConfigurationBackupDocument source, IEnumerable<string> keys)
     {
         byte[] bytes = Encoding.UTF8.GetBytes(Serialize(Select(source, keys)));
-        string path = Path.Combine(directory, $"BASpark_Config_{DateTime.Now:yyyyMMdd-HHmmss-fff}_{Guid.NewGuid():N}.json");
-        bool created = false;
-        try
+        while (true)
         {
-            await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true);
-            created = true;
-            await stream.WriteAsync(bytes);
-            await stream.FlushAsync();
-            return path;
-        }
-        catch
-        {
-            if (created)
+            DateTime exportedAt = DateTime.Now;
+            string path = Path.Combine(directory, $"BASpark_Config_{exportedAt:yyyyMMdd-HHmmss}.json");
+            bool created = false;
+            try
             {
-                try { File.Delete(path); }
-                catch (IOException) { }
-                catch (UnauthorizedAccessException) { }
+                await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true);
+                created = true;
+                await stream.WriteAsync(bytes);
+                await stream.FlushAsync();
+                return path;
             }
-            throw;
+            catch (IOException) when (!created && File.Exists(path))
+            {
+                await Task.Delay(Math.Max(1, 1000 - DateTime.Now.Millisecond));
+            }
+            catch
+            {
+                if (created)
+                {
+                    try { File.Delete(path); }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+                throw;
+            }
         }
     }
 

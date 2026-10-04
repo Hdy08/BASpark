@@ -162,6 +162,12 @@
     <data name="Filter_ProcessList" xml:space="preserve">
       <value>設定済みプロセス</value>
     </data>
+    <data name="Filter_SelectedProcesses" xml:space="preserve">
+      <value>{0} 個のプロセスを選択済み</value>
+    </data>
+    <data name="Filter_ProfileGroup" xml:space="preserve">
+      <value>構成グループ</value>
+    </data>
     <data name="Filter_Profiles" xml:space="preserve">
       <value>プロファイル管理</value>
     </data>

@@ -158,7 +158,9 @@ public sealed partial class ControlPanelWindow
         _backupItems.Clear();
         foreach (BackupSettingDefinition definition in ConfigurationBackup.Settings)
         {
-            if (!document.Data.TryGetValue(definition.Key, out JsonElement value)) continue;
+            if (!document.Data.TryGetValue(definition.Key, out JsonElement value) &&
+                !(definition.Key == "Profiles" && (document.Data.TryGetValue("Profile.Mode", out value) ||
+                    document.Data.TryGetValue("Profile.Processes", out value)))) continue;
             _backupItems.Add(new BackupSelectionItem(definition.Key, Localization.Get(definition.GroupKey),
                 Localization.Get(definition.TitleKey).TrimEnd(':', '：'), DescribeBackupValue(definition.Key, value)) { IsSelected = true });
         }
@@ -182,7 +184,7 @@ public sealed partial class ControlPanelWindow
             description = Localization.Get(value.GetProperty("IsEnabled").GetBoolean() ? "Basic_DarkModeOn" : "Basic_DarkModeOff");
         else if (key is "Profiles" or "Profile.Mode" or "Profile.Processes")
         {
-            int count = key == "Profiles" ? value.GetProperty("Items").GetArrayLength() : value.GetArrayLength();
+            int count = value.ValueKind == JsonValueKind.Object ? value.GetProperty("Items").GetArrayLength() : value.GetArrayLength();
             description = Localization.Format("Backup_ProfileCount", count);
         }
         else if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)

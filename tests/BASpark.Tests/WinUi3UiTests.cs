@@ -929,12 +929,14 @@ public class WinUi3UiTests
         XElement processes = GetNamedElement(document, "ListConfiguredProcesses");
         Assert.Equal("ComboBox", processes.Name.LocalName);
         Assert.Equal("200", (string?)processes.Attribute("MaxDropDownHeight"));
-        Assert.Equal("{Binding Text, ElementName=TxtProcessList}", (string?)processes.Attribute("PlaceholderText"));
+        Assert.Equal("ConfiguredProcesses_SelectionChanged", (string?)processes.Attribute("SelectionChanged"));
         XElement remove = Assert.Single(processes.Descendants(), element => (string?)element.Attribute("Click") == "RemoveProcess_Click");
         Assert.Equal("{Binding}", (string?)remove.Attribute("Tag"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses", source, StringComparison.Ordinal);
-        Assert.Contains("ListConfiguredProcesses.SelectedIndex = CurrentProfileProcesses.Count > 0 ? 0 : -1", source, StringComparison.Ordinal);
+        Assert.Contains("ListConfiguredProcesses.PlaceholderText = Localization.Format(\"Filter_SelectedProcesses\", CurrentProfileProcesses.Count)", source, StringComparison.Ordinal);
+        Assert.Contains("ListConfiguredProcesses.SelectedIndex = -1", source, StringComparison.Ordinal);
+        Assert.Contains("ListConfiguredProcesses.IsEnabled = processFilterEnabled && CurrentProfileProcesses.Count > 0", source, StringComparison.Ordinal);
         foreach ((int index, string key) in new[] { (0, "Filter_Mode_Disabled"), (1, "Filter_Mode_Blacklist"), (2, "Filter_Mode_Whitelist") })
         {
             Assert.Contains($"SetComboItemContent(ComboProcessFilterMode, {index}, \"{key}\")", source, StringComparison.Ordinal);
@@ -1078,6 +1080,9 @@ public class WinUi3UiTests
         XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorPresetsStyle");
         Assert.Single(style.Descendants(), element => element.Name.LocalName == "ColorPresetLayout");
         Assert.Contains("private const int Columns = 8", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        XElement details = GetNamedElement(document, "ColorPickerDetails");
+        Assert.Null(details.Attribute("Width"));
+        Assert.Equal("Auto", (string?)details.Parent!.Element(Presentation + "Grid.ColumnDefinitions")!.Elements().Last().Attribute("Width"));
     }
 
     [Fact]
@@ -1113,7 +1118,8 @@ public class WinUi3UiTests
         Assert.Equal(4, navigation.Element(Presentation + "NavigationView.MenuItems")!.Elements().Count());
         Assert.All(navigation.Element(Presentation + "NavigationView.MenuItems")!.Elements(), item => Assert.Null(item.Attribute("Margin")));
         XElement close = GetNamedElement(document, "BtnCaptionClose");
-        Assert.Contains(close.Descendants(), resource => (string?)resource.Attribute(Xaml + "Key") == "ButtonBackgroundPointerOver" && (string?)resource.Attribute("Color") == "#C42B1C");
+        Assert.Equal("#00E81123", (string?)close.Attribute("Background"));
+        Assert.Contains(close.Descendants(), resource => (string?)resource.Attribute(Xaml + "Key") == "ButtonBackgroundPointerOver" && (string?)resource.Attribute("Color") == "#E81123");
         Assert.Contains(close.Descendants(), resource => (string?)resource.Attribute(Xaml + "Key") == "ButtonForegroundPointerOver" && (string?)resource.Attribute("Color") == "White");
     }
 
@@ -1132,6 +1138,8 @@ public class WinUi3UiTests
         Assert.Equal("Center", (string?)remove.Attribute("VerticalAlignment"));
         Assert.Equal("Center", (string?)remove.Attribute("VerticalContentAlignment"));
         Assert.Equal("Center", (string?)remove.Parent!.Attribute("VerticalAlignment"));
+        Assert.Contains(dropdown.Descendants(Presentation + "Setter"), setter =>
+            (string?)setter.Attribute("Property") == "Padding" && (string?)setter.Attribute("Value") == "11,6,11,6");
     }
 
     [Fact]
@@ -1670,7 +1678,7 @@ public class WinUi3UiTests
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("private string _particleColor = ConfigManager.ParticleColor", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ConfigManager.ParticleColor =", source, StringComparison.Ordinal);
-        Assert.Contains("SaveResetProfileProperty(profileId, resetProcesses: true)", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.SaveProfiles(Profiles.ToList()", source, StringComparison.Ordinal);
         Assert.Contains("JsonSerializer.Deserialize<List<ScreenSelectionState>>(_savedSettingsState!.Screens)", source, StringComparison.Ordinal);
         Assert.Contains("if (!ConfigManager.Save(key, value)) throw", source, StringComparison.Ordinal);
         string config = ReadSource("src", "ConfigManager.cs");

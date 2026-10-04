@@ -162,6 +162,12 @@
     <data name="Filter_ProcessList" xml:space="preserve">
       <value>Configured processes</value>
     </data>
+    <data name="Filter_SelectedProcesses" xml:space="preserve">
+      <value>{0} processes selected</value>
+    </data>
+    <data name="Filter_ProfileGroup" xml:space="preserve">
+      <value>Profiles</value>
+    </data>
     <data name="Filter_Profiles" xml:space="preserve">
       <value>Profile management</value>
     </data>

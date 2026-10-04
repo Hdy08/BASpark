@@ -1,21 +1,54 @@
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace BASpark;
 
 /// <summary>
 /// WinUI 3 不读取 csproj 的 <c>ApplicationIcon</c> 作为窗口图标，
-/// 因此这里从自身可执行文件提取图标并显式设置到窗口句柄上，
-/// 让标题栏与 Alt+Tab 使用与安装包一致的图标。
+/// 因此这里复用嵌入的应用图标，显式设置窗口句柄和原生标题栏。
 /// </summary>
 internal static class WindowChrome
 {
     private const int WM_SETICON = 0x0080;
     private const int ICON_SMALL = 0;
     private const int ICON_BIG = 1;
-    private const uint IMAGE_ICON = 1;
-    private const uint LR_DEFAULTSIZE = 0x00000040;
-    private const uint LR_SHARED = 0x00008000;
+    private static System.Drawing.Icon? _appIcon;
+    private static BitmapImage? _appIconImage;
+
+    private static System.Drawing.Icon GetAppIcon()
+    {
+        if (_appIcon != null) return _appIcon;
+        using Stream stream = typeof(WindowChrome).Assembly.GetManifestResourceStream("BASpark.app.ico")
+            ?? throw new InvalidOperationException("Application icon resource is unavailable.");
+        return _appIcon = new System.Drawing.Icon(stream, 32, 32);
+    }
+
+    public static ImageIconSource? CreateAppIconSource()
+    {
+        try
+        {
+            if (_appIconImage == null)
+            {
+                using System.Drawing.Bitmap bitmap = GetAppIcon().ToBitmap();
+                using var stream = new MemoryStream();
+                bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                stream.Position = 0;
+                using var image = stream.AsRandomAccessStream();
+                var source = new BitmapImage();
+                source.SetSource(image);
+                _appIconImage = source;
+            }
+            return new ImageIconSource { ImageSource = _appIconImage };
+        }
+        catch (Exception exception)
+        {
+            AppLogger.Debug($"Failed to load the title bar icon: {exception.Message}");
+            return null;
+        }
+    }
 
     public static void ApplyAppIcon(Window window)
     {
@@ -31,25 +64,9 @@ internal static class WindowChrome
                 return;
             }
 
-            string exePath = Environment.ProcessPath ?? string.Empty;
-            if (string.IsNullOrEmpty(exePath))
-            {
-                return;
-            }
-
-            IntPtr smallIcon = LoadImage(
-                IntPtr.Zero, exePath, IMAGE_ICON, 16, 16, LR_SHARED);
-            if (smallIcon != IntPtr.Zero)
-            {
-                SendMessage(hwnd, WM_SETICON, ICON_SMALL, smallIcon);
-            }
-
-            IntPtr bigIcon = LoadImage(
-                IntPtr.Zero, exePath, IMAGE_ICON, 32, 32, LR_SHARED);
-            if (bigIcon != IntPtr.Zero)
-            {
-                SendMessage(hwnd, WM_SETICON, ICON_BIG, bigIcon);
-            }
+            IntPtr icon = GetAppIcon().Handle;
+            SendMessage(hwnd, WM_SETICON, ICON_SMALL, icon);
+            SendMessage(hwnd, WM_SETICON, ICON_BIG, icon);
         }
         catch (Exception ex)
         {
@@ -154,10 +171,6 @@ internal static class WindowChrome
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(
         IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern IntPtr LoadImage(
-        IntPtr hinst, string lpszName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, IntPtr lParam);
