@@ -1063,7 +1063,7 @@ public class WinUi3UiTests
         XElement presets = GetNamedElement(document, "EffectColorPresets");
         Assert.Equal("RadioButtons", presets.Name.LocalName);
         Assert.Equal("{StaticResource BasColorPresetsStyle}", (string?)presets.Attribute("Style"));
-        Assert.Equal(12, presets.Elements().Count());
+        Assert.Equal(16, presets.Elements().Count());
         Assert.All(presets.Elements(), swatch =>
         {
             Assert.Equal("RadioButton", swatch.Name.LocalName);
@@ -1077,7 +1077,7 @@ public class WinUi3UiTests
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorPresetsStyle");
         Assert.Single(style.Descendants(), element => element.Name.LocalName == "ColorPresetLayout");
-        Assert.Contains("private const int Columns = 6", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        Assert.Contains("private const int Columns = 8", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
     }
 
     [Fact]

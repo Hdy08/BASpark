@@ -1099,46 +1099,58 @@
                                                     <TextBlock x:Name="ExpandedColorOpacity" Style="{StaticResource BasCaptionStyle}" />
                                                 </StackPanel>
                                             </Grid>
-                                            <RadioButtons x:Name="EffectColorPresets" MaxColumns="6"
+                                            <RadioButtons x:Name="EffectColorPresets" MaxColumns="8"
                                                           Style="{StaticResource BasColorPresetsStyle}"
                                                           SelectionChanged="EffectColorPresets_SelectionChanged"
                                                           AutomationProperties.Name="{Binding Text, ElementName=TxtEffectColor}">
-                                                        <RadioButton Tag="#000000" Background="#000000"
+                                                        <RadioButton Tag="#FF0000" Background="#FF0000"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#000000" AutomationProperties.Name="#000000" />
-                                                        <RadioButton Tag="#1A1A1A" Background="#1A1A1A"
+                                                                     ToolTipService.ToolTip="#FF0000" AutomationProperties.Name="#FF0000" />
+                                                        <RadioButton Tag="#FF5500" Background="#FF5500"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#1A1A1A" AutomationProperties.Name="#1A1A1A" />
-                                                        <RadioButton Tag="#444444" Background="#444444"
+                                                                     ToolTipService.ToolTip="#FF5500" AutomationProperties.Name="#FF5500" />
+                                                        <RadioButton Tag="#FFAA00" Background="#FFAA00"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#444444" AutomationProperties.Name="#444444" />
-                                                        <RadioButton Tag="#888888" Background="#888888"
+                                                                     ToolTipService.ToolTip="#FFAA00" AutomationProperties.Name="#FFAA00" />
+                                                        <RadioButton Tag="#FFFF00" Background="#FFFF00"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#888888" AutomationProperties.Name="#888888" />
-                                                        <RadioButton Tag="#CCCCCC" Background="#CCCCCC"
+                                                                     ToolTipService.ToolTip="#FFFF00" AutomationProperties.Name="#FFFF00" />
+                                                        <RadioButton Tag="#AAFF00" Background="#AAFF00"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#CCCCCC" AutomationProperties.Name="#CCCCCC" />
-                                                        <RadioButton Tag="#FFFFFF" Background="#FFFFFF"
+                                                                     ToolTipService.ToolTip="#AAFF00" AutomationProperties.Name="#AAFF00" />
+                                                        <RadioButton Tag="#55FF00" Background="#55FF00"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#FFFFFF" AutomationProperties.Name="#FFFFFF" />
-                                                        <RadioButton Tag="#ADACF0" Background="#ADACF0"
+                                                                     ToolTipService.ToolTip="#55FF00" AutomationProperties.Name="#55FF00" />
+                                                        <RadioButton Tag="#00FF00" Background="#00FF00"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#ADACF0" AutomationProperties.Name="#ADACF0" />
-                                                        <RadioButton Tag="#203F56" Background="#203F56"
+                                                                     ToolTipService.ToolTip="#00FF00" AutomationProperties.Name="#00FF00" />
+                                                        <RadioButton Tag="#00FF55" Background="#00FF55"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#203F56" AutomationProperties.Name="#203F56" />
-                                                        <RadioButton Tag="#AEDAEC" Background="#AEDAEC"
+                                                                     ToolTipService.ToolTip="#00FF55" AutomationProperties.Name="#00FF55" />
+                                                        <RadioButton Tag="#00FFAA" Background="#00FFAA"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#AEDAEC" AutomationProperties.Name="#AEDAEC" />
-                                                        <RadioButton Tag="#65C958" Background="#65C958"
+                                                                     ToolTipService.ToolTip="#00FFAA" AutomationProperties.Name="#00FFAA" />
+                                                        <RadioButton Tag="#00FFFF" Background="#00FFFF"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#65C958" AutomationProperties.Name="#65C958" />
-                                                        <RadioButton Tag="#FFEB00" Background="#FFEB00"
+                                                                     ToolTipService.ToolTip="#00FFFF" AutomationProperties.Name="#00FFFF" />
+                                                        <RadioButton Tag="#4CA7FF" Background="#4CA7FF"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#FFEB00" AutomationProperties.Name="#FFEB00" />
-                                                        <RadioButton Tag="#FE99AF" Background="#FE99AF"
+                                                                     ToolTipService.ToolTip="#4CA7FF" AutomationProperties.Name="#4CA7FF" />
+                                                        <RadioButton Tag="#0055FF" Background="#0055FF"
                                                                      Style="{StaticResource BasColorSwatchStyle}"
-                                                                     ToolTipService.ToolTip="#FE99AF" AutomationProperties.Name="#FE99AF" />
+                                                                     ToolTipService.ToolTip="#0055FF" AutomationProperties.Name="#0055FF" />
+                                                        <RadioButton Tag="#0000FF" Background="#0000FF"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#0000FF" AutomationProperties.Name="#0000FF" />
+                                                        <RadioButton Tag="#5500FF" Background="#5500FF"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#5500FF" AutomationProperties.Name="#5500FF" />
+                                                        <RadioButton Tag="#AA00FF" Background="#AA00FF"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#AA00FF" AutomationProperties.Name="#AA00FF" />
+                                                        <RadioButton Tag="#FF00FF" Background="#FF00FF"
+                                                                     Style="{StaticResource BasColorSwatchStyle}"
+                                                                     ToolTipService.ToolTip="#FF00FF" AutomationProperties.Name="#FF00FF" />
                                             </RadioButtons>
                                         </StackPanel>
                                     </Grid>
@@ -1322,7 +1334,15 @@
                                                   PlaceholderText="{Binding Text, ElementName=TxtProcessList}"
                                                   Background="{ThemeResource BasSettingsControlBackgroundBrush}"
                                                   BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
-                                                  AutomationProperties.Name="{Binding Text, ElementName=TxtProcessList}">
+                                                  AutomationProperties.Name="{Binding Text, ElementName=TxtProcessList}"
+                                                  SizeChanged="ConfiguredProcesses_SizeChanged">
+                                            <ComboBox.Resources>
+                                                <SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="Transparent" />
+                                                <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="Transparent" />
+                                                <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedUnfocused" Color="Transparent" />
+                                                <SolidColorBrush x:Key="ComboBoxItemBorderBrushSelected" Color="Transparent" />
+                                                <SolidColorBrush x:Key="ComboBoxItemBorderBrushSelectedUnfocused" Color="Transparent" />
+                                            </ComboBox.Resources>
                                             <ComboBox.ItemContainerStyle>
                                                 <Style TargetType="ComboBoxItem" BasedOn="{StaticResource DefaultComboBoxItemStyle}">
                                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -1331,7 +1351,8 @@
                                             </ComboBox.ItemContainerStyle>
                                             <ComboBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid ColumnSpacing="8" MinHeight="20" VerticalAlignment="Center">
+                                                    <Grid x:Name="ConfiguredProcessItemRoot" ColumnSpacing="8" MinHeight="20" VerticalAlignment="Center"
+                                                          Loaded="ConfiguredProcessRow_Loaded">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
                                                             <ColumnDefinition Width="Auto" />

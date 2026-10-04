@@ -131,6 +131,9 @@ public sealed partial class ControlPanelWindow
                 if (json.RootElement.TryGetProperty(definition.Key, out JsonElement value))
                     document.Data[definition.Key] = value.Clone();
         }
+        using (JsonDocument visual = JsonDocument.Parse(CaptureVisualSettings()))
+            document.Data["ParticleColor"] = JsonSerializer.SerializeToElement(ColorPickerColorMath.CombineThemeColor(
+                visual.RootElement.GetProperty("ParticleColor").GetString()!, visual.RootElement.GetProperty("EffectOpacity").GetDouble()));
         ConfigurationBackup.SetProfiles(document, Profiles, (ComboProfiles.SelectedItem as FilterProfile)?.Id ?? string.Empty);
         var screens = document.Data.Where(item => ConfigurationBackup.IsScreenKey(item.Key))
             .Select(item => item.Value.Deserialize<ScreenSelectionState>()!).ToList();
@@ -393,6 +396,7 @@ public sealed partial class ControlPanelWindow
         {
             if (currentGeneral.ContainsKey(key)) general[key] = currentGeneral[key]?.DeepClone();
             if (currentVisual.ContainsKey(key)) visual[key] = currentVisual[key]?.DeepClone();
+            if (key == "ParticleColor") visual["EffectOpacity"] = currentVisual["EffectOpacity"]?.DeepClone();
         }
         if (selected.Any(key => key is "Profiles" or "Profile.Mode" or "Profile.Processes"))
         {

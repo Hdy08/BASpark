@@ -37,7 +37,7 @@ namespace BASpark;
 
 public sealed class ColorPresetLayout : NonVirtualizingLayout
 {
-    private const int Columns = 6;
+    private const int Columns = 8;
     private const double Side = 28;
     private const double Spacing = 6;
 
@@ -358,6 +358,7 @@ public sealed partial class ControlPanelWindow : UserControl
         public bool CloseRequested { get; set; }
     }
     private readonly Dictionary<ContentDialog, ModalDialogState> _modalDialogs = new();
+    private readonly Dictionary<ContentDialog, Border> _dialogPresentationGuards = new();
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
@@ -762,7 +763,11 @@ public sealed partial class ControlPanelWindow : UserControl
                 var currentProfile = currentGeneral["Profiles"]!.AsArray().FirstOrDefault(profile => profile!["Id"]!.GetValue<string>() == item.SelectionId);
                 if (savedProfile != null && currentProfile != null) savedProfile[property] = currentProfile[property]!.DeepClone();
             }
-            else if (currentVisual.ContainsKey(key)) visual[key] = currentVisual[key]?.DeepClone();
+            else if (currentVisual.ContainsKey(key))
+            {
+                visual[key] = currentVisual[key]?.DeepClone();
+                if (key == "ParticleColor") visual["EffectOpacity"] = currentVisual["EffectOpacity"]?.DeepClone();
+            }
             else if (currentGeneral.ContainsKey(key))
             {
                 general[key] = currentGeneral[key]?.DeepClone();
@@ -2422,6 +2427,21 @@ public sealed partial class ControlPanelWindow : UserControl
     // 进程列表
     // ==================================================================
 
+    private void ConfiguredProcessRow_Loaded(object sender, RoutedEventArgs args) => UpdateConfiguredProcessRow((Grid)sender);
+
+    private void ConfiguredProcesses_SizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (FindVisualDescendant<Grid>(ListConfiguredProcesses, "ConfiguredProcessItemRoot") is { } row) UpdateConfiguredProcessRow(row);
+    }
+
+    private void UpdateConfiguredProcessRow(Grid row)
+    {
+        for (DependencyObject? parent = VisualTreeHelper.GetParent(row); parent != null; parent = VisualTreeHelper.GetParent(parent))
+            if (parent is ComboBoxItem) { row.ClearValue(WidthProperty); return; }
+        row.Width = Math.Max(0, ListConfiguredProcesses.ActualWidth - ListConfiguredProcesses.Padding.Left - ListConfiguredProcesses.Padding.Right -
+            ListConfiguredProcesses.BorderThickness.Left - ListConfiguredProcesses.BorderThickness.Right);
+    }
+
     private void RemoveProcess_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button)
@@ -2435,17 +2455,27 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             return;
         }
+        bool wasOpen = ListConfiguredProcesses.IsDropDownOpen;
 
         if (ComboProfiles.SelectedItem is FilterProfile active)
         {
             active.Processes.RemoveAll(existing =>
                 string.Equals(existing, processName, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(NormalizeProcessName(existing), processName, StringComparison.OrdinalIgnoreCase));
-            RefreshCurrentProfileProcesses(active);
+            CurrentProfileProcesses.Remove(processName);
         }
         else
         {
             CurrentProfileProcesses.Remove(processName);
+        }
+        if (ListConfiguredProcesses.SelectedIndex < 0 && CurrentProfileProcesses.Count > 0) ListConfiguredProcesses.SelectedIndex = 0;
+        if (wasOpen && CurrentProfileProcesses.Count > 0)
+        {
+            ListConfiguredProcesses.IsDropDownOpen = true;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_isClosed && CurrentProfileProcesses.Count > 0) ListConfiguredProcesses.IsDropDownOpen = true;
+            });
         }
     }
 
@@ -2815,15 +2845,12 @@ public sealed partial class ControlPanelWindow : UserControl
         AddVisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, CheckFollowDisplayRefreshRate.Header.ToString()!, "FollowDisplayRefreshRate", true,
             () => CheckFollowDisplayRefreshRate.IsOn = true);
         AddVisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, Localization.Get("VisualReset_TrailRefresh"), "TrailRefreshRate", 60, () => SliderTrailRefresh.Value = 60);
-        AddVisualResetItem(VisualAppearanceResetFlags.EffectOpacity, Localization.Get("VisualReset_Opacity"), "EffectOpacity", 1.0, () =>
-        {
-            _effectOpacity = 1;
-            UpdateColorPreview(_particleColor);
-        });
-        AddVisualResetItem(VisualAppearanceResetFlags.ParticleColor, Localization.Get("VisualReset_Color"), "ParticleColor", "76,167,255",
+        AddVisualResetItem(VisualAppearanceResetFlags.ParticleColor | VisualAppearanceResetFlags.EffectOpacity,
+            Localization.Get("VisualReset_Color"), "ParticleColor", ConfigManager.DefaultThemeColor,
             () =>
             {
                 _particleColor = "76,167,255";
+                _effectOpacity = 1;
                 UpdateColorPreview(_particleColor);
             });
     }
@@ -3381,12 +3408,11 @@ public sealed partial class ControlPanelWindow : UserControl
         ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
         ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsOn);
         ConfigManager.Save("AutoStart", autoStartEnabled);
-        ConfigManager.Save("ParticleColor", _particleColor);
+        ConfigManager.Save("ParticleColor", ColorPickerColorMath.CombineThemeColor(_particleColor, effectOpacity));
         ConfigManager.Save("EffectScale", effectScaleForRegistry);
         ConfigManager.Save("UseLinkedEffectScale", useLinkedEffectScale);
         ConfigManager.Save("TrailEffectScale", trailEffectScale);
         ConfigManager.Save("ClickEffectScale", clickEffectScale);
-        ConfigManager.Save("EffectOpacity", effectOpacity);
         ConfigManager.Save("GlowIntensity", glowIntensity);
         ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
         ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
@@ -3627,6 +3653,7 @@ public sealed partial class ControlPanelWindow : UserControl
             if (dialog.XamlRoot != root) dialog.XamlRoot = root;
             dialog.RequestedTheme = RootGrid.ActualTheme;
             ConfigureContentDialog(dialog);
+            PrepareContentDialogPresentation(dialog);
             dialog.Opened += Opened;
             dialog.Closing += Closing;
             await dialog.ShowAsync(ContentDialogPlacement.Popup);
@@ -3719,10 +3746,14 @@ public sealed partial class ControlPanelWindow : UserControl
                 DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, async () =>
                 {
                     if (_isClosed || version != animationVersion) return;
-                    if (layout != null) layout.ClearValue(OpacityProperty);
-                    _ = AnimateScrim(true);
                     _ = VisualStateManager.GoToState(dialog, "DialogHidden", false);
                     _ = VisualStateManager.GoToState(dialog, "DialogShowing", true);
+                    if (layout != null)
+                    {
+                        layout.ClearValue(OpacityProperty);
+                        FindVisualDescendant<Border>(layout, "BackgroundElement")?.ClearValue(OpacityProperty);
+                    }
+                    _ = AnimateScrim(true);
                     await Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlNormalAnimationDuration"], CultureInfo.InvariantCulture));
                     if (_isClosed || version != animationVersion) return;
                     for (DependencyObject? source = FocusManager.GetFocusedElement(dialog.XamlRoot) as DependencyObject; source != null; source = VisualTreeHelper.GetParent(source))
@@ -3785,6 +3816,7 @@ public sealed partial class ControlPanelWindow : UserControl
             scrimAnimation?.Stop();
             scrimAnimation = null;
             scrim = null;
+            if (string.IsNullOrEmpty(dialog.Name)) _dialogPresentationGuards.Remove(dialog);
         };
         dialog.Loaded += (_, _) =>
         {
@@ -3814,6 +3846,16 @@ public sealed partial class ControlPanelWindow : UserControl
                 }
             }
         };
+    }
+
+    private void PrepareContentDialogPresentation(ContentDialog dialog)
+    {
+        dialog.ApplyTemplate();
+        Border? background = FindVisualDescendant<Border>(dialog, "BackgroundElement") ??
+            (_dialogPresentationGuards.TryGetValue(dialog, out Border? saved) ? saved : null);
+        if (background == null) return;
+        _dialogPresentationGuards[dialog] = background;
+        background.Opacity = new Windows.UI.ViewManagement.UISettings().AnimationsEnabled ? 0 : 1;
     }
 
     private Microsoft.UI.Xaml.Shapes.Rectangle? UpdateDialogScrim(ContentDialog dialog)
@@ -3855,6 +3897,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 DefaultButton = ContentDialogButton.Close
             };
             ConfigureContentDialog(_messageDialog);
+            PrepareContentDialogPresentation(_messageDialog);
             await _messageDialog.ShowAsync();
         }
         catch (Exception exception)
@@ -3898,6 +3941,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
             _messageDialog = dialog;
             ConfigureContentDialog(dialog);
+            PrepareContentDialogPresentation(dialog);
             return await dialog.ShowAsync() == ContentDialogResult.Primary;
         }
         catch (Exception ex)
@@ -4041,6 +4085,7 @@ public sealed partial class ControlPanelWindow : UserControl
             pair.Value.Closed.TrySetResult(false);
         }
         _modalDialogs.Clear();
+        _dialogPresentationGuards.Clear();
         foreach (var callback in _navigationIndicatorCallbacks) callback.Item.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
         foreach (var state in _navigationIndicators.Values)
         {

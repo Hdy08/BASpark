@@ -76,6 +76,24 @@ namespace BASpark
         public static string ToHex(Color color) =>
             $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 
+        public static string ToArgbHex(Color color) => $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
+
+        public static bool TryParseArgbHex(string? text, out Color color)
+        {
+            color = default;
+            string value = text?.Trim().TrimStart('#') ?? string.Empty;
+            if (value.Length != 8 || !uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint channels)) return false;
+            color = Color.FromArgb((byte)(channels >> 24), (byte)(channels >> 16), (byte)(channels >> 8), (byte)channels);
+            return true;
+        }
+
+        public static string CombineThemeColor(string rgb, double opacity)
+        {
+            if (!TryParseRgb(rgb, out Color color) && !TryParseHex(rgb, out color)) throw new FormatException("Invalid theme color.");
+            color.A = ToByte(Math.Clamp(opacity, 0.1, 1));
+            return ToArgbHex(color);
+        }
+
         public static bool TryParseHex(string? text, out Color color)
         {
             color = Color.FromArgb(0, 0, 0, 0);

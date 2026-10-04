@@ -64,6 +64,7 @@ namespace BASpark
     public static class ConfigManager
     {
         private const string RegPath = @"Software\BASpark";
+        public const string DefaultThemeColor = "#FF4CA7FF";
 
         public static string ParticleColor { get; set; } = "76,167,255";
         public static bool IsEffectEnabled { get; set; } = true;
@@ -144,7 +145,12 @@ namespace BASpark
                         UseLinkedEffectScale = Convert.ToBoolean(key.GetValue("UseLinkedEffectScale", true));
                         TrailEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("TrailEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
                         ClickEffectScale = Math.Clamp(Convert.ToDouble(key.GetValue("ClickEffectScale", EffectScale), CultureInfo.InvariantCulture), 0.5, 3.0);
-                        EffectOpacity = Math.Clamp(Convert.ToDouble(key.GetValue("EffectOpacity", 1.0), CultureInfo.InvariantCulture), 0.1, 1.0);
+                        if (ColorPickerColorMath.TryParseArgbHex(ParticleColor, out var themeColor))
+                        {
+                            ParticleColor = ColorPickerColorMath.ToRgbString(themeColor);
+                            EffectOpacity = Math.Clamp(themeColor.A / 255.0, 0.1, 1);
+                        }
+                        else EffectOpacity = Math.Clamp(Convert.ToDouble(key.GetValue("EffectOpacity", 1.0), CultureInfo.InvariantCulture), 0.1, 1.0);
                         GlowIntensity = Math.Clamp(Convert.ToDouble(key.GetValue("GlowIntensity", 1.0), CultureInfo.InvariantCulture), 0.0, 3.0);
                         EffectSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("EffectSpeed", 1.0), CultureInfo.InvariantCulture), 0.2, 3.0);
                         UseLinkedAnimationSpeed = Convert.ToBoolean(key.GetValue("UseLinkedAnimationSpeed", true));
@@ -358,7 +364,7 @@ namespace BASpark
 
             if (flags.HasFlag(VisualAppearanceResetFlags.EffectOpacity))
             {
-                Save("EffectOpacity", 1.0);
+                Save("ParticleColor", DefaultThemeColor);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.GlowIntensity))
@@ -392,7 +398,7 @@ namespace BASpark
 
             if (flags.HasFlag(VisualAppearanceResetFlags.ParticleColor))
             {
-                Save("ParticleColor", "76,167,255");
+                Save("ParticleColor", DefaultThemeColor);
             }
         }
 
@@ -403,6 +409,23 @@ namespace BASpark
                 lock (_syncLock)
                 {
                     using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegPath);
+                    if (name is "ParticleColor" or "EffectOpacity")
+                    {
+                        string color = name == "ParticleColor" ? Convert.ToString(value, CultureInfo.InvariantCulture)! : ParticleColor;
+                        double opacity = name == "EffectOpacity" ? Convert.ToDouble(value, CultureInfo.InvariantCulture) : EffectOpacity;
+                        if (ColorPickerColorMath.TryParseArgbHex(color, out var packed))
+                        {
+                            color = ColorPickerColorMath.ToRgbString(packed);
+                            opacity = Math.Clamp(packed.A / 255.0, 0.1, 1);
+                        }
+                        string combined = ColorPickerColorMath.CombineThemeColor(color, opacity);
+                        ColorPickerColorMath.TryParseArgbHex(combined, out var normalized);
+                        key.SetValue("ParticleColor", combined);
+                        key.DeleteValue("EffectOpacity", false);
+                        ParticleColor = ColorPickerColorMath.ToRgbString(normalized);
+                        EffectOpacity = Math.Clamp(opacity, 0.1, 1);
+                        return true;
+                    }
                     if (value is double dVal)
                     {
                         key.SetValue(name, dVal.ToString(CultureInfo.InvariantCulture));
@@ -458,12 +481,14 @@ namespace BASpark
             {
                 try
                 {
-                    var properties = values.Keys.ToDictionary(name => name,
+                    bool hasThemeColor = values.ContainsKey("ParticleColor") || values.ContainsKey("EffectOpacity");
+                    var propertyNames = hasThemeColor ? values.Keys.Concat(new[] { "ParticleColor", "EffectOpacity" }).Distinct() : values.Keys;
+                    var properties = propertyNames.ToDictionary(name => name,
                         name => typeof(ConfigManager).GetProperty(name) ?? throw new InvalidOperationException(name));
                     var previous = properties.ToDictionary(item => item.Key, item => item.Value.GetValue(null));
                     var profiles = GetProfiles();
                     using RegistryKey registry = Registry.CurrentUser.CreateSubKey(RegPath);
-                    var stored = values.Keys.ToDictionary(name => name, name =>
+                    var stored = properties.Keys.ToDictionary(name => name, name =>
                     {
                         object? value = registry.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
                         return (Value: value, Kind: value == null ? RegistryValueKind.Unknown : registry.GetValueKind(name));
@@ -471,7 +496,15 @@ namespace BASpark
                     try
                     {
                         foreach (var item in values)
-                            if (!Save(item.Key, item.Value)) throw new IOException(item.Key);
+                            if (item.Key is not ("ParticleColor" or "EffectOpacity") && !Save(item.Key, item.Value)) throw new IOException(item.Key);
+                        if (hasThemeColor)
+                        {
+                            string color = values.TryGetValue("ParticleColor", out object? colorValue) ? (string)colorValue : ParticleColor;
+                            double opacity = values.TryGetValue("EffectOpacity", out object? opacityValue) ? Convert.ToDouble(opacityValue, CultureInfo.InvariantCulture) : EffectOpacity;
+                            string combined = ColorPickerColorMath.TryParseArgbHex(color, out var packed) ? ColorPickerColorMath.ToArgbHex(packed) :
+                                ColorPickerColorMath.CombineThemeColor(color, opacity);
+                            if (!Save("ParticleColor", combined)) throw new IOException("ParticleColor");
+                        }
                         if (values.ContainsKey("FilterProfiles"))
                             _profiles = System.Text.Json.JsonSerializer.Deserialize<List<FilterProfile>>(FilterProfiles)
                                 ?? throw new InvalidDataException();

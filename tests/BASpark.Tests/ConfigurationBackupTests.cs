@@ -170,16 +170,52 @@ public sealed class ConfigurationBackupTests
     [Fact]
     public void SettingCatalog_CoversAllEditableSettingsAndStatisticsWithUniqueKeys()
     {
-        Assert.Equal(33, ConfigurationBackup.Settings.Count);
+        Assert.Equal(32, ConfigurationBackup.Settings.Count);
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
         Assert.Contains(ConfigurationBackup.Settings, item => item.Key == "TotalClicks");
-        foreach (string key in new[] { "Profiles", "Profile.Mode", "Profile.Processes", "ParticleColor", "EffectOpacity",
+        foreach (string key in new[] { "Profiles", "Profile.Mode", "Profile.Processes", "ParticleColor",
                      "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode" })
             Assert.Contains(ConfigurationBackup.Settings, item => item.Key == key);
+        Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key == "EffectOpacity");
         foreach (BackupSettingDefinition item in ConfigurationBackup.Settings)
         {
             Assert.NotEqual(item.GroupKey, Localization.Get(item.GroupKey));
             Assert.NotEqual(item.TitleKey, Localization.Get(item.TitleKey));
         }
+    }
+
+    [Theory]
+    [InlineData("#804CA7FF", "76,167,255", 128)]
+    [InlineData("#FF0055FF", "0,85,255", 255)]
+    public void Import_ArgbThemeColorAppliesColorAndOpacityTogether(string hex, string rgb, int alpha)
+    {
+        var source = new ConfigurationBackupDocument();
+        source.Data["ParticleColor"] = JsonSerializer.SerializeToElement(hex);
+        Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(source, ["ParticleColor"], CreateFixture());
+        Assert.Equal(rgb, values["ParticleColor"]);
+        Assert.Equal(alpha / 255.0, values["EffectOpacity"]);
+    }
+
+    [Fact]
+    public void Parse_LegacyColorAndOpacityBecomeOneHexField()
+    {
+        var source = new ConfigurationBackupDocument();
+        source.Data["ParticleColor"] = JsonSerializer.SerializeToElement("76,167,255");
+        source.Data["EffectOpacity"] = JsonSerializer.SerializeToElement(0.5);
+        ConfigurationBackupDocument parsed = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source));
+        Assert.Equal("#804CA7FF", parsed.Data["ParticleColor"].GetString());
+        Assert.DoesNotContain("EffectOpacity", parsed.Data.Keys);
+        Assert.Equal("#804CA7FF", ConfigurationBackup.Parse(ConfigurationBackup.Serialize(parsed)).Data["ParticleColor"].GetString());
+    }
+
+    [Theory]
+    [InlineData("#004CA7FF")]
+    [InlineData("#104CA7FF")]
+    [InlineData("#GG4CA7FF")]
+    public void Parse_InvalidArgbColorsAreRejected(string hex)
+    {
+        var source = new ConfigurationBackupDocument();
+        source.Data["ParticleColor"] = JsonSerializer.SerializeToElement(hex);
+        Assert.Throws<InvalidDataException>(() => ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source)));
     }
 }

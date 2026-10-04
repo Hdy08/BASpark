@@ -57,7 +57,6 @@ public static class ConfigurationBackup
         new("ApplyCurveDraw", "Visual_Title", "Visual_CurveDraw"),
         new("FollowDisplayRefreshRate", "Visual_Title", "Visual_FollowDisplayRefreshRate"),
         new("TrailRefreshRate", "Visual_Title", "VisualReset_TrailRefresh"),
-        new("EffectOpacity", "Visual_Title", "VisualReset_Opacity"),
         new("ParticleColor", "Visual_Title", "VisualReset_Color"),
         new("EnableEnvironmentFilter", "Filter_Title", "Filter_Enable"),
         new("HideInFullscreen", "Filter_Title", "Filter_Fullscreen"),
@@ -91,6 +90,7 @@ public static class ConfigurationBackup
             PropertyInfo? property = typeof(ConfigManager).GetProperty(setting.Key);
             if (property == null) continue;
             object value = property.GetValue(null)!;
+            if (setting.Key == "ParticleColor") value = ColorPickerColorMath.CombineThemeColor(ConfigManager.ParticleColor, ConfigManager.EffectOpacity);
             if (setting.Key == "UiLanguage" && string.IsNullOrWhiteSpace((string)value))
                 value = Localization.CurrentCultureName;
             document.Data[setting.Key] = JsonSerializer.SerializeToElement(value, property.PropertyType, JsonOptions);
@@ -166,6 +166,13 @@ public static class ConfigurationBackup
                 document.Data == null || document.Data.Count is 0 or > 1024)
                 throw new InvalidDataException(Localization.Get("Backup_InvalidFile"));
             foreach (var item in document.Data) ValidateValue(item.Key, item.Value);
+            if (document.Data.TryGetValue("EffectOpacity", out JsonElement legacyOpacity))
+            {
+                string color = document.Data.TryGetValue("ParticleColor", out JsonElement legacyColor) ? legacyColor.GetString()! : ConfigManager.ParticleColor;
+                if (!ColorPickerColorMath.TryParseArgbHex(color, out _))
+                    document.Data["ParticleColor"] = JsonSerializer.SerializeToElement(ColorPickerColorMath.CombineThemeColor(color, legacyOpacity.GetDouble()));
+                document.Data.Remove("EffectOpacity");
+            }
             return document;
         }
         catch (JsonException exception)
@@ -222,6 +229,11 @@ public static class ConfigurationBackup
         {
             if (IsScreenKey(item.Key) || item.Key is "Profiles" or "Profile.Mode" or "Profile.Processes") continue;
             values[item.Key] = ReadSimpleValue(item.Key, item.Value);
+            if (item.Key == "ParticleColor" && ColorPickerColorMath.TryParseArgbHex((string)values[item.Key], out var themeColor))
+            {
+                values[item.Key] = ColorPickerColorMath.ToRgbString(themeColor);
+                values["EffectOpacity"] = themeColor.A / 255.0;
+            }
         }
         if (selected.Data.Keys.Any(key => key is "Profiles" or "Profile.Mode" or "Profile.Processes"))
         {
@@ -330,7 +342,7 @@ public static class ConfigurationBackup
 
     private static object ReadSimpleValue(string key, JsonElement value)
     {
-        if (!Settings.Any(setting => setting.Key == key)) throw InvalidValue(key);
+        if (key != "EffectOpacity" && !Settings.Any(setting => setting.Key == key)) throw InvalidValue(key);
         Type type = typeof(ConfigManager).GetProperty(key)?.PropertyType ?? throw InvalidValue(key);
         try
         {
@@ -351,8 +363,12 @@ public static class ConfigurationBackup
             if (key == "UiLanguage" && text is not ("zh-CN" or "en" or "ja")) throw InvalidValue(key);
             if (key == "ParticleColor")
             {
-                string[] channels = text.Split(',');
-                if (channels.Length != 3 || channels.Any(channel => !byte.TryParse(channel, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)))
+                if (ColorPickerColorMath.TryParseArgbHex(text, out var themeColor))
+                {
+                    if (themeColor.A < 26) throw InvalidValue(key);
+                    return ColorPickerColorMath.ToArgbHex(themeColor);
+                }
+                if (!ColorPickerColorMath.TryParseRgb(text, out _))
                     throw InvalidValue(key);
             }
             return text;
