@@ -1749,6 +1749,8 @@ public sealed partial class ControlPanelWindow : UserControl
             if (_isClosed || !SidebarNavigation.IsLoaded) return;
             try
             {
+                if (TabSettings.IsExpanded && ReferenceEquals(SidebarNavigation.SelectedItem, TabSettings) && _selectedSettingsItem != null)
+                    SidebarNavigation.SelectedItem = _selectedSettingsItem;
                 foreach (NavigationViewItem item in new[] { TabWelcome, TabSettings, SubTabBasic, SubTabVisual, SubTabFilter, SubTabMultiScreen, SubTabBackup, TabLog, TabAbout })
                 {
                     if (!item.IsLoaded || FindVisualDescendant<Microsoft.UI.Xaml.Shapes.Rectangle>(item, "SelectionIndicator") is not { Parent: Grid indicatorHost } nativeIndicator) continue;
@@ -1759,12 +1761,15 @@ public sealed partial class ControlPanelWindow : UserControl
                         indicator = new Microsoft.UI.Xaml.Shapes.Rectangle
                         {
                             Name = "LocalSelectionIndicator",
-                            Style = (Style)Application.Current.Resources["BasNavigationIndicatorStyle"]
+                            Style = (Style)Application.Current.Resources["BasNavigationIndicatorStyle"],
+                            Visibility = Visibility.Collapsed
                         };
                         indicatorHost.Children.Add(indicator);
-                        indicatorHost.UpdateLayout();
                     }
-                    bool active = item.IsSelected || item.IsChildSelected && !item.IsExpanded;
+                    bool active = ReferenceEquals(SidebarNavigation.SelectedItem, item) || item == TabSettings && !item.IsExpanded &&
+                        SidebarNavigation.SelectedItem is NavigationViewItem selected && TabSettings.MenuItems.Contains(selected);
+                    indicator.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+                    if (active && (indicator.ActualWidth == 0 || indicator.ActualHeight == 0)) indicatorHost.UpdateLayout();
                     bool tracked = _navigationIndicators.TryGetValue(item, out var previous) && previous.Indicator == indicator;
                     if (tracked && previous.Active == active) continue;
                     _navigationIndicators[item] = (indicator, active);
@@ -2257,9 +2262,7 @@ public sealed partial class ControlPanelWindow : UserControl
         BtnRenameProfile.IsEnabled = environmentFilterEnabled;
         BtnDeleteProfile.IsEnabled = environmentFilterEnabled;
 
-        // 旧版在深色下换用暗色禁用模板；WinUI 的禁用态由系统负责，这里只保留透明度的细微差别。
         ListConfiguredProcesses.IsEnabled = processFilterEnabled && CurrentProfileProcesses.Count > 0;
-        ListConfiguredProcesses.Opacity = ListConfiguredProcesses.IsEnabled ? 1.0 : 0.65;
         BtnBrowseProcess.IsEnabled = processFilterEnabled;
         BtnSelectRunningProcess.IsEnabled = processFilterEnabled;
     }
@@ -3802,7 +3805,9 @@ public sealed partial class ControlPanelWindow : UserControl
         dialog.Loaded += (_, _) =>
         {
             UpdateDialogScrim(dialog);
-            if (FindVisualDescendant<ScrollViewer>(dialog, "ContentScrollViewer")?.Content is Grid content)
+            if ((!string.IsNullOrEmpty(dialog.PrimaryButtonText) || !string.IsNullOrEmpty(dialog.SecondaryButtonText) ||
+                 !string.IsNullOrEmpty(dialog.CloseButtonText)) &&
+                FindVisualDescendant<ScrollViewer>(dialog, "ContentScrollViewer")?.Content is Grid content)
                 content.Padding = new Thickness(content.Padding.Left, content.Padding.Top, content.Padding.Right, 0);
             if (FindVisualDescendant<Grid>(dialog, "CommandSpace") is { } commands)
             {
