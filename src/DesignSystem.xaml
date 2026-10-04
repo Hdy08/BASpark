@@ -71,8 +71,6 @@
             <!-- 日志等只读代码区 -->
             <SolidColorBrush x:Key="BasCodeBackgroundBrush" Color="#FFF9F9F9" />
 
-            <!-- 模态遮罩：必须是明确的暗化层，不能依赖 SystemControl* 系统画刷
-                 （其深色取值接近不透明黑，会让遮罩后的主界面整片全黑）。 -->
             <StaticResource x:Key="ContentDialogTopOverlay" ResourceKey="BasLayerBrush" />
         </ResourceDictionary>
 
@@ -117,7 +115,6 @@
 
             <SolidColorBrush x:Key="BasCodeBackgroundBrush" Color="#FF1F1F1F" />
 
-            <!-- 模态遮罩：深色主题下同样使用半透明暗化，而非不透明黑。 -->
             <StaticResource x:Key="ContentDialogTopOverlay" ResourceKey="BasLayerBrush" />
         </ResourceDictionary>
 
@@ -162,7 +159,6 @@
 
             <SolidColorBrush x:Key="BasCodeBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
 
-            <!-- 高对比度下不使用半透明遮罩。 -->
             <StaticResource x:Key="ContentDialogTopOverlay" ResourceKey="BasLayerBrush" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
@@ -257,6 +253,10 @@
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource BasControlStrokeBrush}" />
         <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
+    </Style>
+
+    <Style x:Key="BasNativeDialogScrimStyle" TargetType="Rectangle">
+        <Setter Property="Fill" Value="{ThemeResource ContentDialogSmokeFill}" />
     </Style>
 
     <Style x:Key="BasStartupInfoBarStyle" TargetType="InfoBar">

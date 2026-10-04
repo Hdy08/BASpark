@@ -3806,6 +3806,9 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             if (popup.Child is Microsoft.UI.Xaml.Shapes.Rectangle scrim)
             {
+                scrim.RequestedTheme = dialog.RequestedTheme;
+                scrim.Style = (Style)Application.Current.Resources["BasNativeDialogScrimStyle"];
+                scrim.ClearValue(Microsoft.UI.Xaml.Shapes.Shape.FillProperty);
                 Point origin = PanelBody.TransformToVisual(RootGrid).TransformPoint(new Point());
                 scrim.Clip = new RectangleGeometry { Rect = new Rect(origin.X, origin.Y, PanelBody.ActualWidth, PanelBody.ActualHeight) };
             }
