@@ -1418,13 +1418,19 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void HeaderAndProcessButtons_UseMatchedWidthsAndNativeSizing()
+    public void HeaderAndProcessButtons_UseContentWidthsAndNativeSizing()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement apply = GetNamedElement(panel, "BtnApplySettings");
         Assert.Null(apply.Attribute("Width"));
-        Assert.Equal("ResetSettings_SizeChanged", (string?)GetNamedElement(panel, "BtnResetSettings").Attribute("SizeChanged"));
-        Assert.Contains("BtnApplySettings.Width = args.NewSize.Width", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        Assert.Null(GetNamedElement(panel, "BtnResetSettings").Attribute("SizeChanged"));
+        Assert.DoesNotContain("BtnApplySettings.Width = args.NewSize.Width", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        foreach (string name in new[] { "BtnResetSettings", "BtnApplySettings", "BtnExitApplication", "BtnRestartApplication", "BtnToggleEffectsPause", "BtnBasicReset", "BtnVisualReset", "BtnFilterReset", "BtnClearLog", "BtnCopyLog" })
+        {
+            XElement button = GetNamedElement(panel, name);
+            Assert.Null(button.Attribute("Width"));
+            Assert.Equal("0", (string?)button.Attribute("MinWidth"));
+        }
         Assert.Equal("0", (string?)apply.Attribute("MinWidth"));
         foreach (string name in new[] { "BtnBrowseProcess", "BtnSelectRunningProcess" })
         {
@@ -1827,9 +1833,9 @@ public class WinUi3UiTests
         Assert.Contains("child.Measure(new Size(double.PositiveInfinity, availableSize.Height))", layout, StringComparison.Ordinal);
         Assert.Contains("Math.Ceiling(child.DesiredSize.Width * scale) / scale", layout, StringComparison.Ordinal);
         Assert.Contains("context.LayoutState = desiredWidths", layout, StringComparison.Ordinal);
-        Assert.Contains("desiredWidths.Max() <= finalSize.Width / count", layout, StringComparison.Ordinal);
-        Assert.Contains("desiredWidths[index] + extra", layout, StringComparison.Ordinal);
-        Assert.Contains("Math.Max(availableSize.Width, minimumWidth)", layout, StringComparison.Ordinal);
+        Assert.Contains("return new Size(desiredWidths.Sum(), height)", layout, StringComparison.Ordinal);
+        Assert.Contains("position += desiredWidths[index]", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("finalSize.Width / count", layout, StringComparison.Ordinal);
         Assert.DoesNotContain(": 240", layout, StringComparison.Ordinal);
         Assert.Contains("_repeater?.InvalidateMeasure()", source, StringComparison.Ordinal);
         Assert.Contains("_selector.InvalidateMeasure()", source, StringComparison.Ordinal);
@@ -1839,7 +1845,8 @@ public class WinUi3UiTests
         Assert.True(update.IndexOf("_selector.UpdateLayout()", StringComparison.Ordinal) < update.IndexOf("_selection.Width = cell.ActualWidth", StringComparison.Ordinal));
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement frame = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedSelectorStyle");
-        Assert.Contains(frame.Elements(), element => (string?)element.Attribute("Property") == "MinWidth" && (string?)element.Attribute("Value") == "240");
+        Assert.Contains(frame.Elements(), element => (string?)element.Attribute("Property") == "MinWidth" && (string?)element.Attribute("Value") == "0");
+        Assert.Contains(frame.Elements(), element => (string?)element.Attribute("Property") == "HorizontalAlignment" && (string?)element.Attribute("Value") == "Right");
         Assert.DoesNotContain(frame.Elements(), element => (string?)element.Attribute("Property") == "MaxWidth");
         XElement segment = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSegmentedRadioStyle");
         XElement label = Assert.Single(segment.Descendants(), element => element.Name == Presentation + "TextBlock");

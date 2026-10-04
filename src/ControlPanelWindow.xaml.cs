@@ -78,26 +78,16 @@ public sealed class SegmentedRadioLayout : NonVirtualizingLayout
 
         double scale = context.Children[0].XamlRoot?.RasterizationScale ?? 1;
         var desiredWidths = new double[count];
+        double height = 0;
         for (int index = 0; index < count; index++)
         {
             UIElement child = context.Children[index];
             child.Measure(new Size(double.PositiveInfinity, availableSize.Height));
             desiredWidths[index] = Math.Ceiling(child.DesiredSize.Width * scale) / scale;
-        }
-        context.LayoutState = desiredWidths;
-        double minimumWidth = desiredWidths.Sum();
-        double width = double.IsFinite(availableSize.Width) ? Math.Max(availableSize.Width, minimumWidth) : minimumWidth;
-        bool equal = desiredWidths.Max() <= width / count;
-        double extra = Math.Max(0, width - minimumWidth) / count;
-        double height = 0;
-        for (int index = 0; index < count; index++)
-        {
-            UIElement child = context.Children[index];
-            child.Measure(new Size(equal ? width / count : desiredWidths[index] + extra, availableSize.Height));
             height = Math.Max(height, child.DesiredSize.Height);
         }
-
-        return new Size(width, height);
+        context.LayoutState = desiredWidths;
+        return new Size(desiredWidths.Sum(), height);
     }
 
     protected override Size ArrangeOverride(NonVirtualizingLayoutContext context, Size finalSize)
@@ -106,13 +96,11 @@ public sealed class SegmentedRadioLayout : NonVirtualizingLayout
         if (count == 0) return finalSize;
         double scale = count > 0 ? context.Children[0].XamlRoot?.RasterizationScale ?? 1 : 1;
         var desiredWidths = (double[])context.LayoutState;
-        bool equal = desiredWidths.Max() <= finalSize.Width / count;
-        double extra = Math.Max(0, finalSize.Width - desiredWidths.Sum()) / count;
         double left = 0;
         double position = 0;
         for (int index = 0; index < count; index++)
         {
-            position += equal ? finalSize.Width / count : desiredWidths[index] + extra;
+            position += desiredWidths[index];
             double right = index == count - 1 ? finalSize.Width : Math.Round(position * scale) / scale;
             context.Children[index].Arrange(new Rect(left, 0, right - left, finalSize.Height));
             left = right;
@@ -3305,11 +3293,6 @@ public sealed partial class ControlPanelWindow : UserControl
     // 保存设置
     // ==================================================================
 
-    private void ResetSettings_SizeChanged(object sender, SizeChangedEventArgs args)
-    {
-        if (BtnApplySettings != null && args.NewSize.Width > 0) BtnApplySettings.Width = args.NewSize.Width;
-    }
-
     private async void SaveSettings_Click(object sender, RoutedEventArgs e)
     {
         Focus(FocusState.Programmatic);
@@ -3695,9 +3678,32 @@ public sealed partial class ControlPanelWindow : UserControl
         dialog.Resources["ContentDialogMinHeight"] = 0d;
         int animationVersion = 0;
         EventHandler<object>? readyHandler = null;
+        Microsoft.UI.Xaml.Shapes.Rectangle? scrim = null;
+        Storyboard? scrimAnimation = null;
+        Task AnimateScrim(bool visible)
+        {
+            if (scrim == null) return Task.CompletedTask;
+            scrimAnimation?.Stop();
+            scrim.Opacity = 1;
+            var completed = new TaskCompletionSource();
+            scrimAnimation = new Storyboard();
+            var fade = new DoubleAnimationUsingKeyFrames();
+            fade.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = visible ? 0 : 1 });
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame
+            {
+                KeyTime = KeyTime.FromTimeSpan(TimeSpan.Parse((string)Application.Current.Resources["ControlFasterAnimationDuration"], CultureInfo.InvariantCulture)),
+                Value = visible ? 1 : 0
+            });
+            Storyboard.SetTarget(fade, scrim);
+            Storyboard.SetTargetProperty(fade, "Opacity");
+            scrimAnimation.Children.Add(fade);
+            scrimAnimation.Completed += (_, _) => completed.TrySetResult();
+            scrimAnimation.Begin();
+            return completed.Task;
+        }
         dialog.Opened += (_, _) =>
         {
-            UpdateDialogScrim(dialog);
+            scrim = UpdateDialogScrim(dialog);
             if (!new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) return;
             int version = ++animationVersion;
             if (readyHandler != null) CompositionTarget.Rendering -= readyHandler;
@@ -3705,6 +3711,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 .Select(popup => popup.Child is Grid { Name: "LayoutRoot" } root ? root : FindVisualDescendant<Grid>(popup.Child, "LayoutRoot"))
                 .FirstOrDefault(root => root != null);
             if (layout != null) layout.Opacity = 0;
+            if (scrim != null) scrim.Opacity = 0;
             readyHandler = (_, _) =>
             {
                 CompositionTarget.Rendering -= readyHandler;
@@ -3713,6 +3720,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 {
                     if (_isClosed || version != animationVersion) return;
                     if (layout != null) layout.ClearValue(OpacityProperty);
+                    _ = AnimateScrim(true);
                     _ = VisualStateManager.GoToState(dialog, "DialogHidden", false);
                     _ = VisualStateManager.GoToState(dialog, "DialogShowing", true);
                     await Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlNormalAnimationDuration"], CultureInfo.InvariantCulture));
@@ -3755,9 +3763,12 @@ public sealed partial class ControlPanelWindow : UserControl
                 await ready.Task;
                 if (_isClosed || args.Cancel) return;
                 dialog.UpdateLayout();
+                Task scrimClosed = AnimateScrim(false);
                 VisualStateManager.GoToState(dialog, "DialogShowing", false);
                 if (VisualStateManager.GoToState(dialog, "DialogHidden", true))
-                    await Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], CultureInfo.InvariantCulture));
+                    await Task.WhenAll(
+                        Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], CultureInfo.InvariantCulture)),
+                        Task.WhenAny(scrimClosed, Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlNormalAnimationDuration"], CultureInfo.InvariantCulture))));
             }
             catch (Exception exception)
             {
@@ -3768,6 +3779,12 @@ public sealed partial class ControlPanelWindow : UserControl
                 try { deferral.Complete(); }
                 catch (Exception exception) { AppLogger.Debug($"Native dialog already closed: {exception.Message}"); }
             }
+        };
+        dialog.Closed += (_, _) =>
+        {
+            scrimAnimation?.Stop();
+            scrimAnimation = null;
+            scrim = null;
         };
         dialog.Loaded += (_, _) =>
         {
@@ -3799,9 +3816,10 @@ public sealed partial class ControlPanelWindow : UserControl
         };
     }
 
-    private void UpdateDialogScrim(ContentDialog dialog)
+    private Microsoft.UI.Xaml.Shapes.Rectangle? UpdateDialogScrim(ContentDialog dialog)
     {
-        if (dialog.XamlRoot == null || _isClosed) return;
+        if (dialog.XamlRoot == null || _isClosed) return null;
+        Microsoft.UI.Xaml.Shapes.Rectangle? mask = null;
         foreach (Popup popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot))
         {
             if (popup.Child is Microsoft.UI.Xaml.Shapes.Rectangle scrim)
@@ -3811,8 +3829,10 @@ public sealed partial class ControlPanelWindow : UserControl
                 scrim.ClearValue(Microsoft.UI.Xaml.Shapes.Shape.FillProperty);
                 Point origin = PanelBody.TransformToVisual(RootGrid).TransformPoint(new Point());
                 scrim.Clip = new RectangleGeometry { Rect = new Rect(origin.X, origin.Y, PanelBody.ActualWidth, PanelBody.ActualHeight) };
+                mask = scrim;
             }
         }
+        return mask;
     }
 
     private async Task ShowMessageAsync(string message)
