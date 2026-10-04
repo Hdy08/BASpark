@@ -3750,6 +3750,12 @@ public sealed partial class ControlPanelWindow : UserControl
             var deferral = args.GetDeferral();
             try
             {
+                var ready = new TaskCompletionSource();
+                if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => ready.TrySetResult())) return;
+                await ready.Task;
+                if (_isClosed || args.Cancel) return;
+                dialog.UpdateLayout();
+                VisualStateManager.GoToState(dialog, "DialogShowing", false);
                 if (VisualStateManager.GoToState(dialog, "DialogHidden", true))
                     await Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], CultureInfo.InvariantCulture));
             }
