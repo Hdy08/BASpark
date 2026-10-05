@@ -3108,23 +3108,6 @@ public sealed partial class ControlPanelWindow : UserControl
             return;
         }
 
-        _suppressValueSync = true;
-        try
-        {
-            if (!CheckLinkedEffectScale.IsOn)
-            {
-                double value = Math.Clamp(Math.Round(SliderScale.Value, 2), 0.5, 3.0);
-                SliderTrailScale.Value = value;
-                SliderClickScale.Value = value;
-            }
-
-            SyncSliderAndBoxValues();
-        }
-        finally
-        {
-            _suppressValueSync = false;
-        }
-
         UpdateEffectScalePanelVisibility(animate: true);
     }
 
@@ -3139,23 +3122,6 @@ public sealed partial class ControlPanelWindow : UserControl
         if (!IsUiReady || _isLoading)
         {
             return;
-        }
-
-        _suppressValueSync = true;
-        try
-        {
-            if (!CheckLinkedAnimationSpeed.IsOn)
-            {
-                double value = Math.Clamp(Math.Round(SliderSpeed.Value, 2), 0.2, 3.0);
-                SliderTrailAnimSpeed.Value = value;
-                SliderClickAnimSpeed.Value = value;
-            }
-
-            SyncSliderAndBoxValues();
-        }
-        finally
-        {
-            _suppressValueSync = false;
         }
 
         UpdateAnimationSpeedPanelVisibility(animate: true);
@@ -3473,37 +3439,17 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         bool useLinkedEffectScale = CheckLinkedEffectScale.IsOn;
-        double trailEffectScale;
-        double clickEffectScale;
+        double trailEffectScale = Math.Round(SliderTrailScale.Value, 2);
+        double clickEffectScale = Math.Round(SliderClickScale.Value, 2);
         double effectScaleForRegistry = Math.Round(SliderScale.Value, 2);
-        if (useLinkedEffectScale)
-        {
-            trailEffectScale = effectScaleForRegistry;
-            clickEffectScale = effectScaleForRegistry;
-        }
-        else
-        {
-            trailEffectScale = Math.Round(SliderTrailScale.Value, 2);
-            clickEffectScale = Math.Round(SliderClickScale.Value, 2);
-        }
 
         double effectOpacity = Math.Round(_effectOpacity, 2);
         double glowIntensity = Math.Round(SliderGlow.Value, 2);
 
         bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsOn;
-        double trailAnimSpeed;
-        double clickAnimSpeed;
+        double trailAnimSpeed = Math.Round(SliderTrailAnimSpeed.Value, 2);
+        double clickAnimSpeed = Math.Round(SliderClickAnimSpeed.Value, 2);
         double effectSpeedForRegistry = Math.Round(SliderSpeed.Value, 2);
-        if (useLinkedAnimationSpeed)
-        {
-            trailAnimSpeed = effectSpeedForRegistry;
-            clickAnimSpeed = effectSpeedForRegistry;
-        }
-        else
-        {
-            trailAnimSpeed = Math.Round(SliderTrailAnimSpeed.Value, 2);
-            clickAnimSpeed = Math.Round(SliderClickAnimSpeed.Value, 2);
-        }
 
         int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
         bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsOn;

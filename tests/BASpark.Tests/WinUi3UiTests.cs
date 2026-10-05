@@ -787,7 +787,7 @@ public class WinUi3UiTests
             Assert.Equal("TextBlock", text.Elements().First().Name.LocalName);
             Assert.Contains(control, controls.Descendants());
             Assert.Equal("Center", (string?)controls.Attribute("VerticalAlignment"));
-            Assert.Equal("Stretch", (string?)controls.Attribute("HorizontalAlignment"));
+            Assert.Equal(name == "ComboProfiles" ? "Right" : "Stretch", (string?)controls.Attribute("HorizontalAlignment"));
             Assert.Null(controls.Attribute("MaxWidth"));
             XElement columns = Assert.Single(layout.Elements(), element => element.Name.LocalName == "Grid.ColumnDefinitions");
             XElement controlColumn = columns.Elements().Last();
@@ -796,6 +796,12 @@ public class WinUi3UiTests
                 Assert.Equal("Auto", (string?)controlColumn.Attribute("Width"));
                 Assert.Null(controlColumn.Attribute("MaxWidth"));
                 Assert.Equal("140", (string?)controlColumn.Attribute("MinWidth"));
+            }
+            else if (name is "ComboLanguage" or "ComboProfiles" or "SliderTrailRefresh" or "SliderGlow")
+            {
+                Assert.Equal("Auto", (string?)controlColumn.Attribute("Width"));
+                Assert.Null(controlColumn.Attribute("MaxWidth"));
+                Assert.Null(controlColumn.Attribute("MinWidth"));
             }
             else if (control.Name.LocalName != "ToggleSwitch")
             {
@@ -1157,7 +1163,7 @@ public class WinUi3UiTests
         XElement dropdown = GetNamedElement(document, "ListConfiguredProcesses");
         Assert.Equal("32", (string?)dropdown.Attribute("Height"));
         Assert.Equal("Center", (string?)dropdown.Attribute("VerticalContentAlignment"));
-        Assert.Equal("10,0,28,0", (string?)dropdown.Attribute("Padding"));
+        Assert.Equal("12,0,0,0", (string?)dropdown.Attribute("Padding"));
         XElement remove = Assert.Single(dropdown.Descendants(), element => (string?)element.Attribute("Click") == "RemoveProcess_Click");
         Assert.Equal("20", (string?)remove.Attribute("Height"));
         Assert.Equal("0", (string?)remove.Attribute("MinHeight"));

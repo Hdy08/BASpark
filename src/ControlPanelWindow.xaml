@@ -330,6 +330,7 @@
                                             x:Name="ComboLanguage"
                                             MinWidth="0"
                                             HorizontalAlignment="Right"
+                                            VerticalContentAlignment="Center" Padding="12,0,0,0"
                                             SelectionChanged="ComboLanguage_SelectionChanged"
                                             Background="{ThemeResource BasSettingsControlBackgroundBrush}"
                                             BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
@@ -1245,10 +1246,11 @@
                                                 Width="0"
                                                 SelectionChanged="ComboProfiles_SelectionChanged"
                                                 HorizontalAlignment="Stretch"
+                                                VerticalContentAlignment="Center" Padding="12,0,0,0"
                                                 Background="{ThemeResource BasSettingsControlBackgroundBrush}"
                                                 BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
                                                 AutomationProperties.Name="{Binding Text, ElementName=TxtFilterProfiles}" />
-                                            <Grid x:Name="ProfileActions" ColumnSpacing="4" HorizontalAlignment="Right" SizeChanged="ProfileActions_SizeChanged">
+                                            <Grid x:Name="ProfileActions" ColumnSpacing="8" HorizontalAlignment="Right" SizeChanged="ProfileActions_SizeChanged">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="Auto" />
@@ -1299,6 +1301,7 @@
                                     <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                                         <ComboBox x:Name="ComboProcessFilterMode"
                                                   MinWidth="0" HorizontalAlignment="Right"
+                                                  VerticalContentAlignment="Center" Padding="12,0,0,0"
                                                   Background="{ThemeResource BasSettingsControlBackgroundBrush}"
                                                   BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
                                                   AutomationProperties.Name="{Binding Text, ElementName=TxtFilterMode}"
@@ -1362,7 +1365,8 @@
                                                                 Tag="{Binding}"
                                                                 MinWidth="0" MinHeight="0" Width="20" Height="20" Padding="0"
                                                                 VerticalAlignment="Center" VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
-                                                            <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                                            <PathIcon Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                      Data="M0,1 L1,0 L5,4 L9,0 L10,1 L6,5 L10,9 L9,10 L5,6 L1,10 L0,9 L4,5 Z" />
                                                         </Button>
                                                     </Grid>
                                                 </DataTemplate>
