@@ -64,6 +64,8 @@ internal sealed class DcompPanelHost : IDisposable
 
     private readonly DesktopWindowXamlSource _xamlSource;
     private readonly AppWindow _appWindow;
+    private readonly bool _fixedSize;
+    private readonly int _minimumHeightDesign;
     private IntPtr _hwnd;
     private RectInt32 _captionButtonsBounds;
     private int _minimumWidthDesign = MinWidthDesign;
@@ -73,19 +75,23 @@ internal sealed class DcompPanelHost : IDisposable
 
     private delegate IntPtr WndProcDelegate(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
 
-    public DcompPanelHost()
+    public DcompPanelHost(bool fixedSize = false, int minimumWidth = MinWidthDesign, int minimumHeight = MinHeightDesign)
     {
+        _fixedSize = fixedSize;
+        _minimumWidthDesign = minimumWidth;
+        _minimumHeightDesign = minimumHeight;
         EnsureClassRegistered();
 
         int style = WsCaption | WsThickFrame | WsSysMenu | WsMinimizeBox | WsMaximizeBox
                     | WsClipSiblings;
+        if (_fixedSize) style &= ~(WsThickFrame | WsMinimizeBox | WsMaximizeBox);
 
         _hwnd = CreateWindowEx(
             WsExNoRedirectionBitmap,
             WindowClassName,
             string.Empty,
             style,
-            0, 0, MinWidthDesign, MinHeightDesign,
+            0, 0, minimumWidth, minimumHeight,
             IntPtr.Zero, IntPtr.Zero, GetModuleHandle(null), IntPtr.Zero);
 
         if (_hwnd == IntPtr.Zero)
@@ -99,6 +105,14 @@ internal sealed class DcompPanelHost : IDisposable
         {
             WindowId windowId = Win32Interop.GetWindowIdFromWindow(_hwnd);
             _appWindow = AppWindow.GetFromWindowId(windowId);
+            if (_fixedSize && _appWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.IsResizable = false;
+                presenter.IsMaximizable = false;
+                presenter.IsMinimizable = false;
+                presenter.IsAlwaysOnTop = true;
+                _appWindow.IsShownInSwitchers = false;
+            }
             xamlSource = new DesktopWindowXamlSource();
             xamlSource.Initialize(windowId);
             _xamlSource = xamlSource;
@@ -133,7 +147,7 @@ internal sealed class DcompPanelHost : IDisposable
 
     public bool IsMaximized => _hwnd != IntPtr.Zero && IsZoomed(_hwnd);
 
-    /// <summary>用户关窗（标题栏关闭按钮）时触发；宿主只隐藏窗口，不销毁。</summary>
+    /// <summary>用户请求关闭窗口时触发。</summary>
     public event EventHandler? CloseRequested;
 
     /// <summary>窗口尺寸变化后触发（用于重算命中区域）。</summary>
@@ -323,10 +337,10 @@ internal sealed class DcompPanelHost : IDisposable
                 _captionButtonsBounds.Width > 0 && _captionButtonsBounds.Height > 0
                     ? [_captionButtonsBounds]
                     : []);
-            source.SetRegionRects(NonClientRegionKind.TopBorder, IsMaximized ? [] : [new RectInt32(0, 0, width, grip)]);
-            source.SetRegionRects(NonClientRegionKind.BottomBorder, IsMaximized ? [] : [new RectInt32(0, height - grip, width, grip)]);
-            source.SetRegionRects(NonClientRegionKind.LeftBorder, IsMaximized ? [] : [new RectInt32(0, 0, grip, height)]);
-            source.SetRegionRects(NonClientRegionKind.RightBorder, IsMaximized ? [] : [new RectInt32(width - grip, 0, grip, height)]);
+            source.SetRegionRects(NonClientRegionKind.TopBorder, IsMaximized || _fixedSize ? [] : [new RectInt32(0, 0, width, grip)]);
+            source.SetRegionRects(NonClientRegionKind.BottomBorder, IsMaximized || _fixedSize ? [] : [new RectInt32(0, height - grip, width, grip)]);
+            source.SetRegionRects(NonClientRegionKind.LeftBorder, IsMaximized || _fixedSize ? [] : [new RectInt32(0, 0, grip, height)]);
+            source.SetRegionRects(NonClientRegionKind.RightBorder, IsMaximized || _fixedSize ? [] : [new RectInt32(width - grip, 0, grip, height)]);
         }
         catch (Exception)
         {
@@ -367,6 +381,9 @@ internal sealed class DcompPanelHost : IDisposable
     {
         switch (msg)
         {
+            case 0x00A3 when InstanceOf(hwnd)?._fixedSize == true:
+            case 0x0112 when InstanceOf(hwnd)?._fixedSize == true && ((long)wParam & 0xFFF0) is 0xF000 or 0xF030 or 0xF020:
+                return IntPtr.Zero;
             case WmDwmCompositionChanged:
                 WindowChrome.ApplyNativeShadow(hwnd);
                 break;
@@ -428,7 +445,6 @@ internal sealed class DcompPanelHost : IDisposable
                 return new IntPtr(1);
 
             case WmClose:
-                // 关闭按钮 = 隐藏面板（应用继续驻留托盘）。
                 InstanceOf(hwnd)?.RequestClose();
                 return IntPtr.Zero;
 
@@ -451,7 +467,7 @@ internal sealed class DcompPanelHost : IDisposable
             uint dpi = GetDpiForWindow(hwnd);
             double scale = dpi > 0 ? dpi / 96.0 : 1.0;
             info.ptMinTrackSize.X = (int)Math.Round((InstanceOf(hwnd)?._minimumWidthDesign ?? MinWidthDesign) * scale);
-            info.ptMinTrackSize.Y = (int)Math.Round(MinHeightDesign * scale);
+            info.ptMinTrackSize.Y = (int)Math.Round((InstanceOf(hwnd)?._minimumHeightDesign ?? MinHeightDesign) * scale);
             Marshal.StructureToPtr(info, lParam, fDeleteOld: false);
         }
         catch (Exception)
@@ -519,10 +535,10 @@ internal sealed class DcompPanelHost : IDisposable
         }
     }
 
-    /// <summary>关闭面板：隐藏窗口并通知调用方（应用继续驻留托盘，不销毁窗口）。</summary>
+    /// <summary>通知调用方关闭；普通面板先隐藏，固定窗口保留内容供关闭动画使用。</summary>
     public void RequestClose()
     {
-        Hide();
+        if (!_fixedSize) Hide();
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 

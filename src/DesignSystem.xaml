@@ -320,7 +320,7 @@
         <Setter Property="Margin" Value="0,20,0,8" />
     </Style>
 
-    <Style x:Key="BasSettingTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
+    <Style x:Key="BasSettingTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
         <Setter Property="Margin" Value="0" />

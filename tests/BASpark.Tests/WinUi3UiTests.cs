@@ -95,7 +95,7 @@ public class WinUi3UiTests
             ("BasCaptionStyle", "CaptionTextBlockStyle"),
             ("BasSectionTitleStyle", "SubtitleTextBlockStyle"),
             ("BasDialogMessageStyle", "BodyStrongTextBlockStyle"),
-            ("BasSettingTitleStyle", "BodyStrongTextBlockStyle")
+            ("BasSettingTitleStyle", "BodyTextBlockStyle")
         })
         {
             XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
@@ -615,7 +615,10 @@ public class WinUi3UiTests
         Assert.DoesNotContain("SetWindowLong", chromeSource, StringComparison.Ordinal);
         Assert.Contains("DwmExtendFrameIntoClientArea", chromeSource, StringComparison.Ordinal);
         Assert.Contains("WindowChrome.ApplyNativeShadow(_hwnd)", hostSource, StringComparison.Ordinal);
-        Assert.Contains("WindowChrome.ApplyNativeShadow(handle)", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
+        string startupSource = ReadSource("src", "StartupDialogHost.cs");
+        Assert.Contains("SetDwmFlag(handle, DwmwaTransitionsForcedDisabled, false)", startupSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("AnimateWindow", startupSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("StartAnimation", startupSource, StringComparison.Ordinal);
         Assert.DoesNotContain("InputNonClientPointerSource", chromeSource, StringComparison.Ordinal);
         Assert.Contains("int style = WsCaption | WsThickFrame | WsSysMenu | WsMinimizeBox | WsMaximizeBox", hostSource, StringComparison.Ordinal);
     }
@@ -651,7 +654,7 @@ public class WinUi3UiTests
         Assert.Contains("XamlRoot.RasterizationScale", source, StringComparison.Ordinal);
         Assert.Contains("CaptionButtons.SizeChanged", source, StringComparison.Ordinal);
         Assert.Contains("NonClientRegionKind.Passthrough", hostSource, StringComparison.Ordinal);
-        Assert.Contains("IsMaximized ? []", hostSource, StringComparison.Ordinal);
+        Assert.Contains("IsMaximized || _fixedSize ? []", hostSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1174,14 +1177,16 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void SettingsText_UsesSemiboldTitlesAndNoScrollbarPreferenceOrLeadingHintStars()
+    public void SettingsText_UsesNativeHeadingAndBodyWeightsAndNoScrollbarPreferenceOrLeadingHintStars()
     {
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
-        foreach (string key in new[] { "BasPageTitleStyle", "BasSectionTitleStyle", "BasSettingTitleStyle" })
+        foreach (string key in new[] { "BasPageTitleStyle", "BasSectionTitleStyle" })
         {
             XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
             Assert.Contains((string?)style.Attribute("BasedOn"), new[] { "{StaticResource TitleTextBlockStyle}", "{StaticResource SubtitleTextBlockStyle}", "{StaticResource BodyStrongTextBlockStyle}" });
         }
+        XElement body = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingTitleStyle");
+        Assert.Equal("{StaticResource BodyTextBlockStyle}", (string?)body.Attribute("BasedOn"));
 
         Assert.DoesNotContain("RadioScrollbar", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
         Assert.DoesNotContain("GetSelectedScrollbarVisibility", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
@@ -1736,8 +1741,9 @@ public class WinUi3UiTests
         Assert.Contains("TimeBeginPeriod(1) == 0", chrome, StringComparison.Ordinal);
         Assert.Contains("TimeEndPeriod(1)", chrome, StringComparison.Ordinal);
         Assert.Contains("new RenderClock(window)", chrome, StringComparison.Ordinal);
-        foreach (string window in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs", "ColorPickerWindow.xaml.cs" })
-            Assert.Contains("WindowChrome.ApplyAppIcon(this)", ReadSource("src", window), StringComparison.Ordinal);
+        Assert.Contains("WindowChrome.ApplyAppIcon(this)", ReadSource("src", "ColorPickerWindow.xaml.cs"), StringComparison.Ordinal);
+        foreach (string window in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs" })
+            Assert.Contains("_host.SetContent(this)", ReadSource("src", window), StringComparison.Ordinal);
         Assert.Contains("SetRenderClockActive(IsWindowVisible(_hwnd) && !IsIconic(_hwnd))", source, StringComparison.Ordinal);
         Assert.Contains("case WmShowWindow:", source, StringComparison.Ordinal);
         Assert.Contains("case WmWindowPosChanged:", source, StringComparison.Ordinal);
@@ -2019,6 +2025,7 @@ public class WinUi3UiTests
         XDocument privacy = LoadXaml("src", "PrivacyWindow.xaml");
         foreach (XDocument document in new[] { language, privacy })
         {
+            Assert.Equal("UserControl", document.Root?.Name.LocalName);
             Assert.Equal("{ThemeResource BasSidebarBackgroundBrush}", (string?)GetNamedElement(document, "RootGrid").Attribute("Background"));
             Assert.Equal("{ThemeResource BasSidebarBackgroundBrush}", (string?)GetNamedElement(document, "AppTitleBar").Attribute("Background"));
             XElement scroller = Assert.Single(document.Descendants(Presentation + "ScrollViewer"));
@@ -2042,9 +2049,13 @@ public class WinUi3UiTests
             Assert.Equal("{StaticResource BodyTextBlockStyle}", (string?)GetNamedElement(privacy, name).Attribute("Style"));
         Assert.Contains("Version {version.Major}.{version.Minor}.{version.Build}-release", ReadSource("src", "PrivacyWindow.xaml.cs"), StringComparison.Ordinal);
         Assert.Contains("root.Measure(new Size(width / scale, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
-        Assert.Contains("appWindow.Resize(new SizeInt32(width + frameWidth, height + frameHeight))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
+        Assert.Contains("appWindow.Resize(new SizeInt32(width, height))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
         foreach (string source in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs" })
-            Assert.Contains("StartupDialogHost.FitToContent(this, root)", ReadSource("src", source), StringComparison.Ordinal);
+        {
+            Assert.Contains("StartupDialogHost.FitToContent(_host, root)", ReadSource("src", source), StringComparison.Ordinal);
+            Assert.Contains("_host.SetContent(this)", ReadSource("src", source), StringComparison.Ordinal);
+            Assert.Contains("WindowChrome.ApplyAppIcon(Handle)", ReadSource("src", source), StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -2129,15 +2140,15 @@ public class WinUi3UiTests
     [Fact]
     public void StartupWindows_BlockDoubleClickMaximizeAndSizingCommandsWithoutChangingTheMainPanel()
     {
-        string source = ReadSource("src", "StartupDialogHost.cs");
-        Assert.Contains("message == 0x00A3", source, StringComparison.Ordinal);
-        Assert.Contains("0xF000 or 0xF030", source, StringComparison.Ordinal);
-        Assert.Contains("RemoveWindowSubclass(handle, procedure", source, StringComparison.Ordinal);
-        Assert.Contains("style & ~(0x00040000 | 0x00010000 | 0x00020000)", source, StringComparison.Ordinal);
-        Assert.Contains("measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity))", source, StringComparison.Ordinal);
+        string source = ReadSource("src", "DcompPanelHost.cs");
+        Assert.Contains("case 0x00A3 when InstanceOf(hwnd)?._fixedSize == true", source, StringComparison.Ordinal);
+        Assert.Contains("0xF000 or 0xF030 or 0xF020", source, StringComparison.Ordinal);
+        Assert.Contains("if (_fixedSize) style &= ~(WsThickFrame | WsMinimizeBox | WsMaximizeBox)", source, StringComparison.Ordinal);
+        Assert.Contains("bool fixedSize = false, int minimumWidth = MinWidthDesign, int minimumHeight = MinHeightDesign", source, StringComparison.Ordinal);
+        Assert.Contains("if (!_fixedSize) Hide()", source, StringComparison.Ordinal);
+        Assert.Contains("measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
         foreach (string file in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs" })
-            Assert.Contains("StartupDialogHost.LockWindow(this)", ReadSource("src", file), StringComparison.Ordinal);
-        Assert.DoesNotContain("StartupDialogHost.LockWindow", ReadSource("src", "DcompPanelHost.cs"), StringComparison.Ordinal);
+            Assert.Contains("new DcompPanelHost(fixedSize: true, minimumWidth: DesignWidth, minimumHeight: 1)", ReadSource("src", file), StringComparison.Ordinal);
     }
 
     [Fact]
