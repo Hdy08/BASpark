@@ -36,7 +36,7 @@ public partial class LanguageSelectWindow : UserControl
         _displayCulture = Localization.DetectCultureFromSystem();
         InitializeComponent();
         _languageWidth = new(ComboLanguage);
-        _host = new DcompPanelHost(fixedSize: true, minimumWidth: DesignWidth, minimumHeight: 1);
+        _host = new DcompPanelHost(fixedSize: true, minimumWidth: 1, minimumHeight: 1);
         WindowChrome.ApplyTitleBarIcon(AppTitleBar);
         StartupDialogHost.ConfigureCaptionButton(_host, RootGrid, BtnCaptionClose);
 

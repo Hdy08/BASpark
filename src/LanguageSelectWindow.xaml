@@ -44,7 +44,7 @@
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="12">
                 <TextBlock x:Name="TxtSubtitle"
-                           Style="{StaticResource BodyStrongTextBlockStyle}" />
+                           Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="NoWrap" />
                 <Border x:Name="LanguageCard" Style="{StaticResource BasSettingCardStyle}" Margin="0">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
@@ -52,7 +52,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="TxtLanguageLabel" Style="{StaticResource BasSettingTitleStyle}"
-                                   VerticalAlignment="Center" />
+                                   VerticalAlignment="Center" TextWrapping="NoWrap" />
                         <ComboBox x:Name="ComboLanguage" Grid.Column="1" MinWidth="0"
                                   HorizontalAlignment="Right" VerticalAlignment="Center"
                                   VerticalContentAlignment="Center" Padding="12,0,0,0"

@@ -285,6 +285,11 @@
         <Setter Property="Padding" Value="24,16,24,24" />
     </Style>
 
+    <Style TargetType="ComboBoxItem" BasedOn="{StaticResource DefaultComboBoxItemStyle}">
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Padding" Value="11,6,11,6" />
+    </Style>
+
     <!-- 设置区块之间的细分隔线 -->
     <Style x:Key="BasDividerStyle" TargetType="Border">
         <Setter Property="Height" Value="1" />

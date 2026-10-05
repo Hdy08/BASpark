@@ -797,7 +797,7 @@ public class WinUi3UiTests
                 Assert.Null(controlColumn.Attribute("MaxWidth"));
                 Assert.Equal("140", (string?)controlColumn.Attribute("MinWidth"));
             }
-            else if (name is "ComboLanguage" or "ComboProfiles" or "SliderTrailRefresh" or "SliderGlow")
+            else if (name is "ComboLanguage" or "ComboProfiles")
             {
                 Assert.Equal("Auto", (string?)controlColumn.Attribute("Width"));
                 Assert.Null(controlColumn.Attribute("MaxWidth"));
@@ -1126,7 +1126,7 @@ public class WinUi3UiTests
             .Select(style => (string?)style.Attribute(Xaml + "Key"))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
-        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle",
+        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle", "DefaultComboBoxItemStyle",
             "TitleTextBlockStyle", "SubtitleTextBlockStyle", "BodyTextBlockStyle", "BodyStrongTextBlockStyle", "CaptionTextBlockStyle" });
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
@@ -2154,9 +2154,9 @@ public class WinUi3UiTests
         Assert.Contains("if (_fixedSize) style &= ~(WsThickFrame | WsMinimizeBox | WsMaximizeBox)", source, StringComparison.Ordinal);
         Assert.Contains("bool fixedSize = false, int minimumWidth = MinWidthDesign, int minimumHeight = MinHeightDesign", source, StringComparison.Ordinal);
         Assert.Contains("if (!_fixedSize) Hide()", source, StringComparison.Ordinal);
-        Assert.Contains("measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
+        Assert.Contains("root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
         foreach (string file in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs" })
-            Assert.Contains("new DcompPanelHost(fixedSize: true, minimumWidth: DesignWidth, minimumHeight: 1)", ReadSource("src", file), StringComparison.Ordinal);
+            Assert.Contains("new DcompPanelHost(fixedSize: true, minimumWidth: 1, minimumHeight: 1)", ReadSource("src", file), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -2,7 +2,6 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Hosting;
-using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices;
 using Windows.Foundation;
 using Windows.Graphics;
@@ -28,16 +27,6 @@ internal static class StartupDialogHost
     {
         int value = enabled ? 1 : 0;
         Marshal.ThrowExceptionForHR(DwmSetWindowAttribute(handle, attribute, ref value, sizeof(int)));
-    }
-
-    private static IEnumerable<TextBlock> TextBlocks(DependencyObject root)
-    {
-        for (int index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
-        {
-            DependencyObject child = VisualTreeHelper.GetChild(root, index);
-            if (child is TextBlock text) yield return text;
-            foreach (TextBlock descendant in TextBlocks(child)) yield return descendant;
-        }
     }
 
     public static async Task<string?> AskLanguageAsync()
@@ -157,27 +146,13 @@ internal static class StartupDialogHost
         if (!root.IsLoaded || root.ActualWidth <= 0 || host.AppWindow is not { } appWindow) return;
         double scale = root.XamlRoot.RasterizationScale;
         DisplayArea area = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest);
-        var scroller = root is Grid grid ? grid.Children.OfType<ScrollViewer>().FirstOrDefault() : null;
-        double naturalWidth = 560;
-        if (scroller?.Content is FrameworkElement content)
-        {
-            foreach (TextBlock text in TextBlocks(content))
-            {
-                var measurement = new TextBlock
-                {
-                    Text = text.Text, FontFamily = text.FontFamily, FontSize = text.FontSize,
-                    FontWeight = text.FontWeight, CharacterSpacing = text.CharacterSpacing, TextWrapping = TextWrapping.NoWrap
-                };
-                measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                double iconWidth = 0;
-                for (DependencyObject? parent = text; parent != null; parent = VisualTreeHelper.GetParent(parent))
-                    if (parent is InfoBar { IsIconVisible: true }) { iconWidth = 30; break; }
-                naturalWidth = Math.Max(naturalWidth, measurement.DesiredSize.Width + 84 + iconWidth);
-            }
-        }
+        root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double naturalWidth = root.DesiredSize.Width;
         int width = Math.Min((int)Math.Ceiling(naturalWidth * scale), area.WorkArea.Width - (int)Math.Round(48 * scale));
         root.Measure(new Size(width / scale, double.PositiveInfinity));
         int height = Math.Min((int)Math.Ceiling(root.DesiredSize.Height * scale), area.WorkArea.Height - (int)Math.Round(32 * scale));
+        root.InvalidateMeasure();
+        root.UpdateLayout();
         if (height <= 0 || (height == appWindow.Size.Height && width == appWindow.Size.Width)) return;
         appWindow.Resize(new SizeInt32(width, height));
         appWindow.Move(new PointInt32(
