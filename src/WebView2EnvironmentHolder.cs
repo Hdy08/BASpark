@@ -51,9 +51,6 @@ internal static class WebView2EnvironmentHolder
             }
 
             _environment = await CreateAsync(_userDataFolder).ConfigureAwait(true);
-            AppLogger.Debug(
-                $"WebView2 environment created (runtime={_environment.BrowserVersionString}, " +
-                $"userData={_userDataFolder})");
             return _environment;
         }
         finally
@@ -75,9 +72,6 @@ internal static class WebView2EnvironmentHolder
         {
             _environment = null;
             _userDataFolder = BuildSessionUserDataFolder();
-
-            AppLogger.Warn(
-                $"Recreating the WebView2 environment with a fresh user data folder: {_userDataFolder}");
 
             _environment = await CreateAsync(_userDataFolder).ConfigureAwait(true);
             return _environment;

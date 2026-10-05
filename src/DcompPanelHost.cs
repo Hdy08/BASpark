@@ -316,9 +316,8 @@ internal sealed class DcompPanelHost : IDisposable
             source.SetRegionRects(NonClientRegionKind.LeftBorder, IsMaximized ? [] : [new RectInt32(0, 0, grip, height)]);
             source.SetRegionRects(NonClientRegionKind.RightBorder, IsMaximized ? [] : [new RectInt32(width - grip, 0, grip, height)]);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Warn($"Failed to update panel host regions: {ex.Message}");
         }
     }
 
@@ -347,10 +346,7 @@ internal sealed class DcompPanelHost : IDisposable
             lpszClassName = WindowClassName
         };
 
-        if (RegisterClassEx(ref wc) == 0)
-        {
-            AppLogger.Warn($"RegisterClassEx failed for the panel host: {Marshal.GetLastWin32Error()}");
-        }
+        _ = RegisterClassEx(ref wc);
 
         _classRegistered = true;
     }
@@ -442,9 +438,8 @@ internal sealed class DcompPanelHost : IDisposable
             info.ptMinTrackSize.Y = (int)Math.Round(MinHeightDesign * scale);
             Marshal.StructureToPtr(info, lParam, fDeleteOld: false);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"Failed to apply min track size: {ex.Message}");
         }
     }
 
@@ -503,9 +498,8 @@ internal sealed class DcompPanelHost : IDisposable
         {
             _xamlSource.SiteBridge.MoveAndResize(new RectInt32(0, 0, width, height));
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Warn($"Failed to resize the XAML island: {ex.Message}");
         }
     }
 

@@ -24,9 +24,8 @@ internal static class NativeMessageBox
         {
             _ = MessageBoxW(IntPtr.Zero, message, title ?? "BASpark", flags);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"MessageBox failed: {ex.Message}");
         }
     }
 
@@ -36,9 +35,8 @@ internal static class NativeMessageBox
         {
             _ = MessageBoxW(IntPtr.Zero, message, title ?? "BASpark", MB_OK | MB_TOPMOST | MB_ICONWARNING);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"MessageBox failed: {ex.Message}");
         }
     }
 

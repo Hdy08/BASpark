@@ -65,9 +65,8 @@ public sealed class TrayIconController : IDisposable
             _ready.Set();
             WinFormsApp.Run();
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            AppLogger.Error("托盘图标初始化失败。", exception);
         }
         finally
         {
@@ -115,9 +114,8 @@ public sealed class TrayIconController : IDisposable
             PostMessage(_messageWindow.Handle, 0, 0, 0);
             Dispatch(command switch { 1 => _openPanel, 2 => _restart, 3 => _exit, 4 => App.ToggleEffectsPaused, _ => null });
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            AppLogger.Error("Failed to show the native tray menu.", exception);
         }
         finally
         {
@@ -137,9 +135,8 @@ public sealed class TrayIconController : IDisposable
             if (Environment.ProcessPath is { Length: > 0 } path &&
                 System.Drawing.Icon.ExtractAssociatedIcon(path) is { } icon) return icon;
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            AppLogger.Debug($"Failed to extract the application icon: {exception.Message}");
         }
         return System.Drawing.SystemIcons.Application;
     }

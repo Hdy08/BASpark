@@ -765,47 +765,6 @@
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="TxtGlowIntensity"
-                                            Text=""
-                                            Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <Grid ColumnSpacing="8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <Slider
-                                                x:Name="SliderGlow"
-                                                Grid.Column="0"
-                                                Minimum="0"
-                                                Maximum="3"
-                                                StepFrequency="0.1"
-                                                ValueChanged="EffectSlider_ValueChanged"
-                                                MinWidth="40"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtGlowIntensity}" />
-                                            <NumberBox
-                                                x:Name="TxtGlowValue"
-                                                Grid.Column="1"
-                                                Minimum="0"
-                                                Maximum="3"
-                                                SmallChange="0.1"
-                                                SpinButtonPlacementMode="Compact"
-                                                Width="84"
-                                                ValueChanged="EffectNumberBox_ValueChanged"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtGlowIntensity}" />
-                                        </Grid>
-                                    </Grid>
-                                </Grid>
-                            </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
@@ -1032,6 +991,47 @@
                                                 SpinButtonPlacementMode="Compact"
                                                 Width="84"
                                                 AutomationProperties.Name="{Binding Text, ElementName=TxtTrailRefresh}" />
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="TxtGlowIntensity"
+                                            Text=""
+                                            Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Slider
+                                                x:Name="SliderGlow"
+                                                Grid.Column="0"
+                                                Minimum="0"
+                                                Maximum="3"
+                                                StepFrequency="0.1"
+                                                ValueChanged="EffectSlider_ValueChanged"
+                                                MinWidth="40"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtGlowIntensity}" />
+                                            <NumberBox
+                                                x:Name="TxtGlowValue"
+                                                Grid.Column="1"
+                                                Minimum="0"
+                                                Maximum="3"
+                                                SmallChange="0.1"
+                                                SpinButtonPlacementMode="Compact"
+                                                Width="84"
+                                                ValueChanged="EffectNumberBox_ValueChanged"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtGlowIntensity}" />
                                         </Grid>
                                     </Grid>
                                 </Grid>

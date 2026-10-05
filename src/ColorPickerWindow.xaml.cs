@@ -146,10 +146,9 @@ public partial class ColorPickerWindow : Window
         {
             ExtendsContentIntoTitleBar = true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // 失败时回退到系统标题栏，功能不受影响。
-            AppLogger.Warn($"Failed to extend content into the title bar: {ex.Message}");
         }
     }
 
@@ -181,9 +180,8 @@ public partial class ColorPickerWindow : Window
                 ? TitleBarTheme.Dark
                 : TitleBarTheme.Light;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"取色器标题栏主题设置失败：{ex.Message}");
         }
     }
 

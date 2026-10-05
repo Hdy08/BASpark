@@ -71,9 +71,8 @@ internal sealed class AppBackdrop : SystemBackdrop
             _brush = _compositor.CreateColorBrush(dark ? DarkColor : LightColor);
             target.SystemBackdrop = _brush;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"System backdrop rejected by the host: {ex.Message}");
         }
     }
 }

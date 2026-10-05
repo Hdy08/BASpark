@@ -524,9 +524,8 @@ namespace BASpark
                         throw;
                     }
                 }
-                catch (Exception exception)
+                catch (Exception)
                 {
-                    AppLogger.Warn($"Failed to import configuration data: {exception.Message}");
                     return false;
                 }
             }

@@ -65,7 +65,6 @@ public sealed partial class ControlPanelWindow
         }
         catch (Exception exception)
         {
-            AppLogger.Warn($"Failed to copy log: {exception.Message}");
             await ShowMessageAsync(Localization.Format("Log_CopyFailed", exception.Message));
         }
     }
@@ -102,7 +101,6 @@ public sealed partial class ControlPanelWindow
         }
         catch (Exception exception)
         {
-            AppLogger.Warn($"Failed to prepare configuration backup: {exception.Message}");
             await ShowMessageAsync(Localization.Format(import ? "Backup_ImportFailed" : "Backup_ExportFailed", exception.Message));
         }
         finally
@@ -252,7 +250,6 @@ public sealed partial class ControlPanelWindow
         }
         catch (Exception exception)
         {
-            AppLogger.Warn($"Failed to transfer configuration data: {exception.Message}");
             await ShowMessageAsync(Localization.Format(_backupImport ? "Backup_ImportFailed" : "Backup_ExportFailed", exception.Message));
         }
         finally
@@ -286,8 +283,7 @@ public sealed partial class ControlPanelWindow
         }
         catch
         {
-            if (!ConfigManager.SaveBackupValues(previous))
-                AppLogger.Warn("Failed to roll back imported configuration.");
+            _ = ConfigManager.SaveBackupValues(previous);
             ApplyBackupValuesToPanel(ConfigurationBackup.BuildImportValues(pending, selected, CapturePendingBackup()));
             ApplyImportedRuntimeSettings(selected);
             _savedSettingsState = baseline;

@@ -547,9 +547,8 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             _host.CenterOnCurrentDisplay(DesignWidth, DesignHeight);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Warn($"Failed to size/center control panel: {ex.Message}");
         }
     }
 
@@ -607,9 +606,8 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             WindowChrome.ApplyTitleBarTheme(Handle, IsDarkThemeEffective());
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"Title bar theming unavailable: {ex.Message}");
         }
     }
 
@@ -1677,7 +1675,6 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         catch (Exception exception)
         {
-            AppLogger.Warn($"Failed to open repository link: {exception.Message}");
             await ShowMessageAsync(Localization.Format("Msg_OpenLinkFailed", exception.Message));
         }
     }
@@ -1823,9 +1820,8 @@ public sealed partial class ControlPanelWindow : UserControl
                     visual.StartAnimation("Opacity", opacity);
                 }
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                AppLogger.Error("Failed to animate the navigation indicator.", exception);
             }
         });
     }
@@ -2526,9 +2522,8 @@ public sealed partial class ControlPanelWindow : UserControl
                 AddProcessToActiveProfile(Path.GetFileName(file.Path));
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Warn($"Failed to pick process executable: {ex.Message}");
         }
     }
 
@@ -2841,7 +2836,6 @@ public sealed partial class ControlPanelWindow : UserControl
         AddVisualResetItem(VisualAppearanceResetFlags.UnifiedEffectScale, Localization.Get("VisualReset_UnifiedScale"), "EffectScale", 1.0, () => SliderScale.Value = 1);
         AddVisualResetItem(VisualAppearanceResetFlags.TrailEffectScale, Localization.Get("VisualReset_TrailScale"), "TrailEffectScale", 1.0, () => SliderTrailScale.Value = 1);
         AddVisualResetItem(VisualAppearanceResetFlags.ClickEffectScale, Localization.Get("VisualReset_ClickScale"), "ClickEffectScale", 1.0, () => SliderClickScale.Value = 1);
-        AddVisualResetItem(VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), "GlowIntensity", 1.0, () => SliderGlow.Value = 1);
         AddVisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, CheckLinkedAnimationSpeed.Header.ToString()!, "UseLinkedAnimationSpeed", true,
             () => CheckLinkedAnimationSpeed.IsOn = true);
         AddVisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), "EffectSpeed", 1.0, () => SliderSpeed.Value = 1);
@@ -2851,6 +2845,7 @@ public sealed partial class ControlPanelWindow : UserControl
         AddVisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, CheckFollowDisplayRefreshRate.Header.ToString()!, "FollowDisplayRefreshRate", true,
             () => CheckFollowDisplayRefreshRate.IsOn = true);
         AddVisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, Localization.Get("VisualReset_TrailRefresh"), "TrailRefreshRate", 60, () => SliderTrailRefresh.Value = 60);
+        AddVisualResetItem(VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), "GlowIntensity", 1.0, () => SliderGlow.Value = 1);
         AddVisualResetItem(VisualAppearanceResetFlags.ParticleColor | VisualAppearanceResetFlags.EffectOpacity,
             Localization.Get("VisualReset_Color"), "ParticleColor", ConfigManager.DefaultThemeColor,
             () =>
@@ -2962,9 +2957,8 @@ public sealed partial class ControlPanelWindow : UserControl
             }
             await ShowMessageAsync(Localization.Get(_resetScope == ResetScope.Visual ? "Msg_VisualResetDone" : "Msg_PageResetDone"));
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            AppLogger.Warn($"Failed to save selected reset settings: {exception.Message}");
             UpdateApplySettingsState(SettingsSections.All);
             await ShowMessageAsync(Localization.Get("Msg_SettingsSaveFailed"));
         }
@@ -3679,9 +3673,8 @@ public sealed partial class ControlPanelWindow : UserControl
                 }
             }
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            AppLogger.Warn($"Failed to show native selection dialog: {exception.Message}");
         }
         finally
         {
@@ -3811,14 +3804,13 @@ public sealed partial class ControlPanelWindow : UserControl
                         Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], CultureInfo.InvariantCulture)),
                         Task.WhenAny(scrimClosed, Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlNormalAnimationDuration"], CultureInfo.InvariantCulture))));
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                AppLogger.Warn($"Failed to animate native dialog closing: {exception.Message}");
             }
             finally
             {
                 try { deferral.Complete(); }
-                catch (Exception exception) { AppLogger.Debug($"Native dialog already closed: {exception.Message}"); }
+                catch (Exception) { }
             }
         };
         dialog.Closed += (_, _) =>
@@ -3921,9 +3913,8 @@ public sealed partial class ControlPanelWindow : UserControl
             PrepareContentDialogPresentation(_messageDialog);
             await _messageDialog.ShowAsync();
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            AppLogger.Warn($"Failed to show in-window message: {exception.Message}");
         }
         finally
         {
@@ -3946,7 +3937,6 @@ public sealed partial class ControlPanelWindow : UserControl
             XamlRoot? root = await EnsureXamlRootAsync();
             if (root == null || _isClosed)
             {
-                AppLogger.Warn("Cannot show confirmation dialog: XamlRoot unavailable.");
                 return false;
             }
 
@@ -3965,9 +3955,8 @@ public sealed partial class ControlPanelWindow : UserControl
             PrepareContentDialogPresentation(dialog);
             return await dialog.ShowAsync() == ContentDialogResult.Primary;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Warn($"Failed to show confirmation dialog: {ex.Message}");
             return false;
         }
         finally
@@ -4148,7 +4137,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         catch (Exception ex)
         {
-            AppLogger.Warn($"Failed to stop panel timers during close: {ex.Message}");
+            AppLogger.Warn($"Failed to dispose panel timers during close: {ex.Message}");
         }
 
         ComboProfiles.ItemsSource = null;

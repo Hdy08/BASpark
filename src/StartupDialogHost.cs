@@ -108,14 +108,12 @@ internal static class StartupDialogHost
                     SetDwmFlag(handle, DwmwaCloak, false);
                     SetDwmFlag(handle, DwmwaTransitionsForcedDisabled, false);
                     _ = DwmFlush();
-                    if (new Windows.UI.ViewManagement.UISettings().AnimationsEnabled &&
-                        !AnimateWindow(handle, ShowAnimationMilliseconds, AwActivate | AwBlend))
-                        AppLogger.Debug($"Failed to animate the startup window: {Marshal.GetLastWin32Error()}.");
+                    if (new Windows.UI.ViewManagement.UISettings().AnimationsEnabled)
+                        _ = AnimateWindow(handle, ShowAnimationMilliseconds, AwActivate | AwBlend);
                     if (!closed && !ClosingWindows.ContainsKey(handle) && NativeMethods.IsWindow(handle)) window.Activate();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    AppLogger.Warn($"Failed to present the startup window: {ex.Message}");
                     if (!closed && !ClosingWindows.ContainsKey(handle) && NativeMethods.IsWindow(handle))
                     {
                         int disabled = 0;
@@ -170,7 +168,6 @@ internal static class StartupDialogHost
             }
             catch (Exception ex)
             {
-                AppLogger.Error("Failed to close the startup window.", ex);
                 completion.TrySetException(ex);
             }
             finally
@@ -359,9 +356,8 @@ internal static class StartupDialogHost
             WindowChrome.ApplyAppIcon(window);
             return window;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Error("启动对话框初始化失败。", ex);
             return null;
         }
     }

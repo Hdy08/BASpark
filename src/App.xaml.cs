@@ -87,11 +87,6 @@ public partial class App : Application
         ConfigManager.Load();
         AppLogger.Initialize();
 
-        // 控制面板是判断「界面是否可用」的主要信号，构建失败必须留下记录。
-        AppLogger.Info(
-            $"BASpark starting (pid={Environment.ProcessId}, " +
-            $"startSilent={ConfigManager.StartSilent}, darkMode={ConfigManager.DarkMode}).");
-
         if (string.IsNullOrWhiteSpace(ConfigManager.UiLanguage))
         {
             if (!ConfigManager.AgreedToPrivacy)
@@ -194,7 +189,6 @@ public partial class App : Application
                 catch (Exception ex)
                 {
                     // 控制面板构造/显示失败时不能让异常逃逸（会静默吞掉且界面缺失）。
-                    AppLogger.Error("控制面板创建失败。", ex);
                     _controlPanel = null;
                     NativeMessageBox.Show(
                         Localization.Format("WebView2_InitFailed", ex.Message),
@@ -234,8 +228,7 @@ public partial class App : Application
         {
             if (generation != _backgroundMemoryGeneration || _controlPanel != null || _isExiting != 0) return;
             SidebarBackgroundHelper.ClearCache();
-            if (!NativeMethods.EmptyWorkingSet(NativeMethods.GetCurrentProcess()))
-                AppLogger.Debug("Failed to reclaim idle application memory.");
+            _ = NativeMethods.EmptyWorkingSet(NativeMethods.GetCurrentProcess());
         });
     }
 
@@ -256,9 +249,8 @@ public partial class App : Application
                 @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
             return key?.GetValue("AppsUseLightTheme") is int value && value == 0;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"Failed to read the Windows app theme: {ex.Message}");
             return false;
         }
     }

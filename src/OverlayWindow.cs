@@ -62,6 +62,7 @@ internal sealed class OverlayWindow : IDisposable
     private bool _environmentInputSuppressed;
     private bool _overlayRuntimePaused;
     private bool _rendererReady;
+    private bool _rendererReadyMessageReceived;
     private bool _usingLegacyRenderer;
     private bool _legacyFallbackAttempted;
     private bool _processRecoveryPending;
@@ -268,10 +269,6 @@ internal sealed class OverlayWindow : IDisposable
 
                 // 只在首次失败时重建环境，避免多屏之间反复互踩。
                 resetRequested = true;
-                AppLogger.Warn(
-                    $"WebView2 controller creation failed on '{_screenDeviceName}'; " +
-                    "recreating the shared environment with a fresh user data folder.");
-
                 try
                 {
                     env = await WebView2EnvironmentHolder
@@ -280,9 +277,6 @@ internal sealed class OverlayWindow : IDisposable
                 }
                 catch (Exception ex) when (!IsExpectedWebViewShutdownException(ex))
                 {
-                    AppLogger.Warn(
-                        $"Recreating the WebView2 environment failed on '{_screenDeviceName}': " +
-                        $"{ex.GetType().Name}: {ex.Message}");
                     break;
                 }
             }
@@ -303,13 +297,6 @@ internal sealed class OverlayWindow : IDisposable
                 return;
             }
 
-            _host.TryGetWindowRect(out NativeMethods.RECT hostRect);
-            AppLogger.Debug(
-                $"[overlay:{_screenDeviceName}] controller ready " +
-                $"(hwnd=0x{_host.Handle.ToInt64():X}, host={hostRect.Width}x{hostRect.Height}, " +
-                $"dpiScale={_host.DpiScale.ToString("F3", CultureInfo.InvariantCulture)}, " +
-                $"runtime={env.BrowserVersionString})");
-
             ConfigureController(env);
         }
         catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
@@ -317,13 +304,6 @@ internal sealed class OverlayWindow : IDisposable
         }
         catch (Exception ex)
         {
-            AppLogger.Error(
-                $"显示器 '{_screenDeviceName}' 上的叠加层初始化失败。" +
-                $" (hwnd=0x{_host.Handle.ToInt64():X}, " +
-                $"hwndValid={NativeMethods.IsWindow(_host.Handle)}, " +
-                $"userData={WebView2EnvironmentHolder.UserDataFolder}, " +
-                $"hresult=0x{ex.HResult:X8})",
-                ex);
             App.ReportFatalWebViewFailure(Localization.Format("WebView2_InitFailed", ex.Message));
         }
     }
@@ -360,14 +340,8 @@ internal sealed class OverlayWindow : IDisposable
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Warn(
-                $"CreateCoreWebView2ControllerAsync failed on '{_screenDeviceName}': " +
-                $"{ex.GetType().Name}: {ex.Message} (hresult=0x{ex.HResult:X8}, " +
-                $"hwnd=0x{_host.Handle.ToInt64():X}, hwndValid={NativeMethods.IsWindow(_host.Handle)}, " +
-                $"hostVisible={_host.IsVisible}, dpiScale={_host.DpiScale.ToString("F3", CultureInfo.InvariantCulture)}, " +
-                $"userData={WebView2EnvironmentHolder.UserDataFolder})");
             return false;
         }
     }
@@ -401,7 +375,7 @@ internal sealed class OverlayWindow : IDisposable
         _processFailedHandler = OnWebViewProcessFailed;
         _navigationStartingHandler = OnNavigationStarting;
         _navigationCompletedHandler = OnNavigationCompleted;
-        _webMessageReceivedHandler = OnWebMessageReceived;
+        _webMessageReceivedHandler = (_, args) => OnWebMessageReceived(coreWebView, args);
         coreWebView.ProcessFailed += _processFailedHandler;
         coreWebView.NavigationStarting += _navigationStartingHandler;
         coreWebView.NavigationCompleted += _navigationCompletedHandler;
@@ -416,6 +390,7 @@ internal sealed class OverlayWindow : IDisposable
     {
         StopRendererReadyTimeout();
         _rendererReady = _usingLegacyRenderer;
+        _rendererReadyMessageReceived = false;
 
         if (_usingLegacyRenderer)
         {
@@ -602,13 +577,16 @@ internal sealed class OverlayWindow : IDisposable
 
             if (string.Equals(type, "ready", StringComparison.Ordinal))
             {
-                bool firstReadyMessage = !_rendererReady;
+                bool firstReadyMessage = !_rendererReadyMessageReceived;
+                _rendererReadyMessageReceived = true;
+                bool firstReady = !_rendererReady;
                 _rendererReady = true;
                 _unresponsiveTracker.Reset();
                 StopRendererReadyTimeout();
+                if (firstReady) ApplySavedRendererSettings();
+                EnsureHostPresented();
                 if (firstReadyMessage)
                 {
-                    ApplySavedRendererSettings();
                     AppLogger.Info(
                         $"BA click renderer ready on '{_screenDeviceName}' " +
                         $"(effective: {backend}, effect: {resolvedEffectBackend}, " +
@@ -730,8 +708,7 @@ internal sealed class OverlayWindow : IDisposable
         {
             StopRendererReadyTimeout();
             AppLogger.Warn(
-                $"BA click renderer ready timeout on '{_screenDeviceName}' " +
-                $"({RendererReadyTimeout.TotalSeconds:F0}s); switching to legacy renderer.");
+                $"BA click renderer ready timeout on '{_screenDeviceName}'; switching to legacy renderer.");
             FallbackToLegacyRenderer("ready timeout");
         }
     }
@@ -761,10 +738,8 @@ internal sealed class OverlayWindow : IDisposable
         {
             return;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Warn(
-                $"Renderer probe failed on '{_screenDeviceName}': {ex.Message}");
         }
         finally
         {
@@ -791,13 +766,6 @@ internal sealed class OverlayWindow : IDisposable
         // 「可以显示」信号；该事件在某些时序下不会到达，若只依赖它，叠加层
         // 会一直保持隐藏。
         EnsureHostPresented();
-
-        double elapsedMs = _rendererStartedAtTicks == 0
-            ? 0
-            : (DateTime.UtcNow.Ticks - _rendererStartedAtTicks) / (double)TimeSpan.TicksPerMillisecond;
-        AppLogger.Info(
-            $"BA click renderer ready on '{_screenDeviceName}' " +
-            $"(via readiness probe after {elapsedMs:F0}ms; no ready message received).");
     }
 
     /// <summary>

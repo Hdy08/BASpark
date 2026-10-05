@@ -48,7 +48,6 @@ internal static class WindowChrome
                     {
                         int result = DCompositionBoostCompositorClock(true);
                         _boostRequested = result >= 0;
-                        if (!_boostRequested) AppLogger.Debug($"Failed to boost the UI compositor clock: 0x{result:X8}.");
                     }
                 }
                 else if (--_activeWindows == 0)
@@ -147,9 +146,8 @@ internal static class WindowChrome
             }
             return new ImageIconSource { ImageSource = _appIconImage };
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            AppLogger.Debug($"Failed to load the title bar icon: {exception.Message}");
             return null;
         }
     }
@@ -173,9 +171,8 @@ internal static class WindowChrome
             SendMessage(hwnd, WM_SETICON, ICON_SMALL, icon);
             SendMessage(hwnd, WM_SETICON, ICON_BIG, icon);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"Failed to apply the window icon: {ex.Message}");
         }
     }
 
@@ -211,9 +208,8 @@ internal static class WindowChrome
             };
             window.AppWindow.Move(center);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"Failed to size the window: {ex.Message}");
         }
     }
 
@@ -252,9 +248,8 @@ internal static class WindowChrome
                 hwnd, IntPtr.Zero, 0, 0, 0, 0,
                 SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            AppLogger.Debug($"Failed to apply the title bar theme: {ex.Message}");
         }
     }
 
