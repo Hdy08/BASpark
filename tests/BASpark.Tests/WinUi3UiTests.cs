@@ -187,7 +187,7 @@ public class WinUi3UiTests
             "RadioButtons",
             "Expander",
             "ColorPicker",
-            "ListView",
+            "ItemsControl",
             "ScrollViewer",
         ];
 
