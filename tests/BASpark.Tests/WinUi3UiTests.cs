@@ -1344,7 +1344,8 @@ public class WinUi3UiTests
         Assert.Contains("TrayMessageWindow(Action openPanel) : Form", tray, StringComparison.Ordinal);
         Assert.Contains("ShowInTaskbar = false", tray, StringComparison.Ordinal);
         Assert.Contains("FindWindow(null, HiddenTrayWindowTitle)", tray, StringComparison.Ordinal);
-        Assert.Contains("TrayIconController.TryShowHiddenControlPanel()", ReadSource("src", "App.xaml.cs"), StringComparison.Ordinal);
+        Assert.Contains("FindWindow(null, TrayWindowTitle)", tray, StringComparison.Ordinal);
+        Assert.Contains("TrayIconController.TryShowExistingControlPanel()", ReadSource("src", "App.xaml.cs"), StringComparison.Ordinal);
     }
 
     [Fact]

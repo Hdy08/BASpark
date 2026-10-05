@@ -545,6 +545,13 @@ namespace BASpark
                 _lastTrailThrottleOverlay = null;
                 return;
             }
+            if (!_isPrimaryPointerDown && !ConfigManager.EnableAlwaysTrailEffect)
+            {
+                if (ConfigManager.EnableEnvironmentFilter) ShouldSuppressEffects();
+                SwitchAlwaysTrailOverlay(null);
+                _lastTrailThrottleOverlay = null;
+                return;
+            }
             if (!CanRenderEffects())
             {
                 _lastTrailThrottleOverlay = null;

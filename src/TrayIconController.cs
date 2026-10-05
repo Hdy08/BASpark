@@ -162,10 +162,14 @@ public sealed class TrayIconController : IDisposable
         });
     }
 
-    public static bool TryShowHiddenControlPanel()
+    public static bool TryShowExistingControlPanel()
     {
         nint window = FindWindow(null, HiddenTrayWindowTitle);
-        return window != 0 && OpenPanelMessage != 0 && PostMessage(window, OpenPanelMessage, 0, 0);
+        if (window == 0) window = FindWindow(null, TrayWindowTitle);
+        if (window == 0 || OpenPanelMessage == 0) return false;
+        GetWindowThreadProcessId(window, out uint processId);
+        if (processId != 0) AllowSetForegroundWindow(processId);
+        return PostMessage(window, OpenPanelMessage, 0, 0);
     }
 
     public void RefreshLocalization()
@@ -279,6 +283,11 @@ public sealed class TrayIconController : IDisposable
     private static extern uint RegisterWindowMessage(string message);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern nint FindWindow(string? className, string title);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint window, out uint processId);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AllowSetForegroundWindow(uint processId);
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool PostMessage(nint window, uint message, nuint parameter, nint data);

@@ -50,7 +50,7 @@ public partial class App : Application
     {
         DispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
-        if (TrayIconController.TryShowHiddenControlPanel())
+        if (TrayIconController.TryShowExistingControlPanel())
         {
             Exit();
             return;

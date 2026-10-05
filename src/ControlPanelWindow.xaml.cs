@@ -347,7 +347,6 @@ public sealed partial class ControlPanelWindow : UserControl
     private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
 
     private readonly DcompPanelHost _host;
-    private readonly WindowChrome.ScrollbarAutoHide _scrollbars = new();
     private readonly DispatcherQueueTimer? _refreshTimer;
 
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
@@ -596,7 +595,6 @@ public sealed partial class ControlPanelWindow : UserControl
         _ = sender;
         _ = e;
         XamlRoot.Changed += PanelXamlRoot_Changed;
-        _scrollbars.Watch(RootGrid);
         UpdateCaptionButtonBounds();
         UpdateCaptionButtonState();
         ApplyTitleBarTheme();
@@ -3834,7 +3832,6 @@ public sealed partial class ControlPanelWindow : UserControl
         dialog.Loading += (_, _) => UpdateDialogScrim(dialog);
         dialog.Loaded += (_, _) =>
         {
-            _scrollbars.Watch(dialog);
             UpdateDialogScrim(dialog);
             if ((!string.IsNullOrEmpty(dialog.PrimaryButtonText) || !string.IsNullOrEmpty(dialog.SecondaryButtonText) ||
                  !string.IsNullOrEmpty(dialog.CloseButtonText)) &&
@@ -4079,7 +4076,6 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         _isClosed = true;
-        _scrollbars.Dispose();
         RootGrid.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootGrid_PointerPressed));
         RootGrid.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished));
         RootGrid.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished));
