@@ -60,11 +60,10 @@
         </DataTemplate>
         <local:SelectionCardTemplateSelector x:Key="SelectionCardTemplates"
             CardTemplate="{StaticResource SelectionCardTemplate}" HeadingTemplate="{StaticResource SelectionHeadingTemplate}" />
-        <Style x:Key="SelectionCardContainerStyle" TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+        <Style x:Key="SelectionCardContainerStyle" TargetType="ContentPresenter">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0,0,16,6" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="IsTabStop" Value="False" />
         </Style>
     </UserControl.Resources>
 
@@ -1608,16 +1607,18 @@
                             <SymbolIcon Symbol="SelectAll" />
                         </Button>
                     </Grid>
-                    <ListView x:Name="ListRunningProcesses" Grid.Row="2" SelectionMode="None"
-                              MinHeight="0" Margin="0,0,-16,0" HorizontalContentAlignment="Stretch"
-                              ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
-                              ItemContainerStyle="{StaticResource SelectionCardContainerStyle}"
-                              ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListView.ItemsPanel>
-                            <ItemsPanelTemplate><ItemsStackPanel CacheLength="2" /></ItemsPanelTemplate>
-                        </ListView.ItemsPanel>
-                        <ListView.ItemContainerTransitions><TransitionCollection /></ListView.ItemContainerTransitions>
-                    </ListView>
+                    <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="ListRunningProcesses"
+                                      MinHeight="0" HorizontalContentAlignment="Stretch"
+                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
+                                      ItemContainerStyle="{StaticResource SelectionCardContainerStyle}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerTransitions><TransitionCollection /></ItemsControl.ItemContainerTransitions>
+                        </ItemsControl>
+                    </ScrollViewer>
                     <TextBlock x:Name="TxtRunningNoResults" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,16"
                                HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource BasCaptionStyle}" />
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" HorizontalAlignment="Right">
@@ -1669,16 +1670,18 @@
                             <SymbolIcon Symbol="SelectAll" />
                         </Button>
                     </Grid>
-                    <ListView x:Name="ListVisualResetItems" Grid.Row="2" SelectionMode="None"
-                              MinHeight="0" Margin="0,0,-16,0" HorizontalContentAlignment="Stretch"
-                              ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
-                              ItemContainerStyle="{StaticResource SelectionCardContainerStyle}"
-                              ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListView.ItemsPanel>
-                            <ItemsPanelTemplate><ItemsStackPanel CacheLength="2" /></ItemsPanelTemplate>
-                        </ListView.ItemsPanel>
-                        <ListView.ItemContainerTransitions><TransitionCollection /></ListView.ItemContainerTransitions>
-                    </ListView>
+                    <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="ListVisualResetItems"
+                                      MinHeight="0" HorizontalContentAlignment="Stretch"
+                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
+                                      ItemContainerStyle="{StaticResource SelectionCardContainerStyle}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerTransitions><TransitionCollection /></ItemsControl.ItemContainerTransitions>
+                        </ItemsControl>
+                    </ScrollViewer>
                     <TextBlock x:Name="TxtResetNoResults" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,16"
                                HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource BasCaptionStyle}" />
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" HorizontalAlignment="Right">
@@ -1725,16 +1728,18 @@
                             <SymbolIcon Symbol="SelectAll" />
                         </Button>
                     </Grid>
-                    <ListView x:Name="ListBackupItems" Grid.Row="2" SelectionMode="None" MinHeight="0"
-                              Margin="0,0,-16,0" HorizontalContentAlignment="Stretch"
-                              ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
-                              ItemContainerStyle="{StaticResource SelectionCardContainerStyle}"
-                              ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListView.ItemsPanel>
-                            <ItemsPanelTemplate><ItemsStackPanel CacheLength="2" /></ItemsPanelTemplate>
-                        </ListView.ItemsPanel>
-                        <ListView.ItemContainerTransitions><TransitionCollection /></ListView.ItemContainerTransitions>
-                    </ListView>
+                    <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="ListBackupItems" MinHeight="0"
+                                      HorizontalContentAlignment="Stretch"
+                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
+                                      ItemContainerStyle="{StaticResource SelectionCardContainerStyle}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerTransitions><TransitionCollection /></ItemsControl.ItemContainerTransitions>
+                        </ItemsControl>
+                    </ScrollViewer>
                     <TextBlock x:Name="TxtBackupNoResults" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,16"
                                HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource BasCaptionStyle}" />
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0"

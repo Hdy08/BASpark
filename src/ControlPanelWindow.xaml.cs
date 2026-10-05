@@ -362,7 +362,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly Dictionary<ContentDialog, Border> _dialogPresentationGuards = new();
     private readonly HashSet<ContentDialog> _dialogPresentationsPending = new();
     private sealed record SelectionToolbar(Button Invert, Button SelectAll, Button Confirm, TextBlock EmptyMessage, List<SelectionCardItem> Items);
-    private readonly Dictionary<ListView, SelectionToolbar> _selectionToolbars = new();
+    private readonly Dictionary<ItemsControl, SelectionToolbar> _selectionToolbars = new();
     private bool _changingSelection;
     private readonly List<WindowChrome.ComboBoxWidthTracker> _comboWidthTrackers = new();
     private readonly List<ProcessItem> _allRunningProcesses = new();
@@ -1301,7 +1301,7 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (var selector in _segmentedSelectors) selector.RefreshLayout();
         UpdateConfiguredProcessSummary();
         foreach (var tracker in _comboWidthTrackers) tracker.Refresh();
-        foreach (ListView list in _selectionToolbars.Keys) UpdateSelectionToolbar(list);
+        foreach (ItemsControl list in _selectionToolbars.Keys) UpdateSelectionToolbar(list);
     }
 
     private static void SetRadioContent(RadioButtons container, int index, string key)
@@ -2952,7 +2952,7 @@ public sealed partial class ControlPanelWindow : UserControl
         RefreshSelectionToolbar(ListVisualResetItems);
     }
 
-    private void RefreshSelectionToolbar(ListView list)
+    private void RefreshSelectionToolbar(ItemsControl list)
     {
         if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
         foreach (SelectionCardItem item in toolbar.Items) item.PropertyChanged -= SelectionItem_PropertyChanged;
@@ -2969,7 +2969,7 @@ public sealed partial class ControlPanelWindow : UserControl
             if (pair.Value.Items.Contains(item)) UpdateSelectionToolbar(pair.Key);
     }
 
-    private void UpdateSelectionToolbar(ListView list)
+    private void UpdateSelectionToolbar(ItemsControl list)
     {
         if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
         bool allSelected = toolbar.Items.Count > 0 && toolbar.Items.All(item => item.IsSelected);
@@ -2992,7 +2992,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ChangeSelection(object sender, bool invert)
     {
-        if (sender is not Button { Tag: ListView list } button || !button.IsEnabled ||
+        if (sender is not Button { Tag: ItemsControl list } button || !button.IsEnabled ||
             !_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
         bool select = !toolbar.Items.All(item => item.IsSelected);
         _changingSelection = true;

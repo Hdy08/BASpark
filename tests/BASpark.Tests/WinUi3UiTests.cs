@@ -1432,17 +1432,19 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void PopupSelectionLists_UseVirtualizedDataTemplatesAndToggleWholeCards()
+    public void PopupSelectionLists_UseStableScrollRangesAndToggleWholeCards()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
-        foreach (string name in new[] { "ListVisualResetItems", "ListRunningProcesses" })
+        foreach (string name in new[] { "ListVisualResetItems", "ListRunningProcesses", "ListBackupItems" })
         {
             XElement list = GetNamedElement(panel, name);
-            Assert.Equal("None", (string?)list.Attribute("SelectionMode"));
+            Assert.Equal("ItemsControl", list.Name.LocalName);
             Assert.Equal("{StaticResource SelectionCardTemplates}", (string?)list.Attribute("ItemTemplateSelector"));
             Assert.Equal("{StaticResource SelectionCardContainerStyle}", (string?)list.Attribute("ItemContainerStyle"));
-            Assert.Equal("0,0,-16,0", (string?)list.Attribute("Margin"));
-            Assert.Single(list.Descendants(), element => element.Name.LocalName == "ItemsStackPanel");
+            Assert.Equal("ScrollViewer", list.Parent!.Name.LocalName);
+            Assert.Equal("0,0,-16,0", (string?)list.Parent.Attribute("Margin"));
+            Assert.Equal("Auto", (string?)list.Parent.Attribute("VerticalScrollBarVisibility"));
+            Assert.Single(list.Descendants(), element => element.Name.LocalName == "StackPanel");
             Assert.Single(list.Descendants(), element => element.Name.LocalName == "TransitionCollection");
         }
         XElement container = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionCardContainerStyle");
@@ -2114,7 +2116,7 @@ public class WinUi3UiTests
         XElement list = GetNamedElement(panel, "ListBackupItems");
         Assert.Equal("{StaticResource SelectionCardTemplates}", (string?)list.Attribute("ItemTemplateSelector"));
         Assert.Equal("{StaticResource SelectionCardContainerStyle}", (string?)list.Attribute("ItemContainerStyle"));
-        Assert.Equal("None", (string?)list.Attribute("SelectionMode"));
+        Assert.Equal("ItemsControl", list.Name.LocalName);
         foreach (string name in new[] { "BtnExportConfiguration", "BtnImportConfiguration" })
         {
             XElement button = GetNamedElement(panel, name);
