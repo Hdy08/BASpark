@@ -594,9 +594,58 @@ public sealed partial class ControlPanelWindow : UserControl
         _ = sender;
         _ = e;
         XamlRoot.Changed += PanelXamlRoot_Changed;
+        UpdateMinimumWindowWidth();
         UpdateCaptionButtonBounds();
         UpdateCaptionButtonState();
         ApplyTitleBarTheme();
+    }
+
+    private static double MeasureSingleLineWidth(TextBlock text)
+    {
+        var measurement = new TextBlock
+        {
+            Text = text.Text, FontFamily = text.FontFamily, FontSize = text.FontSize,
+            FontWeight = text.FontWeight, CharacterSpacing = text.CharacterSpacing,
+            Language = text.Language, TextWrapping = TextWrapping.NoWrap
+        };
+        measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return measurement.DesiredSize.Width;
+    }
+
+    private void UpdateMinimumWindowWidth()
+    {
+        if (_isClosed || !RootGrid.IsLoaded) return;
+        double contentWidth = 0;
+        foreach (TextBlock title in new[] { TxtWelcomeTitle, TxtSettingsTitle, TxtLogTitle, TxtAboutTitle,
+                     TxtStatsTitle, TxtBasicTitle, TxtVisualTitle, TxtFilterTitle, TxtMultiScreenTitle, TxtBackupTitle })
+        {
+            double width = MeasureSingleLineWidth(title);
+            FrameworkElement heading = title;
+            if (heading.Parent is StackPanel { Children.Count: 1 } parent) heading = parent;
+            if (heading.Parent is Grid grid)
+            {
+                foreach (FrameworkElement child in grid.Children.OfType<FrameworkElement>().Where(child => Grid.GetColumn(child) == 1))
+                {
+                    ButtonBase[] buttons = child is ButtonBase button ? [button]
+                        : child is StackPanel actions ? actions.Children.OfType<ButtonBase>().ToArray() : [];
+                    if (buttons.Length == 0) continue;
+                    width += grid.ColumnSpacing + (child is StackPanel stack ? stack.Spacing * (buttons.Length - 1) : 0);
+                    foreach (ButtonBase action in buttons)
+                    {
+                        double labelWidth = MeasureSingleLineWidth(new TextBlock
+                        {
+                            Text = action.Content?.ToString() ?? string.Empty,
+                            FontFamily = action.FontFamily, FontSize = action.FontSize, FontWeight = action.FontWeight
+                        });
+                        width += Math.Max(action.MinWidth, labelWidth + action.Padding.Left + action.Padding.Right +
+                            action.BorderThickness.Left + action.BorderThickness.Right);
+                    }
+                }
+            }
+            contentWidth = Math.Max(contentWidth, width);
+        }
+        _host.SetMinimumWidth((int)Math.Ceiling(contentWidth + PanelBody.ColumnDefinitions[0].Width.Value +
+            PageWelcome.Padding.Left + PageWelcome.Padding.Right + 8));
     }
 
     /// <summary>WinUI 只负责内容区主题，标题栏按钮需要自己跟随（等价于旧的 ThemeManager.ApplyTitleBar）。</summary>
@@ -1214,6 +1263,7 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtOverlayRename.Text = Localization.Get("Overlay_RenameProfile");
         BtnOverlayRenameCancel.Content = Localization.Get("Overlay_Cancel");
         BtnOverlayRenameConfirm.Content = Localization.Get("Overlay_ConfirmRename");
+        UpdateMinimumWindowWidth();
 
         // 点击方式三个单选项在标记里用的是 Name=（不是 x:Name=），没有生成字段，只能从容器里取。
         if (RadioClickType.Items.Count >= 3)
@@ -3698,6 +3748,20 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ConfigureContentDialog(ContentDialog dialog)
     {
+        TextBlock? heading = dialog == RunningProcessOverlay ? TxtOverlayRunning
+            : dialog == VisualResetOverlay ? TxtOverlayVisualReset
+            : dialog == BackupOverlay ? TxtBackupSelectionTitle
+            : dialog == RenameProfileOverlay ? TxtOverlayRename : null;
+        if (heading != null)
+        {
+            double baseWidth = dialog == RenameProfileOverlay ? 380 : 420;
+            double padding = ((Thickness)Application.Current.Resources["ContentDialogPadding"]).Left +
+                ((Thickness)Application.Current.Resources["ContentDialogPadding"]).Right;
+            double width = Math.Min(Math.Max(baseWidth, Math.Ceiling(MeasureSingleLineWidth(heading) + padding + 8)),
+                Math.Max(baseWidth, PanelBody.ActualWidth - PanelBody.ColumnDefinitions[0].ActualWidth - 32));
+            dialog.Resources["ContentDialogMinWidth"] = width;
+            dialog.Resources["ContentDialogMaxWidth"] = width;
+        }
         if (dialog.Resources.ContainsKey("BasNativeDialogConfigured")) return;
         dialog.Resources["BasNativeDialogConfigured"] = true;
         dialog.Title = null;
@@ -3905,7 +3969,7 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 XamlRoot = root,
                 RequestedTheme = RootGrid.ActualTheme,
-                Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                Content = new TextBlock { Text = message, Style = TryGetAppResource<Style>("BasDialogMessageStyle") },
                 CloseButtonText = Localization.Get("ColorPicker_Confirm"),
                 DefaultButton = ContentDialogButton.Close
             };
@@ -3944,7 +4008,7 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 XamlRoot = root,
                 RequestedTheme = RootGrid.ActualTheme,
-                Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                Content = new TextBlock { Text = message, Style = TryGetAppResource<Style>("BasDialogMessageStyle") },
                 PrimaryButtonText = confirmText ?? Localization.Get("ColorPicker_Confirm"),
                 CloseButtonText = Localization.Get("Overlay_Cancel"),
                 DefaultButton = ContentDialogButton.Primary

@@ -93,7 +93,8 @@ public class WinUi3UiTests
             ("BasPageSubtitleStyle", "BodyTextBlockStyle"),
             ("BasFieldLabelStyle", "BodyTextBlockStyle"),
             ("BasCaptionStyle", "CaptionTextBlockStyle"),
-            ("BasSectionTitleStyle", "BodyStrongTextBlockStyle"),
+            ("BasSectionTitleStyle", "SubtitleTextBlockStyle"),
+            ("BasDialogMessageStyle", "BodyStrongTextBlockStyle"),
             ("BasSettingTitleStyle", "BodyStrongTextBlockStyle")
         })
         {
@@ -107,13 +108,13 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void SelectionHeading_UsesCompactSpacingWithoutPageHeadingMargins()
+    public void SelectionHeading_UsesEqualVerticalSpacingWithoutPageHeadingMargins()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement template = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionHeadingTemplate");
         XElement title = Assert.Single(template.Elements());
         Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)title.Attribute("Style"));
-        Assert.Equal("0,0,16,8", (string?)title.Attribute("Margin"));
+        Assert.Equal("0,8,16,8", (string?)title.Attribute("Margin"));
     }
 
     [Theory]
@@ -1116,7 +1117,8 @@ public class WinUi3UiTests
             .Select(style => (string?)style.Attribute(Xaml + "Key"))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
-        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle" });
+        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle",
+            "TitleTextBlockStyle", "SubtitleTextBlockStyle", "BodyTextBlockStyle", "BodyStrongTextBlockStyle", "CaptionTextBlockStyle" });
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
         {
@@ -1178,7 +1180,7 @@ public class WinUi3UiTests
         foreach (string key in new[] { "BasPageTitleStyle", "BasSectionTitleStyle", "BasSettingTitleStyle" })
         {
             XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
-            Assert.Contains((string?)style.Attribute("BasedOn"), new[] { "{StaticResource TitleTextBlockStyle}", "{StaticResource BodyStrongTextBlockStyle}" });
+            Assert.Contains((string?)style.Attribute("BasedOn"), new[] { "{StaticResource TitleTextBlockStyle}", "{StaticResource SubtitleTextBlockStyle}", "{StaticResource BodyStrongTextBlockStyle}" });
         }
 
         Assert.DoesNotContain("RadioScrollbar", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
@@ -1433,12 +1435,13 @@ public class WinUi3UiTests
             Assert.Single(list.Descendants(), element => element.Name.LocalName == "TransitionCollection");
         }
         XElement container = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionCardContainerStyle");
-        Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,16,0");
+        Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,16,6");
         XElement card = GetNamedElement(panel, "SelectionCard");
         Assert.Equal("SelectionCard_PointerPressed", (string?)card.Attribute("PointerPressed"));
         Assert.Equal("SelectionCard_PointerReleased", (string?)card.Attribute("PointerReleased"));
         Assert.Null(card.Attribute("Tapped"));
         Assert.Equal("0", (string?)card.Attribute("MinHeight"));
+        Assert.Equal("0", (string?)card.Attribute("Margin"));
         Assert.Null(card.Attribute("Height"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("if (source is CheckBox) return false", source, StringComparison.Ordinal);
@@ -1970,10 +1973,10 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void PanelDialogs_RemoveOnlyLargeHeadingsAndKeepNormalSizedTitlesAndTheNativeModalStyle()
+    public void PanelDialogs_UseSubtitleHeadingsAndBodyStrongMessagesWithTheNativeModalStyle()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
-        foreach (string name in new[] { "RunningProcessOverlay", "VisualResetOverlay", "RenameProfileOverlay" })
+        foreach (string name in new[] { "RunningProcessOverlay", "VisualResetOverlay", "BackupOverlay", "RenameProfileOverlay" })
         {
             XElement overlay = GetNamedElement(panel, name);
             XElement heading = Assert.Single(overlay.Descendants(Presentation + "TextBlock"));
@@ -2003,7 +2006,8 @@ public class WinUi3UiTests
             Assert.Contains(name + ".Text = Localization.Get", source, StringComparison.Ordinal);
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement sectionTitle = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSectionTitleStyle");
-        Assert.Equal("{StaticResource BodyStrongTextBlockStyle}", (string?)sectionTitle.Attribute("BasedOn"));
+        Assert.Equal("{StaticResource SubtitleTextBlockStyle}", (string?)sectionTitle.Attribute("BasedOn"));
+        Assert.Equal(2, source.Split("Style = TryGetAppResource<Style>(\"BasDialogMessageStyle\")").Length - 1);
     }
 
     [Fact]
@@ -2033,6 +2037,8 @@ public class WinUi3UiTests
         Assert.Equal(new[] { "Informational", "Warning", "Success" }, privacy.Descendants(Presentation + "InfoBar").Select(element => (string?)element.Attribute("Severity")));
         foreach (string name in new[] { "VersionText", "TxtTagline", "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
             Assert.Equal(Presentation + "TextBlock", GetNamedElement(privacy, name).Name);
+        foreach (string name in new[] { "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
+            Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)GetNamedElement(privacy, name).Attribute("Style"));
         Assert.Contains("Version {version.Major}.{version.Minor}.{version.Build}-release", ReadSource("src", "PrivacyWindow.xaml.cs"), StringComparison.Ordinal);
         Assert.Contains("root.Measure(new Size(width / scale, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
         Assert.Contains("appWindow.Resize(new SizeInt32(width + frameWidth, height + frameHeight))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);

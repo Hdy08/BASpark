@@ -184,12 +184,17 @@
 
     <!-- 页面主标题：Title 层级 -->
     <Style x:Key="BasPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
-        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
     </Style>
 
-    <!-- 区块标题：BodyStrong 层级 -->
-    <Style x:Key="BasSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
+    <!-- 区块标题：Subtitle 层级 -->
+    <Style x:Key="BasSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
+    </Style>
+
+    <Style x:Key="BasDialogMessageStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
     </Style>
@@ -310,6 +315,7 @@
     <Style x:Key="BasSettingsPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasPageTitleStyle}" />
 
     <Style x:Key="BasSettingsSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
+        <Setter Property="TextWrapping" Value="NoWrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
         <Setter Property="Margin" Value="0,20,0,8" />
     </Style>

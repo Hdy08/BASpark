@@ -38,7 +38,7 @@
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
         <DataTemplate x:Key="SelectionCardTemplate">
-            <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" MinHeight="0"
+            <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" MinHeight="0" Margin="0"
                     PointerPressed="SelectionCard_PointerPressed" PointerReleased="SelectionCard_PointerReleased">
                 <Grid ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
@@ -56,13 +56,13 @@
             </Border>
         </DataTemplate>
         <DataTemplate x:Key="SelectionHeadingTemplate">
-            <TextBlock Text="{Binding}" Style="{StaticResource BasSectionTitleStyle}" Margin="0,0,16,8" IsHitTestVisible="False" />
+            <TextBlock Text="{Binding}" Style="{StaticResource BasSectionTitleStyle}" Margin="0,8,16,8" IsHitTestVisible="False" />
         </DataTemplate>
         <local:SelectionCardTemplateSelector x:Key="SelectionCardTemplates"
             CardTemplate="{StaticResource SelectionCardTemplate}" HeadingTemplate="{StaticResource SelectionHeadingTemplate}" />
         <Style x:Key="SelectionCardContainerStyle" TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,16,0" />
+            <Setter Property="Margin" Value="0,0,16,6" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="IsTabStop" Value="False" />
         </Style>

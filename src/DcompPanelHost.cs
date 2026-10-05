@@ -66,6 +66,7 @@ internal sealed class DcompPanelHost : IDisposable
     private readonly AppWindow _appWindow;
     private IntPtr _hwnd;
     private RectInt32 _captionButtonsBounds;
+    private int _minimumWidthDesign = MinWidthDesign;
     private bool _renderClockActive;
     private readonly WindowChrome.RenderClock _renderClock = new();
     private IntPtr _previousForegroundWindow;
@@ -258,7 +259,7 @@ internal sealed class DcompPanelHost : IDisposable
         }
 
         double scale = GetDpiScale();
-        int width = (int)Math.Round(designWidth * scale);
+        int width = (int)Math.Round(Math.Max(designWidth, _minimumWidthDesign) * scale);
         int height = (int)Math.Round(designHeight * scale);
 
         DisplayArea? area = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest) ?? DisplayArea.Primary;
@@ -271,6 +272,15 @@ internal sealed class DcompPanelHost : IDisposable
         }
 
         UpdateNonClientRegions();
+    }
+
+    public void SetMinimumWidth(int logicalWidth)
+    {
+        _minimumWidthDesign = Math.Max(MinWidthDesign, logicalWidth);
+        if (AppWindow is not { } window || IsMaximized || IsIconic(_hwnd)) return;
+        int minimumWidth = (int)Math.Ceiling(_minimumWidthDesign * GetDpiScale());
+        if (window.Size.Width < minimumWidth)
+            window.Resize(new SizeInt32(minimumWidth, window.Size.Height));
     }
 
     /// <summary>
@@ -440,7 +450,7 @@ internal sealed class DcompPanelHost : IDisposable
             var info = Marshal.PtrToStructure<MINMAXINFO>(lParam);
             uint dpi = GetDpiForWindow(hwnd);
             double scale = dpi > 0 ? dpi / 96.0 : 1.0;
-            info.ptMinTrackSize.X = (int)Math.Round(MinWidthDesign * scale);
+            info.ptMinTrackSize.X = (int)Math.Round((InstanceOf(hwnd)?._minimumWidthDesign ?? MinWidthDesign) * scale);
             info.ptMinTrackSize.Y = (int)Math.Round(MinHeightDesign * scale);
             Marshal.StructureToPtr(info, lParam, fDeleteOld: false);
         }
