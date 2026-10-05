@@ -1325,52 +1325,59 @@
                                             Style="{StaticResource BasSettingTitleStyle}" />
                                     </StackPanel>
                                     <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <ComboBox x:Name="ListConfiguredProcesses"
-                                                  MinWidth="0" Height="32" MaxDropDownHeight="200"
+                                        <DropDownButton x:Name="ListConfiguredProcesses"
+                                                  MinWidth="0" Height="32"
                                                   HorizontalAlignment="Right" HorizontalContentAlignment="Stretch"
-                                                  VerticalContentAlignment="Center" Padding="12,0,0,0"
-                                                  PlaceholderText=""
+                                                  VerticalContentAlignment="Center" Padding="11,0,13,0"
+                                                  Content=""
                                                   Background="{ThemeResource BasSettingsControlBackgroundBrush}"
                                                   BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
-                                                  AutomationProperties.Name="{Binding Text, ElementName=TxtProcessList}"
-                                                  SelectionChanged="ConfiguredProcesses_SelectionChanged">
-                                            <ComboBox.Resources>
-                                                <SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="Transparent" />
-                                                <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="Transparent" />
-                                                <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedUnfocused" Color="Transparent" />
-                                                <SolidColorBrush x:Key="ComboBoxItemBorderBrushSelected" Color="Transparent" />
-                                                <SolidColorBrush x:Key="ComboBoxItemBorderBrushSelectedUnfocused" Color="Transparent" />
-                                            </ComboBox.Resources>
-                                            <ComboBox.ItemContainerStyle>
-                                                <Style TargetType="ComboBoxItem" BasedOn="{StaticResource DefaultComboBoxItemStyle}">
-                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                                    <Setter Property="VerticalContentAlignment" Value="Center" />
-                                                    <Setter Property="Padding" Value="11,6,11,6" />
-                                                </Style>
-                                            </ComboBox.ItemContainerStyle>
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid x:Name="ConfiguredProcessItemRoot" ColumnSpacing="8" MinHeight="20" VerticalAlignment="Center">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0"
-                                                                   Text="{Binding}"
-                                                                   VerticalAlignment="Center"
-                                                                   TextTrimming="CharacterEllipsis" />
-                                                        <Button Grid.Column="1"
-                                                                Click="RemoveProcess_Click"
-                                                                Tag="{Binding}"
-                                                                MinWidth="0" MinHeight="0" Width="20" Height="20" Padding="0"
-                                                                VerticalAlignment="Center" VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
-                                                            <PathIcon Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                      Data="M0,1 L1,0 L5,4 L9,0 L10,1 L6,5 L10,9 L9,10 L5,6 L1,10 L0,9 L4,5 Z" />
-                                                        </Button>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
+                                                  AutomationProperties.Name="{Binding Text, ElementName=TxtProcessList}">
+                                            <DropDownButton.Flyout>
+                                                <Flyout x:Name="ConfiguredProcessesFlyout" Placement="BottomEdgeAlignedRight" ShouldConstrainToRootBounds="False"
+                                                        Opening="ConfiguredProcessesFlyout_Opening" Opened="ConfiguredProcessesFlyout_Opened">
+                                                    <Flyout.FlyoutPresenterStyle>
+                                                        <Style TargetType="FlyoutPresenter" BasedOn="{StaticResource DefaultFlyoutPresenterStyle}">
+                                                            <Setter Property="Padding" Value="0,4,0,4" />
+                                                            <Setter Property="MinWidth" Value="0" />
+                                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                        </Style>
+                                                    </Flyout.FlyoutPresenterStyle>
+                                                    <ScrollViewer x:Name="ConfiguredProcessScroller" MaxHeight="200" IsTabStop="True"
+                                                                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                                        <ItemsControl x:Name="ConfiguredProcessItems" HorizontalContentAlignment="Stretch">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Grid x:Name="ConfiguredProcessItemRoot" ColumnSpacing="8" MinHeight="32" Padding="11,6,11,6" VerticalAlignment="Center">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*" />
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Grid.Column="0"
+                                                                                   Text="{Binding}"
+                                                                                   VerticalAlignment="Center"
+                                                                                   TextTrimming="CharacterEllipsis" />
+                                                                        <Button Grid.Column="1"
+                                                                                Click="RemoveProcess_Click"
+                                                                                Tag="{Binding}"
+                                                                                MinWidth="0" MinHeight="0" Width="20" Height="20" Padding="0"
+                                                                                VerticalAlignment="Center" VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
+                                                                            <PathIcon Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                                      Data="M0,1 L1,0 L5,4 L9,0 L10,1 L6,5 L10,9 L9,10 L5,6 L1,10 L0,9 L4,5 Z" />
+                                                                        </Button>
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </ScrollViewer>
+                                                </Flyout>
+                                            </DropDownButton.Flyout>
+                                        </DropDownButton>
                                     </Grid>
                                 </Grid>
                             </Border>

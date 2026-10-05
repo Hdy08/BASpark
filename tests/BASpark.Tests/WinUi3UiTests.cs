@@ -959,15 +959,18 @@ public class WinUi3UiTests
         Assert.Equal(3, mode.Elements().Count());
         Assert.All(mode.Elements(), item => Assert.Equal("ComboBoxItem", item.Name.LocalName));
         XElement processes = GetNamedElement(document, "ListConfiguredProcesses");
-        Assert.Equal("ComboBox", processes.Name.LocalName);
-        Assert.Equal("200", (string?)processes.Attribute("MaxDropDownHeight"));
-        Assert.Equal("ConfiguredProcesses_SelectionChanged", (string?)processes.Attribute("SelectionChanged"));
+        Assert.Equal("DropDownButton", processes.Name.LocalName);
+        XElement flyout = GetNamedElement(document, "ConfiguredProcessesFlyout");
+        Assert.Equal("Flyout", flyout.Name.LocalName);
+        Assert.Equal("BottomEdgeAlignedRight", (string?)flyout.Attribute("Placement"));
+        Assert.Equal("{StaticResource DefaultFlyoutPresenterStyle}", (string?)Assert.Single(flyout.Descendants(Presentation + "Style")).Attribute("BasedOn"));
+        Assert.Equal("200", (string?)GetNamedElement(document, "ConfiguredProcessScroller").Attribute("MaxHeight"));
+        Assert.Equal("ItemsControl", GetNamedElement(document, "ConfiguredProcessItems").Name.LocalName);
         XElement remove = Assert.Single(processes.Descendants(), element => (string?)element.Attribute("Click") == "RemoveProcess_Click");
         Assert.Equal("{Binding}", (string?)remove.Attribute("Tag"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        Assert.Contains("ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses", source, StringComparison.Ordinal);
-        Assert.Contains("ListConfiguredProcesses.PlaceholderText = Localization.Format(\"Filter_SelectedProcesses\", CurrentProfileProcesses.Count)", source, StringComparison.Ordinal);
-        Assert.Contains("ListConfiguredProcesses.SelectedIndex = -1", source, StringComparison.Ordinal);
+        Assert.Contains("ConfiguredProcessItems.ItemsSource = CurrentProfileProcesses", source, StringComparison.Ordinal);
+        Assert.Contains("ListConfiguredProcesses.Content = Localization.Format(\"Filter_SelectedProcesses\", CurrentProfileProcesses.Count)", source, StringComparison.Ordinal);
         Assert.Contains("ListConfiguredProcesses.IsEnabled = processFilterEnabled && CurrentProfileProcesses.Count > 0", source, StringComparison.Ordinal);
         foreach ((int index, string key) in new[] { (0, "Filter_Mode_Disabled"), (1, "Filter_Mode_Blacklist"), (2, "Filter_Mode_Whitelist") })
         {
@@ -1126,7 +1129,7 @@ public class WinUi3UiTests
             .Select(style => (string?)style.Attribute(Xaml + "Key"))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
-        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle", "DefaultComboBoxItemStyle",
+        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle", "DefaultComboBoxItemStyle", "DefaultFlyoutPresenterStyle",
             "TitleTextBlockStyle", "SubtitleTextBlockStyle", "BodyTextBlockStyle", "BodyStrongTextBlockStyle", "CaptionTextBlockStyle" });
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
@@ -1163,7 +1166,7 @@ public class WinUi3UiTests
         XElement dropdown = GetNamedElement(document, "ListConfiguredProcesses");
         Assert.Equal("32", (string?)dropdown.Attribute("Height"));
         Assert.Equal("Center", (string?)dropdown.Attribute("VerticalContentAlignment"));
-        Assert.Equal("12,0,0,0", (string?)dropdown.Attribute("Padding"));
+        Assert.Equal("11,0,13,0", (string?)dropdown.Attribute("Padding"));
         XElement remove = Assert.Single(dropdown.Descendants(), element => (string?)element.Attribute("Click") == "RemoveProcess_Click");
         Assert.Equal("20", (string?)remove.Attribute("Height"));
         Assert.Equal("0", (string?)remove.Attribute("MinHeight"));
@@ -1171,8 +1174,7 @@ public class WinUi3UiTests
         Assert.Equal("Center", (string?)remove.Attribute("VerticalAlignment"));
         Assert.Equal("Center", (string?)remove.Attribute("VerticalContentAlignment"));
         Assert.Equal("Center", (string?)remove.Parent!.Attribute("VerticalAlignment"));
-        Assert.Contains(dropdown.Descendants(Presentation + "Setter"), setter =>
-            (string?)setter.Attribute("Property") == "Padding" && (string?)setter.Attribute("Value") == "11,6,11,6");
+        Assert.Equal("11,6,11,6", (string?)remove.Parent!.Attribute("Padding"));
     }
 
     [Fact]

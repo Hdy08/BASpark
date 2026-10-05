@@ -429,7 +429,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _selectionToolbars[ListRunningProcesses] = new(BtnRunningInvert, BtnRunningSelectAll, BtnOverlayConfirmAdd, TxtRunningNoResults, []);
         _selectionToolbars[ListVisualResetItems] = new(BtnResetInvert, BtnResetSelectAll, BtnOverlayVisualConfirm, TxtResetNoResults, []);
         _selectionToolbars[ListBackupItems] = new(BtnBackupInvert, BtnBackupSelectAll, BtnBackupConfirm, TxtBackupNoResults, []);
-        foreach (ComboBox combo in new[] { ComboLanguage, ComboProcessFilterMode, ListConfiguredProcesses }) _comboWidthTrackers.Add(new(combo));
+        foreach (ComboBox combo in new[] { ComboLanguage, ComboProcessFilterMode }) _comboWidthTrackers.Add(new(combo));
 
         try
         {
@@ -473,7 +473,7 @@ public sealed partial class ControlPanelWindow : UserControl
             RootGrid.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ToggleSwitch_PointerCanceled), true);
 
             ComboProfiles.ItemsSource = Profiles;
-            ListConfiguredProcesses.ItemsSource = CurrentProfileProcesses;
+            ConfiguredProcessItems.ItemsSource = CurrentProfileProcesses;
             CurrentProfileProcesses.CollectionChanged += ConfiguredProcesses_CollectionChanged;
             ListRunningProcesses.ItemsSource = RunningProcessList;
 
@@ -2532,16 +2532,27 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateConfiguredProcessSummary()
     {
         if (_isClosed) return;
-        ListConfiguredProcesses.PlaceholderText = Localization.Format("Filter_SelectedProcesses", CurrentProfileProcesses.Count);
+        ListConfiguredProcesses.Content = Localization.Format("Filter_SelectedProcesses", CurrentProfileProcesses.Count);
+        if (CurrentProfileProcesses.Count == 0) ConfiguredProcessesFlyout.Hide();
         UpdateEnvironmentFilterInterlock();
     }
 
     private void ConfiguredProcesses_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args) => UpdateConfiguredProcessSummary();
 
-    private void ConfiguredProcesses_SelectionChanged(object sender, SelectionChangedEventArgs args)
+    private void ConfiguredProcessesFlyout_Opening(object sender, object args)
     {
         if (_isClosed) return;
-        if (ListConfiguredProcesses.SelectedIndex >= 0) ListConfiguredProcesses.SelectedIndex = -1;
+        ConfiguredProcessItems.Width = double.NaN;
+        ConfiguredProcessItems.MinWidth = ListConfiguredProcesses.ActualWidth;
+        ConfiguredProcessScroller.ChangeView(null, 0, null, true);
+    }
+
+    private void ConfiguredProcessesFlyout_Opened(object sender, object args)
+    {
+        if (_isClosed) return;
+        ConfiguredProcessItems.Width = ConfiguredProcessItems.ActualWidth;
+        ConfiguredProcessScroller.Focus(FocusState.Programmatic);
+        ConfiguredProcessScroller.ChangeView(null, 0, null, true);
     }
 
     private void RemoveProcess_Click(object sender, RoutedEventArgs e)
@@ -2557,8 +2568,7 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             return;
         }
-        bool wasOpen = ListConfiguredProcesses.IsDropDownOpen;
-
+        ConfiguredProcessScroller.Focus(FocusState.Programmatic);
         if (ComboProfiles.SelectedItem is FilterProfile active)
         {
             active.Processes.RemoveAll(existing =>
@@ -2569,14 +2579,6 @@ public sealed partial class ControlPanelWindow : UserControl
         else
         {
             CurrentProfileProcesses.Remove(processName);
-        }
-        if (wasOpen && CurrentProfileProcesses.Count > 0)
-        {
-            ListConfiguredProcesses.IsDropDownOpen = true;
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                if (!_isClosed && CurrentProfileProcesses.Count > 0) ListConfiguredProcesses.IsDropDownOpen = true;
-            });
         }
     }
 
@@ -4165,6 +4167,7 @@ public sealed partial class ControlPanelWindow : UserControl
         RootGrid.Loaded -= RootGrid_Loaded;
         _host.CloseRequested -= ControlPanelWindow_Closed;
         _messageDialog?.Hide();
+        ConfiguredProcessesFlyout.Hide();
         StopSettingsAnimations();
         foreach (var pair in _modalDialogs)
         {
@@ -4218,7 +4221,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         ComboProfiles.ItemsSource = null;
-        ListConfiguredProcesses.ItemsSource = null;
+        ConfiguredProcessItems.ItemsSource = null;
         ListRunningProcesses.ItemsSource = null;
         ListVisualResetItems.ItemsSource = null;
         ListBackupItems.ItemsSource = null;
