@@ -17,6 +17,8 @@
         <Thickness x:Key="ToggleSwitchTopHeaderMargin">0</Thickness>
         <x:Double x:Key="ToggleSwitchPreContentMargin">0</x:Double>
         <x:Double x:Key="ToggleSwitchPostContentMargin">0</x:Double>
+        <x:String x:Key="ClearSelectionIconData">F0 M0,0 L1.333333,0 L1.333333,1.333333 L0,1.333333 Z M0,2.666667 L1.333333,2.666667 L1.333333,4 L0,4 Z M0,5.333333 L1.333333,5.333333 L1.333333,6.666667 L0,6.666667 Z M0,8 L1.333333,8 L1.333333,9.333333 L0,9.333333 Z M0,10.666667 L1.333333,10.666667 L1.333333,12 L0,12 Z M0,13.333333 L1.333333,13.333333 L1.333333,14.666667 L0,14.666667 Z M0,16 L1.333333,16 L1.333333,17.333333 L0,17.333333 Z M0,18.666667 L1.333333,18.666667 L1.333333,20 L0,20 Z M18.666667,2.666667 L20,2.666667 L20,4 L18.666667,4 Z M18.666667,5.333333 L20,5.333333 L20,6.666667 L18.666667,6.666667 Z M18.666667,8 L20,8 L20,9.333333 L18.666667,9.333333 Z M18.666667,10.666667 L20,10.666667 L20,12 L18.666667,12 Z M18.666667,13.333333 L20,13.333333 L20,14.666667 L18.666667,14.666667 Z M18.666667,16 L20,16 L20,17.333333 L18.666667,17.333333 Z M18.666667,18.666667 L20,18.666667 L20,20 L18.666667,20 Z M2.666667,0 L4,0 L4,1.333333 L2.666667,1.333333 Z M5.333333,0 L6.666667,0 L6.666667,1.333333 L5.333333,1.333333 Z M8,0 L9.333333,0 L9.333333,1.333333 L8,1.333333 Z M10.666667,0 L12,0 L12,1.333333 L10.666667,1.333333 Z M13.333333,0 L14.666667,0 L14.666667,1.333333 L13.333333,1.333333 Z M16,0 L17.333333,0 L17.333333,1.333333 L16,1.333333 Z M2.666667,18.666667 L4,18.666667 L4,20 L2.666667,20 Z M5.333333,18.666667 L6.666667,18.666667 L6.666667,20 L5.333333,20 Z M8,18.666667 L9.333333,18.666667 L9.333333,20 L8,20 Z M10.666667,18.666667 L12,18.666667 L12,20 L10.666667,20 Z M13.333333,18.666667 L14.666667,18.666667 L14.666667,20 L13.333333,20 Z M16,18.666667 L17.333333,18.666667 L17.333333,20 L16,20 Z M18.666667,0 L20,0 L20,1.333333 L18.666667,1.333333 Z</x:String>
+        <x:String x:Key="InvertSelectionIconData">F0 M0,0 L1.333333,0 L1.333333,1.333333 L0,1.333333 Z M0,2.666667 L1.333333,2.666667 L1.333333,4 L0,4 Z M0,5.333333 L1.333333,5.333333 L1.333333,6.666667 L0,6.666667 Z M0,8 L1.333333,8 L1.333333,9.333333 L0,9.333333 Z M0,10.666667 L1.333333,10.666667 L1.333333,12 L0,12 Z M0,13.333333 L1.333333,13.333333 L1.333333,14.666667 L0,14.666667 Z M0,16 L1.333333,16 L1.333333,17.333333 L0,17.333333 Z M0,18.666667 L1.333333,18.666667 L1.333333,20 L0,20 Z M18.666667,2.666667 L20,2.666667 L20,4 L18.666667,4 Z M18.666667,5.333333 L20,5.333333 L20,6.666667 L18.666667,6.666667 Z M18.666667,8 L20,8 L20,9.333333 L18.666667,9.333333 Z M18.666667,10.666667 L20,10.666667 L20,12 L18.666667,12 Z M18.666667,13.333333 L20,13.333333 L20,14.666667 L18.666667,14.666667 Z M18.666667,16 L20,16 L20,17.333333 L18.666667,17.333333 Z M18.666667,18.666667 L20,18.666667 L20,20 L18.666667,20 Z M2.666667,0 L4,0 L4,1.333333 L2.666667,1.333333 Z M5.333333,0 L6.666667,0 L6.666667,1.333333 L5.333333,1.333333 Z M8,0 L9.333333,0 L9.333333,1.333333 L8,1.333333 Z M10.666667,0 L12,0 L12,1.333333 L10.666667,1.333333 Z M13.333333,0 L14.666667,0 L14.666667,1.333333 L13.333333,1.333333 Z M16,0 L17.333333,0 L17.333333,1.333333 L16,1.333333 Z M2.666667,18.666667 L4,18.666667 L4,20 L2.666667,20 Z M5.333333,18.666667 L6.666667,18.666667 L6.666667,20 L5.333333,20 Z M8,18.666667 L9.333333,18.666667 L9.333333,20 L8,20 Z M10.666667,18.666667 L12,18.666667 L12,20 L10.666667,20 Z M13.333333,18.666667 L14.666667,18.666667 L14.666667,20 L13.333333,20 Z M16,18.666667 L17.333333,18.666667 L17.333333,20 L16,20 Z M18.666667,0 L20,0 L20,1.333333 L18.666667,1.333333 Z M4,4 L16,4 L16,16 L4,16 Z M5.333333,10 L10,10 L10,14.666667 L5.333333,14.666667 Z M10,5.333333 L14.666667,5.333333 L14.666667,10 L10,10 Z</x:String>
         <ResourceDictionary x:Key="DangerButtonResources">
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Default">
@@ -1607,7 +1609,7 @@
                                  TextChanged="SearchRunningProcess_TextChanged" />
                         <Button x:Name="BtnRunningInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
                                 Tag="{Binding ElementName=ListRunningProcesses}" Click="InvertSelection_Click">
-                            <SymbolIcon Symbol="Switch" />
+                            <PathIcon Width="20" Height="20" />
                         </Button>
                         <Button x:Name="BtnRunningSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
                                 Tag="{Binding ElementName=ListRunningProcesses}" Click="SelectAll_Click">
@@ -1670,7 +1672,7 @@
                         <TextBox x:Name="SearchVisualReset" TextChanged="SearchVisualReset_TextChanged" />
                         <Button x:Name="BtnResetInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
                                 Tag="{Binding ElementName=ListVisualResetItems}" Click="InvertSelection_Click">
-                            <SymbolIcon Symbol="Switch" />
+                            <PathIcon Width="20" Height="20" />
                         </Button>
                         <Button x:Name="BtnResetSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
                                 Tag="{Binding ElementName=ListVisualResetItems}" Click="SelectAll_Click">
@@ -1728,7 +1730,7 @@
                         <TextBox x:Name="SearchBackupItems" TextChanged="SearchBackupItems_TextChanged" />
                         <Button x:Name="BtnBackupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
                                 Tag="{Binding ElementName=ListBackupItems}" Click="InvertSelection_Click">
-                            <SymbolIcon Symbol="Switch" />
+                            <PathIcon Width="20" Height="20" />
                         </Button>
                         <Button x:Name="BtnBackupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
                                 Tag="{Binding ElementName=ListBackupItems}" Click="SelectAll_Click">

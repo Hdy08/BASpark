@@ -361,7 +361,10 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly Dictionary<ContentDialog, ModalDialogState> _modalDialogs = new();
     private readonly Dictionary<ContentDialog, Border> _dialogPresentationGuards = new();
     private readonly HashSet<ContentDialog> _dialogPresentationsPending = new();
-    private sealed record SelectionToolbar(Button Invert, Button SelectAll, Button Confirm, TextBlock EmptyMessage, List<SelectionCardItem> Items);
+    private sealed record SelectionToolbar(Button Invert, Button SelectAll, Button Confirm, TextBlock EmptyMessage, List<SelectionCardItem> Items)
+    {
+        public PathIcon? ClearIcon { get; set; }
+    }
     private readonly Dictionary<ItemsControl, SelectionToolbar> _selectionToolbars = new();
     private bool _changingSelection;
     private readonly List<WindowChrome.ComboBoxWidthTracker> _comboWidthTrackers = new();
@@ -433,6 +436,13 @@ public sealed partial class ControlPanelWindow : UserControl
 
         try
         {
+            foreach (SelectionToolbar toolbar in _selectionToolbars.Values)
+            {
+                var icon = CreateSelectionIcon("InvertSelectionIconData");
+                toolbar.Invert.Content = icon;
+                icon.RenderTransformOrigin = new Point(0.5, 0.5);
+                icon.RenderTransform = new ScaleTransform();
+            }
             _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
                 ? Localization.CurrentCultureName
                 : ConfigManager.UiLanguage;
@@ -2971,6 +2981,10 @@ public sealed partial class ControlPanelWindow : UserControl
             if (pair.Value.Items.Contains(item)) UpdateSelectionToolbar(pair.Key);
     }
 
+    private PathIcon CreateSelectionIcon(string resourceKey) =>
+        (PathIcon)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+            $"<PathIcon xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"20\" Height=\"20\" Data=\"{Resources[resourceKey]}\" />");
+
     private void UpdateSelectionToolbar(ItemsControl list)
     {
         if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
@@ -2986,7 +3000,15 @@ public sealed partial class ControlPanelWindow : UserControl
         ToolTipService.SetToolTip(toolbar.SelectAll, selectLabel);
         AutomationProperties.SetName(toolbar.Invert, invertLabel);
         AutomationProperties.SetName(toolbar.SelectAll, selectLabel);
-        if (toolbar.SelectAll.Content is SymbolIcon icon) icon.Symbol = allSelected ? Symbol.ClearSelection : Symbol.SelectAll;
+        if (allSelected)
+        {
+            toolbar.ClearIcon ??= CreateSelectionIcon("ClearSelectionIconData");
+            if (!ReferenceEquals(toolbar.SelectAll.Content, toolbar.ClearIcon)) toolbar.SelectAll.Content = toolbar.ClearIcon;
+        }
+        else if (toolbar.SelectAll.Content is not SymbolIcon)
+        {
+            toolbar.SelectAll.Content = new SymbolIcon(Symbol.SelectAll);
+        }
     }
 
     private void InvertSelection_Click(object sender, RoutedEventArgs args) => ChangeSelection(sender, invert: true);
@@ -3001,6 +3023,7 @@ public sealed partial class ControlPanelWindow : UserControl
         try
         {
             foreach (SelectionCardItem item in toolbar.Items) item.IsSelected = invert ? !item.IsSelected : select;
+            if (invert && toolbar.Invert.Content is PathIcon { RenderTransform: ScaleTransform mirror }) mirror.ScaleX = -mirror.ScaleX;
         }
         finally
         {
