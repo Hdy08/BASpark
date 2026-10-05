@@ -6,7 +6,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const expectedSha256 =
-  '66009D7C1B662B27AE9CF283F025F9A59750B5F38E5953EEF49ECA9D2C0DA7B7';
+  '4953175F158A671E15AF896D102BEA2D211CD6B515D81267A4CDEA50507B797C';
 const vendorPath = new URL(
   '../../src/Web/vendor/ba-click-fx.iife.js',
   import.meta.url,
@@ -179,7 +179,7 @@ function createLegacyHarness()
   };
 }
 
-test('vendored artifact matches BASpark\'s reviewed 1px sampling patch', () =>
+test('vendored artifact matches BASpark\'s reviewed renderer', () =>
 {
   const bytes = readFileSync(vendorPath);
   const actual = createHash('sha256').update(bytes).digest('hex').toUpperCase();
@@ -187,14 +187,37 @@ test('vendored artifact matches BASpark\'s reviewed 1px sampling patch', () =>
   assert.equal(actual, expectedSha256);
 });
 
-test('vendored renderer uses a fixed 1px trail sample threshold', () =>
+test('trail sampling follows its scaled distance and preserves stroke endpoints', () =>
 {
   const source = readFileSync(vendorPath, 'utf8');
+  const context =
+  {
+    atob(encoded)
+    {
+      return Buffer.from(encoded, 'base64').toString('latin1');
+    },
+    structuredClone,
+  };
+  vm.runInNewContext(source, context);
 
-  assert.equal(
-    source.includes('i=this._getScale(),a=1;if(r<a)return;let o=Math.min(512,Math.floor(r/a))'),
-    true,
-  );
+  for (const scale of [0.5, 1, 3])
+  {
+    const renderer = Object.create(context.BAClickFX.BAClickFX.prototype);
+    renderer.currentTrailStroke = { points: [] };
+    renderer.lastPointerPosition = { x: 0, y: 0 };
+    renderer.lastPointerTime = 0;
+    renderer.fxConfig = { trail: { minVertexDistance: 5.4 } };
+    renderer._getScale = () => scale;
+    renderer._spawnTrailShards = () => {};
+    renderer._appendPointerSample({ x: 54 * scale, y: 0 }, 10);
+    const points = renderer.currentTrailStroke.points;
+    assert.ok(points.length >= 9 && points.length <= 10);
+    assert.equal(points.at(-1).x, 54 * scale);
+    assert.equal(points.at(-1).bornAt, 10);
+    const pointCount = points.length;
+    renderer._appendPointerSample({ x: 55 * scale, y: 0 }, 11);
+    assert.equal(points.length, pointCount);
+  }
 });
 
 test('vendored IIFE exposes every host API required by BASpark', () =>

@@ -706,13 +706,16 @@ namespace BASpark
 
         private OverlayWindow? ResolveTargetOverlay(int x, int y)
         {
-            OverlayWindow? direct = _overlays.Values.FirstOrDefault(w => w.ContainsScreenPoint(x, y));
-            if (direct != null) return direct;
+            foreach (OverlayWindow overlay in _overlays.Values)
+            {
+                if (overlay.ContainsScreenPoint(x, y)) return overlay;
+            }
 
             ScreenInfo? nearest = ScreenInfo.FromPoint(x, y);
             if (nearest == null)
             {
-                return _overlays.Values.FirstOrDefault();
+                foreach (OverlayWindow overlay in _overlays.Values) return overlay;
+                return null;
             }
 
             if (_overlays.TryGetValue(nearest.DeviceName, out OverlayWindow? byDevice))
@@ -720,8 +723,11 @@ namespace BASpark
                 return byDevice;
             }
 
-            return _overlays.Values.FirstOrDefault(
-                w => w.ContainsScreenPoint(nearest.BoundsLeft, nearest.BoundsTop));
+            foreach (OverlayWindow overlay in _overlays.Values)
+            {
+                if (overlay.ContainsScreenPoint(nearest.BoundsLeft, nearest.BoundsTop)) return overlay;
+            }
+            return null;
         }
 
         private void RebuildWindows(bool forceRebuild)

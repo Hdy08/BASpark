@@ -451,35 +451,16 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void RendererReadyTimeout_ProbesBeforeFallingBackToLegacy()
+    public void RendererReadyTimeout_UsesNativeMessagesAndOneShotFallback()
     {
         string overlaySource = ReadSource("src", "OverlayWindow.cs");
 
-        // 主渲染器需要等 DOMContentLoaded 后再初始化 WebGL/WebGPU。原先「固定等待
-        // 满 12 秒才探测一次」会让启动整整慢 12 秒；现改为轮询，就绪即显示，
-        // 12 秒仅作为渲染器确实起不来时的兜底。
-        Assert.Contains("PollRendererReadyAsync", overlaySource, StringComparison.Ordinal);
-        Assert.Contains("RendererProbeInterval", overlaySource, StringComparison.Ordinal);
-        Assert.Contains("RendererProbeScript", overlaySource, StringComparison.Ordinal);
-        Assert.Contains("window.externalBoom", overlaySource, StringComparison.Ordinal);
-
-        // 轮询间隔必须远小于兜底超时，否则又退化成干等。
-        int intervalIndex = overlaySource.IndexOf(
-            "RendererProbeInterval = TimeSpan.FromMilliseconds(",
-            StringComparison.Ordinal);
-        Assert.True(intervalIndex >= 0, "Renderer probe interval constant is missing.");
-
-        string intervalLine = overlaySource[intervalIndex..overlaySource.IndexOf(';', intervalIndex)];
-        Assert.Contains("FromMilliseconds(200)", intervalLine, StringComparison.Ordinal);
-
-        // 兜底超时仍须保留，供渲染器确实起不来时回退。
-        int timeoutIndex = overlaySource.IndexOf(
-            "RendererReadyTimeout = TimeSpan.FromSeconds(",
-            StringComparison.Ordinal);
-        Assert.True(timeoutIndex >= 0, "Renderer ready timeout constant is missing.");
-
-        string timeoutLine = overlaySource[timeoutIndex..overlaySource.IndexOf(';', timeoutIndex)];
-        Assert.DoesNotContain("FromSeconds(2)", timeoutLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("PollRendererReadyAsync", overlaySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("RendererProbe", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("_webMessageReceivedHandler = (_, args) => OnWebMessageReceived(coreWebView, args)", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("RendererReadyTimeout = TimeSpan.FromSeconds(2)", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("_rendererReadyTimeoutTimer.IsRepeating = false", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("FallbackToLegacyRenderer(\"ready timeout\")", overlaySource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -495,11 +476,37 @@ public class WinUi3UiTests
         Assert.Contains("ResetWithFreshUserDataFolderAsync", overlaySource, StringComparison.Ordinal);
         Assert.Contains("ResetWithFreshUserDataFolderAsync", holderSource, StringComparison.Ordinal);
 
-        // 失败时必须留下足以定位的上下文（句柄、句柄有效性、HRESULT、用户数据目录）。
-        Assert.Contains("hresult=", overlaySource, StringComparison.Ordinal);
-        Assert.Contains("hwndValid=", overlaySource, StringComparison.Ordinal);
-        Assert.Contains("userData=", overlaySource, StringComparison.Ordinal);
-        Assert.Contains("NativeMethods.IsWindow(_host.Handle)", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("ControllerAttachAttempts", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("attempt <= ControllerAttachAttempts && !attached", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("if (resetRequested)", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("if (_isClosing)", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("App.ReportFatalWebViewFailure", overlaySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OverlayRouting_ReusesBoundsWithoutAllocatingDuringPointerMoves()
+    {
+        var overlay = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
+        typeof(OverlayWindow).GetField("_screenBounds", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(overlay, new NativeMethods.RECT { Left = -1920, Top = -100, Right = 0, Bottom = 980 });
+        Assert.True(overlay.ContainsScreenPoint(-1920, -100));
+        Assert.False(overlay.ContainsScreenPoint(0, 0));
+        Assert.False(overlay.ContainsScreenPoint(-1, 980));
+        using var manager = new OverlayManager();
+        var overlays = (Dictionary<string, OverlayWindow>)typeof(OverlayManager)
+            .GetField("_overlays", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(manager)!;
+        overlays.Add("test-display", overlay);
+        var resolve = typeof(OverlayManager).GetMethod("ResolveTargetOverlay", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .CreateDelegate<Func<int, int, OverlayWindow?>>(manager);
+        Assert.Same(overlay, resolve(-100, 0));
+        for (int index = 0; index < 10000; index++) resolve(-100 - index % 1000, 0);
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        bool sameTarget = true;
+        for (int index = 0; index < 10000; index++) sameTarget &= ReferenceEquals(overlay, resolve(-100 - index % 1000, 0));
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        overlays.Clear();
+        Assert.True(sameTarget);
+        Assert.Equal(0, allocated);
     }
 
     [Fact]
@@ -550,10 +557,10 @@ public class WinUi3UiTests
         Assert.True(navIndex > initIndex, "OnNavigationCompleted is missing.");
         Assert.Contains("EnsureHostPresented()", overlaySource[navIndex..], StringComparison.Ordinal);
 
-        // 渲染器探测成功也必须把窗口显示出来。
-        int probeIndex = overlaySource.IndexOf("PollRendererReadyAsync", StringComparison.Ordinal);
-        Assert.True(probeIndex > initIndex, "Renderer probe is missing.");
-        Assert.Contains("EnsureHostPresented()", overlaySource[probeIndex..], StringComparison.Ordinal);
+        int messageIndex = overlaySource.IndexOf("private void OnWebMessageReceived", StringComparison.Ordinal);
+        Assert.True(messageIndex > initIndex, "Renderer message handler is missing.");
+        int messageEnd = overlaySource.IndexOf("private static string? GetJsonString", messageIndex, StringComparison.Ordinal);
+        Assert.Contains("EnsureHostPresented()", overlaySource[messageIndex..messageEnd], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1694,7 +1701,7 @@ public class WinUi3UiTests
     public void RendererStartup_ReappliesSavedRuntimeSettingsAfterNavigationAndReadiness()
     {
         string source = ReadSource("src", "OverlayWindow.cs");
-        Assert.Equal(3, source.Split("ApplySavedRendererSettings();", StringSplitOptions.None).Length - 1);
+        Assert.Equal(2, source.Split("ApplySavedRendererSettings();", StringSplitOptions.None).Length - 1);
         string sync = source[source.IndexOf("private void ApplySavedRendererSettings()", StringComparison.Ordinal)..source.IndexOf("private void OnWebMessageReceived", StringComparison.Ordinal)];
         foreach (string setting in new[] { "ConfigManager.ParticleColor", "ConfigManager.EffectOpacity", "ConfigManager.GlowIntensity", "SetCurveDraw(ConfigManager.ApplyCurveDraw)", "ConfigManager.ScreenshotCompatibilityMode", "ConfigManager.IsTouchscreenMode ? InputModeTouch : InputModeMouse" })
             Assert.Contains(setting, sync, StringComparison.Ordinal);

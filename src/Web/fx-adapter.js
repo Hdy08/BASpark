@@ -21,6 +21,7 @@
         [
             'trail.geometryWidth',
             'trail.width',
+            'trail.minVertexDistance',
             'trail.outerGlowWidth',
             'shards.trailRadius',
             'shards.trailSpeedMin',
@@ -1008,6 +1009,48 @@
         });
     });
 
+    function handleHostInput(event)
+    {
+        const input = event.data;
+
+        if (
+            !input ||
+            input.source !== 'baspark-input' ||
+            input.generation !== HOST_GENERATION
+        )
+        {
+            return;
+        }
+
+        if (
+            input.mode !== state.inputMode ||
+            Boolean(input.alwaysTrail) !== state.alwaysTrailEnabled
+        )
+        {
+            window.setInputContext(input.mode, input.alwaysTrail);
+        }
+
+        switch (input.type)
+        {
+            case 'down':
+                window.externalBoom(input.x, input.y);
+                break;
+            case 'trailStart':
+                window.externalTrailStart(input.x, input.y);
+                break;
+            case 'move':
+                window.externalMove(input.x, input.y);
+                break;
+            case 'up':
+                window.externalUp();
+                break;
+            case 'cancel':
+                window.externalCancel();
+                break;
+        }
+    }
+
+    window.chrome?.webview?.addEventListener('message', handleHostInput);
     installCompatibilityShims();
 
     if (document.readyState === 'loading')

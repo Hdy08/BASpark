@@ -14,8 +14,8 @@ namespace BASpark;
 /// WinUI 3 无法创建透明顶层窗口，因此改为在 <see cref="LayeredWindowHost"/>
 /// 提供的原生分层窗口上直接挂载 WebView2 的 Win32 控制器。
 ///
-/// 渲染链路（HTML、fx-adapter.js、ba-click-fx、注入脚本协议）与迁移前完全一致，
-/// 本类只负责宿主侧的窗口、生命周期与脚本转发。
+/// 渲染链路保留 HTML、fx-adapter.js 和 ba-click-fx，
+/// 本类负责宿主侧的窗口、生命周期与输入转发。
 /// </summary>
 internal sealed class OverlayWindow : IDisposable
 {
@@ -48,8 +48,8 @@ internal sealed class OverlayWindow : IDisposable
     private long _lastEnsureTopmostTicks;
     private bool _isClosing;
 
-    // 连续的鼠标移动脚本是否仍在执行中（0 = 空闲，1 = 未完成）。
-    // 见 EmitMove 的说明：用于在 WebView2 跟不上时合并移动事件，避免调用积压。
+    // 旧版渲染器的鼠标移动脚本是否仍在执行中（0 = 空闲，1 = 未完成）。
+    // 用于在 WebView2 跟不上时合并旧版移动事件，避免调用积压。
     private int _moveScriptPending;
 
     // WebView2 在窗口尚未置顶时完成初始化更稳定；导航成功后才把叠加层抬到最前。
@@ -62,7 +62,6 @@ internal sealed class OverlayWindow : IDisposable
     private bool _environmentInputSuppressed;
     private bool _overlayRuntimePaused;
     private bool _rendererReady;
-    private bool _rendererReadyMessageReceived;
     private bool _usingLegacyRenderer;
     private bool _legacyFallbackAttempted;
     private bool _processRecoveryPending;
@@ -120,24 +119,7 @@ internal sealed class OverlayWindow : IDisposable
         }
     }
 
-    private NativeMethods.RECT GetScreenBounds()
-    {
-        ScreenInfo? current = ScreenInfo.AllScreens.FirstOrDefault(s =>
-            string.Equals(s.DeviceName, _screenDeviceName, StringComparison.OrdinalIgnoreCase));
-
-        if (current == null)
-        {
-            return _screenBounds;
-        }
-
-        return new NativeMethods.RECT
-        {
-            Left = current.BoundsLeft,
-            Top = current.BoundsTop,
-            Right = current.BoundsLeft + current.BoundsWidth,
-            Bottom = current.BoundsTop + current.BoundsHeight
-        };
-    }
+    private NativeMethods.RECT GetScreenBounds() => _screenBounds;
 
     public bool ContainsScreenPoint(int x, int y)
     {
@@ -309,7 +291,7 @@ internal sealed class OverlayWindow : IDisposable
     }
 
     /// <summary>
-    /// 尝试在宿主窗口上挂载 WebView2 控制器。失败时记录完整上下文并返回 false，
+    /// 尝试在宿主窗口上挂载 WebView2 控制器。失败时返回 false，
     /// 由调用方决定是否换用户数据目录重试。
     /// </summary>
     private async Task<bool> TryAttachControllerAsync(CoreWebView2Environment env)
@@ -372,9 +354,9 @@ internal sealed class OverlayWindow : IDisposable
         coreWebView.Settings.AreDefaultContextMenusEnabled = false;
         coreWebView.Settings.IsStatusBarEnabled = false;
 
-        _processFailedHandler = OnWebViewProcessFailed;
-        _navigationStartingHandler = OnNavigationStarting;
-        _navigationCompletedHandler = OnNavigationCompleted;
+        _processFailedHandler = (_, args) => OnWebViewProcessFailed(coreWebView, args);
+        _navigationStartingHandler = (_, args) => OnNavigationStarting(coreWebView, args);
+        _navigationCompletedHandler = (_, args) => OnNavigationCompleted(coreWebView, args);
         _webMessageReceivedHandler = (_, args) => OnWebMessageReceived(coreWebView, args);
         coreWebView.ProcessFailed += _processFailedHandler;
         coreWebView.NavigationStarting += _navigationStartingHandler;
@@ -390,7 +372,6 @@ internal sealed class OverlayWindow : IDisposable
     {
         StopRendererReadyTimeout();
         _rendererReady = _usingLegacyRenderer;
-        _rendererReadyMessageReceived = false;
 
         if (_usingLegacyRenderer)
         {
@@ -421,7 +402,6 @@ internal sealed class OverlayWindow : IDisposable
         // 无法上报就绪的渲染器不能让叠加层长期处于不可见状态。
         if (!_rendererReady)
         {
-            _rendererStartedAtTicks = DateTime.UtcNow.Ticks;
             StartRendererReadyTimeout();
         }
     }
@@ -485,13 +465,6 @@ internal sealed class OverlayWindow : IDisposable
         }
 
         EnsureHostPresented();
-
-        // 页面已加载完成，立即探测一次：渲染器若已就绪，叠加层不必等到下一个
-        // 轮询周期才显示。
-        if (!_rendererReady && !_usingLegacyRenderer)
-        {
-            _ = PollRendererReadyAsync();
-        }
 
         ApplySavedRendererSettings();
     }
@@ -577,15 +550,13 @@ internal sealed class OverlayWindow : IDisposable
 
             if (string.Equals(type, "ready", StringComparison.Ordinal))
             {
-                bool firstReadyMessage = !_rendererReadyMessageReceived;
-                _rendererReadyMessageReceived = true;
                 bool firstReady = !_rendererReady;
                 _rendererReady = true;
                 _unresponsiveTracker.Reset();
                 StopRendererReadyTimeout();
                 if (firstReady) ApplySavedRendererSettings();
                 EnsureHostPresented();
-                if (firstReadyMessage)
+                if (firstReady)
                 {
                     AppLogger.Info(
                         $"BA click renderer ready on '{_screenDeviceName}' " +
@@ -648,34 +619,14 @@ internal sealed class OverlayWindow : IDisposable
     // 渲染器就绪超时与回退
     // ------------------------------------------------------------------
 
-    // 主渲染器需要先等 DOMContentLoaded，再解析 vendor 包并初始化 WebGL/WebGPU，
-    // 渲染器就绪的兜底上限。正常情况下轮询会在几百毫秒内确认就绪，这里只是
-    // 防止渲染器确实起不来时无限等待。
-    private static readonly TimeSpan RendererReadyTimeout = TimeSpan.FromSeconds(12);
-
-    // 轮询间隔：探测宿主 API 是否已注入。渲染器通常在一秒内就绪，远快于原先
-    // 「固定等待满超时才探测」的做法（后者让启动足足慢 12 秒）。
-    private static readonly TimeSpan RendererProbeInterval = TimeSpan.FromMilliseconds(200);
-
-    // 探测页面：宿主 API 是否已经注入。就绪判定与失败判定都基于此。
-    private const string RendererProbeScript =
-        "(function(){" +
-        "  try {" +
-        "    return (typeof window.externalBoom === 'function' &&" +
-        "            typeof window.externalMove === 'function') ? 'ready' : 'pending';" +
-        "  } catch (e) { return 'pending'; }" +
-        "})()";
-
-    private bool _rendererProbeInFlight;
-
-    /// <summary>本轮渲染器开始等待就绪的时刻，用于统计实际启动耗时。</summary>
-    private long _rendererStartedAtTicks;
+    private static readonly TimeSpan RendererReadyTimeout = TimeSpan.FromSeconds(2);
 
     private void StartRendererReadyTimeout()
     {
         StopRendererReadyTimeout();
         _rendererReadyTimeoutTimer = App.DispatcherQueue.CreateTimer();
-        _rendererReadyTimeoutTimer.Interval = RendererProbeInterval;
+        _rendererReadyTimeoutTimer.Interval = RendererReadyTimeout;
+        _rendererReadyTimeoutTimer.IsRepeating = false;
         _rendererReadyTimeoutTimer.Tick += OnRendererReadyTimeout;
         _rendererReadyTimeoutTimer.Start();
     }
@@ -687,85 +638,11 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
-        if (_isClosing || _rendererReady || _usingLegacyRenderer)
-        {
-            StopRendererReadyTimeout();
-            return;
-        }
-
-        if (_rendererStartedAtTicks == 0)
-        {
-            _rendererStartedAtTicks = DateTime.UtcNow.Ticks;
-        }
-
-        // 先探测：渲染器就绪即刻显示叠加层，不再干等满超时。
-        if (!_rendererProbeInFlight)
-        {
-            _ = PollRendererReadyAsync();
-        }
-
-        if (DateTime.UtcNow.Ticks - _rendererStartedAtTicks >= RendererReadyTimeout.Ticks)
-        {
-            StopRendererReadyTimeout();
-            AppLogger.Warn(
-                $"BA click renderer ready timeout on '{_screenDeviceName}'; switching to legacy renderer.");
-            FallbackToLegacyRenderer("ready timeout");
-        }
-    }
-
-    /// <summary>
-    /// 轮询确认渲染器是否已注入宿主 API。就绪即结束等待并显示叠加层；
-    /// 未就绪则等下一次 Tick 再探。
-    /// </summary>
-    private async Task PollRendererReadyAsync()
-    {
-        CoreWebView2? coreWebView = _coreWebView;
-        if (coreWebView == null || _isClosing || _rendererReady || _usingLegacyRenderer)
-        {
-            return;
-        }
-
-        _rendererProbeInFlight = true;
-        string probeResult = string.Empty;
-        try
-        {
-            string raw = await coreWebView.ExecuteScriptAsync(RendererProbeScript)
-                .AsTask()
-                .ConfigureAwait(true);
-            probeResult = raw.Trim().Trim('"');
-        }
-        catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
-        {
-            return;
-        }
-        catch (Exception)
-        {
-        }
-        finally
-        {
-            _rendererProbeInFlight = false;
-        }
-
-        if (_isClosing || _rendererReady || _usingLegacyRenderer)
-        {
-            return;
-        }
-
-        if (!string.Equals(probeResult, "ready", StringComparison.Ordinal))
-        {
-            // 仍在初始化，交给下一次 Tick。
-            return;
-        }
-
         StopRendererReadyTimeout();
-        _rendererReady = true;
-        _unresponsiveTracker.Reset();
-        ApplySavedRendererSettings();
-
-        // 探针成功同时证明页面已加载完成，是比 NavigationCompleted 更可靠的
-        // 「可以显示」信号；该事件在某些时序下不会到达，若只依赖它，叠加层
-        // 会一直保持隐藏。
-        EnsureHostPresented();
+        if (_isClosing || _rendererReady || _usingLegacyRenderer) return;
+        AppLogger.Warn(
+            $"BA click renderer ready timeout on '{_screenDeviceName}'; switching to legacy renderer.");
+        FallbackToLegacyRenderer("ready timeout");
     }
 
     /// <summary>
@@ -1143,11 +1020,6 @@ internal sealed class OverlayWindow : IDisposable
             {
             }
 
-            // 恢复后渲染器可能已就绪，立即探测一次而不必等下一个轮询周期。
-            if (!_rendererReady && !_usingLegacyRenderer)
-            {
-                _ = PollRendererReadyAsync();
-            }
         }
 
         ExecuteScript("if(window.setRenderingPaused) window.setRenderingPaused(false);");
@@ -1198,6 +1070,7 @@ internal sealed class OverlayWindow : IDisposable
         }
 
         bool touchLike = !NativeMethods.IsCursorVisible();
+        if (PostInput("down", clientPoint, touchLike)) return;
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
         ExecuteWithInputContext(
             inputMode,
@@ -1211,6 +1084,7 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
+        if (PostInput("trailStart", clientPoint, touchLike)) return;
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
         ExecuteWithInputContext(
             inputMode,
@@ -1224,13 +1098,7 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
-        // 连续移动是唯一的高频事件（鼠标每秒可产生数百条）。原先每条都直接
-        // ExecuteScriptAsync 且不跟踪完成情况，WebView2 侧一旦跟不上，调用就会越积
-        // 越多 —— 实测拖动窗口时控制面板 UI 线程的响应 P95 由 0.06ms 涨到 4.2ms
-        // （同样条件下参照程序是 0.06ms），表现为「拖久了、拖快了明显延迟」。
-        // 这里只合并这一类事件：上一条脚本还没执行完就丢掉这一条，几毫秒后的下一次
-        // 移动会带上最新坐标，轨迹形状不变，但不会再有积压。
-        // 按下 / 抬起 / 点击 / 拖尾开始都是离散事件，仍是每条都发。
+        if (PostInput("move", clientPoint, touchLike)) return;
         if (Interlocked.Exchange(ref _moveScriptPending, 1) == 1)
         {
             return;
@@ -1245,16 +1113,39 @@ internal sealed class OverlayWindow : IDisposable
 
     public void EmitUp(bool touchLike)
     {
+        if (PostInput("up", default, touchLike)) return;
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
         ExecuteWithInputContext(inputMode, "if(window.externalUp) window.externalUp();");
     }
 
     public void EmitCancel()
     {
+        if (PostInput("cancel", default, _lastReportedInputMode == InputModeTouch)) return;
         ExecuteScript(
             "if(window.externalCancel){window.externalCancel();}" +
             "else if(window.spark&&window.spark.clearEffects){window.spark.clearEffects();}" +
             "else if(window.externalUp){window.externalUp();}");
+    }
+
+    private bool PostInput(string type, Windows.Foundation.Point point, bool touchLike)
+    {
+        if (_usingLegacyRenderer) return false;
+        CoreWebView2? coreWebView = _coreWebView;
+        if (_isClosing || !_rendererReady || coreWebView == null) return true;
+        string mode = touchLike ? InputModeTouch : InputModeMouse;
+        string alwaysTrail = ConfigManager.EnableAlwaysTrailEffect ? "true" : "false";
+        try
+        {
+            coreWebView.PostWebMessageAsJson(string.Create(
+                CultureInfo.InvariantCulture,
+                $"{{\"source\":\"baspark-input\",\"generation\":\"{_rendererGeneration}\",\"type\":\"{type}\",\"x\":{point.X:F3},\"y\":{point.Y:F3},\"mode\":\"{mode}\",\"alwaysTrail\":{alwaysTrail}}}"));
+            _lastReportedInputMode = mode;
+            _lastReportedAlwaysTrail = ConfigManager.EnableAlwaysTrailEffect;
+        }
+        catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+        {
+        }
+        return true;
     }
 
     private static string FormatCoordinate(double value)

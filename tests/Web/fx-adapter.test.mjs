@@ -27,6 +27,7 @@ function createHarness(options = {})
     updateConfig: [],
   };
   const windowListeners = new Map();
+  const hostListeners = new Map();
   const canvasListeners = new Map();
 
   class FakeFx
@@ -170,6 +171,10 @@ function createHarness(options = {})
     {
       webview:
       {
+        addEventListener(type, listener)
+        {
+          hostListeners.set(type, listener);
+        },
         postMessage(message)
         {
           calls.messages.push(JSON.parse(message));
@@ -208,6 +213,7 @@ function createHarness(options = {})
   return {
     calls,
     canvasListeners,
+    hostListeners,
     fx: FakeFx.instance,
     window: windowMock,
     windowListeners,
@@ -297,7 +303,7 @@ test('maps independent trail and click scales to the renderer', () =>
   assert.equal(settings.scale, 2);
   assert.equal(patch['trail.geometryWidth'], 1);
   assert.equal(patch['trail.width'], 0.75);
-  assert.equal(patch['trail.minVertexDistance'], undefined);
+  assert.equal(patch['trail.minVertexDistance'], 1.25);
   assert.equal(patch['trail.outerGlowWidth'], 1.75);
   assert.equal(patch['shards.trailRadius'], 2.75);
   assert.equal(patch['shards.trailSpeedMin'], 3.25);
@@ -502,6 +508,48 @@ test('reports initialization failure without announcing readiness', () =>
   assert.equal(harness.calls.messages.some((message) => message.type === 'ready'), false);
   assert.equal(harness.calls.messages.at(-1).type, 'error');
   assert.equal(harness.calls.messages.at(-1).phase, 'initialize');
+});
+
+test('native host messages preserve pointer ordering without evaluating per-move scripts', () =>
+{
+  const harness = createHarness();
+  const dispatch = harness.hostListeners.get('message');
+  const send = (type, extra = {}) => dispatch(
+    {
+      data:
+      {
+        source: 'baspark-input',
+        generation: 'test-generation',
+        mode: 'mouse',
+        alwaysTrail: false,
+        type,
+        x: 0.25,
+        y: 0.5,
+        ...extra,
+      },
+    });
+
+  send('down');
+  for (let index = 0; index < 2000; index++)
+    send('move', { x: index / 2000 });
+  send('up');
+  assert.equal(harness.calls.pointerDown.length, 1);
+  assert.equal(harness.calls.pointerMove.length, 2000);
+  assert.equal(harness.calls.pointerUp.length, 1);
+  assert.equal(harness.calls.updateConfig.length, 2);
+  assert.equal(harness.calls.pointerMove.at(-1).x, 799.6);
+  send('move', { generation: 'previous-generation' });
+  send('move', { source: 'another-channel' });
+  assert.equal(harness.calls.pointerMove.length, 2000);
+  send('trailStart');
+  assert.equal(harness.calls.pointerDown.length, 2);
+  send('cancel');
+  assert.ok(harness.calls.pointerCancel.length > 0);
+  send('move', { mode: 'touch', alwaysTrail: true });
+  assert.equal(harness.fx.config.trailAlways, false);
+  harness.window.setRenderingPaused(true);
+  send('down');
+  assert.equal(harness.calls.pointerDown.length, 2);
 });
 
 test('destroys renderer-owned resources before the document unloads', () =>
