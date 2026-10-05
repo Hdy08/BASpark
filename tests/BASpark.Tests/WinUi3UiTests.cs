@@ -2037,8 +2037,9 @@ public class WinUi3UiTests
         Assert.Equal(new[] { "Informational", "Warning", "Success" }, privacy.Descendants(Presentation + "InfoBar").Select(element => (string?)element.Attribute("Severity")));
         foreach (string name in new[] { "VersionText", "TxtTagline", "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
             Assert.Equal(Presentation + "TextBlock", GetNamedElement(privacy, name).Name);
-        foreach (string name in new[] { "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
-            Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)GetNamedElement(privacy, name).Attribute("Style"));
+        Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)GetNamedElement(privacy, "TxtIntro").Attribute("Style"));
+        foreach (string name in new[] { "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
+            Assert.Equal("{StaticResource BodyTextBlockStyle}", (string?)GetNamedElement(privacy, name).Attribute("Style"));
         Assert.Contains("Version {version.Major}.{version.Minor}.{version.Build}-release", ReadSource("src", "PrivacyWindow.xaml.cs"), StringComparison.Ordinal);
         Assert.Contains("root.Measure(new Size(width / scale, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
         Assert.Contains("appWindow.Resize(new SizeInt32(width + frameWidth, height + frameHeight))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
