@@ -22,6 +22,10 @@ internal static class StartupDialogHost
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
     [DllImport("dwmapi.dll")]
     private static extern int DwmFlush();
+    [DllImport("user32.dll")]
+    private static extern IntPtr LoadCursor(IntPtr instance, int cursor);
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetCursor(IntPtr cursor);
 
     private static void SetDwmFlag(IntPtr handle, int attribute, bool enabled)
     {
@@ -83,7 +87,7 @@ internal static class StartupDialogHost
                 _ = DwmFlush();
                 SetDwmFlag(handle, DwmwaTransitionsForcedDisabled, false);
                 _ = DwmFlush();
-                host.Show();
+                ShowReadyWindow(host);
             }
             catch (Exception)
             {
@@ -91,12 +95,18 @@ internal static class StartupDialogHost
                 {
                     int disabled = 0;
                     _ = DwmSetWindowAttribute(handle, DwmwaTransitionsForcedDisabled, ref disabled, sizeof(int));
-                    host.Show();
+                    ShowReadyWindow(host);
                 }
             }
         }
         root.Loaded += Ready;
         if (root.IsLoaded) Ready(root, new RoutedEventArgs());
+    }
+
+    private static void ShowReadyWindow(DcompPanelHost host)
+    {
+        _ = SetCursor(LoadCursor(IntPtr.Zero, 32512));
+        host.Show();
     }
 
     public static Task CloseAsync(DcompPanelHost host)
