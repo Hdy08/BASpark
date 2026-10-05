@@ -763,4 +763,10 @@
     </data>
     <data name="Effects_Pause" xml:space="preserve"><value>Pause effects</value></data>
     <data name="Effects_Enable" xml:space="preserve"><value>Enable effects</value></data>
+    <data name="Overlay_InvertSelection" xml:space="preserve"><value>Invert selection</value></data>
+    <data name="Overlay_SelectAll" xml:space="preserve"><value>Select all</value></data>
+    <data name="Overlay_ClearSelection" xml:space="preserve"><value>Clear selection</value></data>
+    <data name="Overlay_NoSearchResults" xml:space="preserve"><value>No search results</value></data>
+    <data name="Backup_ConfirmImport" xml:space="preserve"><value>Confirm import</value></data>
+    <data name="Backup_ConfirmExport" xml:space="preserve"><value>Confirm export</value></data>
   </root>

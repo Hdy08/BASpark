@@ -57,7 +57,7 @@ internal sealed class DcompPanelHost : IDisposable
 
     /// <summary>窗口最小尺寸（逻辑像素），与设计下限一致。</summary>
     private const int MinWidthDesign = 800;
-    private const int MinHeightDesign = 560;
+    private const int MinHeightDesign = 600;
 
     private static bool _classRegistered;
     private static WndProcDelegate? _wndProc;
@@ -146,6 +146,15 @@ internal sealed class DcompPanelHost : IDisposable
         _hwnd != IntPtr.Zero ? _appWindow : null;
 
     public bool IsMaximized => _hwnd != IntPtr.Zero && IsZoomed(_hwnd);
+
+    public Windows.Foundation.Size GetLogicalSize()
+    {
+        var placement = new WINDOWPLACEMENT { length = Marshal.SizeOf<WINDOWPLACEMENT>() };
+        if (_hwnd == IntPtr.Zero || !GetWindowPlacement(_hwnd, ref placement)) return new();
+        double scale = GetDpiScale();
+        return new Windows.Foundation.Size((placement.rcNormalPosition.Right - placement.rcNormalPosition.Left) / scale,
+            (placement.rcNormalPosition.Bottom - placement.rcNormalPosition.Top) / scale);
+    }
 
     /// <summary>用户请求关闭窗口时触发。</summary>
     public event EventHandler? CloseRequested;
@@ -264,7 +273,7 @@ internal sealed class DcompPanelHost : IDisposable
     }
 
     /// <summary>按 DPI 把窗口居中到当前显示器。</summary>
-    public void CenterOnCurrentDisplay(int designWidth, int designHeight)
+    public void CenterOnCurrentDisplay(double designWidth, double designHeight)
     {
         AppWindow? appWindow = AppWindow;
         if (appWindow == null)
@@ -274,7 +283,7 @@ internal sealed class DcompPanelHost : IDisposable
 
         double scale = GetDpiScale();
         int width = (int)Math.Round(Math.Max(designWidth, _minimumWidthDesign) * scale);
-        int height = (int)Math.Round(designHeight * scale);
+        int height = (int)Math.Round(Math.Max(designHeight, _minimumHeightDesign) * scale);
 
         DisplayArea? area = DisplayArea.GetFromWindowId(appWindow.Id, DisplayAreaFallback.Nearest) ?? DisplayArea.Primary;
         if (area != null)
@@ -590,6 +599,21 @@ internal sealed class DcompPanelHost : IDisposable
         public int Right;
         public int Bottom;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WINDOWPLACEMENT
+    {
+        public int length;
+        public int flags;
+        public int showCmd;
+        public POINT ptMinPosition;
+        public POINT ptMaxPosition;
+        public RECT rcNormalPosition;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowPlacement(IntPtr hwnd, ref WINDOWPLACEMENT placement);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT

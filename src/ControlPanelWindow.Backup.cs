@@ -36,7 +36,7 @@ public sealed partial class ControlPanelWindow
         BtnExportConfiguration.Content = Localization.Get("Backup_Export");
         BtnImportConfiguration.Content = Localization.Get("Backup_Import");
         BtnBackupCancel.Content = Localization.Get("Overlay_Cancel");
-        BtnBackupConfirm.Content = Localization.Get(_backupImport ? "Backup_Import" : "Backup_Export");
+        BtnBackupConfirm.Content = Localization.Get(_backupImport ? "Backup_ConfirmImport" : "Backup_ConfirmExport");
         TxtBackupSelectionTitle.Text = Localization.Get(_backupImport ? "Backup_SelectImport" : "Backup_SelectExport");
         SearchBackupItems.PlaceholderText = Localization.Get("Overlay_SearchSettings");
         BtnExitApplication.Content = Localization.Get("Welcome_Exit");
@@ -211,6 +211,7 @@ public sealed partial class ControlPanelWindow
             rows.Add(item);
         }
         ListBackupItems.ItemsSource = rows;
+        RefreshSelectionToolbar(ListBackupItems);
     }
 
     private async void CloseBackupOverlay_Click(object sender, RoutedEventArgs args)
@@ -229,12 +230,13 @@ public sealed partial class ControlPanelWindow
         _backupBusy = busy;
         BtnExportConfiguration.IsEnabled = BtnImportConfiguration.IsEnabled = !busy;
         BtnBackupConfirm.IsEnabled = BtnBackupCancel.IsEnabled = !busy;
+        UpdateSelectionToolbar(ListBackupItems);
     }
 
     private async void ConfirmBackup_Click(object sender, RoutedEventArgs args)
     {
         if (_backupBusy || _backupSource == null || _isClosed) return;
-        string[] selected = _backupItems.Where(item => item.IsSelected).Select(item => item.Key).ToArray();
+        string[] selected = ListBackupItems.Items.OfType<BackupSelectionItem>().Where(item => item.IsSelected).Select(item => item.Key).ToArray();
         if (selected.Length == 0)
         {
             await ShowMessageAsync(Localization.Get("Backup_SelectData"));

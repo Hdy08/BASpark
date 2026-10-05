@@ -763,4 +763,10 @@
     </data>
     <data name="Effects_Pause" xml:space="preserve"><value>エフェクトを一時停止</value></data>
     <data name="Effects_Enable" xml:space="preserve"><value>エフェクトを有効化</value></data>
+    <data name="Overlay_InvertSelection" xml:space="preserve"><value>選択を反転</value></data>
+    <data name="Overlay_SelectAll" xml:space="preserve"><value>すべて選択</value></data>
+    <data name="Overlay_ClearSelection" xml:space="preserve"><value>選択を解除</value></data>
+    <data name="Overlay_NoSearchResults" xml:space="preserve"><value>検索結果なし</value></data>
+    <data name="Backup_ConfirmImport" xml:space="preserve"><value>インポートを確認</value></data>
+    <data name="Backup_ConfirmExport" xml:space="preserve"><value>エクスポートを確認</value></data>
   </root>

@@ -104,6 +104,8 @@ namespace BASpark
         public static DarkModeOption DarkMode { get; set; } = DarkModeOption.System;
         public static PanelScrollbarVisibility ScrollbarVisibility { get; set; } = PanelScrollbarVisibility.OnScroll;
         public static string SidebarBackgroundImagePath { get; set; } = "";
+        public static double ControlPanelWidth { get; set; }
+        public static double ControlPanelHeight { get; set; }
 
         /// 点击特效是否处于激活状态（点击特效开关）
         public static bool IsClickEffectActive => IsEffectEnabled;
@@ -172,6 +174,8 @@ namespace BASpark
                         DarkMode = ParseDarkMode(key.GetValue("DarkMode", "System")?.ToString());
                         ScrollbarVisibility = ParseScrollbarVisibility(key.GetValue("ScrollbarVisibility", "OnScroll")?.ToString());
                         SidebarBackgroundImagePath = key.GetValue("SidebarBackgroundImagePath", "")?.ToString() ?? "";
+                        ControlPanelWidth = Convert.ToDouble(key.GetValue("ControlPanelWidth", 0), CultureInfo.InvariantCulture);
+                        ControlPanelHeight = Convert.ToDouble(key.GetValue("ControlPanelHeight", 0), CultureInfo.InvariantCulture);
                         
                         if (!string.IsNullOrWhiteSpace(UiLanguage))
                         {

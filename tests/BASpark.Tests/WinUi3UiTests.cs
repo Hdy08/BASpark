@@ -1648,7 +1648,7 @@ public class WinUi3UiTests
     {
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         string confirm = source[source.IndexOf("private async void ConfirmVisualReset_Click", StringComparison.Ordinal)..source.IndexOf("private void LinkedEffectScale_Changed", StringComparison.Ordinal)];
-        Assert.Contains("VisualResetItems.Where(item => item.IsSelected)", confirm, StringComparison.Ordinal);
+        Assert.Contains("ListVisualResetItems.Items.OfType<VisualResetItem>().Where(item => item.IsSelected)", confirm, StringComparison.Ordinal);
         Assert.Contains("foreach (VisualResetItem item in selected) item.Restore?.Invoke()", confirm, StringComparison.Ordinal);
         Assert.Contains("foreach (VisualResetItem item in selected) item.Save?.Invoke()", confirm, StringComparison.Ordinal);
         Assert.DoesNotContain("if (_resetScope == ResetScope.Visual)", confirm, StringComparison.Ordinal);
@@ -1985,7 +1985,7 @@ public class WinUi3UiTests
         foreach (string name in new[] { "RunningProcessOverlay", "VisualResetOverlay", "BackupOverlay", "RenameProfileOverlay" })
         {
             XElement overlay = GetNamedElement(panel, name);
-            XElement heading = Assert.Single(overlay.Descendants(Presentation + "TextBlock"));
+            XElement heading = overlay.Descendants(Presentation + "TextBlock").First();
             Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)heading.Attribute("Style"));
             Assert.Null(heading.Attribute("FontSize"));
             Assert.Null(overlay.Attribute("Background"));
@@ -1996,12 +1996,14 @@ public class WinUi3UiTests
             Assert.Equal("0,16,0,0", (string?)buttons.Attribute("Margin"));
             Assert.Equal("Right", (string?)buttons.Attribute("HorizontalAlignment"));
         }
-        foreach (string name in new[] { "SearchRunningProcess", "SearchVisualReset" })
+        foreach (string name in new[] { "SearchRunningProcess", "SearchVisualReset", "SearchBackupItems" })
         {
             XElement search = GetNamedElement(panel, name);
-            Assert.Equal("1", (string?)search.Attribute("Grid.Row"));
-            Assert.Equal("0,12,0,12", (string?)search.Attribute("Margin"));
-            Assert.Equal(4, search.Parent!.Elements(Presentation + "Grid.RowDefinitions").Single().Elements().Count());
+            XElement toolbar = search.Parent!;
+            Assert.Equal("1", (string?)toolbar.Attribute("Grid.Row"));
+            Assert.Equal("0,12,0,12", (string?)toolbar.Attribute("Margin"));
+            Assert.Equal(2, toolbar.Elements(Presentation + "Button").Count());
+            Assert.Equal(4, toolbar.Parent!.Elements(Presentation + "Grid.RowDefinitions").Single().Elements().Count());
         }
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("dialog.Title = null", source, StringComparison.Ordinal);
@@ -2021,7 +2023,7 @@ public class WinUi3UiTests
     {
         XDocument language = LoadXaml("src", "LanguageSelectWindow.xaml");
         Assert.DoesNotContain(language.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "TxtTitle");
-        Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)GetNamedElement(language, "TxtSubtitle").Attribute("Style"));
+        Assert.Equal("{StaticResource BodyStrongTextBlockStyle}", (string?)GetNamedElement(language, "TxtSubtitle").Attribute("Style"));
         XDocument privacy = LoadXaml("src", "PrivacyWindow.xaml");
         foreach (XDocument document in new[] { language, privacy })
         {

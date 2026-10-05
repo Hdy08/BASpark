@@ -320,7 +320,8 @@ public sealed partial class ControlPanelWindow : UserControl
 
     // 初始尺寸。
     private const int DesignWidth = 800;
-    private const int DesignHeight = 710;
+    private const int DesignHeight = 600;
+    private bool _windowSizeRestored;
 
     private NavigationViewItem? _selectedSettingsItem;
     private readonly Dictionary<NavigationViewItem, (FrameworkElement Indicator, bool Active)> _navigationIndicators = new();
@@ -360,6 +361,10 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly Dictionary<ContentDialog, ModalDialogState> _modalDialogs = new();
     private readonly Dictionary<ContentDialog, Border> _dialogPresentationGuards = new();
     private readonly HashSet<ContentDialog> _dialogPresentationsPending = new();
+    private sealed record SelectionToolbar(Button Invert, Button SelectAll, Button Confirm, TextBlock EmptyMessage, List<SelectionCardItem> Items);
+    private readonly Dictionary<ListView, SelectionToolbar> _selectionToolbars = new();
+    private bool _changingSelection;
+    private readonly List<WindowChrome.ComboBoxWidthTracker> _comboWidthTrackers = new();
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
@@ -421,6 +426,10 @@ public sealed partial class ControlPanelWindow : UserControl
         InitializeComponent();
         WindowChrome.ApplyTitleBarIcon(AppTitleBar);
         _host = new DcompPanelHost();
+        _selectionToolbars[ListRunningProcesses] = new(BtnRunningInvert, BtnRunningSelectAll, BtnOverlayConfirmAdd, TxtRunningNoResults, []);
+        _selectionToolbars[ListVisualResetItems] = new(BtnResetInvert, BtnResetSelectAll, BtnOverlayVisualConfirm, TxtResetNoResults, []);
+        _selectionToolbars[ListBackupItems] = new(BtnBackupInvert, BtnBackupSelectAll, BtnBackupConfirm, TxtBackupNoResults, []);
+        foreach (ComboBox combo in new[] { ComboLanguage, ComboProcessFilterMode, ListConfiguredProcesses }) _comboWidthTrackers.Add(new(combo));
 
         try
         {
@@ -595,6 +604,12 @@ public sealed partial class ControlPanelWindow : UserControl
         _ = e;
         XamlRoot.Changed += PanelXamlRoot_Changed;
         UpdateMinimumWindowWidth();
+        if (!_windowSizeRestored)
+        {
+            _windowSizeRestored = true;
+            _host.CenterOnCurrentDisplay(RestoreDimension(ConfigManager.ControlPanelWidth, DesignWidth),
+                RestoreDimension(ConfigManager.ControlPanelHeight, DesignHeight));
+        }
         UpdateCaptionButtonBounds();
         UpdateCaptionButtonState();
         ApplyTitleBarTheme();
@@ -611,6 +626,9 @@ public sealed partial class ControlPanelWindow : UserControl
         measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         return measurement.DesiredSize.Width;
     }
+
+    private static double RestoreDimension(double saved, int fallback) =>
+        double.IsFinite(saved) && saved > 0 ? Math.Min(saved, 32767) : fallback;
 
     private void UpdateMinimumWindowWidth()
     {
@@ -1282,6 +1300,8 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         foreach (var selector in _segmentedSelectors) selector.RefreshLayout();
         UpdateConfiguredProcessSummary();
+        foreach (var tracker in _comboWidthTrackers) tracker.Refresh();
+        foreach (ListView list in _selectionToolbars.Keys) UpdateSelectionToolbar(list);
     }
 
     private static void SetRadioContent(RadioButtons container, int index, string key)
@@ -2378,6 +2398,11 @@ public sealed partial class ControlPanelWindow : UserControl
         }
     }
 
+    private void ProfileActions_SizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (!_isClosed && ComboProfiles.Width != args.NewSize.Width) ComboProfiles.Width = args.NewSize.Width;
+    }
+
     private void RefreshCurrentProfileProcesses(FilterProfile? profile)
     {
         CurrentProfileProcesses.Clear();
@@ -2625,7 +2650,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _ = sender;
         _ = e;
 
-        List<string> selected = _allRunningProcesses
+        List<string> selected = RunningProcessList
             .Where(item => item.IsSelected)
             .Select(item => item.ProcessName)
             .ToList();
@@ -2743,7 +2768,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
             RunningProcessList.Add(item);
         }
-
+        RefreshSelectionToolbar(ListRunningProcesses);
     }
 
     // ==================================================================
@@ -2924,6 +2949,62 @@ public sealed partial class ControlPanelWindow : UserControl
             rows.Add(item);
         }
         ListVisualResetItems.ItemsSource = rows;
+        RefreshSelectionToolbar(ListVisualResetItems);
+    }
+
+    private void RefreshSelectionToolbar(ListView list)
+    {
+        if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
+        foreach (SelectionCardItem item in toolbar.Items) item.PropertyChanged -= SelectionItem_PropertyChanged;
+        toolbar.Items.Clear();
+        toolbar.Items.AddRange(list.Items.OfType<SelectionCardItem>());
+        foreach (SelectionCardItem item in toolbar.Items) item.PropertyChanged += SelectionItem_PropertyChanged;
+        UpdateSelectionToolbar(list);
+    }
+
+    private void SelectionItem_PropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (_isClosed || _changingSelection || args.PropertyName != nameof(SelectionCardItem.IsSelected) || sender is not SelectionCardItem item) return;
+        foreach (var pair in _selectionToolbars)
+            if (pair.Value.Items.Contains(item)) UpdateSelectionToolbar(pair.Key);
+    }
+
+    private void UpdateSelectionToolbar(ListView list)
+    {
+        if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
+        bool allSelected = toolbar.Items.Count > 0 && toolbar.Items.All(item => item.IsSelected);
+        bool available = list != ListBackupItems || !_backupBusy;
+        toolbar.Invert.IsEnabled = toolbar.SelectAll.IsEnabled = toolbar.Items.Count > 0 && available;
+        toolbar.Confirm.IsEnabled = available && toolbar.Items.Any(item => item.IsSelected);
+        toolbar.EmptyMessage.Text = Localization.Get("Overlay_NoSearchResults");
+        toolbar.EmptyMessage.Visibility = toolbar.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        string invertLabel = Localization.Get("Overlay_InvertSelection");
+        string selectLabel = Localization.Get(allSelected ? "Overlay_ClearSelection" : "Overlay_SelectAll");
+        ToolTipService.SetToolTip(toolbar.Invert, invertLabel);
+        ToolTipService.SetToolTip(toolbar.SelectAll, selectLabel);
+        AutomationProperties.SetName(toolbar.Invert, invertLabel);
+        AutomationProperties.SetName(toolbar.SelectAll, selectLabel);
+        if (toolbar.SelectAll.Content is SymbolIcon icon) icon.Symbol = allSelected ? Symbol.ClearSelection : Symbol.SelectAll;
+    }
+
+    private void InvertSelection_Click(object sender, RoutedEventArgs args) => ChangeSelection(sender, invert: true);
+    private void SelectAll_Click(object sender, RoutedEventArgs args) => ChangeSelection(sender, invert: false);
+
+    private void ChangeSelection(object sender, bool invert)
+    {
+        if (sender is not Button { Tag: ListView list } button || !button.IsEnabled ||
+            !_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
+        bool select = !toolbar.Items.All(item => item.IsSelected);
+        _changingSelection = true;
+        try
+        {
+            foreach (SelectionCardItem item in toolbar.Items) item.IsSelected = invert ? !item.IsSelected : select;
+        }
+        finally
+        {
+            _changingSelection = false;
+            UpdateSelectionToolbar(list);
+        }
     }
 
     private void SelectionCard_PointerPressed(object sender, PointerRoutedEventArgs args)
@@ -2956,7 +3037,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private async void ConfirmVisualReset_Click(object sender, RoutedEventArgs args)
     {
-        VisualResetItem[] selected = VisualResetItems.Where(item => item.IsSelected).ToArray();
+        VisualResetItem[] selected = ListVisualResetItems.Items.OfType<VisualResetItem>().Where(item => item.IsSelected).ToArray();
         if (selected.Length == 0)
         {
             await ShowMessageAsync(Localization.Get("Msg_SelectVisualReset"));
@@ -3030,12 +3111,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _suppressValueSync = true;
         try
         {
-            if (CheckLinkedEffectScale.IsOn)
-            {
-                double average = Math.Round((SliderTrailScale.Value + SliderClickScale.Value) / 2.0, 2);
-                SliderScale.Value = Math.Clamp(average, 0.5, 3.0);
-            }
-            else
+            if (!CheckLinkedEffectScale.IsOn)
             {
                 double value = Math.Clamp(Math.Round(SliderScale.Value, 2), 0.5, 3.0);
                 SliderTrailScale.Value = value;
@@ -3068,12 +3144,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _suppressValueSync = true;
         try
         {
-            if (CheckLinkedAnimationSpeed.IsOn)
-            {
-                double average = Math.Clamp(Math.Round((SliderTrailAnimSpeed.Value + SliderClickAnimSpeed.Value) / 2.0, 2), 0.2, 3.0);
-                SliderSpeed.Value = average;
-            }
-            else
+            if (!CheckLinkedAnimationSpeed.IsOn)
             {
                 double value = Math.Clamp(Math.Round(SliderSpeed.Value, 2), 0.2, 3.0);
                 SliderTrailAnimSpeed.Value = value;
@@ -3404,10 +3475,9 @@ public sealed partial class ControlPanelWindow : UserControl
         bool useLinkedEffectScale = CheckLinkedEffectScale.IsOn;
         double trailEffectScale;
         double clickEffectScale;
-        double effectScaleForRegistry;
+        double effectScaleForRegistry = Math.Round(SliderScale.Value, 2);
         if (useLinkedEffectScale)
         {
-            effectScaleForRegistry = Math.Round(SliderScale.Value, 2);
             trailEffectScale = effectScaleForRegistry;
             clickEffectScale = effectScaleForRegistry;
         }
@@ -3415,7 +3485,6 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             trailEffectScale = Math.Round(SliderTrailScale.Value, 2);
             clickEffectScale = Math.Round(SliderClickScale.Value, 2);
-            effectScaleForRegistry = clickEffectScale;
         }
 
         double effectOpacity = Math.Round(_effectOpacity, 2);
@@ -3424,10 +3493,9 @@ public sealed partial class ControlPanelWindow : UserControl
         bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsOn;
         double trailAnimSpeed;
         double clickAnimSpeed;
-        double effectSpeedForRegistry;
+        double effectSpeedForRegistry = Math.Round(SliderSpeed.Value, 2);
         if (useLinkedAnimationSpeed)
         {
-            effectSpeedForRegistry = Math.Round(SliderSpeed.Value, 2);
             trailAnimSpeed = effectSpeedForRegistry;
             clickAnimSpeed = effectSpeedForRegistry;
         }
@@ -3435,7 +3503,6 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             trailAnimSpeed = Math.Round(SliderTrailAnimSpeed.Value, 2);
             clickAnimSpeed = Math.Round(SliderClickAnimSpeed.Value, 2);
-            effectSpeedForRegistry = clickAnimSpeed;
         }
 
         int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
@@ -3748,20 +3815,9 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ConfigureContentDialog(ContentDialog dialog)
     {
-        TextBlock? heading = dialog == RunningProcessOverlay ? TxtOverlayRunning
-            : dialog == VisualResetOverlay ? TxtOverlayVisualReset
-            : dialog == BackupOverlay ? TxtBackupSelectionTitle
-            : dialog == RenameProfileOverlay ? TxtOverlayRename : null;
-        if (heading != null)
-        {
-            double baseWidth = dialog == RenameProfileOverlay ? 380 : 420;
-            double padding = ((Thickness)Application.Current.Resources["ContentDialogPadding"]).Left +
-                ((Thickness)Application.Current.Resources["ContentDialogPadding"]).Right;
-            double width = Math.Min(Math.Max(baseWidth, Math.Ceiling(MeasureSingleLineWidth(heading) + padding + 8)),
-                Math.Max(baseWidth, PanelBody.ActualWidth - PanelBody.ColumnDefinitions[0].ActualWidth - 32));
-            dialog.Resources["ContentDialogMinWidth"] = width;
-            dialog.Resources["ContentDialogMaxWidth"] = width;
-        }
+        dialog.Resources["ContentDialogMinWidth"] = 400d;
+        dialog.Resources["ContentDialogMaxWidth"] = 400d;
+        dialog.Resources["ContentDialogMaxHeight"] = 540d;
         if (dialog.Resources.ContainsKey("BasNativeDialogConfigured")) return;
         dialog.Resources["BasNativeDialogConfigured"] = true;
         dialog.Title = null;
@@ -4129,6 +4185,17 @@ public sealed partial class ControlPanelWindow : UserControl
         }
 
         _isClosed = true;
+        Size windowSize = _host.GetLogicalSize();
+        if (_windowSizeRestored && windowSize.Width > 0 && windowSize.Height > 0)
+        {
+            ConfigManager.Save("ControlPanelWidth", windowSize.Width);
+            ConfigManager.Save("ControlPanelHeight", windowSize.Height);
+        }
+        foreach (SelectionToolbar toolbar in _selectionToolbars.Values)
+            foreach (SelectionCardItem item in toolbar.Items) item.PropertyChanged -= SelectionItem_PropertyChanged;
+        _selectionToolbars.Clear();
+        foreach (var tracker in _comboWidthTrackers) tracker.Dispose();
+        _comboWidthTrackers.Clear();
         RootGrid.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootGrid_PointerPressed));
         RootGrid.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished));
         RootGrid.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished));

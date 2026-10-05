@@ -20,6 +20,7 @@ public partial class LanguageSelectWindow : UserControl
 
     private bool _closed;
     private readonly DcompPanelHost _host;
+    private readonly WindowChrome.ComboBoxWidthTracker _languageWidth;
     public IntPtr Handle => _host.Handle;
     public AppWindow AppWindow => _host.AppWindow!;
     public event EventHandler? Closed;
@@ -34,6 +35,7 @@ public partial class LanguageSelectWindow : UserControl
     {
         _displayCulture = Localization.DetectCultureFromSystem();
         InitializeComponent();
+        _languageWidth = new(ComboLanguage);
         _host = new DcompPanelHost(fixedSize: true, minimumWidth: DesignWidth, minimumHeight: 1);
         WindowChrome.ApplyTitleBarIcon(AppTitleBar);
         StartupDialogHost.ConfigureCaptionButton(_host, RootGrid, BtnCaptionClose);
@@ -87,6 +89,7 @@ public partial class LanguageSelectWindow : UserControl
         LanguageEnglish.Content = Localization.Get("LangSelect_English", cultureName);
         LanguageJapanese.Content = Localization.Get("LangSelect_Japanese", cultureName);
         BtnContinue.Content = Localization.Get("LangSelect_Continue", cultureName);
+        _languageWidth.Refresh();
         if (RootGrid.IsLoaded) DispatcherQueue.TryEnqueue(() => StartupDialogHost.FitToContent(_host, RootGrid));
     }
 
@@ -134,6 +137,7 @@ public partial class LanguageSelectWindow : UserControl
         if (_closed) return;
         _closed = true;
         await StartupDialogHost.CloseAsync(_host);
+        _languageWidth.Dispose();
         Closed?.Invoke(this, EventArgs.Empty);
         _completion.TrySetResult(SelectedCulture);
     }

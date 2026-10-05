@@ -763,4 +763,10 @@
     </data>
     <data name="Effects_Pause" xml:space="preserve"><value>暂停特效</value></data>
     <data name="Effects_Enable" xml:space="preserve"><value>启用特效</value></data>
+    <data name="Overlay_InvertSelection" xml:space="preserve"><value>反选</value></data>
+    <data name="Overlay_SelectAll" xml:space="preserve"><value>全选</value></data>
+    <data name="Overlay_ClearSelection" xml:space="preserve"><value>清空</value></data>
+    <data name="Overlay_NoSearchResults" xml:space="preserve"><value>无搜索结果</value></data>
+    <data name="Backup_ConfirmImport" xml:space="preserve"><value>确认导入</value></data>
+    <data name="Backup_ConfirmExport" xml:space="preserve"><value>确认导出</value></data>
   </root>

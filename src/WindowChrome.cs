@@ -13,6 +13,52 @@ namespace BASpark;
 /// </summary>
 internal static class WindowChrome
 {
+    internal sealed class ComboBoxWidthTracker : IDisposable
+    {
+        private readonly ComboBox _combo;
+        private readonly long _placeholderToken;
+
+        public ComboBoxWidthTracker(ComboBox combo)
+        {
+            _combo = combo;
+            combo.Loaded += Combo_Loaded;
+            combo.SelectionChanged += Combo_SelectionChanged;
+            _placeholderToken = combo.RegisterPropertyChangedCallback(ComboBox.PlaceholderTextProperty, (_, _) => Refresh());
+        }
+
+        private void Combo_Loaded(object sender, RoutedEventArgs args) => Refresh();
+        private void Combo_SelectionChanged(object sender, SelectionChangedEventArgs args) => Refresh();
+
+        public void Refresh()
+        {
+            if (!_combo.IsLoaded) return;
+            _combo.ApplyTemplate();
+            if (Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(_combo) == 0 ||
+                Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(_combo, 0) is not Grid layout) return;
+            string text = _combo.SelectedItem is ComboBoxItem item ? item.Content?.ToString() ?? string.Empty
+                : _combo.SelectedItem?.ToString() ?? _combo.PlaceholderText ?? string.Empty;
+            var label = new TextBlock
+            {
+                Text = text, FontFamily = _combo.FontFamily, FontSize = _combo.FontSize,
+                FontWeight = _combo.FontWeight, FontStyle = _combo.FontStyle,
+                CharacterSpacing = _combo.CharacterSpacing, Language = _combo.Language, TextWrapping = TextWrapping.NoWrap
+            };
+            label.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+            double chrome = layout.ColumnDefinitions.Where(column => column.Width.IsAbsolute).Sum(column => column.Width.Value);
+            double minimum = layout.Children.OfType<Border>().FirstOrDefault(border => border.Name == "Background")?.MinWidth ?? 0;
+            double scale = _combo.XamlRoot.RasterizationScale;
+            double width = Math.Ceiling(Math.Max(minimum, label.DesiredSize.Width + chrome + _combo.Padding.Left + _combo.Padding.Right) * scale) / scale;
+            if (_combo.Width != width) _combo.Width = width;
+        }
+
+        public void Dispose()
+        {
+            _combo.Loaded -= Combo_Loaded;
+            _combo.SelectionChanged -= Combo_SelectionChanged;
+            _combo.UnregisterPropertyChangedCallback(ComboBox.PlaceholderTextProperty, _placeholderToken);
+        }
+    }
+
     internal sealed class RenderClock : IDisposable
     {
         private static readonly object ClockLock = new();
