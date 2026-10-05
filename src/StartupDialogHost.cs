@@ -247,6 +247,7 @@ internal static class StartupDialogHost
                 if (message == 0x00A3 || (message == 0x0112 && ((long)parameter & 0xFFF0) is 0xF000 or 0xF030))
                     return IntPtr.Zero;
                 IntPtr result = DefSubclassProc(target, message, parameter, data);
+                if (message == 0x031E) WindowChrome.ApplyNativeShadow(target);
                 if (message is 0x0005 or 0x0047) AlignContent(window, target);
                 return result;
             };
@@ -262,6 +263,7 @@ internal static class StartupDialogHost
         _ = NativeMethods.SetWindowPos(handle, IntPtr.Zero, 0, 0, 0, 0,
             NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE | 0x0020);
         AlignContent(window, handle);
+        WindowChrome.ApplyNativeShadow(handle);
     }
 
     private static IEnumerable<TextBlock> TextBlocks(DependencyObject root)

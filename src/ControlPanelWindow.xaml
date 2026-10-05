@@ -1261,7 +1261,6 @@
                                                     Grid.Row="0"
                                                     MinWidth="0"
                                                     Padding="6,4"
-                                                    FontSize="12"
                                                     HorizontalAlignment="Stretch" />
                                                 <Button
                                                     x:Name="BtnRenameProfile"
@@ -1271,7 +1270,6 @@
                                                     Grid.Row="0"
                                                     MinWidth="0"
                                                     Padding="6,4"
-                                                    FontSize="12"
                                                     HorizontalAlignment="Stretch" />
                                                 <Button
                                                     x:Name="BtnDeleteProfile"
@@ -1282,7 +1280,6 @@
                                                     Grid.Row="0"
                                                     MinWidth="0"
                                                     Padding="6,4"
-                                                    FontSize="12"
                                                     HorizontalAlignment="Stretch" />
                                             </Grid>
                                         </StackPanel>

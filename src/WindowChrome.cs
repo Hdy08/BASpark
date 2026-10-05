@@ -114,6 +114,15 @@ internal static class WindowChrome
     private static System.Drawing.Icon? _appIcon;
     private static BitmapImage? _appIconImage;
 
+    public static void ApplyNativeShadow(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return;
+        int policy = DwmNcrpEnabled;
+        _ = DwmSetWindowAttribute(hwnd, DwmwaNcRenderingPolicy, ref policy, sizeof(int));
+        var margins = new FrameMargins { LeftWidth = 1, RightWidth = 1, TopHeight = 1, BottomHeight = 1 };
+        _ = DwmExtendFrameIntoClientArea(hwnd, ref margins);
+    }
+
     private static System.Drawing.Icon GetAppIcon()
     {
         if (_appIcon != null) return _appIcon;
@@ -255,6 +264,8 @@ internal static class WindowChrome
 
     private const int DwmwaUseImmersiveDarkMode = 20;
     private const int DwmwaUseImmersiveDarkModeLegacy = 19;
+    private const int DwmwaNcRenderingPolicy = 2;
+    private const int DwmNcrpEnabled = 2;
     private const uint SwpNoSize = 0x0001;
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoZOrder = 0x0004;
@@ -264,6 +275,18 @@ internal static class WindowChrome
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(
         IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FrameMargins
+    {
+        public int LeftWidth;
+        public int RightWidth;
+        public int TopHeight;
+        public int BottomHeight;
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref FrameMargins margins);
 
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
     private static extern int SetWindowTheme(IntPtr hWnd, string? pszSubAppName, string? pszSubIdList);

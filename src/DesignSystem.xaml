@@ -175,51 +175,39 @@
     <Thickness x:Key="ContentDialogSeparatorThickness">0</Thickness>
     <Thickness x:Key="BasStartupContentMargin">24,20,24,0</Thickness>
 
-    <x:Double x:Key="BasFontSizeCaption">12</x:Double>
-    <x:Double x:Key="BasFontSizeBody">14</x:Double>
-    <x:Double x:Key="BasFontSizeSubtitle">20</x:Double>
-    <x:Double x:Key="BasFontSizeTitle">28</x:Double>
+    <StaticResource x:Key="BasFontSizeCaption" ResourceKey="CaptionTextBlockFontSize" />
+    <StaticResource x:Key="BasFontSizeBody" ResourceKey="BodyTextBlockFontSize" />
+    <StaticResource x:Key="BasFontSizeSubtitle" ResourceKey="SubtitleTextBlockFontSize" />
+    <StaticResource x:Key="BasFontSizeTitle" ResourceKey="TitleTextBlockFontSize" />
 
     <!-- ==================== 可复用样式（全部基于 WinUI 默认模板） ==================== -->
 
     <!-- 页面主标题：Title 层级 -->
-    <Style x:Key="BasPageTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource BasFontSizeTitle}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+    <Style x:Key="BasPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
     </Style>
 
     <!-- 区块标题：BodyStrong 层级 -->
-    <Style x:Key="BasSectionTitleStyle" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+    <Style x:Key="BasSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
     </Style>
 
     <!-- 说明文字：Caption 层级 -->
-    <Style x:Key="BasCaptionStyle" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource BasFontSizeCaption}" />
+    <Style x:Key="BasCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}">
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextSecondaryBrush}" />
     </Style>
 
     <!-- 页头副标题 -->
-    <Style x:Key="BasPageSubtitleStyle" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
+    <Style x:Key="BasPageSubtitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextSecondaryBrush}" />
     </Style>
 
     <!-- 设置项标签 -->
-    <Style x:Key="BasFieldLabelStyle" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource BasFontSizeBody}" />
+    <Style x:Key="BasFieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
         <Setter Property="Margin" Value="0,0,0,6" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
@@ -268,10 +256,6 @@
     </Style>
 
     <Style x:Key="BasRepositoryLinkStyle" TargetType="HyperlinkButton" BasedOn="{StaticResource DefaultHyperlinkButtonStyle}">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="FontSize" Value="14" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="ContentTemplate">
@@ -323,19 +307,16 @@
 
     <!-- ==================== 侧边栏导航项 ==================== -->
 
-    <Style x:Key="BasSettingsPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasPageTitleStyle}">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="FontSize" Value="24" />
-    </Style>
+    <Style x:Key="BasSettingsPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasPageTitleStyle}" />
 
-    <Style x:Key="BasSettingsSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasSectionTitleStyle}">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
+    <Style x:Key="BasSettingsSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
         <Setter Property="Margin" Value="0,20,0,8" />
     </Style>
 
-    <Style x:Key="BasSettingTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BasFieldLabelStyle}">
-        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+    <Style x:Key="BasSettingTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
         <Setter Property="Margin" Value="0" />
     </Style>
 

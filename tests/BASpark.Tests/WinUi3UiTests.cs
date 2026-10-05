@@ -45,6 +45,7 @@ public class WinUi3UiTests
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasRepositoryLinkStyle");
         Assert.Equal("{StaticResource DefaultHyperlinkButtonStyle}", (string?)style.Attribute("BasedOn"));
+        Assert.DoesNotContain(style.Elements(), setter => (string?)setter.Attribute("Property") is "Padding" or "Template" or "CornerRadius" or "FontWeight" or "FontSize");
         Assert.Equal("None", (string?)Assert.Single(style.Descendants(Presentation + "TextBlock")).Attribute("TextDecorations"));
     }
 
@@ -80,13 +81,25 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void UiFonts_UseMicrosoftYaHeiUiWhileLogsKeepConsolas()
+    public void UiFonts_UseNativeWinUiTypographyWhileLogsKeepConsolas()
     {
         XDocument application = LoadXaml("src", "App.xaml");
-        foreach (string name in new[] { "ContentControlThemeFontFamily", "TextControlThemeFontFamily" })
+        Assert.DoesNotContain(application.Descendants(), element => element.Name.LocalName == "FontFamily");
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        foreach ((string key, string nativeStyle) in new[]
         {
-            XElement family = Assert.Single(application.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == name);
-            Assert.Equal("Microsoft YaHei UI", family.Value);
+            ("BasPageTitleStyle", "TitleTextBlockStyle"),
+            ("BasSettingsSectionTitleStyle", "SubtitleTextBlockStyle"),
+            ("BasPageSubtitleStyle", "BodyTextBlockStyle"),
+            ("BasFieldLabelStyle", "BodyTextBlockStyle"),
+            ("BasCaptionStyle", "CaptionTextBlockStyle"),
+            ("BasSectionTitleStyle", "BodyStrongTextBlockStyle"),
+            ("BasSettingTitleStyle", "BodyStrongTextBlockStyle")
+        })
+        {
+            XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
+            Assert.Equal("{StaticResource " + nativeStyle + "}", (string?)style.Attribute("BasedOn"));
+            Assert.DoesNotContain(style.Elements(), setter => (string?)setter.Attribute("Property") is "FontFamily" or "FontSize" or "FontWeight" or "LineHeight" or "LineStackingStrategy" or "TextLineBounds");
         }
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         Assert.Equal("Consolas", (string?)GetNamedElement(panel, "TxtAppLog").Attribute("FontFamily"));
@@ -599,7 +612,9 @@ public class WinUi3UiTests
         string hostSource = ReadSource("src", "DcompPanelHost.cs");
 
         Assert.DoesNotContain("SetWindowLong", chromeSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("DwmExtendFrameIntoClientArea", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("DwmExtendFrameIntoClientArea", chromeSource, StringComparison.Ordinal);
+        Assert.Contains("WindowChrome.ApplyNativeShadow(_hwnd)", hostSource, StringComparison.Ordinal);
+        Assert.Contains("WindowChrome.ApplyNativeShadow(handle)", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
         Assert.DoesNotContain("InputNonClientPointerSource", chromeSource, StringComparison.Ordinal);
         Assert.Contains("int style = WsCaption | WsThickFrame | WsSysMenu | WsMinimizeBox | WsMaximizeBox", hostSource, StringComparison.Ordinal);
     }
@@ -1163,7 +1178,7 @@ public class WinUi3UiTests
         foreach (string key in new[] { "BasPageTitleStyle", "BasSectionTitleStyle", "BasSettingTitleStyle" })
         {
             XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == key);
-            Assert.Contains(style.Elements(), setter => (string?)setter.Attribute("Property") == "FontWeight" && (string?)setter.Attribute("Value") == "SemiBold");
+            Assert.Contains((string?)style.Attribute("BasedOn"), new[] { "{StaticResource TitleTextBlockStyle}", "{StaticResource BodyStrongTextBlockStyle}" });
         }
 
         Assert.DoesNotContain("RadioScrollbar", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
@@ -1988,7 +2003,7 @@ public class WinUi3UiTests
             Assert.Contains(name + ".Text = Localization.Get", source, StringComparison.Ordinal);
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement sectionTitle = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSectionTitleStyle");
-        Assert.Contains(sectionTitle.Elements(), element => (string?)element.Attribute("Property") == "FontSize" && (string?)element.Attribute("Value") == "{StaticResource BasFontSizeBody}");
+        Assert.Equal("{StaticResource BodyStrongTextBlockStyle}", (string?)sectionTitle.Attribute("BasedOn"));
     }
 
     [Fact]

@@ -11,8 +11,6 @@
                 <!-- BASpark 设计令牌与样式 -->
                 <ResourceDictionary Source="ms-appx:///DesignSystem.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <FontFamily x:Key="ContentControlThemeFontFamily">Microsoft YaHei UI</FontFamily>
-            <FontFamily x:Key="TextControlThemeFontFamily">Microsoft YaHei UI</FontFamily>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

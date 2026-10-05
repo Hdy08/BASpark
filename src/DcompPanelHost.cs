@@ -48,6 +48,7 @@ internal sealed class DcompPanelHost : IDisposable
     private const int WmNcCalcSize = 0x0083;
     private const int WmGetMinMaxInfo = 0x0024;
     private const int WmDpiChanged = 0x02E0;
+    private const int WmDwmCompositionChanged = 0x031E;
     private const int DwmwaCloaked = 14;
 
     /// <summary>标题栏拖拽带高度（逻辑像素）与四边缩放抓取宽度。</summary>
@@ -118,6 +119,7 @@ internal sealed class DcompPanelHost : IDisposable
         }
 
         Instances[_hwnd] = this;
+        WindowChrome.ApplyNativeShadow(_hwnd);
         UpdateXamlIslandBounds();
     }
 
@@ -355,6 +357,10 @@ internal sealed class DcompPanelHost : IDisposable
     {
         switch (msg)
         {
+            case WmDwmCompositionChanged:
+                WindowChrome.ApplyNativeShadow(hwnd);
+                break;
+
             case WmNcCalcSize:
                 // 客户区铺满整窗：非客户区（Windows 10 上是 9px 玻璃边框 + 顶部 1px）
                 // 因此完全消失。保持建议的窗口矩形不变并返回 0 即表示整窗为客户区。
