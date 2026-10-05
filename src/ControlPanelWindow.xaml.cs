@@ -364,6 +364,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private sealed record SelectionToolbar(Button Invert, Button SelectAll, Button Confirm, TextBlock EmptyMessage, List<SelectionCardItem> Items)
     {
         public PathIcon? ClearIcon { get; set; }
+        public PathIcon? SelectAllIcon { get; set; }
     }
     private readonly Dictionary<ItemsControl, SelectionToolbar> _selectionToolbars = new();
     private bool _changingSelection;
@@ -442,6 +443,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 toolbar.Invert.Content = icon;
                 icon.RenderTransformOrigin = new Point(0.5, 0.5);
                 icon.RenderTransform = new ScaleTransform();
+                toolbar.SelectAll.Content = toolbar.SelectAllIcon = CreateSelectionIcon("SelectAllIconData");
             }
             _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
                 ? Localization.CurrentCultureName
@@ -3000,15 +3002,10 @@ public sealed partial class ControlPanelWindow : UserControl
         ToolTipService.SetToolTip(toolbar.SelectAll, selectLabel);
         AutomationProperties.SetName(toolbar.Invert, invertLabel);
         AutomationProperties.SetName(toolbar.SelectAll, selectLabel);
-        if (allSelected)
-        {
-            toolbar.ClearIcon ??= CreateSelectionIcon("ClearSelectionIconData");
-            if (!ReferenceEquals(toolbar.SelectAll.Content, toolbar.ClearIcon)) toolbar.SelectAll.Content = toolbar.ClearIcon;
-        }
-        else if (toolbar.SelectAll.Content is not SymbolIcon)
-        {
-            toolbar.SelectAll.Content = new SymbolIcon(Symbol.SelectAll);
-        }
+        PathIcon icon = allSelected
+            ? toolbar.ClearIcon ??= CreateSelectionIcon("ClearSelectionIconData")
+            : toolbar.SelectAllIcon ??= CreateSelectionIcon("SelectAllIconData");
+        if (!ReferenceEquals(toolbar.SelectAll.Content, icon)) toolbar.SelectAll.Content = icon;
     }
 
     private void InvertSelection_Click(object sender, RoutedEventArgs args) => ChangeSelection(sender, invert: true);
