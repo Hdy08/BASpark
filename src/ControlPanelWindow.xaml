@@ -1333,8 +1333,6 @@
                                                   HorizontalAlignment="Right" HorizontalContentAlignment="Stretch"
                                                   VerticalContentAlignment="Center" Padding="11,0,13,0"
                                                   Content=""
-                                                  Background="{ThemeResource BasSettingsControlBackgroundBrush}"
-                                                  BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
                                                   AutomationProperties.Name="{Binding Text, ElementName=TxtProcessList}">
                                             <DropDownButton.Flyout>
                                                 <Flyout x:Name="ConfiguredProcessesFlyout" Placement="BottomEdgeAlignedRight" ShouldConstrainToRootBounds="False"
@@ -1348,7 +1346,7 @@
                                                     </Flyout.FlyoutPresenterStyle>
                                                     <ScrollViewer x:Name="ConfiguredProcessScroller" MaxHeight="200" IsTabStop="True"
                                                                   HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                                                        <ItemsControl x:Name="ConfiguredProcessItems" HorizontalContentAlignment="Stretch">
+                                                        <ItemsControl x:Name="ConfiguredProcessItems" Margin="0,0,16,0" HorizontalContentAlignment="Stretch">
                                                             <ItemsControl.ItemsPanel>
                                                                 <ItemsPanelTemplate>
                                                                     <StackPanel />
