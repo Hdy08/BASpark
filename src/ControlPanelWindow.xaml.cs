@@ -2998,12 +2998,9 @@ public sealed partial class ControlPanelWindow : UserControl
             if (pair.Value.Items.Contains(item)) UpdateSelectionToolbar(pair.Key);
     }
 
-    private PathIcon CreateSelectionIcon(string resourceKey)
-    {
-        string size = ((FontIcon)TabWelcome.Icon).FontSize.ToString(CultureInfo.InvariantCulture);
-        return (PathIcon)Microsoft.UI.Xaml.Markup.XamlReader.Load(
-            $"<PathIcon xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"{size}\" Height=\"{size}\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" Data=\"{Resources[resourceKey]}\" />");
-    }
+    private PathIcon CreateSelectionIcon(string resourceKey) =>
+        (PathIcon)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+            $"<PathIcon xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"16\" Height=\"16\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" Data=\"{Resources[resourceKey]}\" />");
 
     private void UpdateSelectionToolbar(ItemsControl list)
     {

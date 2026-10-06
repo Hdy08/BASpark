@@ -17,9 +17,9 @@
         <Thickness x:Key="ToggleSwitchTopHeaderMargin">0</Thickness>
         <x:Double x:Key="ToggleSwitchPreContentMargin">0</x:Double>
         <x:Double x:Key="ToggleSwitchPostContentMargin">0</x:Double>
-        <x:String x:Key="ClearSelectionIconData">F1 M17.777778,13.333333 L20,13.333333 L20,15.555556 L17.777778,15.555556 L17.777778,13.333333 Z M17.777778,17.777778 L20,17.777778 L20,20 L17.777778,20 L17.777778,17.777778 Z M0,4.444444 L2.222222,4.444444 L2.222222,6.666667 L0,6.666667 L0,4.444444 Z M0,0 L2.222222,0 L2.222222,2.222222 L0,2.222222 L0,0 Z M4.444444,0 L6.666667,0 L6.666667,2.222222 L4.444444,2.222222 L4.444444,0 Z M13.333333,17.777778 L15.555556,17.777778 L15.555556,20 L13.333333,20 L13.333333,17.777778 Z M0,8.888889 L2.222222,8.888889 L2.222222,11.111111 L0,11.111111 L0,8.888889 Z M0,13.333333 L2.222222,13.333333 L2.222222,15.555556 L0,15.555556 L0,13.333333 Z M0,17.777778 L2.222222,17.777778 L2.222222,20 L0,20 L0,17.777778 Z M17.777778,0 L20,0 L20,2.222222 L17.777778,2.222222 L17.777778,0 Z M17.777778,4.444444 L20,4.444444 L20,6.666667 L17.777778,6.666667 L17.777778,4.444444 Z M17.777778,8.888889 L20,8.888889 L20,11.111111 L17.777778,11.111111 L17.777778,8.888889 Z M8.888889,4.444444 L11.111111,4.444444 L11.111111,6.666667 L8.888889,6.666667 L8.888889,4.444444 Z M8.888889,0 L11.111111,0 L11.111111,2.222222 L8.888889,2.222222 L8.888889,0 Z M8.888889,8.888889 L11.111111,8.888889 L11.111111,11.111111 L8.888889,11.111111 L8.888889,8.888889 Z M8.888889,13.333333 L11.111111,13.333333 L11.111111,15.555556 L8.888889,15.555556 L8.888889,13.333333 Z M8.888889,17.777778 L11.111111,17.777778 L11.111111,20 L8.888889,20 L8.888889,17.777778 Z M4.444444,8.888889 L6.666667,8.888889 L6.666667,11.111111 L4.444444,11.111111 L4.444444,8.888889 Z M4.444444,17.777778 L6.666667,17.777778 L6.666667,20 L4.444444,20 L4.444444,17.777778 Z M13.333333,0 L15.555556,0 L15.555556,2.222222 L13.333333,2.222222 L13.333333,0 Z M13.333333,8.888889 L15.555556,8.888889 L15.555556,11.111111 L13.333333,11.111111 L13.333333,8.888889 Z</x:String>
-        <x:String x:Key="InvertSelectionIconData">F1 M20,15.555556 L20,13.333333 L17.777778,13.333333 L17.777778,15.555556 L20,15.555556 Z M20,20 L20,17.777778 L17.777778,17.777778 L17.777778,20 L20,20 Z M0,4.444444 L0,6.666667 L2.222222,6.666667 L2.222222,4.444444 L0,4.444444 Z M0,2.222222 L2.222222,2.222222 L2.222222,0 L0,0 L0,2.222222 Z M6.666667,2.222222 L6.666667,0 L4.444444,0 L4.444444,2.222222 L6.666667,2.222222 Z M8.888889,0 L8.888889,8.888889 L0,8.888889 L0,20 L11.111111,20 L11.111111,11.111111 L20,11.111111 L20,0 L8.888889,0 Z M8.888889,17.777778 L2.222222,17.777778 L2.222222,11.111111 L8.888889,11.111111 L8.888889,17.777778 Z M17.777778,8.888889 L11.111111,8.888889 L11.111111,2.222222 L17.777778,2.222222 L17.777778,8.888889 Z M15.555556,20 L15.555556,17.777778 L13.333333,17.777778 L13.333333,20 L15.555556,20 Z</x:String>
-        <x:String x:Key="SelectAllIconData">F1 M0,0 L0,20 L20,20 L20,0 L0,0 Z M8.888889,17.777778 L2.222222,17.777778 L2.222222,11.111111 L8.888889,11.111111 L8.888889,17.777778 Z M8.888889,8.888889 L2.222222,8.888889 L2.222222,2.222222 L8.888889,2.222222 L8.888889,8.888889 Z M17.777778,17.777778 L11.111111,17.777778 L11.111111,11.111111 L17.777778,11.111111 L17.777778,17.777778 Z M17.777778,8.888889 L11.111111,8.888889 L11.111111,2.222222 L17.777778,2.222222 L17.777778,8.888889 Z</x:String>
+        <x:String x:Key="ClearSelectionIconData">F1 M14.222222,10.666666 L16,10.666666 L16,12.444445 L14.222222,12.444445 L14.222222,10.666666 Z M14.222222,14.222222 L16,14.222222 L16,16 L14.222222,16 L14.222222,14.222222 Z M0,3.555555 L1.777778,3.555555 L1.777778,5.333334 L0,5.333334 L0,3.555555 Z M0,0 L1.777778,0 L1.777778,1.777778 L0,1.777778 L0,0 Z M3.555555,0 L5.333334,0 L5.333334,1.777778 L3.555555,1.777778 L3.555555,0 Z M10.666666,14.222222 L12.444445,14.222222 L12.444445,16 L10.666666,16 L10.666666,14.222222 Z M0,7.111111 L1.777778,7.111111 L1.777778,8.888889 L0,8.888889 L0,7.111111 Z M0,10.666666 L1.777778,10.666666 L1.777778,12.444445 L0,12.444445 L0,10.666666 Z M0,14.222222 L1.777778,14.222222 L1.777778,16 L0,16 L0,14.222222 Z M14.222222,0 L16,0 L16,1.777778 L14.222222,1.777778 L14.222222,0 Z M14.222222,3.555555 L16,3.555555 L16,5.333334 L14.222222,5.333334 L14.222222,3.555555 Z M14.222222,7.111111 L16,7.111111 L16,8.888889 L14.222222,8.888889 L14.222222,7.111111 Z M7.111111,3.555555 L8.888889,3.555555 L8.888889,5.333334 L7.111111,5.333334 L7.111111,3.555555 Z M7.111111,0 L8.888889,0 L8.888889,1.777778 L7.111111,1.777778 L7.111111,0 Z M7.111111,7.111111 L8.888889,7.111111 L8.888889,8.888889 L7.111111,8.888889 L7.111111,7.111111 Z M7.111111,10.666666 L8.888889,10.666666 L8.888889,12.444445 L7.111111,12.444445 L7.111111,10.666666 Z M7.111111,14.222222 L8.888889,14.222222 L8.888889,16 L7.111111,16 L7.111111,14.222222 Z M3.555555,7.111111 L5.333334,7.111111 L5.333334,8.888889 L3.555555,8.888889 L3.555555,7.111111 Z M3.555555,14.222222 L5.333334,14.222222 L5.333334,16 L3.555555,16 L3.555555,14.222222 Z M10.666666,0 L12.444445,0 L12.444445,1.777778 L10.666666,1.777778 L10.666666,0 Z M10.666666,7.111111 L12.444445,7.111111 L12.444445,8.888889 L10.666666,8.888889 L10.666666,7.111111 Z</x:String>
+        <x:String x:Key="InvertSelectionIconData">F1 M16,12.444445 L16,10.666666 L14.222222,10.666666 L14.222222,12.444445 L16,12.444445 Z M16,16 L16,14.222222 L14.222222,14.222222 L14.222222,16 L16,16 Z M0,3.555555 L0,5.333334 L1.777778,5.333334 L1.777778,3.555555 L0,3.555555 Z M0,1.777778 L1.777778,1.777778 L1.777778,0 L0,0 L0,1.777778 Z M5.333334,1.777778 L5.333334,0 L3.555555,0 L3.555555,1.777778 L5.333334,1.777778 Z M7.111111,0 L7.111111,7.111111 L0,7.111111 L0,16 L8.888889,16 L8.888889,8.888889 L16,8.888889 L16,0 L7.111111,0 Z M7.111111,14.222222 L1.777778,14.222222 L1.777778,8.888889 L7.111111,8.888889 L7.111111,14.222222 Z M14.222222,7.111111 L8.888889,7.111111 L8.888889,1.777778 L14.222222,1.777778 L14.222222,7.111111 Z M12.444445,16 L12.444445,14.222222 L10.666666,14.222222 L10.666666,16 L12.444445,16 Z</x:String>
+        <x:String x:Key="SelectAllIconData">F1 M0,0 L0,16 L16,16 L16,0 L0,0 Z M7.111111,14.222222 L1.777778,14.222222 L1.777778,8.888889 L7.111111,8.888889 L7.111111,14.222222 Z M7.111111,7.111111 L1.777778,7.111111 L1.777778,1.777778 L7.111111,1.777778 L7.111111,7.111111 Z M14.222222,14.222222 L8.888889,14.222222 L8.888889,8.888889 L14.222222,8.888889 L14.222222,14.222222 Z M14.222222,7.111111 L8.888889,7.111111 L8.888889,1.777778 L14.222222,1.777778 L14.222222,7.111111 Z</x:String>
         <ResourceDictionary x:Key="DangerButtonResources">
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Default">
@@ -1609,12 +1609,12 @@
                         <Button x:Name="BtnRunningInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListRunningProcesses}" Click="InvertSelection_Click">
-                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <PathIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                         <Button x:Name="BtnRunningSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListRunningProcesses}" Click="SelectAll_Click">
-                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <PathIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                     </Grid>
                     <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
@@ -1674,12 +1674,12 @@
                         <Button x:Name="BtnResetInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListVisualResetItems}" Click="InvertSelection_Click">
-                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <PathIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                         <Button x:Name="BtnResetSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListVisualResetItems}" Click="SelectAll_Click">
-                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <PathIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                     </Grid>
                     <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
@@ -1734,12 +1734,12 @@
                         <Button x:Name="BtnBackupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListBackupItems}" Click="InvertSelection_Click">
-                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <PathIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                         <Button x:Name="BtnBackupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListBackupItems}" Click="SelectAll_Click">
-                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <PathIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                     </Grid>
                     <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
