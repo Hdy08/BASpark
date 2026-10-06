@@ -1346,7 +1346,7 @@
                                                     </Flyout.FlyoutPresenterStyle>
                                                     <ScrollViewer x:Name="ConfiguredProcessScroller" MaxHeight="200" IsTabStop="True"
                                                                   HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                                                        <ItemsControl x:Name="ConfiguredProcessItems" Margin="0,0,16,0" HorizontalContentAlignment="Stretch">
+                                                        <ItemsControl x:Name="ConfiguredProcessItems" HorizontalContentAlignment="Stretch">
                                                             <ItemsControl.ItemsPanel>
                                                                 <ItemsPanelTemplate>
                                                                     <StackPanel />
@@ -1607,12 +1607,14 @@
                         <TextBox x:Name="SearchRunningProcess" PlaceholderText=""
                                  TextChanged="SearchRunningProcess_TextChanged" />
                         <Button x:Name="BtnRunningInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListRunningProcesses}" Click="InvertSelection_Click">
-                            <PathIcon Width="20" Height="20" />
+                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                         <Button x:Name="BtnRunningSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListRunningProcesses}" Click="SelectAll_Click">
-                            <PathIcon Width="20" Height="20" />
+                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                     </Grid>
                     <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
@@ -1670,12 +1672,14 @@
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="SearchVisualReset" TextChanged="SearchVisualReset_TextChanged" />
                         <Button x:Name="BtnResetInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListVisualResetItems}" Click="InvertSelection_Click">
-                            <PathIcon Width="20" Height="20" />
+                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                         <Button x:Name="BtnResetSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListVisualResetItems}" Click="SelectAll_Click">
-                            <PathIcon Width="20" Height="20" />
+                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                     </Grid>
                     <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
@@ -1728,12 +1732,14 @@
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="SearchBackupItems" TextChanged="SearchBackupItems_TextChanged" />
                         <Button x:Name="BtnBackupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListBackupItems}" Click="InvertSelection_Click">
-                            <PathIcon Width="20" Height="20" />
+                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                         <Button x:Name="BtnBackupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Tag="{Binding ElementName=ListBackupItems}" Click="SelectAll_Click">
-                            <PathIcon Width="20" Height="20" />
+                            <PathIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                     </Grid>
                     <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"

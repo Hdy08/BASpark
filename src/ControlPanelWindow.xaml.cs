@@ -369,6 +369,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly Dictionary<ItemsControl, SelectionToolbar> _selectionToolbars = new();
     private bool _changingSelection;
     private readonly List<WindowChrome.ComboBoxWidthTracker> _comboWidthTrackers = new();
+    private readonly long _configuredProcessScrollBarToken;
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
@@ -486,6 +487,8 @@ public sealed partial class ControlPanelWindow : UserControl
 
             ComboProfiles.ItemsSource = Profiles;
             ConfiguredProcessItems.ItemsSource = CurrentProfileProcesses;
+            _configuredProcessScrollBarToken = ConfiguredProcessScroller.RegisterPropertyChangedCallback(
+                ScrollViewer.ComputedVerticalScrollBarVisibilityProperty, ConfiguredProcessScrollBarVisibility_Changed);
             CurrentProfileProcesses.CollectionChanged += ConfiguredProcesses_CollectionChanged;
             ListRunningProcesses.ItemsSource = RunningProcessList;
 
@@ -2555,7 +2558,7 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         if (_isClosed) return;
         ConfiguredProcessItems.Width = double.NaN;
-        ConfiguredProcessItems.MinWidth = ListConfiguredProcesses.ActualWidth;
+        ConfiguredProcessItems.MinWidth = Math.Max(0, ListConfiguredProcesses.ActualWidth - ConfiguredProcessItems.Margin.Right);
         ConfiguredProcessScroller.ChangeView(null, 0, null, true);
     }
 
@@ -2565,6 +2568,18 @@ public sealed partial class ControlPanelWindow : UserControl
         ConfiguredProcessItems.Width = ConfiguredProcessItems.ActualWidth;
         ConfiguredProcessScroller.Focus(FocusState.Programmatic);
         ConfiguredProcessScroller.ChangeView(null, 0, null, true);
+    }
+
+    private void ConfiguredProcessScrollBarVisibility_Changed(DependencyObject sender, DependencyProperty args)
+    {
+        if (_isClosed) return;
+        double spacing = ConfiguredProcessScroller.ComputedVerticalScrollBarVisibility == Visibility.Visible ? 16 : 0;
+        double previousSpacing = ConfiguredProcessItems.Margin.Right;
+        if (spacing == previousSpacing) return;
+        if (!double.IsNaN(ConfiguredProcessItems.Width))
+            ConfiguredProcessItems.Width += previousSpacing - spacing;
+        ConfiguredProcessItems.MinWidth = Math.Max(0, ConfiguredProcessItems.MinWidth + previousSpacing - spacing);
+        ConfiguredProcessItems.Margin = new Thickness(0, 0, spacing, 0);
     }
 
     private void RemoveProcess_Click(object sender, RoutedEventArgs e)
@@ -2983,9 +2998,12 @@ public sealed partial class ControlPanelWindow : UserControl
             if (pair.Value.Items.Contains(item)) UpdateSelectionToolbar(pair.Key);
     }
 
-    private PathIcon CreateSelectionIcon(string resourceKey) =>
-        (PathIcon)Microsoft.UI.Xaml.Markup.XamlReader.Load(
-            $"<PathIcon xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"20\" Height=\"20\" Data=\"{Resources[resourceKey]}\" />");
+    private PathIcon CreateSelectionIcon(string resourceKey)
+    {
+        string size = ((FontIcon)TabWelcome.Icon).FontSize.ToString(CultureInfo.InvariantCulture);
+        return (PathIcon)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+            $"<PathIcon xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"{size}\" Height=\"{size}\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" Data=\"{Resources[resourceKey]}\" />");
+    }
 
     private void UpdateSelectionToolbar(ItemsControl list)
     {
@@ -4164,6 +4182,8 @@ public sealed partial class ControlPanelWindow : UserControl
         _selectionToolbars.Clear();
         foreach (var tracker in _comboWidthTrackers) tracker.Dispose();
         _comboWidthTrackers.Clear();
+        ConfiguredProcessScroller.UnregisterPropertyChangedCallback(
+            ScrollViewer.ComputedVerticalScrollBarVisibilityProperty, _configuredProcessScrollBarToken);
         RootGrid.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(RootGrid_PointerPressed));
         RootGrid.RemoveHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColorPicker_PointerFinished));
         RootGrid.RemoveHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColorPicker_PointerFinished));
