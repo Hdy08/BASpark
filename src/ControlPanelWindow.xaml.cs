@@ -363,8 +363,8 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly HashSet<ContentDialog> _dialogPresentationsPending = new();
     private sealed record SelectionToolbar(Button Invert, Button SelectAll, Button Confirm, TextBlock EmptyMessage, List<SelectionCardItem> Items)
     {
-        public PathIcon? ClearIcon { get; set; }
-        public PathIcon? SelectAllIcon { get; set; }
+        public Viewbox? ClearIcon { get; set; }
+        public Viewbox? SelectAllIcon { get; set; }
     }
     private readonly Dictionary<ItemsControl, SelectionToolbar> _selectionToolbars = new();
     private bool _changingSelection;
@@ -2998,9 +2998,9 @@ public sealed partial class ControlPanelWindow : UserControl
             if (pair.Value.Items.Contains(item)) UpdateSelectionToolbar(pair.Key);
     }
 
-    private PathIcon CreateSelectionIcon(string resourceKey) =>
-        (PathIcon)Microsoft.UI.Xaml.Markup.XamlReader.Load(
-            $"<PathIcon xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"16\" Height=\"16\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" Data=\"{Resources[resourceKey]}\" />");
+    private Viewbox CreateSelectionIcon(string resourceKey) =>
+        (Viewbox)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+            $"<Viewbox xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"16\" Height=\"16\" Stretch=\"Uniform\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"><PathIcon Width=\"9\" Height=\"9\" Data=\"{Resources[resourceKey]}\" /></Viewbox>");
 
     private void UpdateSelectionToolbar(ItemsControl list)
     {
@@ -3017,7 +3017,7 @@ public sealed partial class ControlPanelWindow : UserControl
         ToolTipService.SetToolTip(toolbar.SelectAll, selectLabel);
         AutomationProperties.SetName(toolbar.Invert, invertLabel);
         AutomationProperties.SetName(toolbar.SelectAll, selectLabel);
-        PathIcon icon = allSelected
+        Viewbox icon = allSelected
             ? toolbar.ClearIcon ??= CreateSelectionIcon("ClearSelectionIconData")
             : toolbar.SelectAllIcon ??= CreateSelectionIcon("SelectAllIconData");
         if (!ReferenceEquals(toolbar.SelectAll.Content, icon)) toolbar.SelectAll.Content = icon;
@@ -3035,7 +3035,7 @@ public sealed partial class ControlPanelWindow : UserControl
         try
         {
             foreach (SelectionCardItem item in toolbar.Items) item.IsSelected = invert ? !item.IsSelected : select;
-            if (invert && toolbar.Invert.Content is PathIcon { RenderTransform: ScaleTransform mirror }) mirror.ScaleX = -mirror.ScaleX;
+            if (invert && toolbar.Invert.Content is Viewbox { RenderTransform: ScaleTransform mirror }) mirror.ScaleX = -mirror.ScaleX;
         }
         finally
         {
