@@ -18,6 +18,18 @@ public class WinUi3UiTests
     private static readonly XNamespace Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
     private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr window);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr window, uint command);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendWindowMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowDisplayAffinity(IntPtr window, out uint affinity);
+
     [Fact]
     public void PauseActions_ShareOneRuntimeStateWithoutChangingSavedEffectPreferences()
     {
@@ -411,6 +423,30 @@ public class WinUi3UiTests
 
         // 不得退化成 XAML 窗口。
         Assert.DoesNotContain("Microsoft.UI.Xaml.Window", overlaySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OverlayHost_IsNotAnInteractiveWindowSelectionTargetAndDoesNotProtectCapture()
+    {
+        using var host = new LayeredWindowHost();
+        host.SetBounds(120, 120, 200, 120);
+        host.Show();
+
+        Assert.True(host.IsVisible);
+        Assert.False(IsWindowEnabled(host.Handle));
+        Assert.Equal(new IntPtr(-1), SendWindowMessage(host.Handle, 0x0084, IntPtr.Zero, IntPtr.Zero));
+        Assert.Equal(new IntPtr(3), SendWindowMessage(host.Handle, 0x0021, IntPtr.Zero, IntPtr.Zero));
+        IntPtr owner = GetWindow(host.Handle, 4);
+        Assert.NotEqual(IntPtr.Zero, owner);
+        Assert.False(NativeMethods.IsWindowVisible(owner));
+        Assert.True(GetWindowDisplayAffinity(host.Handle, out uint affinity));
+        Assert.Equal(0u, affinity);
+
+        host.Hide();
+        Assert.False(host.IsVisible);
+        host.Dispose();
+        Assert.False(NativeMethods.IsWindow(owner));
+        Assert.Equal(IntPtr.Zero, host.Handle);
     }
 
     [Fact]

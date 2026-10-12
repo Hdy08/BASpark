@@ -17,6 +17,7 @@ internal static class NativeMethods
     internal const int WS_EX_NOACTIVATE = 0x08000000;
 
     internal const int WS_POPUP = unchecked((int)0x80000000);
+    internal const int WS_DISABLED = 0x08000000;
 
     internal const uint LWA_ALPHA = 0x00000002;
     internal const uint LWA_COLORKEY = 0x00000001;
@@ -142,6 +143,12 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     internal static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll", EntryPoint = "DefWindowProcW")]
+    internal static extern IntPtr DefWindowProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmFlush();
 
     [DllImport("user32.dll")]
     internal static extern bool IsIconic(IntPtr hWnd);

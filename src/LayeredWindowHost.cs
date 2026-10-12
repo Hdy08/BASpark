@@ -14,14 +14,21 @@ namespace BASpark;
 internal sealed class LayeredWindowHost : IDisposable
 {
     private const string WindowClassName = "BASparkOverlayHost";
+    private const uint WmNcHitTest = 0x0084;
+    private const uint WmMouseActivate = 0x0021;
+    private const int HtTransparent = -1;
+    private const int MaNoActivate = 3;
+
+    private delegate IntPtr WindowMessageCallback(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
     private static readonly object ClassGate = new();
     private static bool _classRegistered;
 
     // 必须持有委托实例，否则 GC 会回收 WndProc 导致原生侧悬挂调用。
-    private static readonly IntPtr DefWindowProc = NativeMethods.DefWindowProcPointerValue;
+    private static readonly WindowMessageCallback WindowMessageHandler = ProcessWindowMessage;
 
     private IntPtr _hwnd = IntPtr.Zero;
+    private IntPtr _ownerHwnd = IntPtr.Zero;
     private bool _layeredStyleApplied;
     private bool _disposed;
 
@@ -48,18 +55,34 @@ internal sealed class LayeredWindowHost : IDisposable
                     | NativeMethods.WS_EX_NOACTIVATE;
 
         IntPtr hInstance = NativeMethods.GetModuleHandle(null);
+        _ownerHwnd = NativeMethods.CreateWindowEx(
+            NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE,
+            WindowClassName,
+            string.Empty,
+            NativeMethods.WS_POPUP | NativeMethods.WS_DISABLED,
+            0, 0, 0, 0,
+            IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
+        if (_ownerHwnd == IntPtr.Zero)
+        {
+            throw new InvalidOperationException(
+                $"叠加层所有者窗口创建失败，Win32 错误码 {Marshal.GetLastWin32Error()}。");
+        }
+
         _hwnd = NativeMethods.CreateWindowEx(
             exStyle,
             WindowClassName,
             "BASparkOverlay",
-            NativeMethods.WS_POPUP,
+            NativeMethods.WS_POPUP | NativeMethods.WS_DISABLED,
             0, 0, 0, 0,
-            IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
+            _ownerHwnd, IntPtr.Zero, hInstance, IntPtr.Zero);
 
         if (_hwnd == IntPtr.Zero)
         {
+            int error = Marshal.GetLastWin32Error();
+            NativeMethods.DestroyWindow(_ownerHwnd);
+            _ownerHwnd = IntPtr.Zero;
             throw new InvalidOperationException(
-                $"叠加层宿主窗口创建失败，Win32 错误码 {Marshal.GetLastWin32Error()}。");
+                $"叠加层宿主窗口创建失败，Win32 错误码 {error}。");
         }
 
         DpiScale = ReadDpiScale();
@@ -77,7 +100,7 @@ internal sealed class LayeredWindowHost : IDisposable
             var wc = new NativeMethods.WNDCLASSEX
             {
                 cbSize = Marshal.SizeOf<NativeMethods.WNDCLASSEX>(),
-                lpfnWndProc = DefWindowProc,
+                lpfnWndProc = Marshal.GetFunctionPointerForDelegate(WindowMessageHandler),
                 hInstance = NativeMethods.GetModuleHandle(null),
                 lpszClassName = WindowClassName
             };
@@ -96,6 +119,16 @@ internal sealed class LayeredWindowHost : IDisposable
 
             _classRegistered = true;
         }
+    }
+
+    private static IntPtr ProcessWindowMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam)
+    {
+        return message switch
+        {
+            WmNcHitTest => new IntPtr(HtTransparent),
+            WmMouseActivate => new IntPtr(MaNoActivate),
+            _ => NativeMethods.DefWindowProc(window, message, wParam, lParam)
+        };
     }
 
     /// <summary>
@@ -263,6 +296,12 @@ internal sealed class LayeredWindowHost : IDisposable
         {
             NativeMethods.DestroyWindow(_hwnd);
             _hwnd = IntPtr.Zero;
+        }
+
+        if (_ownerHwnd != IntPtr.Zero)
+        {
+            NativeMethods.DestroyWindow(_ownerHwnd);
+            _ownerHwnd = IntPtr.Zero;
         }
     }
 }

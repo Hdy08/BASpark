@@ -123,15 +123,9 @@ namespace BASpark
 
         private void SyncScreenshotCompatCaptureSurfaces(bool enabled)
         {
-            if (!enabled)
+            if (!enabled && !IsForegroundScreenshotHost())
             {
-                if (_screenshotCompatCaptureWired)
-                {
-                    TeardownScreenshotCompatCaptureSurfaces();
-                }
-
                 EndScreenshotCaptureSession();
-                return;
             }
 
             if (_globalHook == null)
@@ -143,8 +137,8 @@ namespace BASpark
             {
                 _globalHook.KeyDown += OnScreenshotCompatKeyDown;
                 _globalHook.KeyUp += OnScreenshotCompatKeyUp;
-                SyncForegroundWinEventHook();
                 _screenshotCompatCaptureWired = true;
+                SyncForegroundWinEventHook();
             }
 
             EvaluateScreenshotForegroundForCapture();
@@ -162,15 +156,15 @@ namespace BASpark
                 _globalHook.KeyDown -= OnScreenshotCompatKeyDown;
                 _globalHook.KeyUp -= OnScreenshotCompatKeyUp;
             }
+            _screenshotCompatCaptureWired = false;
             SyncForegroundWinEventHook();
             StopScreenshotEndDebounce();
             CancelScreenshotFailsafeTimer();
-            _screenshotCompatCaptureWired = false;
         }
 
         private void SyncForegroundWinEventHook()
         {
-            bool needHook = ConfigManager.EnableEnvironmentFilter || ConfigManager.ScreenshotCompatibilityMode;
+            bool needHook = ConfigManager.EnableEnvironmentFilter || _screenshotCompatCaptureWired;
             if (needHook)
             {
                 InstallForegroundWinEventHook();
@@ -247,7 +241,7 @@ namespace BASpark
                 ShouldSuppressEffects(forceRefresh: true);
             }
 
-            if (ConfigManager.ScreenshotCompatibilityMode)
+            if (_screenshotCompatCaptureWired)
             {
                 EvaluateScreenshotForegroundForCapture();
             }
@@ -255,7 +249,7 @@ namespace BASpark
 
         private void EvaluateScreenshotForegroundForCapture()
         {
-            if (_disposed || !ConfigManager.ScreenshotCompatibilityMode)
+            if (_disposed)
             {
                 return;
             }
@@ -313,7 +307,7 @@ namespace BASpark
 
         private void OnScreenshotCompatKeyDown(object? sender, KeyEventArgs e)
         {
-            if (_disposed || !ConfigManager.ScreenshotCompatibilityMode)
+            if (_disposed)
             {
                 return;
             }
@@ -336,13 +330,20 @@ namespace BASpark
                 return;
             }
 
-            if (e.KeyCode == Keys.A && e.Control && e.Alt)
+            if (e.KeyCode == Keys.PrintScreen)
+            {
+                BeginScreenshotCaptureSession();
+                ScheduleEndScreenshotCaptureSessionDebounced();
+                return;
+            }
+
+            if (ConfigManager.ScreenshotCompatibilityMode && e.KeyCode == Keys.A && e.Control && e.Alt)
             {
                 BeginScreenshotCaptureSession();
                 return;
             }
 
-            if (e.KeyCode == Keys.A && e.Alt && !e.Control)
+            if (ConfigManager.ScreenshotCompatibilityMode && e.KeyCode == Keys.A && e.Alt && !e.Control)
             {
                 BeginScreenshotCaptureSession();
                 return;
@@ -374,7 +375,7 @@ namespace BASpark
 
         private void BeginScreenshotCaptureSession()
         {
-            if (_disposed || !ConfigManager.ScreenshotCompatibilityMode)
+            if (_disposed)
             {
                 return;
             }
@@ -388,6 +389,7 @@ namespace BASpark
             ReleasePointerState();
             _screenshotCaptureSessionActive = true;
             ForEachOverlay(w => w.SetHiddenForExternalScreenshotCapture(true));
+            NativeMethods.DwmFlush();
             ArmScreenshotFailsafeTimer();
         }
 
@@ -428,7 +430,7 @@ namespace BASpark
             _ = sender;
             _ = args;
             StopScreenshotEndDebounce();
-            if (_disposed || !ConfigManager.ScreenshotCompatibilityMode)
+            if (_disposed)
             {
                 return;
             }
