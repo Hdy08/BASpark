@@ -186,25 +186,6 @@ internal sealed class LayeredWindowHost : IDisposable
         _layeredStyleApplied = true;
     }
 
-    /// <summary>把叠加层排除在系统截图之外（截图兼容模式）。</summary>
-    public void ApplyCaptureExclusion(bool excludeFromCapture)
-    {
-        if (_hwnd == IntPtr.Zero)
-        {
-            return;
-        }
-
-        uint affinity = excludeFromCapture
-            ? NativeMethods.WDA_EXCLUDEFROMCAPTURE
-            : NativeMethods.WDA_NONE;
-
-        if (!NativeMethods.SetWindowDisplayAffinity(_hwnd, affinity) && excludeFromCapture)
-        {
-            // 旧版系统不支持 EXCLUDEFROMCAPTURE 时退回整窗涂黑。
-            NativeMethods.SetWindowDisplayAffinity(_hwnd, NativeMethods.WDA_MONITOR);
-        }
-    }
-
     public bool TryGetWindowRect(out NativeMethods.RECT rect)
     {
         rect = default;
@@ -280,8 +261,6 @@ internal sealed class LayeredWindowHost : IDisposable
 
         if (_hwnd != IntPtr.Zero)
         {
-            // 先解除置顶与捕获排除，避免销毁阶段残留状态。
-            NativeMethods.SetWindowDisplayAffinity(_hwnd, NativeMethods.WDA_NONE);
             NativeMethods.DestroyWindow(_hwnd);
             _hwnd = IntPtr.Zero;
         }

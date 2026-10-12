@@ -89,8 +89,7 @@ namespace BASpark
         public void UpdateTouchMode(bool enabled) => ForEachOverlay(w => w.UpdateTouchMode(enabled));
         public void UpdateScreenshotCompatibilityMode(bool enabled)
         {
-            ForEachOverlay(w => w.UpdateScreenshotCompatibilityMode(enabled));
-            SyncScreenshotCompatCaptureSurfaces();
+            SyncScreenshotCompatCaptureSurfaces(enabled);
         }
         public void SetCurveDraw(bool enabled) => ForEachOverlay(w => w.SetCurveDraw(enabled));
         public bool IsEffectSuppressedByEnvironment() => _isSuppressedByEnvironment;
@@ -119,12 +118,12 @@ namespace BASpark
             _globalHook.MouseDownExt += OnMouseDownExt;
             _globalHook.MouseMoveExt += OnMouseMoveExt;
             _globalHook.MouseUpExt += OnMouseUpExt;
-            SyncScreenshotCompatCaptureSurfaces();
+            SyncScreenshotCompatCaptureSurfaces(ConfigManager.ScreenshotCompatibilityMode);
         }
 
-        private void SyncScreenshotCompatCaptureSurfaces()
+        private void SyncScreenshotCompatCaptureSurfaces(bool enabled)
         {
-            if (!ConfigManager.ScreenshotCompatibilityMode)
+            if (!enabled)
             {
                 if (_screenshotCompatCaptureWired)
                 {
@@ -147,6 +146,8 @@ namespace BASpark
                 SyncForegroundWinEventHook();
                 _screenshotCompatCaptureWired = true;
             }
+
+            EvaluateScreenshotForegroundForCapture();
         }
 
         private void TeardownScreenshotCompatCaptureSurfaces()
@@ -772,6 +773,7 @@ namespace BASpark
                     : _manualTrailRefreshRate;
                 var win = new OverlayWindow(pair.Value, refreshRate);
                 _overlays[pair.Key] = win;
+                if (_screenshotCaptureSessionActive) win.SetHiddenForExternalScreenshotCapture(true);
                 if (App.IsEffectsPaused) win.RefreshPauseState();
             }
         }

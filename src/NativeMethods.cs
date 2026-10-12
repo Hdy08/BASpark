@@ -31,11 +31,6 @@ internal static class NativeMethods
     internal const uint SWP_NOMOVE = 0x0002;
     internal const uint SWP_NOSIZE = 0x0001;
 
-    // ---- 屏幕捕获排除 ---------------------------------------------------
-    internal const uint WDA_NONE = 0x00000000;
-    internal const uint WDA_MONITOR = 0x00000001;
-    internal const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
-
     // ---- 显示器枚举 -----------------------------------------------------
     internal const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
     internal const uint MONITORINFOF_PRIMARY = 0x00000001;
@@ -132,9 +127,6 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    internal static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);

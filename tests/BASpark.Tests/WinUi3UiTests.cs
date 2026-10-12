@@ -1736,7 +1736,7 @@ public class WinUi3UiTests
         string source = ReadSource("src", "OverlayWindow.cs");
         Assert.Equal(2, source.Split("ApplySavedRendererSettings();", StringSplitOptions.None).Length - 1);
         string sync = source[source.IndexOf("private void ApplySavedRendererSettings()", StringComparison.Ordinal)..source.IndexOf("private void OnWebMessageReceived", StringComparison.Ordinal)];
-        foreach (string setting in new[] { "ConfigManager.ParticleColor", "ConfigManager.EffectOpacity", "ConfigManager.GlowIntensity", "SetCurveDraw(ConfigManager.ApplyCurveDraw)", "ConfigManager.ScreenshotCompatibilityMode", "ConfigManager.IsTouchscreenMode ? InputModeTouch : InputModeMouse" })
+        foreach (string setting in new[] { "ConfigManager.ParticleColor", "ConfigManager.EffectOpacity", "ConfigManager.GlowIntensity", "SetCurveDraw(ConfigManager.ApplyCurveDraw)", "ConfigManager.IsTouchscreenMode ? InputModeTouch : InputModeMouse" })
             Assert.Contains(setting, sync, StringComparison.Ordinal);
     }
 

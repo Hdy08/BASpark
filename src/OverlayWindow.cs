@@ -54,7 +54,6 @@ internal sealed class OverlayWindow : IDisposable
 
     // WebView2 在窗口尚未置顶时完成初始化更稳定；导航成功后才把叠加层抬到最前。
     private bool _webViewReadyForTopmost;
-    private bool _screenshotCompatibilityMode = ConfigManager.ScreenshotCompatibilityMode;
 
     private static readonly long EnsureTopmostDebounceTicks = TimeSpan.FromMilliseconds(80).Ticks;
 
@@ -363,8 +362,6 @@ internal sealed class OverlayWindow : IDisposable
         coreWebView.NavigationCompleted += _navigationCompletedHandler;
         coreWebView.WebMessageReceived += _webMessageReceivedHandler;
 
-        _host.ApplyCaptureExclusion(_screenshotCompatibilityMode);
-
         NavigateCurrentRenderer(coreWebView);
     }
 
@@ -478,7 +475,6 @@ internal sealed class OverlayWindow : IDisposable
         ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
         UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.GlowIntensity);
         SetCurveDraw(ConfigManager.ApplyCurveDraw);
-        UpdateScreenshotCompatibilityMode(ConfigManager.ScreenshotCompatibilityMode);
         SyncInputContext(ConfigManager.IsTouchscreenMode ? InputModeTouch : InputModeMouse);
         ApplyEnvironmentInputSuppression();
         if (_overlayRuntimePaused)
@@ -904,12 +900,6 @@ internal sealed class OverlayWindow : IDisposable
         ConfigManager.IsTouchscreenMode = enabled;
     }
 
-    public void UpdateScreenshotCompatibilityMode(bool enabled)
-    {
-        _screenshotCompatibilityMode = enabled;
-        _host.ApplyCaptureExclusion(enabled);
-    }
-
     /// <summary>截图工具框选期间暂时隐藏叠加层。</summary>
     public void SetHiddenForExternalScreenshotCapture(bool hidden)
     {
@@ -948,7 +938,6 @@ internal sealed class OverlayWindow : IDisposable
                 try
                 {
                     _controller.IsVisible = true;
-                    _host.ApplyCaptureExclusion(_screenshotCompatibilityMode);
                 }
                 catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
                 {
