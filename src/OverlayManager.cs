@@ -11,6 +11,8 @@ using Microsoft.Win32;
 
 namespace BASpark
 {
+    internal readonly record struct TrailSample(int ScreenX, int ScreenY, long Timestamp);
+
     public sealed class OverlayManager : IDisposable
     {
         // 全部 Win32 声明集中在 NativeMethods；此处只保留业务常量。
@@ -24,6 +26,10 @@ namespace BASpark
         private OverlayWindow? _activePointerOverlay;
         private OverlayWindow? _lastTrailOverlay;
         private OverlayWindow? _lastTrailThrottleOverlay;
+        private readonly Queue<TrailSample> _trailHistory = new(1024);
+        private TrailSample? _lastTrailSample;
+        private long _trailStrokeId;
+        private static readonly long TrailHistoryRetentionTicks = Stopwatch.Frequency * 2;
         private long _lastMoveTimestamp;
         private long _lastClickTicks;
         private long _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / 60);
@@ -541,7 +547,10 @@ namespace BASpark
             _lastClickTicks = currentTicks;
 
             ConfigManager.TotalClicks++;
+            ClearTrailHistory();
+            target.TrailStrokeId = _trailStrokeId;
             target.EmitDown(cursorX, cursorY);
+            RecordTrailSample(cursorX, cursorY, Stopwatch.GetTimestamp());
         }
 
         private void OnMouseMoveExt(object? sender, MouseEventExtArgs e)
@@ -586,16 +595,7 @@ namespace BASpark
             }
 
             OverlayWindow? hoveredTarget = ResolveTargetOverlay(cursorX, cursorY);
-            if (_isPrimaryPointerDown &&
-                hoveredTarget != null &&
-                !ReferenceEquals(_activePointerOverlay, hoveredTarget))
-            {
-                _activePointerOverlay?.EmitCancel();
-                _activePointerOverlay = hoveredTarget;
-                hoveredTarget.EmitTrailStart(cursorX, cursorY, _isTouchLikeInput || !cursorVisible);
-            }
-
-            OverlayWindow? target = _activePointerOverlay ?? hoveredTarget;
+            OverlayWindow? target = hoveredTarget;
             bool targetChanged = !ReferenceEquals(target, _lastTrailThrottleOverlay);
             long currentTimestamp = Stopwatch.GetTimestamp();
             long moveInterval = target?.TrailMoveIntervalTimestamp ?? _idleMoveIntervalTimestamp;
@@ -607,12 +607,85 @@ namespace BASpark
             _lastMoveTimestamp = currentTimestamp;
             _lastTrailThrottleOverlay = target;
 
-            if (!_isPrimaryPointerDown)
+            RouteTrailMove(target, cursorX, cursorY, _isTouchLikeInput || !cursorVisible);
+        }
+
+        private void RouteTrailMove(OverlayWindow? target, int cursorX, int cursorY, bool touchLike)
+        {
+            OverlayWindow? previous = _isPrimaryPointerDown ? _activePointerOverlay : _lastTrailOverlay;
+            long timestamp = Stopwatch.GetTimestamp();
+            TrimTrailHistory(timestamp);
+            if (ReferenceEquals(previous, target))
             {
-                SwitchAlwaysTrailOverlay(
-                    ConfigManager.EnableAlwaysTrailEffect ? target : null);
+                if (target != null) target.TrailStrokeId = _trailStrokeId;
+                target?.EmitMove(cursorX, cursorY, touchLike);
             }
-            target?.EmitMove(cursorX, cursorY, _isTouchLikeInput || !cursorVisible);
+            else if (_lastTrailSample is TrailSample lastSample)
+            {
+                if (previous != null)
+                {
+                    previous.TrailStrokeId = _trailStrokeId;
+                    previous.EmitTrailContinuation(_trailHistory, timestamp, cursorX, cursorY,
+                        touchLike, _isPrimaryPointerDown, beginStroke: false, finishStroke: true);
+                }
+
+                foreach (OverlayWindow overlay in _overlays.Values)
+                {
+                    if (!ReferenceEquals(overlay, previous)
+                        && overlay.IntersectsScreenSegment(lastSample.ScreenX, lastSample.ScreenY, cursorX, cursorY))
+                    {
+                        overlay.TrailStrokeId = _trailStrokeId;
+                        overlay.EmitTrailContinuation(_trailHistory, timestamp, cursorX, cursorY,
+                            touchLike, _isPrimaryPointerDown, beginStroke: true,
+                            finishStroke: !ReferenceEquals(overlay, target));
+                    }
+                }
+            }
+            else if (_isPrimaryPointerDown)
+            {
+                if (target != null) target.TrailStrokeId = _trailStrokeId;
+                target?.EmitTrailStart(cursorX, cursorY, touchLike);
+            }
+            else
+            {
+                if (target != null) target.TrailStrokeId = _trailStrokeId;
+                target?.EmitMove(cursorX, cursorY, touchLike);
+            }
+
+            if (_isPrimaryPointerDown) _activePointerOverlay = target;
+            _lastTrailOverlay = ConfigManager.EnableAlwaysTrailEffect ? target : null;
+            RecordTrailSample(cursorX, cursorY, timestamp);
+        }
+
+        private void RecordTrailSample(int cursorX, int cursorY, long timestamp)
+        {
+            TrimTrailHistory(timestamp);
+            if (_trailHistory.Count >= 1024) _trailHistory.Dequeue();
+            var sample = new TrailSample(cursorX, cursorY, timestamp);
+            _trailHistory.Enqueue(sample);
+            _lastTrailSample = sample;
+        }
+
+        private void TrimTrailHistory(long timestamp)
+        {
+            while (_trailHistory.TryPeek(out TrailSample oldest)
+                && timestamp - oldest.Timestamp > TrailHistoryRetentionTicks)
+            {
+                _trailHistory.Dequeue();
+            }
+            if (_trailHistory.Count == 0 && _lastTrailSample is TrailSample lastSample)
+            {
+                var renewed = lastSample with { Timestamp = timestamp };
+                _trailHistory.Enqueue(renewed);
+                _lastTrailSample = renewed;
+            }
+        }
+
+        private void ClearTrailHistory()
+        {
+            _trailHistory.Clear();
+            _lastTrailSample = null;
+            _trailStrokeId++;
         }
 
         private void OnMouseUpExt(object? sender, MouseEventExtArgs e)
@@ -632,6 +705,7 @@ namespace BASpark
 
             _activePointerOverlay?.EmitUp(_isTouchLikeInput);
             ResetPrimaryPointerState();
+            if (!ConfigManager.EnableAlwaysTrailEffect) ClearTrailHistory();
         }
 
         /// <summary>
@@ -675,6 +749,7 @@ namespace BASpark
             _lastTrailOverlay = null;
             _lastTrailThrottleOverlay = null;
             _lastMoveTimestamp = 0;
+            ClearTrailHistory();
         }
 
         // 环境过滤通过 SetEnvironmentSuppressed 释放渲染器，此处只清理宿主侧路由状态。
@@ -684,6 +759,7 @@ namespace BASpark
             _lastTrailOverlay = null;
             _lastTrailThrottleOverlay = null;
             _lastMoveTimestamp = 0;
+            ClearTrailHistory();
         }
 
         private void ReleasePointerState()
@@ -696,6 +772,7 @@ namespace BASpark
 
             _activePointerOverlay?.EmitUp(_isTouchLikeInput);
             ResetPrimaryPointerState();
+            ClearTrailHistory();
         }
 
         private void ResetPrimaryPointerState()
@@ -712,9 +789,9 @@ namespace BASpark
                 return;
             }
 
-            // The old renderer must forget its last point before coordinates switch to another screen.
-            _lastTrailOverlay?.EmitCancel();
+            _lastTrailOverlay?.EmitUp(_isTouchLikeInput);
             _lastTrailOverlay = target;
+            if (target == null && !_isPrimaryPointerDown) ClearTrailHistory();
         }
 
         private OverlayWindow? ResolveTargetOverlay(int x, int y)

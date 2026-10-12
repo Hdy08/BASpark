@@ -20,6 +20,7 @@ function createHarness(options = {})
     pointerDown: [],
     pointerMove: [],
     pointerUp: [],
+    pointerTimes: [],
     setFxParams: [],
     setCompositingReference: [],
     setPaused: [],
@@ -43,6 +44,10 @@ function createHarness(options = {})
       this.height = 600;
       this.config = config;
       this.shards = [];
+      this.trailStrokes = [];
+      this.currentTrailStroke = null;
+      this.nextOwnerId = 1;
+      this.trailShardCounts = new Map();
       this.resolvedEffectBackend = 'pending';
       this.resolvedBloomBackend = 'pending';
       this.resolvedHostCompositing = 'pending';
@@ -79,6 +84,8 @@ function createHarness(options = {})
         resolvedHostCompositing: this.resolvedHostCompositing,
         hostCompositingSurface: this.config.hostCompositingSurface,
         compositingWarning: this.compositingWarning,
+        trailTimeScale: this.config.trailTimeScale,
+        clickEnabled: this.config.clickEnabled,
       };
     }
 
@@ -86,6 +93,7 @@ function createHarness(options = {})
     {
       return {
         trail: {
+          lifetimeMs: 300,
           geometryWidth: 4,
           width: 3,
           minVertexDistance: 5,
@@ -112,20 +120,44 @@ function createHarness(options = {})
 
     pointerDown(input)
     {
-      calls.pointerDown.push(input);
+      const normalized = this._normalizePointerInput(input);
+      calls.pointerDown.push(normalized);
+      calls.pointerTimes.push({ type: 'down', time: this._getTrailInputTime() });
+      this.currentTrailStroke = { ownerId: this.nextOwnerId++, active: true, points: [normalized] };
+      this.trailStrokes.push(this.currentTrailStroke);
       return true;
     }
 
     pointerMove(input)
     {
-      calls.pointerMove.push(input);
+      const normalized = this._normalizePointerInput(input);
+      calls.pointerMove.push(normalized);
+      calls.pointerTimes.push({ type: 'move', time: this._getTrailInputTime() });
+      if (!this.currentTrailStroke && this.config.trailAlways)
+      {
+        this.currentTrailStroke = { ownerId: this.nextOwnerId++, active: true, points: [] };
+        this.trailStrokes.push(this.currentTrailStroke);
+      }
+      this.currentTrailStroke?.points.push(normalized);
       return true;
     }
 
     pointerUp(pointerId)
     {
       calls.pointerUp.push(pointerId);
+      if (this.currentTrailStroke) this.currentTrailStroke.active = false;
+      this.currentTrailStroke = null;
       return true;
+    }
+
+    _normalizePointerInput(input)
+    {
+      return { ...input, x: Math.max(0, Math.min(this.width, input.x)), y: Math.max(0, Math.min(this.height, input.y)) };
+    }
+
+    _getTrailInputTime()
+    {
+      return 1000;
     }
 
     setPaused(paused, pauseOptions)
@@ -343,6 +375,97 @@ test('starts a pressed trail without creating a click boom', () =>
   assert.equal(clickConfigUpdates.length, 2);
   assert.equal(clickConfigUpdates[0].clickEnabled, false);
   assert.equal(clickConfigUpdates[1].clickEnabled, true);
+});
+
+test('cross-screen departure preserves the old stroke and extends past the canvas edge', () =>
+{
+  const harness = createHarness();
+  harness.window.externalBoom(0.5, 0.5);
+  harness.window.externalMove(0.9, 0.5);
+  const originalStroke = harness.fx.currentTrailStroke;
+  const normalize = harness.fx._normalizePointerInput;
+  const clock = harness.fx._getTrailInputTime;
+  const cancels = harness.calls.pointerCancel.length;
+  const clears = harness.calls.clearTrail;
+
+  harness.window.externalTrailContinue([], 1.2, 0.5, true, false, true);
+
+  assert.equal(harness.calls.pointerMove.at(-1).x, 960);
+  assert.equal(harness.calls.pointerUp.at(-1), 1);
+  assert.equal(harness.calls.pointerCancel.length, cancels);
+  assert.equal(harness.calls.clearTrail, clears);
+  assert.equal(harness.fx.trailStrokes[0], originalStroke);
+  assert.equal(originalStroke.active, false);
+  assert.equal(harness.fx._normalizePointerInput, normalize);
+  assert.equal(harness.fx._getTrailInputTime, clock);
+  harness.window.externalMove(1.3, 0.5);
+  assert.equal(harness.calls.pointerMove.at(-1).x, 800);
+});
+
+test('cross-screen entry inherits unclipped geometry and sample ages without adding a click', () =>
+{
+  const harness = createHarness();
+  const dispatch = harness.hostListeners.get('message');
+  dispatch({ data: { source: 'baspark-input', generation: 'test-generation', type: 'trailContinue',
+    mode: 'mouse', alwaysTrail: false, strokeId: 42, pressed: true, beginStroke: true, finishStroke: false,
+    history: [[-0.75, 0.3, 180], [-0.25, 0.4, 90], [-0.05, 0.5, 25]], x: 0.125, y: 0.6 } });
+
+  assert.equal(harness.calls.pointerDown.at(-1).x, -600);
+  assert.equal(harness.calls.pointerDown.at(-1).y, 180);
+  assert.deepEqual(harness.calls.pointerMove.map((point) => point.x), [-200, -40, 100]);
+  assert.deepEqual(harness.calls.pointerTimes.map((sample) => sample.time), [820, 910, 975, 1000]);
+  assert.equal(harness.fx.currentTrailStroke.basparkStrokeId, 42);
+  assert.equal(harness.calls.pointerCancel.length, 0);
+  assert.equal(harness.calls.clearTrail, 0);
+  assert.deepEqual(harness.calls.updateConfig.filter((patch) => 'clickEnabled' in patch).map((patch) => patch.clickEnabled), [false, true]);
+});
+
+test('cross-screen hover inherits slow trails and releases an intermediate screen naturally', () =>
+{
+  const harness = createHarness();
+  harness.window.setInputContext('mouse', true);
+  harness.window.updateEffectSettings(1, 1, 1, 0.2, 1);
+  harness.window.externalTrailContinue([[-1, 0.5, 1000], [-0.1, 0.5, 100]], 1.2, 0.5, false, true, true);
+
+  assert.equal(harness.calls.pointerDown.length, 0);
+  assert.deepEqual(harness.calls.pointerMove.map((point) => point.x), [-800, -80, 960]);
+  assert.deepEqual(harness.calls.pointerTimes.map((sample) => sample.time), [800, 980, 1000]);
+  assert.equal(harness.fx.currentTrailStroke, null);
+  assert.equal(harness.fx.trailStrokes.length, 1);
+  assert.equal(harness.calls.clearTrail, 0);
+});
+
+test('cross-screen return replaces only the same trajectory without clearing other effects', () =>
+{
+  const harness = createHarness();
+  const dispatch = harness.hostListeners.get('message');
+  harness.fx.trailStrokes = [{ ownerId: 7, basparkStrokeId: 42 }, { ownerId: 8, basparkStrokeId: 43 }];
+  harness.fx.shards = [{ kind: 'trail', ownerId: 7 }, { kind: 'trail', ownerId: 8 }, { kind: 'click' }];
+  harness.fx.trailShardCounts.set(7, 1);
+  dispatch({ data: { source: 'baspark-input', generation: 'test-generation', type: 'trailContinue',
+    mode: 'mouse', alwaysTrail: false, strokeId: 42, pressed: true, beginStroke: true, finishStroke: false,
+    history: [[1.2, 0.5, 40]], x: 0.8, y: 0.5 } });
+
+  assert.equal(harness.fx.trailStrokes.filter((stroke) => stroke.basparkStrokeId === 42).length, 1);
+  assert.equal(harness.fx.trailStrokes.some((stroke) => stroke.basparkStrokeId === 43), true);
+  assert.equal(harness.fx.shards.some((shard) => shard.ownerId === 7), false);
+  assert.equal(harness.fx.shards.some((shard) => shard.ownerId === 8), true);
+  assert.equal(harness.fx.shards.some((shard) => shard.kind === 'click'), true);
+  assert.equal(harness.fx.trailShardCounts.has(7), false);
+  assert.equal(harness.calls.clearTrail, 0);
+});
+
+test('cross-screen replay rejects stale messages and invalid coordinates', () =>
+{
+  const harness = createHarness();
+  const dispatch = harness.hostListeners.get('message');
+  dispatch({ data: { source: 'baspark-input', generation: 'old-generation', type: 'trailContinue',
+    history: [[-1, 0.5, 0]], x: 0.2, y: 0.5, beginStroke: true } });
+  assert.equal(harness.calls.pointerMove.length, 0);
+  assert.equal(harness.window.externalTrailContinue([], NaN, 0.5, true, true, false), false);
+  harness.window.externalTrailContinue([[NaN, 0, 10], [-1, 0.5, -1], [-0.5, 0.5, 25]], 0.2, 0.5, true, true, false);
+  assert.equal(harness.calls.pointerDown.length, 1);
+  assert.equal(harness.calls.pointerDown.at(-1).x, -400);
 });
 
 test('uses 1.00 scale when host scale input is invalid', () =>

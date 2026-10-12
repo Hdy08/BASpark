@@ -295,7 +295,7 @@ public class WinUi3UiTests
         Assert.Contains("FollowDisplayRefreshRate { get; set; } = true", configSource, StringComparison.Ordinal);
         Assert.Contains("Math.Clamp(hz, 30, 360)", overlaySource, StringComparison.Ordinal);
         Assert.Contains("ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)", overlaySource, StringComparison.Ordinal);
-        Assert.Contains("hoveredTarget.EmitTrailStart", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("RouteTrailMove(target, cursorX, cursorY", overlaySource, StringComparison.Ordinal);
         Assert.Contains("long moveInterval = target?.TrailMoveIntervalTimestamp", overlaySource, StringComparison.Ordinal);
         Assert.Contains("RestartDisplaySettingsRecoveryTimer", overlaySource, StringComparison.Ordinal);
     }
@@ -531,6 +531,48 @@ public class WinUi3UiTests
         Assert.Contains("if (resetRequested)", overlaySource, StringComparison.Ordinal);
         Assert.Contains("if (_isClosing)", overlaySource, StringComparison.Ordinal);
         Assert.Contains("App.ReportFatalWebViewFailure", overlaySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CrossScreenTrailHistory_IsBoundedAndRestartsItsAgeAfterIdle()
+    {
+        using var manager = new OverlayManager();
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var record = typeof(OverlayManager).GetMethod("RecordTrailSample", members)!
+            .CreateDelegate<Action<int, int, long>>(manager);
+        var trim = typeof(OverlayManager).GetMethod("TrimTrailHistory", members)!.CreateDelegate<Action<long>>(manager);
+        var clear = typeof(OverlayManager).GetMethod("ClearTrailHistory", members)!.CreateDelegate<Action>(manager);
+        var history = (Queue<TrailSample>)typeof(OverlayManager).GetField("_trailHistory", members)!.GetValue(manager)!;
+        long timestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+        for (int index = 0; index < 2048; index++) record(index, -index, timestamp + index);
+        Assert.Equal(1024, history.Count);
+        Assert.Equal(1024, history.Peek().ScreenX);
+        long resumed = timestamp + System.Diagnostics.Stopwatch.Frequency * 3;
+        trim(resumed);
+        TrailSample sample = Assert.Single(history);
+        Assert.Equal(2047, sample.ScreenX);
+        Assert.Equal(-2047, sample.ScreenY);
+        Assert.Equal(resumed, sample.Timestamp);
+        clear();
+        Assert.Empty(history);
+        Assert.Null(typeof(OverlayManager).GetField("_lastTrailSample", members)!.GetValue(manager));
+    }
+
+    [Theory]
+    [InlineData(-100, 50, 200, 50, true)]
+    [InlineData(50, -100, 50, 200, true)]
+    [InlineData(-100, -100, 200, 200, true)]
+    [InlineData(-100, -100, -10, 200, false)]
+    [InlineData(-100, 200, 200, 110, false)]
+    [InlineData(0, 50, 0, 50, true)]
+    [InlineData(int.MinValue, 50, int.MaxValue, 50, true)]
+    public void CrossScreenTrailSegment_OnlyRoutesToIntersectedScreens(
+        int startX, int startY, int endX, int endY, bool expected)
+    {
+        var overlay = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
+        typeof(OverlayWindow).GetField("_screenBounds", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(overlay, new NativeMethods.RECT { Left = 0, Top = 0, Right = 100, Bottom = 100 });
+        Assert.Equal(expected, overlay.IntersectsScreenSegment(startX, startY, endX, endY));
     }
 
     [Fact]

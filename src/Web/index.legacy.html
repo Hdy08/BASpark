@@ -75,6 +75,7 @@
                 this.waves = [];
                 this.sparks = [];
                 this.trail = [];
+                this.trailStrokeId = 0;
                 this.isDown = false;
                 this.lastPos = null;
                 this.baseFrameMs = 1000 / 60;
@@ -100,6 +101,7 @@
                 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
                 window.addEventListener("mousedown", (e) => {
+                    if (Number.isSafeInteger(window.currentTrailStrokeId)) this.trailStrokeId = window.currentTrailStrokeId;
                     this.isDown = true;
                     this.lastPos = getPos(e);
                     this.createEffects(this.lastPos.x, this.lastPos.y);
@@ -114,7 +116,7 @@
                         return;
                     }
                     if (dist(p, prev) >= 1) {
-                        this.trail.push({ x: p.x, y: p.y, life: 1 });
+                        this.trail.push({ x: p.x, y: p.y, life: 1, strokeId: this.trailStrokeId, basparkStrokeId: window.currentTrailStrokeId });
                         if (this.trail.length > this.maxTrail) this.trail.shift();
 
                         if (Math.random() < 0.3) {
@@ -311,7 +313,7 @@
                 const head = this.lastPos;
                 const pts =
                     head && this.trail.length > 0
-                        ? this.trail.concat([{ x: head.x, y: head.y, life: 1 }])
+                        ? this.trail.concat([{ x: head.x, y: head.y, life: 1, strokeId: this.trailStrokeId }])
                         : this.trail.slice();
 
                 if (pts.length < 2) {
@@ -346,6 +348,7 @@
                     const alphaEnd = (i + 1) / lastIdx;
                     const a0 = pts[i];
                     const a1 = pts[i + 1];
+                    if ((a0.strokeId ?? 0) !== (a1.strokeId ?? 0)) continue;
 
                     const segGrad = ctx.createLinearGradient(a0.x, a0.y, a1.x, a1.y);
                     segGrad.addColorStop(0, `rgba(${this.color}, ${alphaStart})`);
@@ -568,13 +571,14 @@
                 const trailPad = 18 * this.trailScale + 12;
                 const trailPoints =
                     this.lastPos && this.trail.length > 0
-                        ? this.trail.concat([{ x: this.lastPos.x, y: this.lastPos.y }])
+                        ? this.trail.concat([{ x: this.lastPos.x, y: this.lastPos.y, strokeId: this.trailStrokeId }])
                         : this.trail;
 
                 if (trailPoints.length === 1) {
                     rects.push(this._pointRect(trailPoints[0].x, trailPoints[0].y, trailPad));
                 } else {
                     for (let i = 0; i < trailPoints.length - 1; i++) {
+                        if ((trailPoints[i].strokeId ?? 0) !== (trailPoints[i + 1].strokeId ?? 0)) continue;
                         rects.push(this._segmentRect(trailPoints[i], trailPoints[i + 1], trailPad));
                     }
                 }
@@ -816,6 +820,40 @@
             if (!Number.isFinite(c)) c = t;
             window.spark.trailSpeed = Math.max(0.2, Math.min(3, t));
             window.spark.clickSpeed = Math.max(0.2, Math.min(3, c));
+        };
+
+        window.externalTrailContinue = (history, percentX, percentY, pressed, beginStroke, finishStroke, strokeId) => {
+            if (window.renderingPaused || window.environmentInputSuppressed || !window.spark || !Array.isArray(history)) return false;
+            if (!Number.isFinite(percentX) || !Number.isFinite(percentY)) return false;
+            const spark = window.spark;
+            if (beginStroke) {
+                window.externalUp();
+                spark.trailStrokeId++;
+                window.currentTrailStrokeId = strokeId;
+                spark.lastPos = null;
+                if (Number.isSafeInteger(strokeId)) spark.trail = spark.trail.filter((point) => point.basparkStrokeId !== strokeId);
+                spark.isDown = pressed;
+                lastMoveX = NaN;
+                lastMoveY = NaN;
+                for (const sample of history.slice(-spark.maxTrail)) {
+                    if (!Array.isArray(sample) || sample.length !== 3 || !sample.every(Number.isFinite) || sample[2] < 0) continue;
+                    const life = 1 - sample[2] * spark.trailSpeed * 60 * 0.085 * 0.7 / 1000;
+                    if (life <= 0) continue;
+                    const x = sample[0] * window.innerWidth;
+                    const y = sample[1] * window.innerHeight;
+                    spark.trail.push({ x, y, life, strokeId: spark.trailStrokeId, basparkStrokeId: strokeId });
+                    spark.lastPos = { x, y };
+                }
+                while (spark.trail.length > spark.maxTrail) spark.trail.shift();
+                if (!spark.lastPos) spark.lastPos = { x: percentX * window.innerWidth, y: percentY * window.innerHeight };
+            }
+            window.externalMove(percentX, percentY);
+            if (finishStroke) {
+                window.externalUp();
+                spark.lastPos = null;
+            }
+            window.scheduleNextAnimationFrame();
+            return true;
         };
 
         window.externalTrailStart = (percentX, percentY) => {

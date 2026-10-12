@@ -42,6 +42,7 @@
         alwaysTrailEnabled: false,
         effectiveAlwaysTrail: false,
         activePointerKind: null,
+        strokeId: null,
         color: DEFAULT_COLOR,
         settings:
         {
@@ -142,12 +143,20 @@
         return !state.paused && !state.environmentInputSuppressed && state.fx !== null;
     }
 
+    function tagCurrentTrail()
+    {
+        if (state.fx.currentTrailStroke && state.strokeId !== null)
+        {
+            state.fx.currentTrailStroke.basparkStrokeId = state.strokeId;
+        }
+    }
+
     function pointerType()
     {
         return state.inputMode === 'touch' ? 'touch' : 'mouse';
     }
 
-    function toCanvasPoint(percentX, percentY)
+    function toCanvasPoint(percentX, percentY, allowOutside = false)
     {
         if (!state.fx)
         {
@@ -165,8 +174,8 @@
         // C# 传入窗口内归一化坐标；公开 API 要求 Canvas 局部 CSS 像素。
         return (
             {
-                x: clamp(normalizedX, 0, 1) * state.fx.width,
-                y: clamp(normalizedY, 0, 1) * state.fx.height,
+                x: (allowOutside ? normalizedX : clamp(normalizedX, 0, 1)) * state.fx.width,
+                y: (allowOutside ? normalizedY : clamp(normalizedY, 0, 1)) * state.fx.height,
                 pointerId: POINTER_ID,
                 pointerType: pointerType(),
             });
@@ -510,20 +519,21 @@
             if (accepted)
             {
                 state.activePointerKind = 'press';
+                tagCurrentTrail();
             }
 
             return accepted;
         });
     };
 
-    window.externalTrailStart = function (percentX, percentY)
+    window.externalTrailStart = function (percentX, percentY, allowOutside = false)
     {
         if (!canAcceptHostInput())
         {
             return false;
         }
 
-        const point = toCanvasPoint(percentX, percentY);
+        const point = toCanvasPoint(percentX, percentY, allowOutside);
 
         if (!point)
         {
@@ -551,6 +561,7 @@
                 if (accepted)
                 {
                     state.activePointerKind = 'press';
+                    tagCurrentTrail();
                 }
 
                 return accepted;
@@ -565,7 +576,7 @@
         });
     };
 
-    window.externalMove = function (percentX, percentY)
+    window.externalMove = function (percentX, percentY, allowOutside = false)
     {
         if (!canAcceptHostInput())
         {
@@ -583,7 +594,7 @@
             return false;
         }
 
-        const point = toCanvasPoint(numericX, numericY);
+        const point = toCanvasPoint(numericX, numericY, allowOutside);
 
         if (!point)
         {
@@ -600,6 +611,7 @@
             if (accepted)
             {
                 applyTrailShardScale();
+                tagCurrentTrail();
             }
 
             if (
@@ -613,6 +625,92 @@
 
             return accepted;
         });
+    };
+
+    window.externalTrailContinue = function (history, percentX, percentY, pressed, beginStroke, finishStroke)
+    {
+        if (!canAcceptHostInput() || !toCanvasPoint(percentX, percentY, true) || !Array.isArray(history))
+        {
+            return false;
+        }
+
+        const fx = state.fx;
+        const normalizeInput = fx._normalizePointerInput;
+        const inputTime = fx._getTrailInputTime;
+        const currentTime = typeof inputTime === 'function' ? inputTime.call(fx) : 0;
+        const timeScale = Number(fx.getConfig().trailTimeScale) || 1;
+        const lifetime = Number(fx.getFxConfig().trail.lifetimeMs) || 300;
+        const validSamples = history.slice(-1024).filter((sample) =>
+            Array.isArray(sample) && sample.length === 3 && sample.every(Number.isFinite) && sample[2] >= 0);
+        const recentSamples = validSamples.filter((sample) => sample[2] * timeScale <= lifetime);
+        if (recentSamples.length === 0 && validSamples.length > 0)
+        {
+            const lastSample = validSamples.at(-1);
+            recentSamples.push([lastSample[0], lastSample[1], 0]);
+        }
+
+        let replayTime = currentTime;
+        if (typeof normalizeInput === 'function')
+        {
+            fx._normalizePointerInput = function (input)
+            {
+                const normalized = normalizeInput.call(this, input);
+                if (normalized)
+                {
+                    normalized.x = input.x;
+                    normalized.y = input.y;
+                }
+                return normalized;
+            };
+        }
+        if (typeof inputTime === 'function') fx._getTrailInputTime = () => replayTime;
+
+        try
+        {
+            if (beginStroke)
+            {
+                window.externalUp();
+                state.activePointerKind = null;
+                if (state.strokeId !== null && Array.isArray(fx.trailStrokes))
+                {
+                    const owners = new Set(fx.trailStrokes
+                        .filter((stroke) => stroke.basparkStrokeId === state.strokeId)
+                        .map((stroke) => stroke.ownerId));
+                    fx.trailStrokes = fx.trailStrokes.filter((stroke) => stroke.basparkStrokeId !== state.strokeId);
+                    if (Array.isArray(fx.shards))
+                    {
+                        fx.shards = fx.shards.filter((shard) => shard.kind !== 'trail' || !owners.has(shard.ownerId));
+                    }
+                    for (const owner of owners) fx.trailShardCounts?.delete(owner);
+                }
+                state.lastMoveX = NaN;
+                state.lastMoveY = NaN;
+                const samples = recentSamples.length > 0 ? recentSamples : [[Number(percentX), Number(percentY), 0]];
+                for (let index = 0; index < samples.length; index++)
+                {
+                    const sample = samples[index];
+                    replayTime = Math.max(0, currentTime - sample[2] * timeScale);
+                    if (index === 0 && pressed)
+                    {
+                        window.externalTrailStart(sample[0], sample[1], true);
+                    }
+                    else
+                    {
+                        window.externalMove(sample[0], sample[1], true);
+                    }
+                }
+            }
+
+            replayTime = currentTime;
+            const accepted = window.externalMove(percentX, percentY, true);
+            if (finishStroke) window.externalUp();
+            return accepted;
+        }
+        finally
+        {
+            if (typeof normalizeInput === 'function') fx._normalizePointerInput = normalizeInput;
+            if (typeof inputTime === 'function') fx._getTrailInputTime = inputTime;
+        }
     };
 
     window.externalUp = function ()
@@ -1022,6 +1120,11 @@
             return;
         }
 
+        if (Number.isSafeInteger(input.strokeId) && input.strokeId >= 0)
+        {
+            state.strokeId = input.strokeId;
+        }
+
         if (
             input.mode !== state.inputMode ||
             Boolean(input.alwaysTrail) !== state.alwaysTrailEnabled
@@ -1037,6 +1140,10 @@
                 break;
             case 'trailStart':
                 window.externalTrailStart(input.x, input.y);
+                break;
+            case 'trailContinue':
+                window.externalTrailContinue(input.history, input.x, input.y,
+                    Boolean(input.pressed), Boolean(input.beginStroke), Boolean(input.finishStroke));
                 break;
             case 'move':
                 window.externalMove(input.x, input.y);

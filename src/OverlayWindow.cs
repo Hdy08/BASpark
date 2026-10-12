@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using Microsoft.UI.Dispatching;
 using Microsoft.Web.WebView2.Core;
@@ -94,6 +95,8 @@ internal sealed class OverlayWindow : IDisposable
 
     public long TrailMoveIntervalTimestamp => _trailMoveIntervalTimestamp;
 
+    internal long TrailStrokeId { get; set; }
+
     // ------------------------------------------------------------------
     // 窗口几何
     // ------------------------------------------------------------------
@@ -146,6 +149,35 @@ internal sealed class OverlayWindow : IDisposable
     {
         NativeMethods.RECT bounds = GetScreenBounds();
         return x >= bounds.Left && x < bounds.Right && y >= bounds.Top && y < bounds.Bottom;
+    }
+
+    internal bool IntersectsScreenSegment(int startX, int startY, int endX, int endY)
+    {
+        double minimum = 0;
+        double maximum = 1;
+        double deltaX = (double)endX - startX;
+        double deltaY = (double)endY - startY;
+        return ClipSegmentBoundary(-deltaX, (double)startX - _screenBounds.Left, ref minimum, ref maximum)
+            && ClipSegmentBoundary(deltaX, (double)_screenBounds.Right - startX, ref minimum, ref maximum)
+            && ClipSegmentBoundary(-deltaY, (double)startY - _screenBounds.Top, ref minimum, ref maximum)
+            && ClipSegmentBoundary(deltaY, (double)_screenBounds.Bottom - startY, ref minimum, ref maximum);
+    }
+
+    private static bool ClipSegmentBoundary(double direction, double distance, ref double minimum, ref double maximum)
+    {
+        if (direction == 0) return distance >= 0;
+        double ratio = distance / direction;
+        if (direction < 0)
+        {
+            if (ratio > maximum) return false;
+            minimum = Math.Max(minimum, ratio);
+        }
+        else
+        {
+            if (ratio < minimum) return false;
+            maximum = Math.Min(maximum, ratio);
+        }
+        return true;
     }
 
     // ------------------------------------------------------------------
@@ -1128,6 +1160,59 @@ internal sealed class OverlayWindow : IDisposable
         ExecuteWithInputContext(inputMode, "if(window.externalUp) window.externalUp();");
     }
 
+    internal void EmitTrailContinuation(Queue<TrailSample> history, long timestamp, int screenX, int screenY,
+        bool touchLike, bool pressed, bool beginStroke, bool finishStroke)
+    {
+        if (_isClosing || !_rendererReady || _coreWebView == null
+            || !_host.TryGetWindowRect(out NativeMethods.RECT bounds)
+            || bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        var samples = new StringBuilder(beginStroke ? history.Count * 48 + 2 : 2);
+        samples.Append('[');
+        if (beginStroke)
+        {
+            bool firstSample = true;
+            foreach (TrailSample sample in history)
+            {
+                if (!firstSample) samples.Append(',');
+                firstSample = false;
+                double horizontal = ((double)sample.ScreenX - bounds.Left) / bounds.Width;
+                double vertical = ((double)sample.ScreenY - bounds.Top) / bounds.Height;
+                double age = Math.Max(0, (timestamp - sample.Timestamp) * 1000.0 / Stopwatch.Frequency);
+                samples.Append(CultureInfo.InvariantCulture, $"[{horizontal:F6},{vertical:F6},{age:F3}]");
+            }
+        }
+        samples.Append(']');
+        double currentX = ((double)screenX - bounds.Left) / bounds.Width;
+        double currentY = ((double)screenY - bounds.Top) / bounds.Height;
+        string pressedValue = pressed ? "true" : "false";
+        string beginValue = beginStroke ? "true" : "false";
+        string finishValue = finishStroke ? "true" : "false";
+        string inputMode = touchLike ? InputModeTouch : InputModeMouse;
+        if (_usingLegacyRenderer)
+        {
+            ExecuteWithInputContext(inputMode,
+                string.Create(CultureInfo.InvariantCulture,
+                    $"if(window.externalTrailContinue) window.externalTrailContinue({samples},{currentX:F6},{currentY:F6},{pressedValue},{beginValue},{finishValue},{TrailStrokeId});"));
+            return;
+        }
+
+        try
+        {
+            string alwaysTrail = ConfigManager.EnableAlwaysTrailEffect ? "true" : "false";
+            _coreWebView.PostWebMessageAsJson(string.Create(CultureInfo.InvariantCulture,
+                $"{{\"source\":\"baspark-input\",\"generation\":\"{_rendererGeneration}\",\"type\":\"trailContinue\",\"strokeId\":{TrailStrokeId},\"history\":{samples},\"x\":{currentX:F6},\"y\":{currentY:F6},\"pressed\":{pressedValue},\"beginStroke\":{beginValue},\"finishStroke\":{finishValue},\"mode\":\"{inputMode}\",\"alwaysTrail\":{alwaysTrail}}}"));
+            _lastReportedInputMode = inputMode;
+            _lastReportedAlwaysTrail = ConfigManager.EnableAlwaysTrailEffect;
+        }
+        catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+        {
+        }
+    }
+
     public void EmitCancel()
     {
         if (PostInput("cancel", default, _lastReportedInputMode == InputModeTouch)) return;
@@ -1148,7 +1233,7 @@ internal sealed class OverlayWindow : IDisposable
         {
             coreWebView.PostWebMessageAsJson(string.Create(
                 CultureInfo.InvariantCulture,
-                $"{{\"source\":\"baspark-input\",\"generation\":\"{_rendererGeneration}\",\"type\":\"{type}\",\"x\":{point.X:F3},\"y\":{point.Y:F3},\"mode\":\"{mode}\",\"alwaysTrail\":{alwaysTrail}}}"));
+                $"{{\"source\":\"baspark-input\",\"generation\":\"{_rendererGeneration}\",\"type\":\"{type}\",\"strokeId\":{TrailStrokeId},\"x\":{point.X:F6},\"y\":{point.Y:F6},\"mode\":\"{mode}\",\"alwaysTrail\":{alwaysTrail}}}"));
             _lastReportedInputMode = mode;
             _lastReportedAlwaysTrail = ConfigManager.EnableAlwaysTrailEffect;
         }
@@ -1160,7 +1245,7 @@ internal sealed class OverlayWindow : IDisposable
 
     private static string FormatCoordinate(double value)
     {
-        return value.ToString("F3", CultureInfo.InvariantCulture);
+        return value.ToString("F6", CultureInfo.InvariantCulture);
     }
 
     /// <summary>把屏幕物理坐标转换为叠加层的 0..1 百分比坐标。</summary>
@@ -1200,13 +1285,14 @@ internal sealed class OverlayWindow : IDisposable
         bool alwaysTrailEnabled = ConfigManager.EnableAlwaysTrailEffect;
         if (_lastReportedInputMode == inputMode && _lastReportedAlwaysTrail == alwaysTrailEnabled)
         {
-            return string.Empty;
+            return _usingLegacyRenderer ? $"window.currentTrailStrokeId = {TrailStrokeId};" : string.Empty;
         }
 
         _lastReportedInputMode = inputMode;
         _lastReportedAlwaysTrail = alwaysTrailEnabled;
         string alwaysTrailLiteral = alwaysTrailEnabled ? "true" : "false";
-        return $"if(window.setInputContext) window.setInputContext('{inputMode}', {alwaysTrailLiteral});";
+        string identity = _usingLegacyRenderer ? $"window.currentTrailStrokeId = {TrailStrokeId};" : string.Empty;
+        return identity + $"if(window.setInputContext) window.setInputContext('{inputMode}', {alwaysTrailLiteral});";
     }
 
     private void SyncInputContext(string inputMode)

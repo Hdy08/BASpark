@@ -220,6 +220,50 @@ test('trail sampling follows its scaled distance and preserves stroke endpoints'
   }
 });
 
+test('cross-screen replay retains the reviewed coordinate and time hooks', () =>
+{
+  const context = { atob: (encoded) => Buffer.from(encoded, 'base64').toString('latin1'), structuredClone };
+  vm.runInNewContext(readFileSync(vendorPath, 'utf8'), context);
+  const prototype = context.BAClickFX.BAClickFX.prototype;
+  assert.equal(typeof prototype._normalizePointerInput, 'function');
+  assert.equal(typeof prototype._getTrailInputTime, 'function');
+  const renderer = Object.create(prototype);
+  renderer.width = 800;
+  renderer.height = 600;
+  assert.equal(renderer._normalizePointerInput({ x: -100, y: 700 }).x, 0);
+  assert.equal(renderer._normalizePointerInput({ x: -100, y: 700 }).y, 600);
+});
+
+test('cross-screen legacy continuation preserves foreign strokes and avoids return duplicates', () =>
+{
+  const { window } = createLegacyHarness();
+  const foreign = { x: 10, y: 10, life: 1, strokeId: 0, basparkStrokeId: 12 };
+  window.spark.trail = [foreign];
+  const history = [[-0.5, 0.5, 75], [-0.1, 0.5, 25]];
+  window.externalTrailContinue(history, 0.2, 0.5, true, true, false, 42);
+  assert.equal(window.spark.trail.includes(foreign), true);
+  assert.equal(window.spark.trail.filter((point) => point.basparkStrokeId === 42).length, 3);
+  assert.equal(window.spark.trail.some((point) => point.x < 0), true);
+  assert.equal(window.spark.waves.length, 0);
+  window.externalTrailContinue(history, 0.3, 0.5, true, true, false, 42);
+  assert.equal(window.spark.trail.includes(foreign), true);
+  assert.equal(window.spark.trail.filter((point) => point.basparkStrokeId === 42).length, 3);
+  window.externalTrailContinue([], 1.2, 0.5, true, false, true, 42);
+  assert.equal(window.spark.isDown, false);
+  assert.equal(window.spark.trail.at(-1).x, 960);
+  assert.ok(window.spark.trail.length > 0);
+});
+
+test('cross-screen legacy replay keeps a recent edge vertex at the fastest speed', () =>
+{
+  const { window } = createLegacyHarness();
+  window.spark.trailSpeed = 3;
+  window.externalTrailContinue([[-0.1, 0.5, 50]], 0.2, 0.5, true, true, false, 42);
+  window.spark._updateTrail(3);
+  assert.equal(window.spark.trail.some((point) => point.x < 0 && point.life > 0), true);
+  assert.equal(window.spark.trail.some((point) => point.x > 0 && point.life > 0), true);
+});
+
 test('vendored IIFE exposes every host API required by BASpark', () =>
 {
   const source = readFileSync(vendorPath, 'utf8');
