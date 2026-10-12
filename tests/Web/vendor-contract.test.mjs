@@ -264,6 +264,32 @@ test('cross-screen legacy replay keeps a recent edge vertex at the fastest speed
   assert.equal(window.spark.trail.some((point) => point.x > 0 && point.life > 0), true);
 });
 
+test('cross-screen legacy followers share the head beyond the departing edge', () =>
+{
+  for (const pressed of [false, true])
+  {
+    const departure = createLegacyHarness().window;
+    const arrival = createLegacyHarness().window;
+    departure.setInputContext('mouse', !pressed);
+    arrival.setInputContext('mouse', !pressed);
+    departure.externalTrailContinue([[0.5, 0.5, 30], [0.9, 0.5, 10]], 1.1, 0.5, pressed, true, false, 42);
+    arrival.externalTrailContinue([[-0.5, 0.5, 30], [-0.1, 0.5, 10]], 0.1, 0.5, pressed, true, false, 42);
+    const strokeId = departure.spark.trailStrokeId;
+    departure.externalTrailContinue([], 1.6, 0.5, pressed, false, false, 42);
+    arrival.externalMove(0.6, 0.5);
+    assert.equal(departure.spark.trailStrokeId, strokeId);
+    assert.equal(departure.spark.lastPos.x, 800 + arrival.spark.lastPos.x);
+    assert.equal(departure.spark.isDown, pressed);
+    assert.equal(departure.spark.waves.length, 0);
+    assert.equal(arrival.spark.waves.length, 0);
+    departure.externalUp();
+    arrival.externalUp();
+    assert.equal(departure.spark.isDown, false);
+    assert.equal(arrival.spark.isDown, false);
+    assert.ok(departure.spark.trail.length > 0);
+  }
+});
+
 test('vendored IIFE exposes every host API required by BASpark', () =>
 {
   const source = readFileSync(vendorPath, 'utf8');

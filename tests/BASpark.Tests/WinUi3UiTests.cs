@@ -575,6 +575,68 @@ public class WinUi3UiTests
         Assert.Equal(expected, overlay.IntersectsScreenSegment(startX, startY, endX, endY));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CrossScreenTrailRouting_KeepsDepartedScreensUntilTheirTailsExpire(bool pressed)
+    {
+        using var manager = new OverlayManager();
+        using var firstHost = new LayeredWindowHost();
+        using var secondHost = new LayeredWindowHost();
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        OverlayWindow CreateOverlay(int left, LayeredWindowHost host)
+        {
+            host.SetBounds(left, 0, 400, 600);
+            var overlay = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
+            typeof(OverlayWindow).GetField("_host", members)!.SetValue(overlay, host);
+            typeof(OverlayWindow).GetField("_screenBounds", members)!.SetValue(overlay,
+                new NativeMethods.RECT { Left = left, Top = 0, Right = left + 400, Bottom = 600 });
+            return overlay;
+        }
+        OverlayWindow first = CreateOverlay(0, firstHost);
+        OverlayWindow second = CreateOverlay(400, secondHost);
+        var overlays = (Dictionary<string, OverlayWindow>)typeof(OverlayManager).GetField("_overlays", members)!.GetValue(manager)!;
+        var participants = (Dictionary<OverlayWindow, long>)typeof(OverlayManager).GetField("_trailParticipants", members)!.GetValue(manager)!;
+        var move = typeof(OverlayManager).GetMethod("RouteTrailMove", members)!
+            .CreateDelegate<Action<OverlayWindow, int, int, bool>>(manager);
+        var clear = typeof(OverlayManager).GetMethod("ClearTrailHistory", members)!.CreateDelegate<Action>(manager);
+        var release = typeof(OverlayManager).GetMethod("ReleaseTrailParticipants", members)!.CreateDelegate<Action<bool, bool>>(manager);
+        typeof(OverlayManager).GetField("_isPrimaryPointerDown", members)!.SetValue(manager, pressed);
+        overlays.Add("first", first);
+        overlays.Add("second", second);
+        try
+        {
+            move(first, 100, 300, false);
+            move(first, 390, 300, false);
+            move(second, 410, 300, false);
+            Assert.Equal(2, participants.Count);
+            long departure = participants[first];
+            move(second, 550, 300, false);
+            Assert.Equal(departure, participants[first]);
+            Assert.Equal(first.TrailStrokeId, second.TrailStrokeId);
+            release(false, true);
+            Assert.Equal(2, participants.Count);
+            Assert.True((bool)typeof(OverlayManager).GetField("_resumeTrailParticipants", members)!.GetValue(manager)!);
+            move(second, 600, 300, false);
+            Assert.False((bool)typeof(OverlayManager).GetField("_resumeTrailParticipants", members)!.GetValue(manager)!);
+            Assert.Equal(2, participants.Count);
+            move(first, 350, 300, false);
+            Assert.Equal(2, participants.Count);
+            Assert.True(participants[first] >= departure);
+            move(second, 550, 300, false);
+            participants[first] = System.Diagnostics.Stopwatch.GetTimestamp() - System.Diagnostics.Stopwatch.Frequency * 3;
+            move(second, 650, 300, false);
+            Assert.False(participants.ContainsKey(first));
+            Assert.True(participants.ContainsKey(second));
+            clear();
+            Assert.Empty(participants);
+        }
+        finally
+        {
+            overlays.Clear();
+        }
+    }
+
     [Fact]
     public void OverlayHost_RestoresBoundsAfterExternalWindowMovement()
     {

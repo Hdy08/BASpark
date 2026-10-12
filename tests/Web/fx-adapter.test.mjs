@@ -420,6 +420,39 @@ test('cross-screen entry inherits unclipped geometry and sample ages without add
   assert.deepEqual(harness.calls.updateConfig.filter((patch) => 'clickEnabled' in patch).map((patch) => patch.clickEnabled), [false, true]);
 });
 
+test('cross-screen followers keep one moving head until the physical pointer releases', () =>
+{
+  for (const pressed of [false, true])
+  {
+    const departure = createHarness();
+    const arrival = createHarness();
+    departure.window.setInputContext('mouse', !pressed);
+    arrival.window.setInputContext('mouse', !pressed);
+    if (pressed) departure.window.externalBoom(0.5, 0.5);
+    else departure.window.externalMove(0.5, 0.5);
+    departure.window.externalMove(0.9, 0.5);
+    const stroke = departure.fx.currentTrailStroke;
+    arrival.window.externalTrailContinue([[-0.5, 0.5, 30], [-0.1, 0.5, 10]], 0.1, 0.5, pressed, true, false);
+    for (const horizontal of [0.1, 0.3, 0.6])
+    {
+      departure.window.externalTrailContinue([], 1 + horizontal, 0.5, pressed, false, false);
+      arrival.window.externalMove(horizontal, 0.5);
+      assert.equal(departure.fx.currentTrailStroke, stroke);
+      assert.equal(stroke.active, true);
+      assert.equal(departure.fx.trailStrokes.length, 1);
+      assert.equal(arrival.fx.trailStrokes.length, 1);
+      assert.ok(Math.abs(stroke.points.at(-1).x - 800 - arrival.fx.currentTrailStroke.points.at(-1).x) < 1e-8);
+    }
+    departure.window.externalUp();
+    arrival.window.externalUp();
+    assert.equal(stroke.active, false);
+    assert.equal(departure.fx.currentTrailStroke, null);
+    assert.equal(arrival.fx.currentTrailStroke, null);
+    assert.equal(departure.calls.clearTrail, 0);
+    assert.equal(arrival.calls.clearTrail, 0);
+  }
+});
+
 test('cross-screen hover inherits slow trails and releases an intermediate screen naturally', () =>
 {
   const harness = createHarness();
