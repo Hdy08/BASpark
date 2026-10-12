@@ -145,7 +145,10 @@ internal sealed class LayeredWindowHost : IDisposable
         // 尺寸位置没变就不做 SetWindowPos：全屏分层窗口的重复定位会连带整屏重新合成。
         if (_boundsApplied
             && _boundsLeft == left && _boundsTop == top
-            && _boundsWidth == width && _boundsHeight == height)
+            && _boundsWidth == width && _boundsHeight == height
+            && TryGetWindowRect(out NativeMethods.RECT actualBounds)
+            && actualBounds.Left == left && actualBounds.Top == top
+            && actualBounds.Width == width && actualBounds.Height == height)
         {
             DpiScale = ReadDpiScale();
             return;

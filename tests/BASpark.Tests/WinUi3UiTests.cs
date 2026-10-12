@@ -534,6 +534,92 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void OverlayHost_RestoresBoundsAfterExternalWindowMovement()
+    {
+        using var host = new LayeredWindowHost();
+        host.SetBounds(120, 130, 400, 240);
+        Assert.True(NativeMethods.SetWindowPos(host.Handle, IntPtr.Zero, 180, 190, 320, 200,
+            NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_NOZORDER));
+
+        host.SetBounds(120, 130, 400, 240);
+        Assert.True(host.TryGetWindowRect(out NativeMethods.RECT bounds));
+        Assert.Equal(120, bounds.Left);
+        Assert.Equal(130, bounds.Top);
+        Assert.Equal(400, bounds.Width);
+        Assert.Equal(240, bounds.Height);
+    }
+
+    [Fact]
+    public void OverlayRouting_RefreshesExistingWindowsWhenDisplayCoordinatesChange()
+    {
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        using var firstHost = new LayeredWindowHost();
+        using var secondHost = new LayeredWindowHost();
+        using var manager = new OverlayManager();
+        manager.UpdateTrailRefreshRate(40, false);
+        var first = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
+        var second = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
+        typeof(OverlayWindow).GetField("_host", members)!.SetValue(first, firstHost);
+        typeof(OverlayWindow).GetField("_host", members)!.SetValue(second, secondHost);
+        first.UpdateScreen(new ScreenInfo("test-first", 0, 0, 640, 360));
+        second.UpdateScreen(new ScreenInfo("test-second", 640, -100, 800, 450));
+        var overlays = (Dictionary<string, OverlayWindow>)typeof(OverlayManager).GetField("_overlays", members)!.GetValue(manager)!;
+        overlays.Add("test-first", first);
+        overlays.Add("test-second", second);
+        var synchronize = typeof(OverlayManager).GetMethod("SynchronizeWindows", members)!
+            .CreateDelegate<Action<IReadOnlyDictionary<string, ScreenInfo>, bool>>(manager);
+        var resolve = typeof(OverlayManager).GetMethod("ResolveTargetOverlay", members)!
+            .CreateDelegate<Func<int, int, OverlayWindow?>>(manager);
+        System.Reflection.MethodInfo convert = typeof(OverlayWindow).GetMethod("TryConvertScreenToOverlayPoint", members)!;
+        ScreenInfo[][] layouts =
+        [
+            [new("test-first", -640, 100, 640, 360), new("test-second", 0, 0, 800, 450)],
+            [new("test-first", 0, -360, 640, 360), new("test-second", 0, 0, 800, 450)],
+            [new("test-first", -800, -100, 800, 450), new("test-second", 0, 0, 640, 360)]
+        ];
+        try
+        {
+            foreach (ScreenInfo[] screens in layouts)
+            {
+                typeof(OverlayManager).GetField("_activePointerOverlay", members)!.SetValue(manager, first);
+                typeof(OverlayManager).GetField("_lastTrailOverlay", members)!.SetValue(manager, second);
+                typeof(OverlayManager).GetField("_lastTrailThrottleOverlay", members)!.SetValue(manager, first);
+                typeof(OverlayManager).GetField("_isPrimaryPointerDown", members)!.SetValue(manager, true);
+                typeof(OverlayManager).GetField("_lastMoveTimestamp", members)!.SetValue(manager, 123L);
+                synchronize(screens.ToDictionary(screen => screen.DeviceName), false);
+
+                Assert.Same(first, overlays["test-first"]);
+                Assert.Same(second, overlays["test-second"]);
+                Assert.Null(typeof(OverlayManager).GetField("_activePointerOverlay", members)!.GetValue(manager));
+                Assert.Null(typeof(OverlayManager).GetField("_lastTrailOverlay", members)!.GetValue(manager));
+                Assert.Null(typeof(OverlayManager).GetField("_lastTrailThrottleOverlay", members)!.GetValue(manager));
+                Assert.Equal(false, typeof(OverlayManager).GetField("_isPrimaryPointerDown", members)!.GetValue(manager));
+                Assert.Equal(0L, typeof(OverlayManager).GetField("_lastMoveTimestamp", members)!.GetValue(manager));
+                foreach (ScreenInfo screen in screens)
+                {
+                    OverlayWindow overlay = overlays[screen.DeviceName];
+                    Assert.True(overlay.MatchesScreenBounds(screen));
+                    int horizontal = screen.BoundsLeft + screen.BoundsWidth / 2;
+                    int vertical = screen.BoundsTop + screen.BoundsHeight / 2;
+                    Assert.Same(overlay, resolve(horizontal, vertical));
+                    Assert.True(overlay.ContainsScreenPoint(screen.BoundsLeft, screen.BoundsTop));
+                    Assert.False(overlay.ContainsScreenPoint(screen.BoundsLeft + screen.BoundsWidth, vertical));
+                    object?[] arguments = [horizontal, vertical, null];
+                    Assert.Equal(true, convert.Invoke(overlay, arguments));
+                    var point = Assert.IsType<Windows.Foundation.Point>(arguments[2]);
+                    Assert.Equal(0.5, point.X, 8);
+                    Assert.Equal(0.5, point.Y, 8);
+                    Assert.Equal(Math.Max(1, System.Diagnostics.Stopwatch.Frequency / 40), overlay.TrailMoveIntervalTimestamp);
+                }
+            }
+        }
+        finally
+        {
+            overlays.Clear();
+        }
+    }
+
+    [Fact]
     public void OverlayRouting_ReusesBoundsWithoutAllocatingDuringPointerMoves()
     {
         var overlay = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));

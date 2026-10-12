@@ -20,7 +20,7 @@ namespace BASpark;
 internal sealed class OverlayWindow : IDisposable
 {
     private readonly string _screenDeviceName;
-    private readonly NativeMethods.RECT _screenBounds;
+    private NativeMethods.RECT _screenBounds;
     private readonly LayeredWindowHost _host;
 
     private CoreWebView2Controller? _controller;
@@ -99,12 +99,17 @@ internal sealed class OverlayWindow : IDisposable
     // ------------------------------------------------------------------
 
     /// <summary>按物理像素把宿主窗口铺满目标显示器。</summary>
-    private void UpdateRendererBounds()
+    private void UpdateRendererBounds(bool forceUpdate = false)
     {
         NativeMethods.RECT bounds = GetScreenBounds();
+        bool boundsChanged = !_host.TryGetWindowRect(out NativeMethods.RECT actualBounds)
+            || actualBounds.Left != bounds.Left || actualBounds.Top != bounds.Top
+            || actualBounds.Width != bounds.Width || actualBounds.Height != bounds.Height;
+        double previousScale = _host.DpiScale;
         _host.SetBounds(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
 
-        if (_controller != null && _controllerInitialized)
+        if (_controller != null && _controllerInitialized
+            && (forceUpdate || boundsChanged || previousScale != _host.DpiScale))
         {
             try
             {
@@ -119,6 +124,23 @@ internal sealed class OverlayWindow : IDisposable
     }
 
     private NativeMethods.RECT GetScreenBounds() => _screenBounds;
+
+    internal bool MatchesScreenBounds(ScreenInfo screen) =>
+        _screenBounds.Left == screen.BoundsLeft && _screenBounds.Top == screen.BoundsTop
+        && _screenBounds.Width == screen.BoundsWidth && _screenBounds.Height == screen.BoundsHeight;
+
+    internal void UpdateScreen(ScreenInfo screen)
+    {
+        bool boundsChanged = !MatchesScreenBounds(screen);
+        _screenBounds = new NativeMethods.RECT
+        {
+            Left = screen.BoundsLeft,
+            Top = screen.BoundsTop,
+            Right = screen.BoundsLeft + screen.BoundsWidth,
+            Bottom = screen.BoundsTop + screen.BoundsHeight
+        };
+        UpdateRendererBounds(forceUpdate: boundsChanged);
+    }
 
     public bool ContainsScreenPoint(int x, int y)
     {
@@ -193,8 +215,7 @@ internal sealed class OverlayWindow : IDisposable
             return;
         }
 
-        NativeMethods.RECT bounds = GetScreenBounds();
-        _host.SetBounds(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+        UpdateRendererBounds();
         _host.SetTopmost();
     }
 

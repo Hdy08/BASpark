@@ -45,6 +45,8 @@ namespace BASpark
         private System.Threading.Timer? _screenshotFailsafeTimer;
         private DispatcherQueueTimer? _screenshotEndDebounceTimer;
         private DispatcherQueueTimer? _displaySettingsRecoveryTimer;
+        private DispatcherQueueTimer? _displayTopologyTimer;
+        private IReadOnlyList<ScreenInfo> _lastDisplayScreens = Array.Empty<ScreenInfo>();
         private long _lastResumeRecoveryTicks;
         private static readonly long ResumeRecoveryDebounceTicks = TimeSpan.FromSeconds(2).Ticks;
 
@@ -65,6 +67,10 @@ namespace BASpark
             SystemEvents.DisplaySettingsChanged += HandleDisplaySettingsChanged;
             SystemEvents.PowerModeChanged += HandlePowerModeChanged;
             SystemEvents.SessionSwitch += HandleSessionSwitch;
+            _displayTopologyTimer = App.DispatcherQueue.CreateTimer();
+            _displayTopologyTimer.Interval = TimeSpan.FromSeconds(2);
+            _displayTopologyTimer.Tick += DisplayTopologyTimer_Tick;
+            _displayTopologyTimer.Start();
         }
 
         public void UpdateColor(string color) => ForEachOverlay(w => w.UpdateColor(color));
@@ -739,7 +745,14 @@ namespace BASpark
 
         private void RebuildWindows(bool forceRebuild)
         {
-            var screenInfos = ScreenInfo.AllScreens
+            IReadOnlyList<ScreenInfo> screens = ScreenInfo.AllScreens;
+            if (screens.Count == 0)
+            {
+                RestartDisplaySettingsRecoveryTimer();
+                return;
+            }
+
+            var screenInfos = screens
                 .Select(screen => new { Screen = screen, Identity = ScreenIdentity.FromScreen(screen) })
                 .ToList();
             var enabledIds = ConfigManager.ResolveEnabledScreenDeviceNames(screenInfos.Select(item => item.Identity));
@@ -749,9 +762,17 @@ namespace BASpark
                 .Select(item => item.Screen)
                 .ToDictionary(screen => screen.DeviceName, screen => screen, StringComparer.OrdinalIgnoreCase);
 
+            SynchronizeWindows(targetScreens, forceRebuild);
+            _lastDisplayScreens = screens;
+        }
+
+        private void SynchronizeWindows(IReadOnlyDictionary<string, ScreenInfo> targetScreens, bool forceRebuild)
+        {
             bool topologyChanged = forceRebuild ||
                 _overlays.Keys.Except(targetScreens.Keys, StringComparer.OrdinalIgnoreCase).Any() ||
-                targetScreens.Keys.Except(_overlays.Keys, StringComparer.OrdinalIgnoreCase).Any();
+                targetScreens.Keys.Except(_overlays.Keys, StringComparer.OrdinalIgnoreCase).Any() ||
+                targetScreens.Any(pair => _overlays.TryGetValue(pair.Key, out OverlayWindow? overlay)
+                    && !overlay.MatchesScreenBounds(pair.Value));
             if (topologyChanged)
             {
                 ReleasePointerStateSilent();
@@ -769,16 +790,19 @@ namespace BASpark
 
             foreach (var pair in targetScreens)
             {
-                if (_overlays.ContainsKey(pair.Key))
-                {
-                    continue;
-                }
-
                 int refreshRate = _followDisplayRefreshRate
                     ? ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)
                     : _manualTrailRefreshRate;
+                if (_overlays.TryGetValue(pair.Key, out OverlayWindow? existing))
+                {
+                    existing.UpdateScreen(pair.Value);
+                    existing.UpdateTrailRefreshRate(refreshRate);
+                    continue;
+                }
+
                 var win = new OverlayWindow(pair.Value, refreshRate);
                 _overlays[pair.Key] = win;
+                win.SetEnvironmentSuppressed(_isSuppressedByEnvironment);
                 if (_screenshotCaptureSessionActive) win.SetHiddenForExternalScreenshotCapture(true);
                 if (App.IsEffectsPaused) win.RefreshPauseState();
             }
@@ -1071,7 +1095,26 @@ namespace BASpark
             _displaySettingsRecoveryTimer?.Stop();
             if (!_disposed)
             {
-                RecoverAfterSystemResume();
+                RebuildWindows(forceRebuild: false);
+                RefreshEnvironmentFilterState();
+            }
+        }
+
+        private void DisplayTopologyTimer_Tick(DispatcherQueueTimer sender, object args)
+        {
+            _ = sender;
+            _ = args;
+            if (_disposed)
+            {
+                return;
+            }
+
+            IReadOnlyList<ScreenInfo> screens = ScreenInfo.AllScreens;
+            if (screens.Count > 0 && (screens.Count != _lastDisplayScreens.Count
+                || screens.Any(screen => !_lastDisplayScreens.Contains(screen))))
+            {
+                RebuildWindows(forceRebuild: false);
+                RefreshEnvironmentFilterState();
             }
         }
 
@@ -1144,6 +1187,12 @@ namespace BASpark
             SystemEvents.DisplaySettingsChanged -= HandleDisplaySettingsChanged;
             SystemEvents.PowerModeChanged -= HandlePowerModeChanged;
             SystemEvents.SessionSwitch -= HandleSessionSwitch;
+            if (_displayTopologyTimer != null)
+            {
+                _displayTopologyTimer.Stop();
+                _displayTopologyTimer.Tick -= DisplayTopologyTimer_Tick;
+                _displayTopologyTimer = null;
+            }
             if (_displaySettingsRecoveryTimer != null)
             {
                 _displaySettingsRecoveryTimer.Stop();

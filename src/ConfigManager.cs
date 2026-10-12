@@ -658,18 +658,30 @@ namespace BASpark
 
         private static bool IsSameScreen(ScreenSelectionState selection, ScreenIdentityInfo screen)
         {
-            return (!string.IsNullOrWhiteSpace(selection.IdentityKey) &&
-                    string.Equals(selection.IdentityKey, screen.IdentityKey, StringComparison.OrdinalIgnoreCase)) ||
-                   (!string.IsNullOrWhiteSpace(selection.DeviceName) &&
-                    string.Equals(selection.DeviceName, screen.DeviceName, StringComparison.OrdinalIgnoreCase));
+            return IsSameScreenIdentity(selection.IdentityKey, selection.DeviceName,
+                screen.IdentityKey, screen.DeviceName);
         }
 
         private static bool IsSameSavedScreen(ScreenSelectionState left, ScreenSelectionState right)
         {
-            return (!string.IsNullOrWhiteSpace(left.IdentityKey) &&
-                    string.Equals(left.IdentityKey, right.IdentityKey, StringComparison.OrdinalIgnoreCase)) ||
-                   (!string.IsNullOrWhiteSpace(left.DeviceName) &&
-                    string.Equals(left.DeviceName, right.DeviceName, StringComparison.OrdinalIgnoreCase));
+            return IsSameScreenIdentity(left.IdentityKey, left.DeviceName, right.IdentityKey, right.DeviceName);
+        }
+
+        private static bool IsSameScreenIdentity(string leftIdentity, string leftDevice, string rightIdentity, string rightDevice)
+        {
+            bool leftHasStableIdentity = !string.IsNullOrWhiteSpace(leftIdentity)
+                && !string.Equals(leftIdentity, leftDevice, StringComparison.OrdinalIgnoreCase);
+            bool rightHasStableIdentity = !string.IsNullOrWhiteSpace(rightIdentity)
+                && !string.Equals(rightIdentity, rightDevice, StringComparison.OrdinalIgnoreCase);
+            if (leftHasStableIdentity && rightHasStableIdentity)
+            {
+                return string.Equals(leftIdentity, rightIdentity, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return (!string.IsNullOrWhiteSpace(leftIdentity)
+                    && string.Equals(leftIdentity, rightIdentity, StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrWhiteSpace(leftDevice)
+                    && string.Equals(leftDevice, rightDevice, StringComparison.OrdinalIgnoreCase));
         }
 
         private static string NormalizeScreenValue(string value) => value.Trim();
