@@ -123,9 +123,11 @@ namespace BASpark
 
         private void SyncScreenshotCompatCaptureSurfaces(bool enabled)
         {
-            if (!enabled && !IsForegroundScreenshotHost())
+            if (!enabled)
             {
+                TeardownScreenshotCompatCaptureSurfaces();
                 EndScreenshotCaptureSession();
+                return;
             }
 
             if (_globalHook == null)
@@ -157,6 +159,8 @@ namespace BASpark
                 _globalHook.KeyUp -= OnScreenshotCompatKeyUp;
             }
             _screenshotCompatCaptureWired = false;
+            _winKeyDown = false;
+            _shiftKeyDown = false;
             SyncForegroundWinEventHook();
             StopScreenshotEndDebounce();
             CancelScreenshotFailsafeTimer();
@@ -249,7 +253,7 @@ namespace BASpark
 
         private void EvaluateScreenshotForegroundForCapture()
         {
-            if (_disposed)
+            if (_disposed || !_screenshotCompatCaptureWired)
             {
                 return;
             }
@@ -307,7 +311,7 @@ namespace BASpark
 
         private void OnScreenshotCompatKeyDown(object? sender, KeyEventArgs e)
         {
-            if (_disposed)
+            if (_disposed || !_screenshotCompatCaptureWired)
             {
                 return;
             }
@@ -357,7 +361,7 @@ namespace BASpark
 
         private void OnScreenshotCompatKeyUp(object? sender, KeyEventArgs e)
         {
-            if (_disposed)
+            if (_disposed || !_screenshotCompatCaptureWired)
             {
                 return;
             }
@@ -375,7 +379,7 @@ namespace BASpark
 
         private void BeginScreenshotCaptureSession()
         {
-            if (_disposed)
+            if (_disposed || !_screenshotCompatCaptureWired)
             {
                 return;
             }
@@ -413,7 +417,7 @@ namespace BASpark
 
         private void ScheduleEndOnDispatcherThread()
         {
-            if (_disposed)
+            if (_disposed || !_screenshotCaptureSessionActive)
             {
                 return;
             }

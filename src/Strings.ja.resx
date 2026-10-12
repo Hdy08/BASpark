@@ -82,7 +82,7 @@
       <value>タスクマネージャーなどの高権限ウィンドウでエフェクトを表示する場合に必要です。</value>
     </data>
     <data name="Basic_ScreenshotHint" xml:space="preserve">
-      <value>（実験的）有効にすると、QQ (Ctrl+Alt+A) または WeChat (Alt+A) のスクリーンショット時にエフェクトを一時非表示にします。この設定に関係なく、システムのスクリーンショットでは正しくウィンドウを選択できるようオーバーレイを一時非表示にします。</value>
+      <value>（実験的）有効にすると、システム、QQ (Ctrl+Alt+A)、WeChat (Alt+A) のスクリーンショット時にエフェクトを一時非表示にします。無効時はスクリーンショット中もエフェクトを表示します。システムのウィンドウ選択には影響しません。</value>
     </data>
     <data name="Basic_ScreenshotMode" xml:space="preserve">
       <value>スクリーンショット互換</value>

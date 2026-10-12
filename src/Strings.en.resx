@@ -82,7 +82,7 @@
       <value>Required for effects over elevated windows such as Task Manager.</value>
     </data>
     <data name="Basic_ScreenshotHint" xml:space="preserve">
-      <value>(Experimental) Temporarily hides effects for QQ screenshots (Ctrl+Alt+A) or WeChat screenshots (Alt+A) when enabled. System screenshots temporarily hide the overlay for correct window selection regardless of this setting.</value>
+      <value>(Experimental) Temporarily hides effects for system screenshots, QQ screenshots (Ctrl+Alt+A), or WeChat screenshots (Alt+A) when enabled. Effects remain visible during screenshots when disabled. System screenshot window selection is independent of this setting.</value>
     </data>
     <data name="Basic_ScreenshotMode" xml:space="preserve">
       <value>Screenshot compatibility</value>
