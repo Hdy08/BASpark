@@ -671,10 +671,14 @@ public class WinUi3UiTests
 
     [Theory]
     [InlineData(0, 0.25, 0.75, -1150, 700)]
-    [InlineData(1, 0.25, 0.75, -1150, 300)]
-    [InlineData(2, 0.25, 0.75, -650, 300)]
-    [InlineData(3, 0.25, 0.75, -650, 700)]
-    [InlineData(0, -1, 2, -1400, 900)]
+    [InlineData(1, 0.25, 0.75, -1150, 700)]
+    [InlineData(2, 0.25, 0.75, -1150, 300)]
+    [InlineData(3, 0.25, 0.75, -650, 300)]
+    [InlineData(4, 0.25, 0.75, -650, 700)]
+    [InlineData(1, 0.75, 0.25, -650, 300)]
+    [InlineData(1, 0, 0, -1400, 100)]
+    [InlineData(1, 1, 1, -400, 900)]
+    [InlineData(1, -1, 2, -1400, 900)]
     public void TouchscreenInput_MapsRawContactCoordinatesToTheAssignedRotatedDisplay(uint orientation, double normalizedX,
         double normalizedY, int screenX, int screenY)
     {
@@ -684,8 +688,13 @@ public class WinUi3UiTests
         Assert.Equal(screenY, point.y);
     }
 
-    [Fact]
-    public void TouchscreenInput_ReceivesContactsWithoutMousePromotionAndIgnoresUnusedFingerSlots()
+    [Theory]
+    [InlineData(1, -750, 700, -500, 700)]
+    [InlineData(2, -750, 300, -750, 500)]
+    [InlineData(3, -250, 300, -500, 300)]
+    [InlineData(4, -250, 700, -250, 500)]
+    public void TouchscreenInput_ReceivesContactsWithoutMousePromotionAndIgnoresUnusedFingerSlots(uint orientation,
+        int downX, int downY, int moveX, int moveY)
     {
         var values = new List<NativeMethods.HIDP_VALUE_CAPS>();
         var buttons = new List<NativeMethods.HIDP_BUTTON_CAPS>();
@@ -721,17 +730,17 @@ public class WinUi3UiTests
         data[0].Value = 250;
         data[1].Value = 750;
         data[3].Value = 1;
-        device.ProcessData(1, data, display, 0, Receive);
-        Assert.Equal((0U, false, true, -750, 700), Assert.Single(received));
+        device.ProcessData(1, data, display, orientation, Receive);
+        Assert.Equal((0U, false, true, downX, downY), Assert.Single(received));
         data[0].Value = 500;
-        device.ProcessData(1, data, display, 0, Receive);
-        Assert.Equal((0U, true, true, -500, 700), received[^1]);
-        device.ProcessData(2, data, display, 0, Receive);
+        device.ProcessData(1, data, display, orientation, Receive);
+        Assert.Equal((0U, true, true, moveX, moveY), received[^1]);
+        device.ProcessData(2, data, display, orientation, Receive);
         Assert.Equal(2, received.Count);
         data[3].Value = 0;
-        device.ProcessData(1, data, display, 0, Receive);
-        Assert.Equal((0U, true, false, -500, 700), received[^1]);
-        device.ProcessData(1, data, display, 0, Receive);
+        device.ProcessData(1, data, display, orientation, Receive);
+        Assert.Equal((0U, true, false, moveX, moveY), received[^1]);
+        device.ProcessData(1, data, display, orientation, Receive);
         Assert.Equal(3, received.Count);
     }
 

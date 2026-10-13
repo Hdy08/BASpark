@@ -1524,8 +1524,8 @@ namespace BASpark
         {
             (normalizedX, normalizedY) = orientation switch
             {
-                1 => (1 - normalizedY, normalizedX), 2 => (1 - normalizedX, 1 - normalizedY),
-                3 => (normalizedY, 1 - normalizedX), _ => (normalizedX, normalizedY)
+                2 => (1 - normalizedY, normalizedX), 3 => (1 - normalizedX, 1 - normalizedY),
+                4 => (normalizedY, 1 - normalizedX), _ => (normalizedX, normalizedY)
             };
             return new NativeMethods.POINT
             {
