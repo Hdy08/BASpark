@@ -2248,7 +2248,7 @@ public class WinUi3UiTests
 
         Assert.Equal("UserControl", document.Root?.Name.LocalName);
         Assert.Contains("ControlPanelWindow : UserControl", source, StringComparison.Ordinal);
-        Assert.Contains("_host = new DcompPanelHost()", source, StringComparison.Ordinal);
+        Assert.Contains("_host = new DcompPanelHost(minimumWidth: LanguageMinimumWidth)", source, StringComparison.Ordinal);
         Assert.Contains("_host.SetContent(this)", source, StringComparison.Ordinal);
         Assert.Contains("WsExNoRedirectionBitmap = 0x00200000", hostSource, StringComparison.Ordinal);
         Assert.Contains("_xamlSource.SiteBridge.MoveAndResize", hostSource, StringComparison.Ordinal);
