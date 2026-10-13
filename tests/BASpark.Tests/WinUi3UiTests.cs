@@ -2797,6 +2797,21 @@ public class WinUi3UiTests
     {
         Assert.Contains("MinWidthDesign = 800", ReadSource("src", "DcompPanelHost.cs"), StringComparison.Ordinal);
         Assert.Contains("DesignWidth = 800", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        var minimumWidth = typeof(ControlPanelWindow).GetProperty("LanguageMinimumWidth",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+        string originalCulture = Localization.CurrentCultureName;
+        try
+        {
+            foreach (var setting in new[] { (Localization.CultureZhCn, 800), (Localization.CultureEn, 900), (Localization.CultureJa, 900) })
+            {
+                Localization.ApplyCulture(setting.Item1);
+                Assert.Equal(setting.Item2, minimumWidth.GetValue(null));
+            }
+        }
+        finally
+        {
+            Localization.ApplyCulture(originalCulture);
+        }
     }
 
     [Fact]
@@ -2922,10 +2937,11 @@ public class WinUi3UiTests
     }
 
     [Theory]
-    [InlineData(0, "1970-01-01 00:00:00")]
-    [InlineData(480, "1970-01-01 08:00:00")]
-    [InlineData(-480, "1969-12-31 16:00:00")]
-    [InlineData(330, "1970-01-01 05:30:00")]
+    [InlineData(0, "1970-01-01 00:00:00 UTC+0")]
+    [InlineData(480, "1970-01-01 08:00:00 UTC+8")]
+    [InlineData(-480, "1969-12-31 16:00:00 UTC-8")]
+    [InlineData(330, "1970-01-01 05:30:00 UTC+5:30")]
+    [InlineData(-30, "1969-12-31 23:30:00 UTC-0:30")]
     public void BuildInformation_ConvertsUtcTimestampsToTheRequestedSystemTimeZone(int offsetMinutes, string expected)
     {
         TimeZoneInfo timeZone = TimeZoneInfo.CreateCustomTimeZone("BuildTime", TimeSpan.FromMinutes(offsetMinutes), "BuildTime", "BuildTime");

@@ -17,9 +17,14 @@ internal static class BuildInformation
         commitHash.Length == 40 && commitHash.All(Uri.IsHexDigit)
             ? "https://github.com/Hdy08/BASpark/commit/" + commitHash : null;
 
-    internal static string FormatBuildTime(long timestamp, TimeZoneInfo timeZone) =>
-        TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeSeconds(timestamp), timeZone)
-            .ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+    internal static string FormatBuildTime(long timestamp, TimeZoneInfo timeZone)
+    {
+        DateTimeOffset localTime = TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeSeconds(timestamp), timeZone);
+        string formatted = localTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'%z", CultureInfo.InvariantCulture);
+        if (localTime.Offset.Minutes != 0)
+            formatted += ":" + Math.Abs(localTime.Offset.Minutes).ToString("00", CultureInfo.InvariantCulture);
+        return formatted;
+    }
 
     private static string ReadMetadata(string key) =>
         typeof(BuildInformation).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()

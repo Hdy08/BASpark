@@ -368,6 +368,7 @@ public sealed partial class ControlPanelWindow : UserControl
     // 初始尺寸。
     private const int DesignWidth = 800;
     private const int DesignHeight = 600;
+    private static int LanguageMinimumWidth => Localization.IsChineseLocale ? DesignWidth : 900;
     private bool _windowSizeRestored;
 
     private NavigationViewItem? _selectedSettingsItem;
@@ -479,7 +480,7 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         InitializeComponent();
         WindowChrome.ApplyTitleBarIcon(AppTitleBar);
-        _host = new DcompPanelHost();
+        _host = new DcompPanelHost(minimumWidth: LanguageMinimumWidth);
         _selectionToolbars[ListRunningProcesses] = new(BtnRunningInvert, BtnRunningSelectAll, BtnOverlayConfirmAdd, TxtRunningNoResults, []);
         _selectionToolbars[ListVisualResetItems] = new(BtnResetInvert, BtnResetSelectAll, BtnOverlayVisualConfirm, TxtResetNoResults, []);
         _selectionToolbars[ListBackupItems] = new(BtnBackupInvert, BtnBackupSelectAll, BtnBackupConfirm, TxtBackupNoResults, []);
@@ -729,8 +730,8 @@ public sealed partial class ControlPanelWindow : UserControl
             }
             contentWidth = Math.Max(contentWidth, width);
         }
-        _host.SetMinimumWidth((int)Math.Ceiling(contentWidth + PanelBody.ColumnDefinitions[0].Width.Value +
-            PageWelcome.Padding.Left + PageWelcome.Padding.Right + 8));
+        _host.SetMinimumWidth(Math.Max(LanguageMinimumWidth, (int)Math.Ceiling(contentWidth + PanelBody.ColumnDefinitions[0].Width.Value +
+            PageWelcome.Padding.Left + PageWelcome.Padding.Right + 8)));
     }
 
     /// <summary>WinUI 只负责内容区主题，标题栏按钮需要自己跟随（等价于旧的 ThemeManager.ApplyTitleBar）。</summary>
