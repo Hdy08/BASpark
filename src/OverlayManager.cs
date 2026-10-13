@@ -25,6 +25,8 @@ namespace BASpark
         private IKeyboardMouseEvents? _globalHook;
         private IntPtr _mouseHook;
         private NativeMethods.MouseHookProc? _mouseHookDelegate;
+        private TouchInputListener? _touchInputListener;
+        private NativeMethods.POINT? _touchPoint;
         private OverlayWindow? _activePointerOverlay;
         private OverlayWindow? _lastTrailOverlay;
         private OverlayWindow? _lastTrailThrottleOverlay;
@@ -106,6 +108,7 @@ namespace BASpark
         {
             ConfigManager.IsTouchscreenMode = enabled;
             if (!enabled && _isTouchLikeInput) ReleasePointerStateSilent();
+            SyncTouchInputListener();
             ForEachOverlay(w => w.UpdateTouchMode(enabled));
         }
         public void UpdateScreenshotCompatibilityMode(bool enabled)
@@ -142,11 +145,44 @@ namespace BASpark
                 NativeMethods.WH_MOUSE_LL, _mouseHookDelegate, NativeMethods.GetModuleHandle(null), 0);
             if (_mouseHook == IntPtr.Zero)
                 throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            SyncTouchInputListener();
             SyncScreenshotCompatCaptureSurfaces(ConfigManager.ScreenshotCompatibilityMode);
+        }
+
+        private void SyncTouchInputListener()
+        {
+            if (_mouseHook != IntPtr.Zero && ConfigManager.IsTouchscreenMode)
+            {
+                _touchInputListener ??= new TouchInputListener(OnTouchInput);
+            }
+            else
+            {
+                _touchInputListener?.Dispose();
+                _touchInputListener = null;
+            }
+        }
+
+        private void OnTouchInput(TouchInputPhase phase, int screenX, int screenY)
+        {
+            switch (phase)
+            {
+                case TouchInputPhase.Down:
+                    if (_isPrimaryPointerDown && _isTouchLikeInput) OnPointerMove(screenX, screenY, true);
+                    else OnPointerDown(MouseButtons.Left, screenX, screenY, true);
+                    break;
+                case TouchInputPhase.Move:
+                    OnPointerMove(screenX, screenY, true);
+                    break;
+                case TouchInputPhase.Up:
+                    OnPointerUp(true);
+                    break;
+            }
         }
 
         private void UninstallMouseHook()
         {
+            _touchInputListener?.Dispose();
+            _touchInputListener = null;
             if (_mouseHook == IntPtr.Zero) return;
             NativeMethods.UnhookWindowsHookEx(_mouseHook);
             _mouseHook = IntPtr.Zero;
@@ -171,6 +207,7 @@ namespace BASpark
         private void HandleMouseInput(uint message, NativeMethods.MSLLHOOKSTRUCT input)
         {
             bool touchLike = NativeMethods.IsTouchInput(input.dwExtraInfo);
+            if (touchLike && _touchInputListener?.ShouldIgnorePromotedTouch(input.pt.x, input.pt.y) == true) return;
             switch (message)
             {
                 case NativeMethods.WM_MOUSEMOVE:
@@ -562,8 +599,9 @@ namespace BASpark
             // 点击特效开关
             if (!ConfigManager.IsClickEffectActive) return;
             if (touchLike && !ConfigManager.IsTouchscreenMode) return;
+            if (touchLike) _touchPoint = new NativeMethods.POINT { x = cursorX, y = cursorY };
             // 每次点击都检测环境 避免切窗后首次点击渲染
-            if (ShouldSuppressEffects(forceRefresh: true)) return;
+            if (ShouldSuppressEffects(forceRefresh: true, inputPoint: touchLike ? _touchPoint : null)) return;
             if (!CanRenderEffects(touchLike, skipSuppressionCheck: true)) return;
 
             bool isLeft = button == MouseButtons.Left;
@@ -621,6 +659,7 @@ namespace BASpark
         {
             if (touchLike && (!ConfigManager.IsTouchscreenMode || !_isPrimaryPointerDown || !_isTouchLikeInput)) return;
             if (_isPrimaryPointerDown && touchLike != _isTouchLikeInput) return;
+            if (touchLike) _touchPoint = new NativeMethods.POINT { x = cursorX, y = cursorY };
             // 拖尾仅在点击特效开启或常驻拖尾开启时渲染
             if (!ConfigManager.IsTrailEffectActive)
             {
@@ -853,6 +892,7 @@ namespace BASpark
             _isPrimaryPointerDown = false;
             _isTouchLikeInput = false;
             _activePointerOverlay = null;
+            _touchPoint = null;
         }
 
         private void SwitchAlwaysTrailOverlay(OverlayWindow? target)
@@ -1001,7 +1041,7 @@ namespace BASpark
             _overlays.Remove(deviceName);
         }
 
-        private bool ShouldSuppressEffects(bool forceRefresh = false)
+        private bool ShouldSuppressEffects(bool forceRefresh = false, NativeMethods.POINT? inputPoint = null)
         {
             long nowTicks = DateTime.UtcNow.Ticks;
             if (!ConfigManager.EnableEnvironmentFilter)
@@ -1010,7 +1050,9 @@ namespace BASpark
                 return false;
             }
 
-            NativeMethods.GetCursorPos(out NativeMethods.POINT pt);
+            NativeMethods.POINT pt;
+            if ((inputPoint ?? (_isTouchLikeInput ? _touchPoint : null)) is NativeMethods.POINT touchPoint) pt = touchPoint;
+            else NativeMethods.GetCursorPos(out pt);
             IntPtr cursorHwnd = NativeMethods.WindowFromPoint(pt);
             IntPtr targetWindow = NativeMethods.GetAncestor(cursorHwnd, NativeMethods.GA_ROOT);
 
@@ -1360,6 +1402,251 @@ namespace BASpark
             UninstallForegroundWinEventHook();
 
             CloseWindows();
+        }
+    }
+
+    internal enum TouchInputPhase { Down, Move, Up }
+
+    internal sealed class TouchInputListener : NativeWindow, IDisposable
+    {
+        private readonly Action<TouchInputPhase, int, int> _input;
+        private readonly Action<IntPtr, uint, bool, bool, int, int> _contactInput;
+        private readonly Dictionary<IntPtr, TouchDevice?> _devices = new();
+        private byte[] _buffer = Array.Empty<byte>();
+        private (IntPtr Device, uint Id)? _primary;
+        private int _lastX;
+        private int _lastY;
+        private int _minX;
+        private int _minY;
+        private int _maxX;
+        private int _maxY;
+        private long _lastTouchTime;
+        private bool _hasRecentTouch;
+
+        internal TouchInputListener(Action<TouchInputPhase, int, int> input)
+        {
+            _input = input;
+            _contactInput = HandleContact;
+            CreateHandle(new CreateParams { Caption = "BASpark.TouchInput", Parent = new IntPtr(-3) });
+            var device = new NativeMethods.RAWINPUTDEVICE { UsagePage = 13, Usage = 4, Flags = 0x2100, Target = Handle };
+            if (!NativeMethods.RegisterRawInputDevices([device], 1, (uint)Marshal.SizeOf<NativeMethods.RAWINPUTDEVICE>()))
+            {
+                Debug.WriteLine("Touch input registration failed: " + Marshal.GetLastWin32Error());
+                DestroyHandle();
+            }
+        }
+
+        internal bool ShouldIgnorePromotedTouch(int screenX, int screenY) => _hasRecentTouch
+            && (_primary != null || Environment.TickCount64 - _lastTouchTime <= 1000)
+            && screenX >= _minX - 24 && screenX <= _maxX + 24 && screenY >= _minY - 24 && screenY <= _maxY + 24;
+
+        protected override void WndProc(ref Message message)
+        {
+            try
+            {
+                if (message.Msg == 0x00FF) ReadInput(message.LParam);
+                else if (message.Msg == 0x00FE)
+                {
+                    _devices.Remove(message.LParam);
+                    if (_primary?.Device == message.LParam)
+                    {
+                        _primary = null;
+                        _input(TouchInputPhase.Up, _lastX, _lastY);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine("Touch input routing failed: " + exception.Message);
+            }
+            base.WndProc(ref message);
+        }
+
+        private void ReadInput(IntPtr input)
+        {
+            uint size = 0;
+            uint headerSize = (uint)Marshal.SizeOf<NativeMethods.RAWINPUTHEADER>();
+            if (NativeMethods.GetRawInputData(input, 0x10000003, null, ref size, headerSize) == uint.MaxValue
+                || size < headerSize + 8 || size > 1024 * 1024) return;
+            if (_buffer.Length < size) _buffer = new byte[size];
+            if (NativeMethods.GetRawInputData(input, 0x10000003, _buffer, ref size, headerSize) != size) return;
+            var header = MemoryMarshal.Read<NativeMethods.RAWINPUTHEADER>(_buffer);
+            if (header.Type != 2) return;
+            if (!_devices.TryGetValue(header.Device, out TouchDevice? device))
+            {
+                device = TouchDevice.TryCreate(header.Device);
+                _devices[header.Device] = device;
+            }
+            if (device == null) return;
+            int reportSize = BitConverter.ToInt32(_buffer, (int)headerSize);
+            int reportCount = BitConverter.ToInt32(_buffer, (int)headerSize + 4);
+            if (reportSize <= 0 || reportCount <= 0 || (long)reportSize * reportCount > size - headerSize - 8) return;
+            for (int index = 0; index < reportCount; index++)
+                device.ReadReport(_buffer, (int)headerSize + 8 + index * reportSize, reportSize, _contactInput);
+        }
+
+        private void HandleContact(IntPtr device, uint id, bool wasDown, bool down, int screenX, int screenY)
+        {
+            var contact = (device, id);
+            if (!wasDown && down && _primary == null)
+            {
+                _primary = contact;
+                _minX = _maxX = screenX;
+                _minY = _maxY = screenY;
+            }
+            else if (_primary != contact) return;
+            _lastX = screenX;
+            _lastY = screenY;
+            _minX = Math.Min(_minX, screenX);
+            _minY = Math.Min(_minY, screenY);
+            _maxX = Math.Max(_maxX, screenX);
+            _maxY = Math.Max(_maxY, screenY);
+            _lastTouchTime = Environment.TickCount64;
+            _hasRecentTouch = true;
+            if (!down) _primary = null;
+            _input(down ? wasDown ? TouchInputPhase.Move : TouchInputPhase.Down : TouchInputPhase.Up, screenX, screenY);
+        }
+
+        public void Dispose()
+        {
+            if (Handle != IntPtr.Zero)
+            {
+                var device = new NativeMethods.RAWINPUTDEVICE { UsagePage = 13, Usage = 4, Flags = 1 };
+                NativeMethods.RegisterRawInputDevices([device], 1, (uint)Marshal.SizeOf<NativeMethods.RAWINPUTDEVICE>());
+                DestroyHandle();
+            }
+            _primary = null;
+            _devices.Clear();
+            _buffer = Array.Empty<byte>();
+        }
+
+        internal static NativeMethods.POINT MapPoint(double normalizedX, double normalizedY, uint orientation, NativeMethods.RECT display)
+        {
+            (normalizedX, normalizedY) = orientation switch
+            {
+                1 => (1 - normalizedY, normalizedX), 2 => (1 - normalizedX, 1 - normalizedY),
+                3 => (normalizedY, 1 - normalizedX), _ => (normalizedX, normalizedY)
+            };
+            return new NativeMethods.POINT
+            {
+                x = display.Left + (int)Math.Round(Math.Clamp(normalizedX, 0, 1) * Math.Max(0, display.Width - 1)),
+                y = display.Top + (int)Math.Round(Math.Clamp(normalizedY, 0, 1) * Math.Max(0, display.Height - 1))
+            };
+        }
+
+        internal sealed class TouchDevice
+        {
+            private readonly IntPtr _device;
+            private readonly byte[] _preparsed;
+            private readonly byte[] _report;
+            private readonly NativeMethods.HIDP_DATA[] _data;
+            private readonly Dictionary<ushort, uint> _values = new();
+            private readonly Dictionary<uint, ushort> _activeCollections = new();
+            private readonly Dictionary<uint, (bool Down, uint RawX, uint RawY, Contact Contact)> _frame = new();
+            private readonly Contact[] _contacts;
+            private uint _orientation;
+
+            private readonly record struct Contact(byte ReportId, ushort Collection, NativeMethods.HIDP_VALUE_CAPS AxisX,
+                NativeMethods.HIDP_VALUE_CAPS AxisY, ushort Tip, ushort? Id);
+
+            private TouchDevice(IntPtr device, byte[] preparsed, NativeMethods.HIDP_CAPS caps, Contact[] contacts)
+            {
+                _device = device;
+                _preparsed = preparsed;
+                _report = new byte[caps.InputReportByteLength];
+                _data = new NativeMethods.HIDP_DATA[caps.NumberInputDataIndices];
+                _contacts = contacts;
+            }
+
+            internal static TouchDevice? TryCreate(IntPtr device)
+            {
+                uint size = 0;
+                if (NativeMethods.GetRawInputDeviceInfo(device, 0x20000005, null, ref size) == uint.MaxValue
+                    || size == 0 || size > 1024 * 1024) return null;
+                var preparsed = new byte[size];
+                if (NativeMethods.GetRawInputDeviceInfo(device, 0x20000005, preparsed, ref size) == uint.MaxValue
+                    || NativeMethods.HidP_GetCaps(preparsed, out var caps) != 0x110000
+                    || caps.UsagePage != 13 || caps.Usage != 4 || caps.InputReportByteLength == 0) return null;
+                var values = new NativeMethods.HIDP_VALUE_CAPS[caps.NumberInputValueCaps];
+                var buttons = new NativeMethods.HIDP_BUTTON_CAPS[caps.NumberInputButtonCaps];
+                ushort valueCount = caps.NumberInputValueCaps;
+                ushort buttonCount = caps.NumberInputButtonCaps;
+                if (NativeMethods.HidP_GetValueCaps(0, values, ref valueCount, preparsed) != 0x110000
+                    || NativeMethods.HidP_GetButtonCaps(0, buttons, ref buttonCount, preparsed) != 0x110000) return null;
+                return Create(device, preparsed, caps, values.Take(valueCount).ToArray(), buttons.Take(buttonCount).ToArray());
+            }
+
+            internal static TouchDevice? Create(IntPtr device, byte[] preparsed, NativeMethods.HIDP_CAPS caps,
+                NativeMethods.HIDP_VALUE_CAPS[] values, NativeMethods.HIDP_BUTTON_CAPS[] buttons)
+            {
+                var contacts = new List<Contact>();
+                foreach (var tip in buttons.Where(cap => cap.UsagePage == 13 && ContainsUsage(cap.UsageMin, cap.UsageMax, cap.IsRange, 0x42)))
+                {
+                    var axes = values.Where(cap => cap.ReportId == tip.ReportId && cap.LinkCollection == tip.LinkCollection).ToArray();
+                    var axisX = axes.FirstOrDefault(cap => cap.UsagePage == 1 && ContainsUsage(cap.UsageMin, cap.UsageMax, cap.IsRange, 0x30));
+                    var axisY = axes.FirstOrDefault(cap => cap.UsagePage == 1 && ContainsUsage(cap.UsageMin, cap.UsageMax, cap.IsRange, 0x31));
+                    if (axisX.LogicalMax <= axisX.LogicalMin || axisY.LogicalMax <= axisY.LogicalMin || axisX.IsAbsolute == 0 || axisY.IsAbsolute == 0) continue;
+                    axisX.DataIndexMin += (ushort)(0x30 - axisX.UsageMin);
+                    axisY.DataIndexMin += (ushort)(0x31 - axisY.UsageMin);
+                    var identifier = axes.FirstOrDefault(cap => cap.UsagePage == 13 && ContainsUsage(cap.UsageMin, cap.UsageMax, cap.IsRange, 0x51));
+                    contacts.Add(new Contact(tip.ReportId, tip.LinkCollection, axisX, axisY,
+                        (ushort)(tip.DataIndexMin + 0x42 - tip.UsageMin), identifier.UsagePage == 13
+                            ? (ushort)(identifier.DataIndexMin + 0x51 - identifier.UsageMin) : null));
+                }
+                return contacts.Count == 0 ? null : new TouchDevice(device, preparsed, caps, contacts.ToArray());
+            }
+
+            private static bool ContainsUsage(ushort minimum, ushort maximum, byte range, ushort usage) =>
+                minimum == usage || (range != 0 && usage >= minimum && usage <= maximum);
+
+            internal void ReadReport(byte[] buffer, int offset, int length, Action<IntPtr, uint, bool, bool, int, int> contactInput)
+            {
+                if (length != _report.Length) return;
+                Buffer.BlockCopy(buffer, offset, _report, 0, length);
+                uint count = (uint)_data.Length;
+                if (NativeMethods.HidP_GetData(0, _data, ref count, _preparsed, _report, (uint)length) != 0x110000) return;
+                if (!NativeMethods.GetPointerDeviceRects(_device, out _, out var display) || display.Width <= 0 || display.Height <= 0) return;
+                if (_activeCollections.Count == 0 && NativeMethods.GetPointerDevice(_device, out var info)) _orientation = info.DisplayOrientation;
+                ProcessData(_report[0], _data.AsSpan(0, (int)count), display, _orientation, contactInput);
+            }
+
+            internal void ProcessData(byte reportId, ReadOnlySpan<NativeMethods.HIDP_DATA> data, NativeMethods.RECT display,
+                uint orientation, Action<IntPtr, uint, bool, bool, int, int> contactInput)
+            {
+                _values.Clear();
+                foreach (var item in data) _values[item.DataIndex] = item.Value;
+                _frame.Clear();
+                foreach (Contact contact in _contacts)
+                {
+                    if (contact.ReportId != reportId
+                        || !_values.TryGetValue(contact.AxisX.DataIndexMin, out uint rawX)
+                        || !_values.TryGetValue(contact.AxisY.DataIndexMin, out uint rawY)) continue;
+                    uint id = contact.Id is ushort identifier ? _values.GetValueOrDefault(identifier) : contact.Collection;
+                    bool down = _values.GetValueOrDefault(contact.Tip) != 0;
+                    if (!_frame.TryGetValue(id, out var existing) || down
+                        || (!existing.Down && _activeCollections.GetValueOrDefault(id) == contact.Collection))
+                        _frame[id] = (down, rawX, rawY, contact);
+                }
+                foreach (var pair in _frame)
+                {
+                    uint id = pair.Key;
+                    var sample = pair.Value;
+                    bool down = sample.Down;
+                    bool wasDown = _activeCollections.ContainsKey(id);
+                    if (down) _activeCollections[id] = sample.Contact.Collection;
+                    else _activeCollections.Remove(id);
+                    if (!down && !wasDown) continue;
+                    var point = MapPoint(Normalize(sample.RawX, sample.Contact.AxisX), Normalize(sample.RawY, sample.Contact.AxisY), orientation, display);
+                    contactInput(_device, id, wasDown, down, point.x, point.y);
+                }
+            }
+
+            private static double Normalize(uint value, NativeMethods.HIDP_VALUE_CAPS axis)
+            {
+                long signed = axis.LogicalMin < 0 && axis.BitSize is > 0 and <= 32
+                    ? (int)(value << (32 - axis.BitSize)) >> (32 - axis.BitSize) : value;
+                return (signed - (double)axis.LogicalMin) / ((double)axis.LogicalMax - axis.LogicalMin);
+            }
         }
     }
 }

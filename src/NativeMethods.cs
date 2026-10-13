@@ -102,6 +102,83 @@ internal static class NativeMethods
         public UIntPtr dwExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RAWINPUTDEVICE
+    {
+        public ushort UsagePage;
+        public ushort Usage;
+        public uint Flags;
+        public IntPtr Target;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RAWINPUTHEADER
+    {
+        public uint Type;
+        public uint Size;
+        public IntPtr Device;
+        public IntPtr Parameter;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
+    internal struct HIDP_CAPS
+    {
+        [FieldOffset(0)] public ushort Usage;
+        [FieldOffset(2)] public ushort UsagePage;
+        [FieldOffset(4)] public ushort InputReportByteLength;
+        [FieldOffset(46)] public ushort NumberInputButtonCaps;
+        [FieldOffset(48)] public ushort NumberInputValueCaps;
+        [FieldOffset(50)] public ushort NumberInputDataIndices;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 72)]
+    internal struct HIDP_VALUE_CAPS
+    {
+        [FieldOffset(0)] public ushort UsagePage;
+        [FieldOffset(2)] public byte ReportId;
+        [FieldOffset(6)] public ushort LinkCollection;
+        [FieldOffset(12)] public byte IsRange;
+        [FieldOffset(15)] public byte IsAbsolute;
+        [FieldOffset(18)] public ushort BitSize;
+        [FieldOffset(40)] public int LogicalMin;
+        [FieldOffset(44)] public int LogicalMax;
+        [FieldOffset(56)] public ushort UsageMin;
+        [FieldOffset(58)] public ushort UsageMax;
+        [FieldOffset(68)] public ushort DataIndexMin;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 72)]
+    internal struct HIDP_BUTTON_CAPS
+    {
+        [FieldOffset(0)] public ushort UsagePage;
+        [FieldOffset(2)] public byte ReportId;
+        [FieldOffset(6)] public ushort LinkCollection;
+        [FieldOffset(12)] public byte IsRange;
+        [FieldOffset(56)] public ushort UsageMin;
+        [FieldOffset(58)] public ushort UsageMax;
+        [FieldOffset(68)] public ushort DataIndexMin;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct HIDP_DATA
+    {
+        public ushort DataIndex;
+        public ushort Reserved;
+        public uint Value;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct POINTER_DEVICE_INFO
+    {
+        public uint DisplayOrientation;
+        public IntPtr Device;
+        public uint Type;
+        public IntPtr Monitor;
+        public uint StartingCursorId;
+        public ushort MaxActiveContacts;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 520)] public string ProductString;
+    }
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     internal struct MONITORINFOEX
     {
@@ -150,6 +227,33 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     internal static extern bool UnhookWindowsHookEx(IntPtr hook);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool RegisterRawInputDevices(RAWINPUTDEVICE[] devices, uint count, uint size);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern uint GetRawInputData(IntPtr input, uint command, [Out] byte[]? data, ref uint size, uint headerSize);
+
+    [DllImport("user32.dll", EntryPoint = "GetRawInputDeviceInfoW", SetLastError = true)]
+    internal static extern uint GetRawInputDeviceInfo(IntPtr device, uint command, [Out] byte[]? data, ref uint size);
+
+    [DllImport("user32.dll")]
+    internal static extern bool GetPointerDeviceRects(IntPtr device, out RECT deviceRect, out RECT displayRect);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern bool GetPointerDevice(IntPtr device, out POINTER_DEVICE_INFO info);
+
+    [DllImport("hid.dll")]
+    internal static extern int HidP_GetCaps(byte[] preparsed, out HIDP_CAPS caps);
+
+    [DllImport("hid.dll")]
+    internal static extern int HidP_GetValueCaps(int reportType, [Out] HIDP_VALUE_CAPS[] caps, ref ushort count, byte[] preparsed);
+
+    [DllImport("hid.dll")]
+    internal static extern int HidP_GetButtonCaps(int reportType, [Out] HIDP_BUTTON_CAPS[] caps, ref ushort count, byte[] preparsed);
+
+    [DllImport("hid.dll")]
+    internal static extern int HidP_GetData(int reportType, [Out] HIDP_DATA[] data, ref uint count, byte[] preparsed, byte[] report, uint length);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern int GetWindowLong(IntPtr hWnd, int nIndex);
@@ -331,6 +435,7 @@ internal static class NativeMethods
     internal static bool IsCursorVisible(CURSORINFO pci, bool allowTouchSuppression)
     {
         bool suppressed = (pci.flags & CURSOR_SUPPRESSED) != 0;
+        if (suppressed && allowTouchSuppression && pci.hCursor == IntPtr.Zero) return true;
         if (pci.hCursor == IntPtr.Zero || (suppressed ? !allowTouchSuppression : (pci.flags & CURSOR_SHOWING) == 0))
         {
             lock (CursorShapeGate) _cachedCursorShape = IntPtr.Zero;

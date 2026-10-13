@@ -544,25 +544,38 @@ public class WinUi3UiTests
     {
         bool previousCompatibility = ConfigManager.ScreenshotCompatibilityMode;
         bool previousFilter = ConfigManager.EnableEnvironmentFilter;
+        bool previousTouchMode = ConfigManager.IsTouchscreenMode;
         using var manager = new OverlayManager();
         const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
         var setup = typeof(OverlayManager).GetMethod("SetupGlobalHooks", members)!.CreateDelegate<Action>(manager);
         var hook = typeof(OverlayManager).GetField("_mouseHook", members)!;
+        var touchListener = typeof(OverlayManager).GetField("_touchInputListener", members)!;
         try
         {
             ConfigManager.ScreenshotCompatibilityMode = false;
             ConfigManager.EnableEnvironmentFilter = false;
+            ConfigManager.IsTouchscreenMode = true;
             setup();
             Assert.NotEqual(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
+            var firstListener = Assert.IsType<TouchInputListener>(touchListener.GetValue(manager));
+            Assert.NotEqual(IntPtr.Zero, firstListener.Handle);
             setup();
             Assert.NotEqual(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
+            Assert.Equal(IntPtr.Zero, firstListener.Handle);
+            manager.UpdateTouchMode(false);
+            Assert.Null(touchListener.GetValue(manager));
+            manager.UpdateTouchMode(true);
+            var lastListener = Assert.IsType<TouchInputListener>(touchListener.GetValue(manager));
+            Assert.NotEqual(IntPtr.Zero, lastListener.Handle);
             manager.Dispose();
             Assert.Equal(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
+            Assert.Equal(IntPtr.Zero, lastListener.Handle);
         }
         finally
         {
             ConfigManager.ScreenshotCompatibilityMode = previousCompatibility;
             ConfigManager.EnableEnvironmentFilter = previousFilter;
+            ConfigManager.IsTouchscreenMode = previousTouchMode;
         }
     }
 
@@ -599,7 +612,7 @@ public class WinUi3UiTests
         };
         Assert.Equal(visible, NativeMethods.IsCursorVisible(cursorInfo, touch));
         cursorInfo.hCursor = IntPtr.Zero;
-        Assert.False(NativeMethods.IsCursorVisible(cursorInfo, touch));
+        Assert.Equal(touch && (flags & NativeMethods.CURSOR_SUPPRESSED) != 0, NativeMethods.IsCursorVisible(cursorInfo, touch));
     }
 
     [Theory]
@@ -654,6 +667,98 @@ public class WinUi3UiTests
         {
             ConfigManager.IsTouchscreenMode = previousMode;
         }
+    }
+
+    [Theory]
+    [InlineData(0, 0.25, 0.75, -1150, 700)]
+    [InlineData(1, 0.25, 0.75, -1150, 300)]
+    [InlineData(2, 0.25, 0.75, -650, 300)]
+    [InlineData(3, 0.25, 0.75, -650, 700)]
+    [InlineData(0, -1, 2, -1400, 900)]
+    public void TouchscreenInput_MapsRawContactCoordinatesToTheAssignedRotatedDisplay(uint orientation, double normalizedX,
+        double normalizedY, int screenX, int screenY)
+    {
+        var display = new NativeMethods.RECT { Left = -1400, Top = 100, Right = -399, Bottom = 901 };
+        var point = TouchInputListener.MapPoint(normalizedX, normalizedY, orientation, display);
+        Assert.Equal(screenX, point.x);
+        Assert.Equal(screenY, point.y);
+    }
+
+    [Fact]
+    public void TouchscreenInput_ReceivesContactsWithoutMousePromotionAndIgnoresUnusedFingerSlots()
+    {
+        var values = new List<NativeMethods.HIDP_VALUE_CAPS>();
+        var buttons = new List<NativeMethods.HIDP_BUTTON_CAPS>();
+        for (ushort collection = 1; collection <= 2; collection++)
+        {
+            ushort firstIndex = (ushort)((collection - 1) * 4);
+            values.Add(new NativeMethods.HIDP_VALUE_CAPS
+            {
+                UsagePage = 1, ReportId = 1, LinkCollection = collection, IsRange = 1, IsAbsolute = 1,
+                BitSize = 16, LogicalMin = 0, LogicalMax = 1000, UsageMin = 0x30, UsageMax = 0x31, DataIndexMin = firstIndex
+            });
+            values.Add(new NativeMethods.HIDP_VALUE_CAPS
+            {
+                UsagePage = 13, ReportId = 1, LinkCollection = collection, UsageMin = 0x51, DataIndexMin = (ushort)(firstIndex + 2)
+            });
+            buttons.Add(new NativeMethods.HIDP_BUTTON_CAPS
+            {
+                UsagePage = 13, ReportId = 1, LinkCollection = collection, UsageMin = 0x42, DataIndexMin = (ushort)(firstIndex + 3)
+            });
+        }
+        var device = TouchInputListener.TouchDevice.Create(new IntPtr(123), Array.Empty<byte>(),
+            new NativeMethods.HIDP_CAPS { InputReportByteLength = 10, NumberInputDataIndices = 8 }, values.ToArray(), buttons.ToArray());
+        Assert.NotNull(device);
+        var received = new List<(uint Id, bool WasDown, bool Down, int ScreenX, int ScreenY)>();
+        void Receive(IntPtr source, uint id, bool wasDown, bool down, int screenX, int screenY)
+        {
+            Assert.Equal(new IntPtr(123), source);
+            received.Add((id, wasDown, down, screenX, screenY));
+        }
+        var display = new NativeMethods.RECT { Left = -1000, Top = 100, Right = 1, Bottom = 901 };
+        var data = new NativeMethods.HIDP_DATA[8];
+        for (ushort index = 0; index < data.Length; index++) data[index].DataIndex = index;
+        data[0].Value = 250;
+        data[1].Value = 750;
+        data[3].Value = 1;
+        device.ProcessData(1, data, display, 0, Receive);
+        Assert.Equal((0U, false, true, -750, 700), Assert.Single(received));
+        data[0].Value = 500;
+        device.ProcessData(1, data, display, 0, Receive);
+        Assert.Equal((0U, true, true, -500, 700), received[^1]);
+        device.ProcessData(2, data, display, 0, Receive);
+        Assert.Equal(2, received.Count);
+        data[3].Value = 0;
+        device.ProcessData(1, data, display, 0, Receive);
+        Assert.Equal((0U, true, false, -500, 700), received[^1]);
+        device.ProcessData(1, data, display, 0, Receive);
+        Assert.Equal(3, received.Count);
+    }
+
+    [Fact]
+    public void TouchscreenInput_KeepsOnePrimaryContactAndDeduplicatesItsPromotedMouseMessages()
+    {
+        var received = new List<(TouchInputPhase Phase, int ScreenX, int ScreenY)>();
+        using var listener = new TouchInputListener((phase, screenX, screenY) => received.Add((phase, screenX, screenY)));
+        Assert.NotEqual(IntPtr.Zero, listener.Handle);
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contact = typeof(TouchInputListener).GetMethod("HandleContact", members)!
+            .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
+        contact(new IntPtr(1), 0, false, true, 200, 300);
+        typeof(TouchInputListener).GetField("_lastTouchTime", members)!.SetValue(listener, Environment.TickCount64 - 2000);
+        Assert.True(listener.ShouldIgnorePromotedTouch(200, 300));
+        contact(new IntPtr(1), 1, false, true, 400, 500);
+        contact(new IntPtr(1), 0, true, true, 250, 350);
+        contact(new IntPtr(1), 1, true, false, 400, 500);
+        contact(new IntPtr(1), 0, true, false, 250, 350);
+        Assert.Equal(new[] { (TouchInputPhase.Down, 200, 300), (TouchInputPhase.Move, 250, 350), (TouchInputPhase.Up, 250, 350) }, received);
+        Assert.True(listener.ShouldIgnorePromotedTouch(200, 300));
+        Assert.True(listener.ShouldIgnorePromotedTouch(250, 350));
+        Assert.False(listener.ShouldIgnorePromotedTouch(400, 500));
+        typeof(TouchInputListener).GetField("_lastTouchTime", members)!.SetValue(listener, Environment.TickCount64 - 1001);
+        Assert.False(listener.ShouldIgnorePromotedTouch(200, 300));
+        listener.Dispose();
+        Assert.Equal(IntPtr.Zero, listener.Handle);
     }
 
     [Fact]
