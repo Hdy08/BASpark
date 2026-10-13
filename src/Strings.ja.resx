@@ -97,7 +97,7 @@
       <value>タッチスクリーンモード</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
-      <value>カーソル非表示時もエフェクトが動作します。タッチスクリーンや特定の全画面アプリ向けです。</value>
+      <value>実際のタッチ操作でもエフェクトを表示します。システムやアプリがカーソルを非表示にしている場合は表示しません。</value>
     </data>
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>マウスの常時トレイルを有効にする</value>

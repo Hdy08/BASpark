@@ -30,6 +30,12 @@ public class WinUi3UiTests
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     private static extern bool GetWindowDisplayAffinity(IntPtr window, out uint affinity);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr CreateCursor(IntPtr instance, int hotSpotX, int hotSpotY, int width, int height, byte[] andMask, byte[] xorMask);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool DestroyCursor(IntPtr cursor);
+
     [Fact]
     public void PauseActions_ShareOneRuntimeStateWithoutChangingSavedEffectPreferences()
     {
@@ -531,6 +537,123 @@ public class WinUi3UiTests
         Assert.Contains("if (resetRequested)", overlaySource, StringComparison.Ordinal);
         Assert.Contains("if (_isClosing)", overlaySource, StringComparison.Ordinal);
         Assert.Contains("App.ReportFatalWebViewFailure", overlaySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TouchscreenInput_ReinstallsAndReleasesTheSourceAwareMouseHook()
+    {
+        bool previousCompatibility = ConfigManager.ScreenshotCompatibilityMode;
+        bool previousFilter = ConfigManager.EnableEnvironmentFilter;
+        using var manager = new OverlayManager();
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var setup = typeof(OverlayManager).GetMethod("SetupGlobalHooks", members)!.CreateDelegate<Action>(manager);
+        var hook = typeof(OverlayManager).GetField("_mouseHook", members)!;
+        try
+        {
+            ConfigManager.ScreenshotCompatibilityMode = false;
+            ConfigManager.EnableEnvironmentFilter = false;
+            setup();
+            Assert.NotEqual(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
+            setup();
+            Assert.NotEqual(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
+            manager.Dispose();
+            Assert.Equal(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
+        }
+        finally
+        {
+            ConfigManager.ScreenshotCompatibilityMode = previousCompatibility;
+            ConfigManager.EnableEnvironmentFilter = previousFilter;
+        }
+    }
+
+    [Theory]
+    [InlineData(0UL, false)]
+    [InlineData(1UL, false)]
+    [InlineData(0xFF515700UL, false)]
+    [InlineData(0xFF51577FUL, false)]
+    [InlineData(0xFF515780UL, true)]
+    [InlineData(0xFF515781UL, true)]
+    [InlineData(0xFF5157FFUL, true)]
+    [InlineData(0xFF515680UL, false)]
+    [InlineData(0xFFFFFFFFFF515780UL, true)]
+    public void TouchscreenInput_RecognizesTouchSignaturesWithoutTreatingMouseOrPenAsTouch(ulong extraInfo, bool touch)
+    {
+        Assert.Equal(touch, NativeMethods.IsTouchInput(new UIntPtr(extraInfo)));
+    }
+
+    [Theory]
+    [InlineData(0, false, false)]
+    [InlineData(0, true, false)]
+    [InlineData(NativeMethods.CURSOR_SHOWING, false, true)]
+    [InlineData(NativeMethods.CURSOR_SHOWING, true, true)]
+    [InlineData(NativeMethods.CURSOR_SUPPRESSED, false, false)]
+    [InlineData(NativeMethods.CURSOR_SUPPRESSED, true, true)]
+    [InlineData(NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED, false, false)]
+    [InlineData(NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED, true, true)]
+    public void TouchscreenInput_OnlyAllowsSuppressionCausedByTouchAndKeepsHiddenCursorFiltering(int flags, bool touch, bool visible)
+    {
+        var cursorInfo = new NativeMethods.CURSORINFO
+        {
+            flags = flags,
+            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+        };
+        Assert.Equal(visible, NativeMethods.IsCursorVisible(cursorInfo, touch));
+        cursorInfo.hCursor = IntPtr.Zero;
+        Assert.False(NativeMethods.IsCursorVisible(cursorInfo, touch));
+    }
+
+    [Theory]
+    [InlineData(NativeMethods.CURSOR_SHOWING, false)]
+    [InlineData(NativeMethods.CURSOR_SHOWING, true)]
+    [InlineData(NativeMethods.CURSOR_SUPPRESSED, false)]
+    [InlineData(NativeMethods.CURSOR_SUPPRESSED, true)]
+    public void TouchscreenInput_StillRejectsTransparentCursorShapes(int flags, bool touch)
+    {
+        IntPtr transparent = CreateCursor(IntPtr.Zero, 0, 0, 32, 32,
+            Enumerable.Repeat((byte)255, 128).ToArray(), new byte[128]);
+        Assert.NotEqual(IntPtr.Zero, transparent);
+        try
+        {
+            var cursorInfo = new NativeMethods.CURSORINFO { flags = flags, hCursor = transparent };
+            Assert.False(NativeMethods.IsCursorVisible(cursorInfo, touch));
+        }
+        finally
+        {
+            DestroyCursor(transparent);
+        }
+    }
+
+    [Fact]
+    public void TouchscreenInput_DoesNotMixMouseEventsIntoContactAndCancelsWhenDisabled()
+    {
+        bool previousMode = ConfigManager.IsTouchscreenMode;
+        using var manager = new OverlayManager();
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var pointerDown = typeof(OverlayManager).GetField("_isPrimaryPointerDown", members)!;
+        var touchInput = typeof(OverlayManager).GetField("_isTouchLikeInput", members)!;
+        var history = (Queue<TrailSample>)typeof(OverlayManager).GetField("_trailHistory", members)!.GetValue(manager)!;
+        var move = typeof(OverlayManager).GetMethod("OnPointerMove", members)!.CreateDelegate<Action<int, int, bool>>(manager);
+        var up = typeof(OverlayManager).GetMethod("OnPointerUp", members)!.CreateDelegate<Action<bool>>(manager);
+        try
+        {
+            manager.UpdateTouchMode(true);
+            pointerDown.SetValue(manager, true);
+            touchInput.SetValue(manager, true);
+            history.Enqueue(new TrailSample(200, 300, System.Diagnostics.Stopwatch.GetTimestamp()));
+            move(400, 500, false);
+            up(false);
+            Assert.True((bool)pointerDown.GetValue(manager)!);
+            Assert.True((bool)touchInput.GetValue(manager)!);
+            Assert.Equal(200, Assert.Single(history).ScreenX);
+            manager.UpdateTouchMode(false);
+            Assert.False((bool)pointerDown.GetValue(manager)!);
+            Assert.False((bool)touchInput.GetValue(manager)!);
+            Assert.Empty(history);
+        }
+        finally
+        {
+            ConfigManager.IsTouchscreenMode = previousMode;
+        }
     }
 
     [Fact]
@@ -1962,7 +2085,7 @@ public class WinUi3UiTests
         string source = ReadSource("src", "OverlayWindow.cs");
         Assert.Equal(2, source.Split("ApplySavedRendererSettings();", StringSplitOptions.None).Length - 1);
         string sync = source[source.IndexOf("private void ApplySavedRendererSettings()", StringComparison.Ordinal)..source.IndexOf("private void OnWebMessageReceived", StringComparison.Ordinal)];
-        foreach (string setting in new[] { "ConfigManager.ParticleColor", "ConfigManager.EffectOpacity", "ConfigManager.GlowIntensity", "SetCurveDraw(ConfigManager.ApplyCurveDraw)", "ConfigManager.IsTouchscreenMode ? InputModeTouch : InputModeMouse" })
+        foreach (string setting in new[] { "ConfigManager.ParticleColor", "ConfigManager.EffectOpacity", "ConfigManager.GlowIntensity", "SetCurveDraw(ConfigManager.ApplyCurveDraw)", "SyncInputContext(InputModeMouse)" })
             Assert.Contains(setting, sync, StringComparison.Ordinal);
     }
 

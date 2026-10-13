@@ -23,6 +23,8 @@ namespace BASpark
 
         private readonly Dictionary<string, OverlayWindow> _overlays = new(StringComparer.OrdinalIgnoreCase);
         private IKeyboardMouseEvents? _globalHook;
+        private IntPtr _mouseHook;
+        private NativeMethods.MouseHookProc? _mouseHookDelegate;
         private OverlayWindow? _activePointerOverlay;
         private OverlayWindow? _lastTrailOverlay;
         private OverlayWindow? _lastTrailThrottleOverlay;
@@ -100,7 +102,12 @@ namespace BASpark
                 pair.Value.UpdateTrailRefreshRate(effectiveRefreshRate);
             }
         }
-        public void UpdateTouchMode(bool enabled) => ForEachOverlay(w => w.UpdateTouchMode(enabled));
+        public void UpdateTouchMode(bool enabled)
+        {
+            ConfigManager.IsTouchscreenMode = enabled;
+            if (!enabled && _isTouchLikeInput) ReleasePointerStateSilent();
+            ForEachOverlay(w => w.UpdateTouchMode(enabled));
+        }
         public void UpdateScreenshotCompatibilityMode(bool enabled)
         {
             SyncScreenshotCompatCaptureSurfaces(enabled);
@@ -127,12 +134,64 @@ namespace BASpark
         private void SetupGlobalHooks()
         {
             TeardownScreenshotCompatCaptureSurfaces();
+            UninstallMouseHook();
             _globalHook?.Dispose();
             _globalHook = Hook.GlobalEvents();
-            _globalHook.MouseDownExt += OnMouseDownExt;
-            _globalHook.MouseMoveExt += OnMouseMoveExt;
-            _globalHook.MouseUpExt += OnMouseUpExt;
+            _mouseHookDelegate ??= MouseHookCallback;
+            _mouseHook = NativeMethods.SetWindowsHookEx(
+                NativeMethods.WH_MOUSE_LL, _mouseHookDelegate, NativeMethods.GetModuleHandle(null), 0);
+            if (_mouseHook == IntPtr.Zero)
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
             SyncScreenshotCompatCaptureSurfaces(ConfigManager.ScreenshotCompatibilityMode);
+        }
+
+        private void UninstallMouseHook()
+        {
+            if (_mouseHook == IntPtr.Zero) return;
+            NativeMethods.UnhookWindowsHookEx(_mouseHook);
+            _mouseHook = IntPtr.Zero;
+        }
+
+        private IntPtr MouseHookCallback(int code, IntPtr message, IntPtr data)
+        {
+            if (code >= 0 && !_disposed)
+            {
+                try
+                {
+                    HandleMouseInput(unchecked((uint)message.ToInt64()), Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(data));
+                }
+                catch (Exception exception)
+                {
+                    Debug.WriteLine("Mouse input routing failed: " + exception.Message);
+                }
+            }
+            return NativeMethods.CallNextHookEx(_mouseHook, code, message, data);
+        }
+
+        private void HandleMouseInput(uint message, NativeMethods.MSLLHOOKSTRUCT input)
+        {
+            bool touchLike = NativeMethods.IsTouchInput(input.dwExtraInfo);
+            switch (message)
+            {
+                case NativeMethods.WM_MOUSEMOVE:
+                    OnPointerMove(input.pt.x, input.pt.y, touchLike);
+                    break;
+                case NativeMethods.WM_LBUTTONDOWN:
+                    OnPointerDown(MouseButtons.Left, input.pt.x, input.pt.y, touchLike);
+                    break;
+                case NativeMethods.WM_RBUTTONDOWN:
+                    OnPointerDown(MouseButtons.Right, input.pt.x, input.pt.y, touchLike);
+                    break;
+                case NativeMethods.WM_MBUTTONDOWN:
+                    OnPointerDown(MouseButtons.Middle, input.pt.x, input.pt.y, touchLike);
+                    break;
+                case NativeMethods.WM_LBUTTONUP:
+                case NativeMethods.WM_RBUTTONUP:
+                case NativeMethods.WM_MBUTTONUP:
+                case NativeMethods.WM_XBUTTONUP:
+                    OnPointerUp(touchLike);
+                    break;
+            }
         }
 
         private void SyncScreenshotCompatCaptureSurfaces(bool enabled)
@@ -498,17 +557,18 @@ namespace BASpark
             _screenshotFailsafeTimer = null;
         }
 
-        private void OnMouseDownExt(object? sender, MouseEventExtArgs e)
+        private void OnPointerDown(MouseButtons button, int cursorX, int cursorY, bool touchLike)
         {
             // 点击特效开关
             if (!ConfigManager.IsClickEffectActive) return;
+            if (touchLike && !ConfigManager.IsTouchscreenMode) return;
             // 每次点击都检测环境 避免切窗后首次点击渲染
             if (ShouldSuppressEffects(forceRefresh: true)) return;
-            if (!CanRenderEffects(skipSuppressionCheck: true)) return;
+            if (!CanRenderEffects(touchLike, skipSuppressionCheck: true)) return;
 
-            bool isLeft = e.Button == MouseButtons.Left;
-            bool isRight = e.Button == MouseButtons.Right;
-            bool isMiddle = e.Button == MouseButtons.Middle;
+            bool isLeft = button == MouseButtons.Left;
+            bool isRight = button == MouseButtons.Right;
+            bool isMiddle = button == MouseButtons.Middle;
             bool shouldPrimaryTrigger = ConfigManager.ClickTriggerType switch
             {
                 1 => isRight,
@@ -519,10 +579,10 @@ namespace BASpark
             bool shouldTrigger = shouldPrimaryTrigger || (ConfigManager.EnableMiddleClickTrigger && isMiddle);
             if (!shouldTrigger) return;
 
-            if (!TryGetPhysicalCursorPosition(out int cursorX, out int cursorY))
+            if (!touchLike && TryGetPhysicalCursorPosition(out int physicalX, out int physicalY))
             {
-                cursorX = e.X;
-                cursorY = e.Y;
+                cursorX = physicalX;
+                cursorY = physicalY;
             }
 
             OverlayWindow? target = ResolveTargetOverlay(cursorX, cursorY);
@@ -541,7 +601,7 @@ namespace BASpark
             }
 
             _isPrimaryPointerDown = true;
-            _isTouchLikeInput = !CursorIsVisible();
+            _isTouchLikeInput = touchLike;
             _activePointerOverlay = target;
 
             long currentTicks = DateTime.Now.Ticks;
@@ -551,14 +611,16 @@ namespace BASpark
             ConfigManager.TotalClicks++;
             ClearTrailHistory();
             target.TrailStrokeId = _trailStrokeId;
-            target.EmitDown(cursorX, cursorY);
+            target.EmitDown(cursorX, cursorY, touchLike);
             long timestamp = Stopwatch.GetTimestamp();
             _trailParticipants[target] = timestamp;
             RecordTrailSample(cursorX, cursorY, timestamp);
         }
 
-        private void OnMouseMoveExt(object? sender, MouseEventExtArgs e)
+        private void OnPointerMove(int cursorX, int cursorY, bool touchLike)
         {
+            if (touchLike && (!ConfigManager.IsTouchscreenMode || !_isPrimaryPointerDown || !_isTouchLikeInput)) return;
+            if (_isPrimaryPointerDown && touchLike != _isTouchLikeInput) return;
             // 拖尾仅在点击特效开启或常驻拖尾开启时渲染
             if (!ConfigManager.IsTrailEffectActive)
             {
@@ -578,24 +640,16 @@ namespace BASpark
                 _lastTrailThrottleOverlay = null;
                 return;
             }
-            if (!CanRenderEffects())
+            if (!CanRenderEffects(touchLike))
             {
                 _lastTrailThrottleOverlay = null;
                 return;
             }
 
-            bool cursorVisible = CursorIsVisible();
-            if (!cursorVisible && !_isPrimaryPointerDown)
+            if (!touchLike && TryGetPhysicalCursorPosition(out int physicalX, out int physicalY))
             {
-                SwitchAlwaysTrailOverlay(null);
-                _lastTrailThrottleOverlay = null;
-                return;
-            }
-
-            if (!TryGetPhysicalCursorPosition(out int cursorX, out int cursorY))
-            {
-                cursorX = e.X;
-                cursorY = e.Y;
+                cursorX = physicalX;
+                cursorY = physicalY;
             }
 
             OverlayWindow? hoveredTarget = ResolveTargetOverlay(cursorX, cursorY);
@@ -611,7 +665,7 @@ namespace BASpark
             _lastMoveTimestamp = currentTimestamp;
             _lastTrailThrottleOverlay = target;
 
-            RouteTrailMove(target, cursorX, cursorY, _isTouchLikeInput || !cursorVisible);
+            RouteTrailMove(target, cursorX, cursorY, touchLike);
         }
 
         private void RouteTrailMove(OverlayWindow? target, int cursorX, int cursorY, bool touchLike)
@@ -705,14 +759,14 @@ namespace BASpark
             if (!resume) _trailParticipants.Clear();
         }
 
-        private void OnMouseUpExt(object? sender, MouseEventExtArgs e)
+        private void OnPointerUp(bool touchLike)
         {
-            _ = e;
             if (!_isPrimaryPointerDown)
             {
                 _isTouchLikeInput = false;
                 return;
             }
+            if (touchLike != _isTouchLikeInput) return;
 
             if (ShouldSuppressEffects())
             {
@@ -730,7 +784,7 @@ namespace BASpark
         /// 检查渲染环境条件（覆盖窗口存在性、环境过滤、光标可见性）。
         /// 业务开关（点击特效、常驻拖尾）由各调用点自行判断。
         /// </summary>
-        private bool CanRenderEffects(bool skipSuppressionCheck = false)
+        private bool CanRenderEffects(bool touchLike, bool skipSuppressionCheck = false)
         {
             if (App.IsEffectsPaused || _overlays.Count == 0)
             {
@@ -744,7 +798,7 @@ namespace BASpark
                 return false;
             }
 
-            if (!ConfigManager.IsTouchscreenMode && !CursorIsVisible())
+            if (!NativeMethods.IsCursorVisible(allowTouchSuppression: touchLike && ConfigManager.IsTouchscreenMode))
             {
                 ReleasePointerStateSilent();
                 return false;
@@ -1149,8 +1203,6 @@ namespace BASpark
                    Math.Abs(windowRect.Bottom - monitorInfo.rcMonitor.Bottom) <= FullscreenTolerance;
         }
 
-        private static bool CursorIsVisible() => NativeMethods.IsCursorVisible();
-
         private static bool TryGetPhysicalCursorPosition(out int x, out int y) =>
             NativeMethods.TryGetCursorPosition(out x, out y);
 
@@ -1298,11 +1350,9 @@ namespace BASpark
             }
             TeardownScreenshotCompatCaptureSurfaces();
             EndScreenshotCaptureSession();
+            UninstallMouseHook();
             if (_globalHook != null)
             {
-                _globalHook.MouseDownExt -= OnMouseDownExt;
-                _globalHook.MouseMoveExt -= OnMouseMoveExt;
-                _globalHook.MouseUpExt -= OnMouseUpExt;
                 _globalHook.Dispose();
                 _globalHook = null;
             }

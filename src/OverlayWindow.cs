@@ -528,7 +528,7 @@ internal sealed class OverlayWindow : IDisposable
         ConfigManager.GetAnimationSpeedsForOverlay(out double trailSp, out double clickSp);
         UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSp, clickSp, ConfigManager.GlowIntensity);
         SetCurveDraw(ConfigManager.ApplyCurveDraw);
-        SyncInputContext(ConfigManager.IsTouchscreenMode ? InputModeTouch : InputModeMouse);
+        SyncInputContext(InputModeMouse);
         ApplyEnvironmentInputSuppression();
         if (_overlayRuntimePaused)
         {
@@ -1104,14 +1104,13 @@ internal sealed class OverlayWindow : IDisposable
     // 输入事件转发
     // ------------------------------------------------------------------
 
-    public void EmitDown(int x, int y)
+    public void EmitDown(int x, int y, bool touchLike = false)
     {
         if (!TryConvertScreenToOverlayPoint(x, y, out Windows.Foundation.Point clientPoint))
         {
             return;
         }
 
-        bool touchLike = !NativeMethods.IsCursorVisible();
         if (PostInput("down", clientPoint, touchLike)) return;
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
         ExecuteWithInputContext(

@@ -97,7 +97,7 @@
       <value>Touchscreen mode</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
-      <value>Effects work when the cursor is hidden; for touchscreens or certain fullscreen apps.</value>
+      <value>Also trigger effects from actual touch input. Effects remain disabled when the system or an app explicitly hides the cursor.</value>
     </data>
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>Enable mouse trail</value>

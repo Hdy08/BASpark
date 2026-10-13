@@ -41,10 +41,24 @@ internal static class NativeMethods
     internal const uint EVENT_OBJECT_REORDER = 0x8004;
     internal const uint WINEVENT_OUTOFCONTEXT = 0x0000;
 
+    internal const int WH_MOUSE_LL = 14;
+    internal const uint WM_MOUSEMOVE = 0x0200;
+    internal const uint WM_LBUTTONDOWN = 0x0201;
+    internal const uint WM_LBUTTONUP = 0x0202;
+    internal const uint WM_RBUTTONDOWN = 0x0204;
+    internal const uint WM_RBUTTONUP = 0x0205;
+    internal const uint WM_MBUTTONDOWN = 0x0207;
+    internal const uint WM_MBUTTONUP = 0x0208;
+    internal const uint WM_XBUTTONUP = 0x020C;
+    private const uint TouchInputSignature = 0xFF515700;
+    private const uint TouchInputSignatureMask = 0xFFFFFF00;
+    private const uint TouchInputFlag = 0x80;
+
     // ---- 窗口查询 -------------------------------------------------------
     internal const uint GA_ROOT = 2;
     internal const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
     internal const int CURSOR_SHOWING = 0x0001;
+    internal const int CURSOR_SUPPRESSED = 0x0002;
     private static readonly object CursorShapeGate = new();
     private static IntPtr _cachedCursorShape;
     private static bool _cachedCursorShapeVisible;
@@ -76,6 +90,16 @@ internal static class NativeMethods
         public int flags;
         public IntPtr hCursor;
         public POINT ptScreenPos;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MSLLHOOKSTRUCT
+    {
+        public POINT pt;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public UIntPtr dwExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -115,6 +139,17 @@ internal static class NativeMethods
         int idChild,
         uint dwEventThread,
         uint dwmsEventTime);
+
+    internal delegate IntPtr MouseHookProc(int code, IntPtr message, IntPtr data);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW", SetLastError = true)]
+    internal static extern IntPtr SetWindowsHookEx(int hookId, MouseHookProc callback, IntPtr module, uint threadId);
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
+
+    [DllImport("user32.dll")]
+    internal static extern bool UnhookWindowsHookEx(IntPtr hook);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern int GetWindowLong(IntPtr hWnd, int nIndex);
@@ -274,11 +309,29 @@ internal static class NativeMethods
         return fileName.ToLowerInvariant();
     }
 
+    internal static bool IsTouchInput(UIntPtr extraInfo)
+    {
+        uint signature = unchecked((uint)extraInfo.ToUInt64());
+        return (signature & TouchInputSignatureMask) == TouchInputSignature
+            && (signature & TouchInputFlag) != 0;
+    }
+
     /// <summary>光标当前是否可见（触摸输入会隐藏光标）。</summary>
-    internal static bool IsCursorVisible()
+    internal static bool IsCursorVisible(bool allowTouchSuppression = false)
     {
         var pci = new CURSORINFO { cbSize = Marshal.SizeOf<CURSORINFO>() };
-        if (!GetCursorInfo(out pci) || (pci.flags & CURSOR_SHOWING) == 0 || pci.hCursor == IntPtr.Zero)
+        if (!GetCursorInfo(out pci))
+        {
+            lock (CursorShapeGate) _cachedCursorShape = IntPtr.Zero;
+            return false;
+        }
+        return IsCursorVisible(pci, allowTouchSuppression);
+    }
+
+    internal static bool IsCursorVisible(CURSORINFO pci, bool allowTouchSuppression)
+    {
+        bool suppressed = (pci.flags & CURSOR_SUPPRESSED) != 0;
+        if (pci.hCursor == IntPtr.Zero || (suppressed ? !allowTouchSuppression : (pci.flags & CURSOR_SHOWING) == 0))
         {
             lock (CursorShapeGate) _cachedCursorShape = IntPtr.Zero;
             return false;
