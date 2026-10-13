@@ -280,7 +280,7 @@ public sealed class ConfigurationBackupTests
     [Fact]
     public void SettingCatalog_CoversAllEditableSettingsAndStatisticsWithUniqueKeys()
     {
-        Assert.Equal(30, ConfigurationBackup.Settings.Count);
+        Assert.Equal(31 + AdvancedFxSettings.Definitions.Count, ConfigurationBackup.Settings.Count);
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
         Assert.Equal(new[] { "Backup_Statistics", "Nav_Basic", "Nav_Visual", "Nav_Filter" },
             ConfigurationBackup.Settings.Select(item => item.GroupKey).Distinct());
