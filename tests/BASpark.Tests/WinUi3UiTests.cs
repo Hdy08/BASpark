@@ -667,6 +667,62 @@ public class WinUi3UiTests
         Assert.False(state.IsVisible(cursor, window, true));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TouchscreenInput_WebViewRemembersTheActualTouchWindowInsteadOfTheStationaryMouseWindow(bool suppressedFirst)
+    {
+        var state = new TouchCursorState();
+        var mouseWindow = new IntPtr(123);
+        var touchWindow = new IntPtr(456);
+        var cursor = new NativeMethods.CURSORINFO
+        {
+            flags = NativeMethods.CURSOR_SHOWING,
+            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+        };
+        state.Observe(cursor, mouseWindow);
+        if (suppressedFirst) cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        Assert.True(state.IsVisible(cursor, touchWindow, true));
+        cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        state.Observe(cursor, mouseWindow);
+        cursor.hCursor = IntPtr.Zero;
+        for (int tap = 0; tap < 40; tap++)
+        {
+            state.Observe(cursor, mouseWindow);
+            Assert.True(state.IsVisible(cursor, touchWindow, true));
+            Assert.False(state.IsVisible(cursor, mouseWindow, true));
+            Assert.False(state.IsVisible(cursor, touchWindow, false));
+        }
+        cursor.flags = 0;
+        state.Observe(cursor, mouseWindow);
+        Assert.False(state.IsVisible(cursor, touchWindow, true));
+    }
+
+    [Fact]
+    public void TouchscreenInput_WebViewExplicitHidingAfterSuccessfulTouchStillBlocksEffects()
+    {
+        var state = new TouchCursorState();
+        var window = new IntPtr(123);
+        var cursor = new NativeMethods.CURSORINFO
+        {
+            flags = NativeMethods.CURSOR_SHOWING,
+            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+        };
+        state.Observe(cursor, window);
+        cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        cursor.hCursor = IntPtr.Zero;
+        Assert.True(state.IsVisible(cursor, window, true));
+        cursor.flags = 0;
+        state.Observe(cursor, window);
+        Assert.False(state.IsVisible(cursor, window, true));
+        cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        Assert.False(state.IsVisible(cursor, window, true));
+        cursor.flags = NativeMethods.CURSOR_SHOWING;
+        cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+        state.Observe(cursor, window);
+        Assert.True(state.IsVisible(cursor, window, true));
+    }
+
     [Fact]
     public void TouchscreenInput_WebViewHiddenAndTransparentCursorsStayFilteredAfterTouch()
     {
@@ -688,7 +744,10 @@ public class WinUi3UiTests
             cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
             cursor.hCursor = transparent;
             Assert.False(state.IsVisible(cursor, window, true));
+            cursor.hCursor = IntPtr.Zero;
+            Assert.False(state.IsVisible(cursor, window, true));
             cursor.flags = NativeMethods.CURSOR_SHOWING;
+            cursor.hCursor = transparent;
             state.Observe(cursor, window);
             cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
             cursor.hCursor = IntPtr.Zero;
@@ -806,6 +865,67 @@ public class WinUi3UiTests
         Assert.Equal((0U, true, false, moveX, moveY), received[^1]);
         device.ProcessData(1, data, display, orientation, Receive);
         Assert.Equal(3, received.Count);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void TouchscreenInput_WebViewRecycledContactIdsDoNotBlockSubsequentTaps(bool clearedId, bool omittedAxes)
+    {
+        var device = TouchInputListener.TouchDevice.Create(new IntPtr(123), Array.Empty<byte>(),
+            new NativeMethods.HIDP_CAPS { InputReportByteLength = 10, NumberInputDataIndices = 4 },
+            [
+                new NativeMethods.HIDP_VALUE_CAPS
+                {
+                    UsagePage = 1, ReportId = 1, LinkCollection = 1, IsRange = 1, IsAbsolute = 1,
+                    BitSize = 16, LogicalMin = 0, LogicalMax = 1000, UsageMin = 0x30, UsageMax = 0x31, DataIndexMin = 0
+                },
+                new NativeMethods.HIDP_VALUE_CAPS
+                {
+                    UsagePage = 13, ReportId = 1, LinkCollection = 1, UsageMin = 0x51, DataIndexMin = 2
+                }
+            ],
+            [new NativeMethods.HIDP_BUTTON_CAPS
+            {
+                UsagePage = 13, ReportId = 1, LinkCollection = 1, UsageMin = 0x42, DataIndexMin = 3
+            }]);
+        Assert.NotNull(device);
+        var phases = new List<TouchInputPhase>();
+        using var listener = new TouchInputListener((phase, screenX, screenY) => phases.Add(phase));
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var receive = typeof(TouchInputListener).GetMethod("HandleContact", members)!
+            .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
+        var display = new NativeMethods.RECT { Left = 0, Top = 0, Right = 1001, Bottom = 1001 };
+        for (uint contactId = 1; contactId <= 12; contactId++)
+        {
+            NativeMethods.HIDP_DATA[] data =
+            [
+                new() { DataIndex = 0, Value = 250 }, new() { DataIndex = 1, Value = 750 },
+                new() { DataIndex = 2, Value = contactId }, new() { DataIndex = 3, Value = 1 }
+            ];
+            device.ProcessData(1, data, display, 1, receive);
+            device.ProcessData(1, data, display, 1, receive);
+            data[2].Value = clearedId ? 0 : contactId;
+            data[3].Value = 0;
+            device.ProcessData(1, omittedAxes ? data.AsSpan(2) : data, display, 1, receive);
+            Assert.Equal(new[] { TouchInputPhase.Down, TouchInputPhase.Move, TouchInputPhase.Up }, phases);
+            phases.Clear();
+        }
+        NativeMethods.HIDP_DATA[] replacement =
+        [
+            new() { DataIndex = 0, Value = 400 }, new() { DataIndex = 1, Value = 600 },
+            new() { DataIndex = 2, Value = 13 }, new() { DataIndex = 3, Value = 1 }
+        ];
+        device.ProcessData(1, replacement, display, 1, receive);
+        device.ProcessData(2, replacement, display, 1, receive);
+        Assert.Equal(new[] { TouchInputPhase.Down }, phases);
+        replacement[2].Value = 14;
+        device.ProcessData(1, replacement, display, 1, receive);
+        Assert.Equal(new[] { TouchInputPhase.Down, TouchInputPhase.Up, TouchInputPhase.Down }, phases);
+        device.ProcessData(1, ReadOnlySpan<NativeMethods.HIDP_DATA>.Empty, display, 1, receive);
+        Assert.Equal(new[] { TouchInputPhase.Down, TouchInputPhase.Up, TouchInputPhase.Down, TouchInputPhase.Up }, phases);
     }
 
     [Fact]

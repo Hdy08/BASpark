@@ -520,8 +520,17 @@ internal sealed class TouchCursorState
     {
         if (chromium && window != IntPtr.Zero && window == _window
             && (cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0)
-            return _visible && (cursor.hCursor == IntPtr.Zero || NativeMethods.IsCursorVisible(cursor, true));
-        return NativeMethods.IsCursorVisible(cursor, true);
+        {
+            if (cursor.hCursor != IntPtr.Zero && !NativeMethods.IsCursorVisible(cursor, true)) _visible = false;
+            return _visible;
+        }
+        bool visible = NativeMethods.IsCursorVisible(cursor, true);
+        if (chromium && window != IntPtr.Zero && visible)
+        {
+            _window = window;
+            _visible = true;
+        }
+        return visible;
     }
 
     internal void Reset()

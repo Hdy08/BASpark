@@ -1597,7 +1597,7 @@ namespace BASpark
             private readonly byte[] _report;
             private readonly NativeMethods.HIDP_DATA[] _data;
             private readonly Dictionary<ushort, uint> _values = new();
-            private readonly Dictionary<uint, ushort> _activeCollections = new();
+            private readonly Dictionary<uint, (Contact Contact, uint RawX, uint RawY)> _activeCollections = new();
             private readonly Dictionary<uint, (bool Down, uint RawX, uint RawY, Contact Contact)> _frame = new();
             private readonly Contact[] _contacts;
             private uint _orientation;
@@ -1680,20 +1680,32 @@ namespace BASpark
                     uint id = contact.Id is ushort identifier ? _values.GetValueOrDefault(identifier) : contact.Collection;
                     bool down = _values.GetValueOrDefault(contact.Tip) != 0;
                     if (!_frame.TryGetValue(id, out var existing) || down
-                        || (!existing.Down && _activeCollections.GetValueOrDefault(id) == contact.Collection))
+                        || (!existing.Down && _activeCollections.GetValueOrDefault(id).Contact.Collection == contact.Collection))
                         _frame[id] = (down, rawX, rawY, contact);
+                }
+                foreach (var pair in _activeCollections)
+                {
+                    var previous = pair.Value;
+                    if (previous.Contact.ReportId != reportId || (_frame.TryGetValue(pair.Key, out var sample) && sample.Down)) continue;
+                    if (!_frame.ContainsKey(pair.Key))
+                        _frame[pair.Key] = (false, previous.RawX, previous.RawY, previous.Contact);
+                }
+                foreach (var pair in _frame)
+                {
+                    var sample = pair.Value;
+                    if (sample.Down || !_activeCollections.Remove(pair.Key)) continue;
+                    var point = MapPoint(Normalize(sample.RawX, sample.Contact.AxisX), Normalize(sample.RawY, sample.Contact.AxisY), orientation, display);
+                    contactInput(_device, pair.Key, true, false, point.x, point.y);
                 }
                 foreach (var pair in _frame)
                 {
                     uint id = pair.Key;
                     var sample = pair.Value;
-                    bool down = sample.Down;
+                    if (!sample.Down) continue;
                     bool wasDown = _activeCollections.ContainsKey(id);
-                    if (down) _activeCollections[id] = sample.Contact.Collection;
-                    else _activeCollections.Remove(id);
-                    if (!down && !wasDown) continue;
+                    _activeCollections[id] = (sample.Contact, sample.RawX, sample.RawY);
                     var point = MapPoint(Normalize(sample.RawX, sample.Contact.AxisX), Normalize(sample.RawY, sample.Contact.AxisY), orientation, display);
-                    contactInput(_device, id, wasDown, down, point.x, point.y);
+                    contactInput(_device, id, wasDown, true, point.x, point.y);
                 }
             }
 
