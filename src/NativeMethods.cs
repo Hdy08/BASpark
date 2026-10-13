@@ -435,7 +435,6 @@ internal static class NativeMethods
     internal static bool IsCursorVisible(CURSORINFO pci, bool allowTouchSuppression)
     {
         bool suppressed = (pci.flags & CURSOR_SUPPRESSED) != 0;
-        if (suppressed && allowTouchSuppression && pci.hCursor == IntPtr.Zero) return true;
         if (pci.hCursor == IntPtr.Zero || (suppressed ? !allowTouchSuppression : (pci.flags & CURSOR_SHOWING) == 0))
         {
             lock (CursorShapeGate) _cachedCursorShape = IntPtr.Zero;

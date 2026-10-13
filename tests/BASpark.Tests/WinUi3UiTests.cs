@@ -612,7 +612,7 @@ public class WinUi3UiTests
         };
         Assert.Equal(visible, NativeMethods.IsCursorVisible(cursorInfo, touch));
         cursorInfo.hCursor = IntPtr.Zero;
-        Assert.Equal(touch && (flags & NativeMethods.CURSOR_SUPPRESSED) != 0, NativeMethods.IsCursorVisible(cursorInfo, touch));
+        Assert.False(NativeMethods.IsCursorVisible(cursorInfo, touch));
     }
 
     [Theory]
