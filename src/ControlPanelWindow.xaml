@@ -1214,7 +1214,7 @@
                             <Expander x:Name="BaClickAdvancedList" IsExpanded="False" MinWidth="0" MinHeight="0"
                                       Padding="0" BorderThickness="0" Background="Transparent"
                                       HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                                      Loaded="BaClickAdvancedList_Loaded">
+                                      Loaded="ConditionalSettingsList_Loaded">
                                 <StackPanel x:Name="PanelBaClickAdvanced" />
                             </Expander>
                         </StackPanel>
@@ -1241,216 +1241,223 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Header, ElementName=CheckHideInFullscreen}" Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <ToggleSwitch
-                                            x:Name="CheckHideInFullscreen"
-                                            Header=""
-                                            Style="{StaticResource BasSettingToggleStyle}"
-                                            AutomationProperties.Name="{Binding Header, ElementName=CheckHideInFullscreen}" />
-                                    </Grid>
-                                </Grid>
-                            </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Header, ElementName=CheckShowEffectOnDesktop}" Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <ToggleSwitch
-                                            x:Name="CheckShowEffectOnDesktop"
-                                            Header=""
-                                            Style="{StaticResource BasSettingToggleStyle}"
-                                            AutomationProperties.Name="{Binding Header, ElementName=CheckShowEffectOnDesktop}" />
-                                    </Grid>
-                                </Grid>
-                            </Border>
-                            <TextBlock x:Name="TxtFilterAdvancedTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="TxtFilterProfiles"
-                                            Text=""
-                                            Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <StackPanel Spacing="8">
-                                            <ComboBox
-                                                x:Name="ComboProfiles"
-                                                MinWidth="0"
-                                                Width="0"
-                                                SelectionChanged="ComboProfiles_SelectionChanged"
-                                                HorizontalAlignment="Stretch"
-                                                VerticalContentAlignment="Center" Padding="12,0,0,0"
-                                                Background="{ThemeResource BasSettingsControlBackgroundBrush}"
-                                                BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtFilterProfiles}" />
-                                            <Grid x:Name="ProfileActions" ColumnSpacing="8" HorizontalAlignment="Right" SizeChanged="ProfileActions_SizeChanged">
+                            <Expander x:Name="EnvironmentFilterList" IsExpanded="False" MinWidth="0" MinHeight="0"
+                                      Padding="0" BorderThickness="0" Background="Transparent"
+                                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                      Loaded="ConditionalSettingsList_Loaded">
+                                <StackPanel x:Name="PanelEnvironmentFilter">
+                                    <Border Style="{StaticResource BasSettingCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.15*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Header, ElementName=CheckHideInFullscreen}" Style="{StaticResource BasSettingTitleStyle}" />
+                                            </StackPanel>
+                                            <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                                <ToggleSwitch
+                                                    x:Name="CheckHideInFullscreen"
+                                                    Header=""
+                                                    Style="{StaticResource BasSettingToggleStyle}"
+                                                    AutomationProperties.Name="{Binding Header, ElementName=CheckHideInFullscreen}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                    <Border Style="{StaticResource BasSettingCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.15*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Header, ElementName=CheckShowEffectOnDesktop}" Style="{StaticResource BasSettingTitleStyle}" />
+                                            </StackPanel>
+                                            <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                                <ToggleSwitch
+                                                    x:Name="CheckShowEffectOnDesktop"
+                                                    Header=""
+                                                    Style="{StaticResource BasSettingToggleStyle}"
+                                                    AutomationProperties.Name="{Binding Header, ElementName=CheckShowEffectOnDesktop}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock x:Name="TxtFilterAdvancedTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
+                                    <Border Style="{StaticResource BasSettingCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock
+                                                    x:Name="TxtFilterProfiles"
+                                                    Text=""
+                                                    Style="{StaticResource BasSettingTitleStyle}" />
+                                            </StackPanel>
+                                            <Grid Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <StackPanel Spacing="8">
+                                                    <ComboBox
+                                                        x:Name="ComboProfiles"
+                                                        MinWidth="0"
+                                                        Width="0"
+                                                        SelectionChanged="ComboProfiles_SelectionChanged"
+                                                        HorizontalAlignment="Stretch"
+                                                        VerticalContentAlignment="Center" Padding="12,0,0,0"
+                                                        Background="{ThemeResource BasSettingsControlBackgroundBrush}"
+                                                        BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
+                                                        AutomationProperties.Name="{Binding Text, ElementName=TxtFilterProfiles}" />
+                                                    <Grid x:Name="ProfileActions" ColumnSpacing="8" HorizontalAlignment="Right" SizeChanged="ProfileActions_SizeChanged">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button
+                                                            x:Name="BtnAddProfile"
+                                                            Content=""
+                                                            Click="AddProfile_Click"
+                                                            Grid.Column="0"
+                                                            Grid.Row="0"
+                                                            MinWidth="0"
+                                                            HorizontalAlignment="Left" />
+                                                        <Button
+                                                            x:Name="BtnRenameProfile"
+                                                            Content=""
+                                                            Click="RenameProfile_Click"
+                                                            Grid.Column="1"
+                                                            Grid.Row="0"
+                                                            MinWidth="0"
+                                                            HorizontalAlignment="Left" />
+                                                        <Button
+                                                            x:Name="BtnDeleteProfile"
+                                                            Content=""
+                                                            Style="{StaticResource BasDangerButtonStyle}"
+                                                            Click="DeleteProfile_Click"
+                                                            Grid.Column="2"
+                                                            Grid.Row="0"
+                                                            MinWidth="0"
+                                                            HorizontalAlignment="Left" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                    <Border Style="{StaticResource BasSettingCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.15*" />
+                                                <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock
+                                                    x:Name="TxtFilterMode"
+                                                    Text=""
+                                                    Style="{StaticResource BasSettingTitleStyle}" />
+                                            </StackPanel>
+                                            <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                                <ComboBox x:Name="ComboProcessFilterMode"
+                                                          MinWidth="0" HorizontalAlignment="Right"
+                                                          VerticalContentAlignment="Center" Padding="12,0,0,0"
+                                                          Background="{ThemeResource BasSettingsControlBackgroundBrush}"
+                                                          BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
+                                                          AutomationProperties.Name="{Binding Text, ElementName=TxtFilterMode}"
+                                                          SelectionChanged="ProcessFilterMode_Changed">
+                                                    <ComboBoxItem Content="" />
+                                                    <ComboBoxItem Content="" />
+                                                    <ComboBoxItem Content="" />
+                                                </ComboBox>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                    <Border Style="{StaticResource BasSettingCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.15*" />
+                                                <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock
+                                                    x:Name="TxtProcessList"
+                                                    Text=""
+                                                    Style="{StaticResource BasSettingTitleStyle}" />
+                                            </StackPanel>
+                                            <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                                <DropDownButton x:Name="ListConfiguredProcesses"
+                                                          MinWidth="0" Height="32"
+                                                          HorizontalAlignment="Right" HorizontalContentAlignment="Stretch"
+                                                          VerticalContentAlignment="Center" Padding="11,0,13,0"
+                                                          Content=""
+                                                          AutomationProperties.Name="{Binding Text, ElementName=TxtProcessList}">
+                                                    <DropDownButton.Flyout>
+                                                        <Flyout x:Name="ConfiguredProcessesFlyout" Placement="BottomEdgeAlignedRight" ShouldConstrainToRootBounds="False"
+                                                                Opening="ConfiguredProcessesFlyout_Opening" Opened="ConfiguredProcessesFlyout_Opened">
+                                                            <Flyout.FlyoutPresenterStyle>
+                                                                <Style TargetType="FlyoutPresenter" BasedOn="{StaticResource DefaultFlyoutPresenterStyle}">
+                                                                    <Setter Property="Padding" Value="0,4,0,4" />
+                                                                    <Setter Property="MinWidth" Value="0" />
+                                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                                </Style>
+                                                            </Flyout.FlyoutPresenterStyle>
+                                                            <ScrollViewer x:Name="ConfiguredProcessScroller" MaxHeight="200" IsTabStop="True"
+                                                                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                                                <ItemsControl x:Name="ConfiguredProcessItems" HorizontalContentAlignment="Stretch">
+                                                                    <ItemsControl.ItemsPanel>
+                                                                        <ItemsPanelTemplate>
+                                                                            <StackPanel />
+                                                                        </ItemsPanelTemplate>
+                                                                    </ItemsControl.ItemsPanel>
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <Grid x:Name="ConfiguredProcessItemRoot" ColumnSpacing="8" MinHeight="32" Padding="11,6,11,6" VerticalAlignment="Center">
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="*" />
+                                                                                    <ColumnDefinition Width="Auto" />
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <TextBlock Grid.Column="0"
+                                                                                           Text="{Binding}"
+                                                                                           VerticalAlignment="Center"
+                                                                                           TextTrimming="CharacterEllipsis" />
+                                                                                <Button Grid.Column="1"
+                                                                                        Click="RemoveProcess_Click"
+                                                                                        Tag="{Binding}"
+                                                                                        MinWidth="0" MinHeight="0" Width="20" Height="20" Padding="0"
+                                                                                        VerticalAlignment="Center" VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
+                                                                                    <PathIcon Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                                              Data="M0,1 L1,0 L5,4 L9,0 L10,1 L6,5 L10,9 L9,10 L5,6 L1,10 L0,9 L4,5 Z" />
+                                                                                </Button>
+                                                                            </Grid>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </ScrollViewer>
+                                                        </Flyout>
+                                                    </DropDownButton.Flyout>
+                                                </DropDownButton>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                    <Border Style="{StaticResource BasSettingCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="TxtAddProcess" Text="" Style="{StaticResource BasSettingTitleStyle}"
+                                                       VerticalAlignment="Center" />
+                                            <Grid Grid.Column="1" ColumnSpacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <Button
-                                                    x:Name="BtnAddProfile"
-                                                    Content=""
-                                                    Click="AddProfile_Click"
-                                                    Grid.Column="0"
-                                                    Grid.Row="0"
-                                                    MinWidth="0"
-                                                    HorizontalAlignment="Left" />
-                                                <Button
-                                                    x:Name="BtnRenameProfile"
-                                                    Content=""
-                                                    Click="RenameProfile_Click"
-                                                    Grid.Column="1"
-                                                    Grid.Row="0"
-                                                    MinWidth="0"
-                                                    HorizontalAlignment="Left" />
-                                                <Button
-                                                    x:Name="BtnDeleteProfile"
-                                                    Content=""
-                                                    Style="{StaticResource BasDangerButtonStyle}"
-                                                    Click="DeleteProfile_Click"
-                                                    Grid.Column="2"
-                                                    Grid.Row="0"
-                                                    MinWidth="0"
-                                                    HorizontalAlignment="Left" />
+                                                <Button x:Name="BtnBrowseProcess" Content="" Click="BrowseProcess_Click" />
+                                                <Button x:Name="BtnSelectRunningProcess" Grid.Column="1" Content=""
+                                                        Click="SelectRunningProcess_Click" />
                                             </Grid>
-                                        </StackPanel>
-                                    </Grid>
-                                </Grid>
-                            </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="TxtFilterMode"
-                                            Text=""
-                                            Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <ComboBox x:Name="ComboProcessFilterMode"
-                                                  MinWidth="0" HorizontalAlignment="Right"
-                                                  VerticalContentAlignment="Center" Padding="12,0,0,0"
-                                                  Background="{ThemeResource BasSettingsControlBackgroundBrush}"
-                                                  BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
-                                                  AutomationProperties.Name="{Binding Text, ElementName=TxtFilterMode}"
-                                                  SelectionChanged="ProcessFilterMode_Changed">
-                                            <ComboBoxItem Content="" />
-                                            <ComboBoxItem Content="" />
-                                            <ComboBoxItem Content="" />
-                                        </ComboBox>
-                                    </Grid>
-                                </Grid>
-                            </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="TxtProcessList"
-                                            Text=""
-                                            Style="{StaticResource BasSettingTitleStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <DropDownButton x:Name="ListConfiguredProcesses"
-                                                  MinWidth="0" Height="32"
-                                                  HorizontalAlignment="Right" HorizontalContentAlignment="Stretch"
-                                                  VerticalContentAlignment="Center" Padding="11,0,13,0"
-                                                  Content=""
-                                                  AutomationProperties.Name="{Binding Text, ElementName=TxtProcessList}">
-                                            <DropDownButton.Flyout>
-                                                <Flyout x:Name="ConfiguredProcessesFlyout" Placement="BottomEdgeAlignedRight" ShouldConstrainToRootBounds="False"
-                                                        Opening="ConfiguredProcessesFlyout_Opening" Opened="ConfiguredProcessesFlyout_Opened">
-                                                    <Flyout.FlyoutPresenterStyle>
-                                                        <Style TargetType="FlyoutPresenter" BasedOn="{StaticResource DefaultFlyoutPresenterStyle}">
-                                                            <Setter Property="Padding" Value="0,4,0,4" />
-                                                            <Setter Property="MinWidth" Value="0" />
-                                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                                        </Style>
-                                                    </Flyout.FlyoutPresenterStyle>
-                                                    <ScrollViewer x:Name="ConfiguredProcessScroller" MaxHeight="200" IsTabStop="True"
-                                                                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                                                        <ItemsControl x:Name="ConfiguredProcessItems" HorizontalContentAlignment="Stretch">
-                                                            <ItemsControl.ItemsPanel>
-                                                                <ItemsPanelTemplate>
-                                                                    <StackPanel />
-                                                                </ItemsPanelTemplate>
-                                                            </ItemsControl.ItemsPanel>
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate>
-                                                                    <Grid x:Name="ConfiguredProcessItemRoot" ColumnSpacing="8" MinHeight="32" Padding="11,6,11,6" VerticalAlignment="Center">
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="*" />
-                                                                            <ColumnDefinition Width="Auto" />
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <TextBlock Grid.Column="0"
-                                                                                   Text="{Binding}"
-                                                                                   VerticalAlignment="Center"
-                                                                                   TextTrimming="CharacterEllipsis" />
-                                                                        <Button Grid.Column="1"
-                                                                                Click="RemoveProcess_Click"
-                                                                                Tag="{Binding}"
-                                                                                MinWidth="0" MinHeight="0" Width="20" Height="20" Padding="0"
-                                                                                VerticalAlignment="Center" VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
-                                                                            <PathIcon Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                                      Data="M0,1 L1,0 L5,4 L9,0 L10,1 L6,5 L10,9 L9,10 L5,6 L1,10 L0,9 L4,5 Z" />
-                                                                        </Button>
-                                                                    </Grid>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                    </ScrollViewer>
-                                                </Flyout>
-                                            </DropDownButton.Flyout>
-                                        </DropDownButton>
-                                    </Grid>
-                                </Grid>
-                            </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="TxtAddProcess" Text="" Style="{StaticResource BasSettingTitleStyle}"
-                                               VerticalAlignment="Center" />
-                                    <Grid Grid.Column="1" ColumnSpacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Button x:Name="BtnBrowseProcess" Content="" Click="BrowseProcess_Click" />
-                                        <Button x:Name="BtnSelectRunningProcess" Grid.Column="1" Content=""
-                                                Click="SelectRunningProcess_Click" />
-                                    </Grid>
-                                </Grid>
-                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Expander>
                         </StackPanel>
 
                         <!-- ===== 多屏管理 ===== -->

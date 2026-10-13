@@ -411,14 +411,18 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly HashSet<ContentDialog> _dialogPresentationsPending = new();
     private sealed record SelectionToolbar(Button Invert, Button SelectAll, Button Confirm, TextBlock EmptyMessage, List<SelectionCardItem> Items)
     {
-        public Viewbox? ClearIcon { get; set; }
+        public Viewbox? InvertIcon { get; set; }
         public Viewbox? SelectAllIcon { get; set; }
+        public Geometry? ClearIconData { get; set; }
+        public Geometry? SelectAllIconData { get; set; }
     }
     private readonly Dictionary<ItemsControl, SelectionToolbar> _selectionToolbars = new();
     private bool _changingSelection;
     private readonly List<WindowChrome.ComboBoxWidthTracker> _comboWidthTrackers = new();
     private readonly long _configuredProcessScrollBarToken;
     private readonly List<ProcessItem> _allRunningProcesses = new();
+    private int _runningProcessLoadGeneration;
+    private bool _loadingRunningProcesses;
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
     private CompositionRoundedRectangleGeometry? _colorCardGeometry;
@@ -2361,15 +2365,30 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateClickEffectPanelVisibility(bool animate = false) =>
         SetSettingsVisibility(SectionBasic, animate, (PanelClickEffectOptions, CheckMasterSwitch.IsOn));
 
-    private void CheckTouchscreenMode_Changed(object sender, RoutedEventArgs args) => UpdateMultiTouchPanelVisibility(animate: true);
+    private void CheckTouchscreenMode_Changed(object sender, RoutedEventArgs args)
+    {
+        if (!IsUiReady || _isLoading) return;
+        UpdateMultiTouchPanelVisibility(animate: true);
+    }
 
     private void UpdateMultiTouchPanelVisibility(bool animate = false) =>
         SetSettingsVisibility(SectionBasic, animate, (PanelMaxTouchEffects, CheckTouchscreenMode.IsOn));
 
+    private void UpdateDependentSettingsVisibility(bool animate = false)
+    {
+        SetSettingsVisibility(SectionBasic, animate, (PanelClickEffectOptions, CheckMasterSwitch.IsOn),
+            (PanelMaxTouchEffects, CheckTouchscreenMode.IsOn));
+        SetSettingsVisibility(SectionVisual, animate, (PanelUnifiedEffectScale, CheckLinkedEffectScale.IsOn),
+            (PanelSplitEffectScale, !CheckLinkedEffectScale.IsOn),
+            (PanelUnifiedAnimationSpeed, CheckLinkedAnimationSpeed.IsOn),
+            (PanelSplitAnimationSpeed, !CheckLinkedAnimationSpeed.IsOn));
+        UpdateEnvironmentFilterInterlock();
+    }
+
     private void SetSettingsVisibility(Panel section, bool animate, params (FrameworkElement Element, bool Visible)[] changes)
     {
-        StopSettingsAnimation(section);
         if (changes.All(change => (change.Element.Visibility == Visibility.Visible) == change.Visible)) return;
+        StopSettingsAnimation(section);
         bool play = animate && !_isLoading && IsUiReady && PageSettings.Visibility == Visibility.Visible &&
             section.Visibility == Visibility.Visible && section.ActualHeight > 0;
         section.UpdateLayout();
@@ -2450,7 +2469,7 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         _ = sender;
         _ = e;
-        if (!IsUiReady)
+        if (!IsUiReady || _isLoading)
         {
             return;
         }
@@ -2478,6 +2497,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateEnvironmentFilterInterlock()
     {
         bool environmentFilterEnabled = CheckEnvironmentFilter.IsOn;
+        EnvironmentFilterList.IsExpanded = environmentFilterEnabled;
         ProcessFilterModeOption selectedMode = GetSelectedProcessFilterMode();
         bool processFilterEnabled = environmentFilterEnabled && selectedMode != ProcessFilterModeOption.Disabled;
 
@@ -2492,6 +2512,7 @@ public sealed partial class ControlPanelWindow : UserControl
         ListConfiguredProcesses.IsEnabled = processFilterEnabled && CurrentProfileProcesses.Count > 0;
         BtnBrowseProcess.IsEnabled = processFilterEnabled;
         BtnSelectRunningProcess.IsEnabled = processFilterEnabled;
+        _settingsHeaders?.Update();
     }
 
     private void SelectProcessFilterMode(ProcessFilterModeOption mode)
@@ -2779,15 +2800,21 @@ public sealed partial class ControlPanelWindow : UserControl
     // 运行中进程
     // ==================================================================
 
-    private void SelectRunningProcess_Click(object sender, RoutedEventArgs e)
+    private async void SelectRunningProcess_Click(object sender, RoutedEventArgs e)
     {
-        _ = sender;
-        _ = e;
-
-        RefreshRunningProcessList();
+        if (_isClosed || _modalDialogs.ContainsKey(RunningProcessOverlay)) return;
+        int generation = ++_runningProcessLoadGeneration;
+        _loadingRunningProcesses = true;
+        _allRunningProcesses.Clear();
         SearchRunningProcess.Text = string.Empty;
         ApplyRunningProcessFilter(null);
         _ = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: true);
+        List<ProcessItem> processes = await Task.Run(GetRunningProcesses);
+        if (_isClosed || generation != _runningProcessLoadGeneration) return;
+        _loadingRunningProcesses = false;
+        if (!_modalDialogs.TryGetValue(RunningProcessOverlay, out ModalDialogState? state) || state.CloseRequested) return;
+        _allRunningProcesses.AddRange(processes);
+        ApplyRunningProcessFilter(SearchRunningProcess.Text);
     }
 
     private void CloseRunningProcessOverlay_Click(object sender, RoutedEventArgs e)
@@ -2821,15 +2848,14 @@ public sealed partial class ControlPanelWindow : UserControl
         ApplyRunningProcessFilter(SearchRunningProcess.Text);
     }
 
-    private void RefreshRunningProcessList()
+    private static List<ProcessItem> GetRunningProcesses()
     {
-        _allRunningProcesses.Clear();
-        RunningProcessList.Clear();
-
+        var processes = new List<ProcessItem>();
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             int selfId = Environment.ProcessId;
-            foreach (Process process in Process.GetProcesses().OrderBy(item => item.ProcessName))
+            foreach (Process process in Process.GetProcesses())
             {
                 try
                 {
@@ -2860,7 +2886,7 @@ public sealed partial class ControlPanelWindow : UserControl
                     }
 
                     string processName = NormalizeProcessName(baseName);
-                    if (_allRunningProcesses.Any(item => item.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase)))
+                    if (!names.Add(processName))
                     {
                         continue;
                     }
@@ -2886,12 +2912,15 @@ public sealed partial class ControlPanelWindow : UserControl
                         }
                     }
 
-                    _allRunningProcesses.Add(new ProcessItem
+                    processes.Add(new ProcessItem
                     {
                         DisplayName = displayName,
                         ProcessName = processName,
                         IsSelected = false
                     });
+                }
+                catch (Exception)
+                {
                 }
                 finally
                 {
@@ -2903,6 +2932,7 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             AppLogger.Warn($"Failed to enumerate running processes: {ex.Message}");
         }
+        return processes.OrderBy(item => item.ProcessName, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private void ApplyRunningProcessFilter(string? filter)
@@ -3126,17 +3156,62 @@ public sealed partial class ControlPanelWindow : UserControl
             if (pair.Value.Items.Contains(item)) UpdateSelectionToolbar(pair.Key);
     }
 
-    private Viewbox CreateSelectionIcon(string resourceKey) =>
-        (Viewbox)Microsoft.UI.Xaml.Markup.XamlReader.Load(
-            $"<Viewbox xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"16\" Height=\"16\" Stretch=\"Uniform\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"><PathIcon Width=\"9\" Height=\"9\" Data=\"{Resources[resourceKey]}\" /></Viewbox>");
+    private Geometry GetSelectionIconData(string resourceKey) =>
+        (Geometry)Microsoft.UI.Xaml.Markup.XamlBindingHelper.ConvertValue(typeof(Geometry), Resources[resourceKey]);
+
+    private Viewbox CreateSelectionIcon(string resourceKey) => new()
+    {
+        Width = 16, Height = 16, Stretch = Stretch.Uniform,
+        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        Child = new PathIcon { Width = 9, Height = 9, Data = GetSelectionIconData(resourceKey) }
+    };
 
     private void InitializeSelectionToolbar(SelectionToolbar toolbar)
     {
-        var icon = CreateSelectionIcon("InvertSelectionIconData");
-        toolbar.Invert.Content = icon;
-        icon.RenderTransformOrigin = new Point(0.5, 0.5);
-        icon.RenderTransform = new ScaleTransform();
+        toolbar.Invert.Content = toolbar.InvertIcon = CreateSelectionIcon("InvertSelectionIconData");
+        toolbar.InvertIcon.Tag = false;
         toolbar.SelectAll.Content = toolbar.SelectAllIcon = CreateSelectionIcon("SelectAllIconData");
+        toolbar.SelectAllIconData = ((PathIcon)toolbar.SelectAllIcon.Child).Data;
+    }
+
+    private void AnimateSelectionIcon(Viewbox icon, bool mirror, bool animate)
+    {
+        Visual visual = ElementCompositionPreview.GetElementVisual(icon);
+        float from = visual.Scale.X;
+        float target = mirror ? -1 : 1;
+        visual.StopAnimation("Scale.X");
+        visual.StopAnimation("Opacity");
+        visual.CenterPoint = new Vector3((float)icon.ActualWidth / 2, (float)icon.ActualHeight / 2, 0);
+        visual.Scale = new Vector3(target, 1, 1);
+        visual.Opacity = 1;
+        if (!animate || !icon.IsLoaded || !new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) return;
+        var scale = visual.Compositor.CreateScalarKeyFrameAnimation();
+        scale.InsertKeyFrame(0, from);
+        scale.InsertKeyFrame(1, target);
+        scale.Duration = TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], CultureInfo.InvariantCulture);
+        visual.StartAnimation("Scale.X", scale);
+        var fade = visual.Compositor.CreateScalarKeyFrameAnimation();
+        fade.InsertKeyFrame(0, 0.4f);
+        fade.InsertKeyFrame(1, 1);
+        fade.Duration = scale.Duration;
+        visual.StartAnimation("Opacity", fade);
+    }
+
+    private void ResetSelectionIcons(ContentDialog dialog)
+    {
+        ItemsControl? list = dialog == RunningProcessOverlay ? ListRunningProcesses
+            : dialog == VisualResetOverlay ? ListVisualResetItems : dialog == BackupOverlay ? ListBackupItems : null;
+        if (list == null) return;
+        IEnumerable<SelectionToolbar> toolbars = new[] { _selectionToolbars[list] }
+            .Concat(_groupSelectionToolbars.Values.Where(entry => entry.Group.List == list).Select(entry => entry.Toolbar));
+        if (_pinnedSelectionToolbars.TryGetValue(list, out SelectionToolbar? pinned)) toolbars = toolbars.Append(pinned);
+        foreach (SelectionToolbar toolbar in toolbars)
+        {
+            if (toolbar.InvertIcon is not { } icon) continue;
+            icon.Tag = false;
+            AnimateSelectionIcon(icon, mirror: false, animate: false);
+        }
+        UpdateSelectionToolbar(list);
     }
 
     private void UpdateSelectionToolbar(ItemsControl list)
@@ -3146,7 +3221,8 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateSelectionButtons(toolbar, available);
         toolbar.Confirm.IsEnabled = available && toolbar.Items.Any(item => item.IsSelected);
         toolbar.EmptyMessage.Text = Localization.Get("Overlay_NoSearchResults");
-        toolbar.EmptyMessage.Visibility = toolbar.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        toolbar.EmptyMessage.Visibility = toolbar.Items.Count == 0 && (list != ListRunningProcesses || !_loadingRunningProcesses)
+            ? Visibility.Visible : Visibility.Collapsed;
         UpdateSectionSelectionToolbars(list);
     }
 
@@ -3160,10 +3236,13 @@ public sealed partial class ControlPanelWindow : UserControl
         ToolTipService.SetToolTip(toolbar.SelectAll, selectLabel);
         AutomationProperties.SetName(toolbar.Invert, invertLabel);
         AutomationProperties.SetName(toolbar.SelectAll, selectLabel);
-        Viewbox icon = allSelected
-            ? toolbar.ClearIcon ??= CreateSelectionIcon("ClearSelectionIconData")
-            : toolbar.SelectAllIcon ??= CreateSelectionIcon("SelectAllIconData");
-        if (!ReferenceEquals(toolbar.SelectAll.Content, icon)) toolbar.SelectAll.Content = icon;
+        if (toolbar.SelectAllIcon is { Child: PathIcon glyph } icon)
+        {
+            Geometry data = allSelected ? toolbar.ClearIconData ??= GetSelectionIconData("ClearSelectionIconData") : toolbar.SelectAllIconData!;
+            if (ReferenceEquals(glyph.Data, data)) return;
+            glyph.Data = data;
+            AnimateSelectionIcon(icon, mirror: false, animate: toolbar.SelectAll.IsEnabled);
+        }
     }
 
     private void InvertSelection_Click(object sender, RoutedEventArgs args) => ChangeSelection(sender, invert: true);
@@ -3181,7 +3260,12 @@ public sealed partial class ControlPanelWindow : UserControl
         try
         {
             SelectionBatch.Change(items, invert);
-            if (invert && button.Content is Viewbox { RenderTransform: ScaleTransform mirror }) mirror.ScaleX = -mirror.ScaleX;
+            if (invert && button.Content is Viewbox icon)
+            {
+                bool mirror = icon.Tag is not true;
+                icon.Tag = mirror;
+                AnimateSelectionIcon(icon, mirror, animate: true);
+            }
         }
         finally
         {
@@ -3819,6 +3903,7 @@ public sealed partial class ControlPanelWindow : UserControl
             if (dialog.Parent is Panel parent) parent.Children.Remove(dialog);
             if (dialog.XamlRoot != root) dialog.XamlRoot = root;
             dialog.RequestedTheme = RootGrid.ActualTheme;
+            ResetSelectionIcons(dialog);
             ConfigureContentDialog(dialog);
             PrepareContentDialogPresentation(dialog);
             dialog.Opened += Opened;
@@ -3913,7 +3998,7 @@ public sealed partial class ControlPanelWindow : UserControl
             {
                 CompositionTarget.Rendering -= readyHandler;
                 readyHandler = null;
-                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, async () =>
+                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
                 {
                     if (_isClosed || version != animationVersion) return;
                     _ = VisualStateManager.GoToState(dialog, "DialogHidden", false);
@@ -3962,7 +4047,7 @@ public sealed partial class ControlPanelWindow : UserControl
             try
             {
                 var ready = new TaskCompletionSource();
-                if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => ready.TrySetResult())) return;
+                if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () => ready.TrySetResult())) return;
                 await ready.Task;
                 if (_isClosed || args.Cancel) return;
                 dialog.UpdateLayout();

@@ -293,7 +293,7 @@ public sealed partial class ControlPanelWindow
         }
     }
 
-    private void ApplyBackupValuesToPanel(IReadOnlyDictionary<string, object> values)
+    private void ApplyBackupValuesToPanel(IReadOnlyDictionary<string, object> values, bool animate = false)
     {
         _isLoading = true;
         _suppressValueSync = true;
@@ -358,11 +358,7 @@ public sealed partial class ControlPanelWindow
             _suppressValueSync = false;
             _isLoading = false;
         }
-        UpdateClickEffectPanelVisibility();
-        UpdateEnvironmentFilterInterlock();
-        UpdateMultiTouchPanelVisibility();
-        UpdateEffectScalePanelVisibility();
-        UpdateAnimationSpeedPanelVisibility();
+        UpdateDependentSettingsVisibility(animate);
         ClickCountText.Text = Localization.Format("Welcome_ClicksUnit", ConfigManager.TotalClicks);
     }
 

@@ -284,10 +284,11 @@ public sealed partial class ControlPanelWindow
         finally { _updatingAdvancedControls = previous; }
     }
 
-    private void BaClickAdvancedList_Loaded(object sender, RoutedEventArgs args)
+    private void ConditionalSettingsList_Loaded(object sender, RoutedEventArgs args)
     {
-        BaClickAdvancedList.ApplyTemplate();
-        if (FindVisualDescendant<ToggleButton>(BaClickAdvancedList, "ExpanderHeader") is ToggleButton header)
+        if (sender is not Expander expander) return;
+        expander.ApplyTemplate();
+        if (FindVisualDescendant<ToggleButton>(expander, "ExpanderHeader") is ToggleButton header)
             header.Visibility = Visibility.Collapsed;
     }
 

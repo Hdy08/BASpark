@@ -1397,7 +1397,7 @@ public class WinUi3UiTests
         Assert.Equal((string?)GetNamedElement(document, "TxtTrailSamplingRateValue").Attribute("Width"), (string?)input.Attribute("Width"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("SetSettingsVisibility(SectionBasic, animate, (PanelMaxTouchEffects, CheckTouchscreenMode.IsOn))", source, StringComparison.Ordinal);
-        Assert.Contains("ConfigManager.Save(\"MaxTouchEffects\", _touchEffectLimitFormatter.ToStoredValue(SliderMaxTouchEffects.Value))", source, StringComparison.Ordinal);
+        Assert.Contains("MaxTouchEffects = _touchEffectLimitFormatter.ToStoredValue(GetPendingSliderValue(SliderMaxTouchEffects))", source, StringComparison.Ordinal);
         foreach (string language in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
         {
             XDocument strings = XDocument.Parse(ReadSource("src", language));
@@ -3878,7 +3878,7 @@ public class WinUi3UiTests
         XElement list = GetNamedElement(panel, "BaClickAdvancedList");
         Assert.Equal(Presentation + "Expander", list.Name);
         Assert.Equal("False", (string?)list.Attribute("IsExpanded"));
-        Assert.Equal("BaClickAdvancedList_Loaded", (string?)list.Attribute("Loaded"));
+        Assert.Equal("ConditionalSettingsList_Loaded", (string?)list.Attribute("Loaded"));
         Assert.Same(list, GetNamedElement(panel, "PanelBaClickAdvanced").Parent);
         Assert.Null(GetNamedElement(panel, "PanelBaClickAdvanced").Attribute("Visibility"));
         XDocument design = LoadXaml("src", "DesignSystem.xaml");
@@ -3979,7 +3979,7 @@ public class WinUi3UiTests
         string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
         string reset = source[source.IndexOf("private void ResetSection_Click", StringComparison.Ordinal)..source.IndexOf("private void ApplyPageRuntimeSettings", StringComparison.Ordinal)];
         Assert.Contains("item.Restore?.Invoke()", reset, StringComparison.Ordinal);
-        Assert.Contains("ApplyBackupValuesToPanel(_savedSettingsState.GetValues(CurrentSettingsPage))", reset, StringComparison.Ordinal);
+        Assert.Contains("ApplyBackupValuesToPanel(_savedSettingsState.GetValues(CurrentSettingsPage), animate: true)", reset, StringComparison.Ordinal);
         Assert.DoesNotContain("ConfigManager.Save", reset, StringComparison.Ordinal);
         Assert.DoesNotContain("App.Overlay", reset, StringComparison.Ordinal);
         Assert.DoesNotContain("ApplyDarkMode", reset, StringComparison.Ordinal);

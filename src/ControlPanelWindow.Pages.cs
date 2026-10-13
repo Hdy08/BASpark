@@ -27,6 +27,9 @@ public sealed partial class ControlPanelWindow
         private readonly Action<StickyHeading?> _show;
         private readonly List<StickyHeading> _headings = [];
         private StickyHeading? _active;
+        private bool _updatePending;
+        private bool _refreshPending;
+        private bool _disposed;
 
         internal StickySectionTracker(ScrollViewer scroll, FrameworkElement content, Action<StickyHeading?> show)
         {
@@ -41,13 +44,13 @@ public sealed partial class ControlPanelWindow
         internal void Add(StickyHeading heading)
         {
             _headings.Add(heading);
-            Update();
+            RequestUpdate();
         }
 
         internal void Remove(FrameworkElement anchor)
         {
             _headings.RemoveAll(heading => ReferenceEquals(heading.Anchor, anchor));
-            Update();
+            RequestUpdate();
         }
 
         internal void Clear()
@@ -88,11 +91,26 @@ public sealed partial class ControlPanelWindow
         }
 
         private void ViewChanged(object? sender, ScrollViewerViewChangedEventArgs args) => Update();
-        private void Loaded(object sender, RoutedEventArgs args) => Update(true);
-        private void SizeChanged(object sender, SizeChangedEventArgs args) => Update();
+        private void RequestUpdate(bool refresh = false)
+        {
+            _refreshPending |= refresh;
+            if (_disposed || _updatePending) return;
+            _updatePending = true;
+            if (!_scroll.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    _updatePending = false;
+                    bool requestedRefresh = _refreshPending;
+                    _refreshPending = false;
+                    if (!_disposed) Update(requestedRefresh);
+                })) _updatePending = false;
+        }
+
+        private void Loaded(object sender, RoutedEventArgs args) => RequestUpdate(true);
+        private void SizeChanged(object sender, SizeChangedEventArgs args) => RequestUpdate();
 
         public void Dispose()
         {
+            _disposed = true;
             _scroll.ViewChanged -= ViewChanged;
             _scroll.Loaded -= Loaded;
             _content.SizeChanged -= SizeChanged;
@@ -139,9 +157,11 @@ public sealed partial class ControlPanelWindow
                  })
         {
             var request = section.Item2 == SectionBackup ? null : new SectionResetRequest(section.Item3, section.Item4);
-            FrameworkElement anchor = WrapPageHeading(section.Item1, section.Item2, request, section.Item5);
+            StackPanel parent = section.Item1 == TxtFilterAdvancedTitle ? PanelEnvironmentFilter : section.Item2;
+            FrameworkElement anchor = WrapPageHeading(section.Item1, parent, request, section.Item5);
             StackPanel page = section.Item2;
-            _settingsHeaders.Add(new(anchor, section.Item1, request, () => page.Visibility == Visibility.Visible));
+            _settingsHeaders.Add(new(anchor, section.Item1, request, () => page.Visibility == Visibility.Visible &&
+                (section.Item1 != TxtFilterAdvancedTitle || EnvironmentFilterList.IsExpanded)));
         }
         _aboutHeaders = new(AboutScrollViewer, AboutContent,
             heading => TxtActiveAboutSection.Text = heading?.Label.Text ?? string.Empty);
@@ -186,7 +206,7 @@ public sealed partial class ControlPanelWindow
         BtnVisualReset.Visibility = page == SettingsSections.Visual ? Visibility.Visible : Visibility.Collapsed;
         BtnFilterReset.Visibility = page == SettingsSections.Filter ? Visibility.Visible : Visibility.Collapsed;
         BtnRefreshScreens.Visibility = page == SettingsSections.Screens ? Visibility.Visible : Visibility.Collapsed;
-        foreach (Button button in new[] { BtnResetSection }.Concat(SettingsContent.Children.OfType<StackPanel>()
+        foreach (Button button in new[] { BtnResetSection }.Concat(SettingsContent.Children.OfType<StackPanel>().Append(PanelEnvironmentFilter)
                      .SelectMany(section => section.Children.OfType<Grid>()).SelectMany(header => header.Children.OfType<StackPanel>())
                      .SelectMany(header => header.Children.OfType<Button>())))
         {
@@ -221,11 +241,7 @@ public sealed partial class ControlPanelWindow
             SyncSliderAndBoxValues();
         }
         finally { _isLoading = _suppressValueSync = false; }
-        UpdateClickEffectPanelVisibility();
-        UpdateEnvironmentFilterInterlock();
-        UpdateMultiTouchPanelVisibility();
-        UpdateEffectScalePanelVisibility();
-        UpdateAnimationSpeedPanelVisibility();
+        UpdateDependentSettingsVisibility(animate: true);
         UpdateAdvancedSettingsVisibility();
         UpdateAdvancedHdrControls();
         UpdateApplySettingsState(SettingsSections.All);
@@ -236,7 +252,7 @@ public sealed partial class ControlPanelWindow
     {
         if (_savedSettingsState == null || _isApplyingSettings) return;
         Focus(FocusState.Programmatic);
-        ApplyBackupValuesToPanel(_savedSettingsState.GetValues(CurrentSettingsPage));
+        ApplyBackupValuesToPanel(_savedSettingsState.GetValues(CurrentSettingsPage), animate: true);
         UpdateAdvancedSettingsVisibility();
         UpdateAdvancedHdrControls();
         UpdateApplySettingsState(SettingsSections.All);
