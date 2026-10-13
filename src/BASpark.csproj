@@ -71,6 +71,20 @@
           CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <Target Name="GenerateBuildInformation"
+          BeforeTargets="GetAssemblyAttributes"
+          DependsOnTargets="InitializeSourceControlInformation">
+    <PropertyGroup>
+      <BuildCommitHash Condition="'$(BuildCommitHash)' == ''">$(SourceRevisionId)</BuildCommitHash>
+      <BuildUnixTimestamp Condition="'$(BuildUnixTimestamp)' == ''">$([System.DateTimeOffset]::UtcNow.ToUnixTimeSeconds())</BuildUnixTimestamp>
+    </PropertyGroup>
+    <ItemGroup>
+      <AssemblyMetadata Include="BuildVersion" Value="$(Version)" />
+      <AssemblyMetadata Include="BuildCommitHash" Value="$(BuildCommitHash)" />
+      <AssemblyMetadata Include="BuildUnixTimestamp" Value="$(BuildUnixTimestamp)" />
+    </ItemGroup>
+  </Target>
+
   <!--
     WinUI 3 的编译产物（各窗口的 .xbf 与合并后的资源索引 BASpark.pri）
     只在 Build 输出目录生成，`dotnet publish` 的默认复制管线不会带上它们。

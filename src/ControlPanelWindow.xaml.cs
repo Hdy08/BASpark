@@ -27,6 +27,7 @@ using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Text;
 using Microsoft.Win32;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.Storage.Pickers;
@@ -542,7 +543,6 @@ public sealed partial class ControlPanelWindow : UserControl
 
             ApplyLocalizedText();
             PopulateLanguageCombo();
-            LoadVersion();
             LoadSettings();
             ApplyScrollbarSettings();
             LoadScreenOptions();
@@ -700,7 +700,9 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (TextBlock title in new[] { TxtWelcomeTitle, TxtSettingsTitle, TxtLogTitle, TxtAboutTitle,
                      TxtStatsTitle, TxtBasicTitle, TxtBasicTriggerTitle, TxtBasicRuntimeTitle,
                      TxtVisualTitle, TxtVisualSpeedTitle, TxtVisualSamplingTitle, TxtVisualOtherTitle,
-                     TxtFilterTitle, TxtFilterAdvancedTitle, TxtBackupTitle, TxtBackupRestoreTitle })
+                     TxtFilterTitle, TxtFilterAdvancedTitle, TxtBackupTitle, TxtBackupRestoreTitle,
+                     TxtBuildInfoTitle, TxtAuthorsTitle, TxtAuthorDoom, TxtAuthorDoomDescription,
+                     TxtAuthorCiallo, TxtAuthorCialloDescription, TxtAuthorHdy, TxtAuthorHdyDescription })
         {
             double width = MeasureSingleLineWidth(title);
             FrameworkElement heading = title;
@@ -1330,12 +1332,28 @@ public sealed partial class ControlPanelWindow : UserControl
         BtnBrowseProcess.Content = Localization.Get("Filter_Browse");
         BtnSelectRunningProcess.Content = Localization.Get("Filter_SelectRunning");
         BtnRefreshScreens.Content = Localization.Get("MultiScreen_Refresh");
-        TxtMultiScreenHint.Text = Localization.Get("MultiScreen_Hint");
         TxtLogTitle.Text = Localization.Get("Nav_Log");
         BtnClearLog.Content = Localization.Get("Log_Clear");
         TxtLogHint.Text = Localization.Get("Log_Hint");
         TxtAboutTitle.Text = Localization.Get("About_Title");
         TxtAboutDescription.Text = Localization.Get("About_Description");
+        TxtBuildInfoTitle.Text = Localization.Get("About_BuildInfo");
+        TxtVersionInfo.Text = Localization.Get("About_VersionInfo");
+        TxtCommitDetails.Text = Localization.Get("About_CommitDetails");
+        TxtBuildTime.Text = Localization.Get("About_BuildTime");
+        BtnCopyVersion.Content = BtnCopyBuildTime.Content = Localization.Get("About_Copy");
+        BtnViewCommit.Content = Localization.Get("About_View");
+        TxtAuthorsTitle.Text = Localization.Get("About_Authors");
+        TxtAuthorDoomDescription.Text = Localization.Get("About_DoomRole");
+        TxtAuthorCialloDescription.Text = Localization.Get("About_CialloRole");
+        TxtAuthorHdyDescription.Text = Localization.Get("About_HdyRole");
+        BtnAuthorDoomWebsite.Content = Localization.Get("About_OfficialSite");
+        BtnAuthorDoomWebsite.Tag = Localization.IsChineseLocale ? "https://basp.catbotstudio.cn" : "https://basp.catbotstudio.top";
+        BtnAuthorDoomQq.Content = Localization.Get("About_QqGroup");
+        BtnAuthorDoomSponsor.Content = Localization.Get("About_Sponsor");
+        foreach (Button button in new[] { BtnAuthorDoomGithub, BtnAuthorCialloGithub, BtnAuthorHdyGithub }) button.Content = "GitHub";
+        foreach (Button button in new[] { BtnAuthorDoomBilibili, BtnAuthorCialloBilibili, BtnAuthorHdyBilibili }) button.Content = "Bilibili";
+        LoadVersion();
         TxtRepositoryLinks.Text = Localization.Get("About_Repositories");
         BtnRepoDoomVoss.Content = Localization.Get("About_OpenRepository");
         BtnRepoCialloKing.Content = Localization.Get("About_OpenRepository");
@@ -1822,25 +1840,33 @@ public sealed partial class ControlPanelWindow : UserControl
         }
     }
 
-    private void LoadVersion()
+    private async void CopyAboutInformation_Click(object sender, RoutedEventArgs args)
     {
+        if (sender is not Button { Tag: string text } || string.IsNullOrEmpty(text)) return;
         try
         {
-            Version? version = Assembly.GetExecutingAssembly().GetName().Version;
-            if (version != null)
-            {
-                string versionNum = $"V{version.Major}.{version.Minor}.{version.Build}";
-                string versionText = $"BASpark V{version.Major}.{version.Minor}.{version.Build}";
-                AboutVersionText.Text = versionNum;
-                TxtSidebarVersion.Text = versionText;
-            }
+            var data = new DataPackage();
+            data.SetText(text);
+            Clipboard.SetContent(data);
+            Clipboard.Flush();
         }
-        catch
+        catch (Exception exception)
         {
-            string failed = Localization.Get("Version_ReadFailed");
-            AboutVersionText.Text = failed;
-            TxtSidebarVersion.Text = failed;
+            await ShowMessageAsync(Localization.Format("About_CopyFailed", exception.Message));
         }
+    }
+
+    private void LoadVersion()
+    {
+        BtnCopyVersion.IsEnabled = BuildInformation.Version.Length > 1;
+        AboutVersionText.Text = BtnCopyVersion.IsEnabled ? BuildInformation.Version : Localization.Get("Version_ReadFailed");
+        TxtSidebarVersion.Text = BtnCopyVersion.IsEnabled ? "BASpark " + BuildInformation.Version : AboutVersionText.Text;
+        AboutCommitText.Text = string.IsNullOrEmpty(BuildInformation.CommitHash) ? Localization.Get("About_InfoUnavailable") : BuildInformation.CommitHash;
+        BtnViewCommit.Tag = BuildInformation.GetCommitUrl(BuildInformation.CommitHash);
+        BtnViewCommit.IsEnabled = BtnViewCommit.Tag != null;
+        BtnCopyBuildTime.IsEnabled = BuildInformation.UnixTimestamp.HasValue;
+        AboutBuildTimeText.Text = BuildInformation.UnixTimestamp is long timestamp
+            ? BuildInformation.FormatBuildTime(timestamp, TimeZoneInfo.Local) : Localization.Get("About_InfoUnavailable");
     }
 
     public void PopulateLanguageCombo()
@@ -2061,7 +2087,6 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateSettingsPageTitle()
     {
         TxtSettingsTitle.Text = (_selectedSettingsItem?.Content as TextBlock ?? SubTabBasicLabel).Text;
-        TxtMultiScreenHint.Visibility = _selectedSettingsItem == SubTabMultiScreen ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void UpdateSettingsSectionVisibility()

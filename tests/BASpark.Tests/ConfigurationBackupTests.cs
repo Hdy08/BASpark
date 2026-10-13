@@ -191,6 +191,8 @@ public sealed class ConfigurationBackupTests
     {
         Assert.Equal(30, ConfigurationBackup.Settings.Count);
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
+        Assert.Equal(new[] { "Backup_Statistics", "Nav_Basic", "Nav_Visual", "Nav_Filter" },
+            ConfigurationBackup.Settings.Select(item => item.GroupKey).Distinct());
         Assert.Contains(ConfigurationBackup.Settings, item => item.Key == "TotalClicks");
         foreach (string key in new[] { "Profiles", "ParticleColor",
                      "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "MaxTouchEffects", "InputSamplingRate" })

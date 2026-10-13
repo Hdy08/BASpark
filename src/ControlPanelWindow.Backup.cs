@@ -166,7 +166,7 @@ public sealed partial class ControlPanelWindow
         foreach (var item in document.Data.Where(item => ConfigurationBackup.IsScreenKey(item.Key)))
         {
             var screen = item.Value.Deserialize<ScreenSelectionState>()!;
-            _backupItems.Add(new BackupSelectionItem(item.Key, Localization.Get("MultiScreen_Title"),
+            _backupItems.Add(new BackupSelectionItem(item.Key, Localization.Get("Nav_MultiScreen"),
                 string.IsNullOrWhiteSpace(screen.DisplayName) ? screen.DeviceName : screen.DisplayName,
                 DescribeBackupValue(item.Key, item.Value)) { IsSelected = true });
         }

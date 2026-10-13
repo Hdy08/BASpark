@@ -2899,9 +2899,9 @@ public class WinUi3UiTests
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement about = GetNamedElement(panel, "PageAbout");
-        Assert.Equal(4, about.Descendants().Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
+        Assert.Equal(9, about.Descendants().Count(element => (string?)element.Attribute("Style") == "{StaticResource BasSettingCardStyle}"));
         Assert.DoesNotContain(about.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "BtnResetAll");
-        Assert.Equal("{StaticResource BasSettingTitleStyle}", (string?)GetNamedElement(panel, "AboutVersionText").Attribute("Style"));
+        Assert.Equal("{StaticResource BasCaptionStyle}", (string?)GetNamedElement(panel, "AboutVersionText").Attribute("Style"));
         Assert.DoesNotContain("TxtDevOptions", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
         Assert.DoesNotContain("TxtDevOptions", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
         XDocument app = LoadXaml("src", "App.xaml");
@@ -2910,6 +2910,43 @@ public class WinUi3UiTests
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.DoesNotContain("ApplySystemBackdrop", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Failed to apply the solid backdrop", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildInformation_ReadsTheVersionFullCommitAndTimestampEmbeddedDuringCompilation()
+    {
+        Assert.Matches(@"^V\d+\.\d+\.\d+", BuildInformation.Version);
+        Assert.Matches(@"^[0-9a-fA-F]{40}$", BuildInformation.CommitHash);
+        long timestamp = Assert.IsType<long>(BuildInformation.UnixTimestamp);
+        Assert.InRange(timestamp, 1, DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 60);
+    }
+
+    [Theory]
+    [InlineData(0, "1970-01-01 00:00:00")]
+    [InlineData(480, "1970-01-01 08:00:00")]
+    [InlineData(-480, "1969-12-31 16:00:00")]
+    [InlineData(330, "1970-01-01 05:30:00")]
+    public void BuildInformation_ConvertsUtcTimestampsToTheRequestedSystemTimeZone(int offsetMinutes, string expected)
+    {
+        TimeZoneInfo timeZone = TimeZoneInfo.CreateCustomTimeZone("BuildTime", TimeSpan.FromMinutes(offsetMinutes), "BuildTime", "BuildTime");
+        Assert.Equal(expected, BuildInformation.FormatBuildTime(0, timeZone));
+    }
+
+    [Fact]
+    public void BuildInformation_CommitLinksUseTheFullHashInTheRequestedRepository()
+    {
+        const string commitHash = "0123456789abcdef0123456789abcdef01234567";
+        Assert.Equal("https://github.com/Hdy08/BASpark/commit/" + commitHash, BuildInformation.GetCommitUrl(commitHash));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("f541903")]
+    [InlineData("0123456789abcdef0123456789abcdef0123456g")]
+    [InlineData("0123456789abcdef0123456789abcdef012345678")]
+    public void BuildInformation_UnavailableOrInvalidCommitsDoNotCreateMisleadingLinks(string commitHash)
+    {
+        Assert.Null(BuildInformation.GetCommitUrl(commitHash));
     }
 
     [Fact]

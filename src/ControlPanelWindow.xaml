@@ -287,8 +287,6 @@
                         <TextBlock x:Name="TxtSettingsTitle"
                                    Text=""
                                    Style="{StaticResource BasSettingsPageTitleStyle}" />
-                        <TextBlock x:Name="TxtMultiScreenHint" Text="" Visibility="Collapsed"
-                                   Margin="0,8,0,0" Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -1529,20 +1527,48 @@
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <TextBlock x:Name="TxtAboutTitle" Text="" Style="{StaticResource BasSettingsPageTitleStyle}" />
-
-                    <Border Style="{StaticResource BasSettingCardStyle}" Margin="0,16,0,6">
+                    <TextBlock x:Name="TxtAboutDescription" Text="" Margin="0,8,0,0" Style="{StaticResource BasCaptionStyle}" />
+                    <TextBlock x:Name="TxtBuildInfoTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
+                    <Border Style="{StaticResource BasSettingCardStyle}">
                         <Grid ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Text="BASpark" Style="{StaticResource BasSettingTitleStyle}" />
-                                <TextBlock x:Name="TxtAboutDescription" Text="" Style="{StaticResource BasCaptionStyle}" />
+                                <TextBlock x:Name="TxtVersionInfo" Text="" Style="{StaticResource BasSettingTitleStyle}" />
+                                <TextBlock x:Name="AboutVersionText" Text="" Style="{StaticResource BasCaptionStyle}" />
                             </StackPanel>
-                            <TextBlock x:Name="AboutVersionText" Grid.Column="1" Text="—"
-                                       Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center"
-                                       HorizontalAlignment="Right" />
+                            <Button x:Name="BtnCopyVersion" Grid.Column="1" Content="" Tag="{Binding Text, ElementName=AboutVersionText}"
+                                    MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Center" Click="CopyAboutInformation_Click" />
+                        </Grid>
+                    </Border>
+                    <Border Style="{StaticResource BasSettingCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtCommitDetails" Text="" Style="{StaticResource BasSettingTitleStyle}" />
+                                <TextBlock x:Name="AboutCommitText" Text="" Style="{StaticResource BasCaptionStyle}" />
+                            </StackPanel>
+                            <Button x:Name="BtnViewCommit" Grid.Column="1" Content="" MinWidth="0"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
+                        </Grid>
+                    </Border>
+                    <Border Style="{StaticResource BasSettingCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtBuildTime" Text="" Style="{StaticResource BasSettingTitleStyle}" />
+                                <TextBlock x:Name="AboutBuildTimeText" Text="" Style="{StaticResource BasCaptionStyle}" />
+                            </StackPanel>
+                            <Button x:Name="BtnCopyBuildTime" Grid.Column="1" Content="" Tag="{Binding Text, ElementName=AboutBuildTimeText}"
+                                    MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Center" Click="CopyAboutInformation_Click" />
                         </Grid>
                     </Border>
                     <TextBlock x:Name="TxtRepositoryLinks" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}"
@@ -1581,6 +1607,58 @@
                                              NavigateUri="https://github.com/Hdy08/BASpark/tree/WinUI3" Style="{StaticResource BasRepositoryLinkStyle}" />
                             <Button x:Name="BtnRepoWinUI" Grid.Column="1" Content="" Tag="https://github.com/Hdy08/BASpark/tree/WinUI3"
                                     HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
+                        </Grid>
+                    </Border>
+                    <TextBlock x:Name="TxtAuthorsTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
+                    <Border Style="{StaticResource BasSettingCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtAuthorDoom" Text="DoomVoss" Style="{StaticResource BasSettingTitleStyle}" />
+                                <TextBlock x:Name="TxtAuthorDoomDescription" Text="" Style="{StaticResource BasCaptionStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button x:Name="BtnAuthorDoomWebsite" Content="" MinWidth="0" Click="OpenRepository_Click" />
+                                <Button x:Name="BtnAuthorDoomGithub" Content="" Tag="https://github.com/DoomVoss" MinWidth="0" Click="OpenRepository_Click" />
+                                <Button x:Name="BtnAuthorDoomBilibili" Content="" Tag="https://space.bilibili.com/3493116084488813" MinWidth="0" Click="OpenRepository_Click" />
+                                <Button x:Name="BtnAuthorDoomQq" Content="" Tag="https://qm.qq.com/q/lgvVto3yPm" MinWidth="0" Click="OpenRepository_Click" />
+                                <Button x:Name="BtnAuthorDoomSponsor" Content="" Tag="https://afdian.com/a/doomvoss" MinWidth="0" Click="OpenRepository_Click" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <Border Style="{StaticResource BasSettingCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtAuthorCiallo" Text="CialloKing" Style="{StaticResource BasSettingTitleStyle}" />
+                                <TextBlock x:Name="TxtAuthorCialloDescription" Text="" Style="{StaticResource BasCaptionStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button x:Name="BtnAuthorCialloGithub" Content="" Tag="https://github.com/CialloKing" MinWidth="0" Click="OpenRepository_Click" />
+                                <Button x:Name="BtnAuthorCialloBilibili" Content="" Tag="https://space.bilibili.com/3707010887453483" MinWidth="0" Click="OpenRepository_Click" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <Border Style="{StaticResource BasSettingCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtAuthorHdy" Text="Hdy08" Style="{StaticResource BasSettingTitleStyle}" />
+                                <TextBlock x:Name="TxtAuthorHdyDescription" Text="" Style="{StaticResource BasCaptionStyle}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button x:Name="BtnAuthorHdyGithub" Content="" Tag="https://github.com/Hdy08" MinWidth="0" Click="OpenRepository_Click" />
+                                <Button x:Name="BtnAuthorHdyBilibili" Content="" Tag="https://space.bilibili.com/674739421" MinWidth="0" Click="OpenRepository_Click" />
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </StackPanel>
