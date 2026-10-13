@@ -1187,10 +1187,16 @@
                     });
             }
 
-            postHostMessage(
-                'ready',
-                readBackendState(),
-            );
+            window.requestAnimationFrame(() =>
+            {
+                window.requestAnimationFrame(() =>
+                {
+                    postHostMessage(
+                        'ready',
+                        readBackendState(),
+                    );
+                });
+            });
         }
         catch (error)
         {

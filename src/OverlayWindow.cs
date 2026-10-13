@@ -700,14 +700,13 @@ internal sealed class OverlayWindow : IDisposable
     /// </summary>
     private void EnsureHostPresented()
     {
-        if (_isClosing || _hiddenForExternalScreenshotCapture)
+        if (_isClosing || !_controllerInitialized || !_rendererReady)
         {
             return;
         }
 
         _webViewReadyForTopmost = true;
-        _host.Show();
-        SafeEnsureTopmost();
+        SyncOverlayPresentationState();
     }
 
     private void StopRendererReadyTimeout()
@@ -985,9 +984,10 @@ internal sealed class OverlayWindow : IDisposable
 
     private void SyncOverlayPresentationState()
     {
+        if (_isClosing) return;
         if (ShouldOverlayBeVisible)
         {
-            _host.Show();
+            if (!_webViewReadyForTopmost || !_controllerInitialized || !_rendererReady) return;
             if (_controller != null && _controllerInitialized)
             {
                 try
@@ -999,6 +999,7 @@ internal sealed class OverlayWindow : IDisposable
                 }
             }
 
+            _host.Show();
             ResumeOverlayRuntime();
         }
         else

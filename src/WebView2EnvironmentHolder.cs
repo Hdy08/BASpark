@@ -84,6 +84,7 @@ internal static class WebView2EnvironmentHolder
 
     private static async Task<CoreWebView2Environment> CreateAsync(string userDataFolder)
     {
+        Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00000000", EnvironmentVariableTarget.Process);
         // WinRT 投影的 CoreWebView2EnvironmentOptions 只提供无参构造 + 属性。
         var options = new CoreWebView2EnvironmentOptions
         {

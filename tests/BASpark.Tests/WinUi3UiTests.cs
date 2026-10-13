@@ -2199,6 +2199,30 @@ public class WinUi3UiTests
         Assert.Contains("EnsureHostPresented()", overlaySource[messageIndex..messageEnd], StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void Overlay_StartupAndCaptureStateChangesCannotShowAnUnpreparedHost(bool rendererReady, bool controllerInitialized)
+    {
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        using var host = new LayeredWindowHost();
+        host.SetBounds(120, 120, 64, 64);
+        var overlay = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
+        typeof(OverlayWindow).GetField("_host", members)!.SetValue(overlay, host);
+        typeof(OverlayWindow).GetField("_rendererReady", members)!.SetValue(overlay, rendererReady);
+        typeof(OverlayWindow).GetField("_controllerInitialized", members)!.SetValue(overlay, controllerInitialized);
+
+        overlay.RefreshPauseState();
+        Assert.False(host.IsVisible);
+        overlay.SetHiddenForExternalScreenshotCapture(true);
+        overlay.SetHiddenForExternalScreenshotCapture(false);
+        Assert.False(host.IsVisible);
+        typeof(OverlayWindow).GetMethod("EnsureHostPresented", members)!.CreateDelegate<Action>(overlay)();
+        Assert.False(host.IsVisible);
+        Assert.False((bool)typeof(OverlayWindow).GetField("_webViewReadyForTopmost", members)!.GetValue(overlay)!);
+    }
+
     [Fact]
     public void SettingsSubNav_UsesNativeHierarchicalNavigationAndItsSubtreeTransitions()
     {
