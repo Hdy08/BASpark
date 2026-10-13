@@ -118,27 +118,29 @@ public sealed class EnvironmentFilterBehaviorTests
         int helperStart = overlaySource.IndexOf(
             "private static bool IsCurrentProcessWindow(IntPtr hwnd)",
             StringComparison.Ordinal);
+        Assert.True(helperStart >= 0, "Current-process window handler is missing.");
         int helperEnd = overlaySource.IndexOf(
             "private static bool IsSuppressedByProcessFilter",
             helperStart,
             StringComparison.Ordinal);
 
         Assert.True(ownWindowCheck >= 0 && foregroundFallback > ownWindowCheck);
-        Assert.True(helperStart >= 0 && helperEnd > helperStart);
+        Assert.True(helperEnd > helperStart);
 
         string helper = overlaySource[helperStart..helperEnd];
         Assert.Contains("GetWindowThreadProcessId(hwnd, out uint processId)", helper, StringComparison.Ordinal);
         Assert.Contains("processId == (uint)Environment.ProcessId", helper, StringComparison.Ordinal);
 
         int mouseMoveStart = overlaySource.IndexOf(
-            "private void OnMouseMoveExt(object? sender, MouseEventExtArgs e)",
+            "private void OnPointerMove(",
             StringComparison.Ordinal);
+        Assert.True(mouseMoveStart >= 0, "Pointer movement handler is missing.");
         int mouseMoveEnd = overlaySource.IndexOf(
-            "private void OnMouseUpExt",
+            "private void RouteTrailMove(",
             mouseMoveStart,
             StringComparison.Ordinal);
 
-        Assert.True(mouseMoveStart >= 0 && mouseMoveEnd > mouseMoveStart);
+        Assert.True(mouseMoveEnd > mouseMoveStart);
         string mouseMoveMethod = overlaySource[mouseMoveStart..mouseMoveEnd];
         Assert.Contains("if (!ConfigManager.IsTrailEffectActive)", mouseMoveMethod, StringComparison.Ordinal);
         Assert.Contains("ShouldSuppressEffects();", mouseMoveMethod, StringComparison.Ordinal);
