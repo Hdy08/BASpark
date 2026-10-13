@@ -551,12 +551,14 @@ public class WinUi3UiTests
         string[] mustBeFilledWithContent =
         [
             "BtnApplySettings", "BtnVisualReset", "BtnClearLog",
-            "BtnResetSettings", "BtnScreensReset", "BtnRefreshScreens", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile",
+            "BtnResetSettings", "BtnRefreshScreens", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile",
             "BtnRepoDoomVoss", "BtnRepoCialloKing", "BtnRepoWinUI",
         ];
 
+        XDocument panel = XDocument.Parse(xaml);
         foreach (string name in mustBeFilledWithContent)
         {
+            GetNamedElement(panel, name);
             Assert.Contains(name + ".Content", source, StringComparison.Ordinal);
         }
 
@@ -3072,8 +3074,19 @@ public class WinUi3UiTests
         Assert.Contains("key.GetValue(\"HideTrayIcon\", false)", config, StringComparison.Ordinal);
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("CheckHideTrayIcon.IsOn = ConfigManager.HideTrayIcon", source, StringComparison.Ordinal);
-        Assert.Contains("ConfigManager.Save(\"HideTrayIcon\", hideTrayIcon)", source, StringComparison.Ordinal);
-        Assert.Contains("App.Tray?.SetHidden(hideTrayIcon)", source, StringComparison.Ordinal);
+        Assert.Contains("HideTrayIcon = CheckHideTrayIcon.IsOn", source, StringComparison.Ordinal);
+        Assert.Contains("Dictionary<string, object> values = current.GetValues(page)", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.SaveBackupValues(values)", source, StringComparison.Ordinal);
+        Assert.Contains("ApplyPageRuntimeSettings(page, screensChanged)", source, StringComparison.Ordinal);
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        Assert.Contains("if (page == SettingsSections.Basic)", pages, StringComparison.Ordinal);
+        Assert.Contains("App.Tray?.SetHidden(ConfigManager.HideTrayIcon)", pages, StringComparison.Ordinal);
+        foreach (bool hideTrayIcon in new[] { false, true })
+        {
+            var state = new SettingsState(System.Text.Json.JsonSerializer.Serialize(new { HideTrayIcon = hideTrayIcon }), "{}", "[]", "{}");
+            Assert.Equal(hideTrayIcon, Assert.IsType<bool>(state.GetValues(SettingsSections.Basic)["HideTrayIcon"]));
+            Assert.DoesNotContain("HideTrayIcon", state.GetValues(SettingsSections.Visual).Keys);
+        }
         string tray = ReadSource("src", "TrayIconController.cs");
         Assert.Contains("Visible = !ConfigManager.HideTrayIcon", tray, StringComparison.Ordinal);
         Assert.Contains("TrayMessageWindow(Action openPanel) : Form", tray, StringComparison.Ordinal);
