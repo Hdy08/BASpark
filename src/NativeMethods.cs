@@ -506,36 +506,59 @@ internal static class NativeMethods
 
 internal sealed class TouchCursorState
 {
-    private IntPtr _window;
-    private bool _visible;
+    private readonly Dictionary<IntPtr, bool> _windows = new();
+    private IntPtr _contactWindow;
+    private bool _contactChromium;
 
     internal void Observe(NativeMethods.CURSORINFO cursor, IntPtr window)
     {
         if ((cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0) return;
-        _window = window;
-        _visible = NativeMethods.IsCursorVisible(cursor, false);
+        Remember(window, NativeMethods.IsCursorVisible(cursor, false));
+    }
+
+    internal void BeginContact(IntPtr window, bool chromium)
+    {
+        _contactWindow = window;
+        _contactChromium = chromium;
+    }
+
+    internal void EndContact()
+    {
+        _contactWindow = IntPtr.Zero;
+        _contactChromium = false;
     }
 
     internal bool IsVisible(NativeMethods.CURSORINFO cursor, IntPtr window, bool chromium)
     {
-        if (chromium && window != IntPtr.Zero && window == _window
-            && (cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0)
+        if (_contactWindow != IntPtr.Zero && _contactChromium)
         {
-            if (cursor.hCursor != IntPtr.Zero && !NativeMethods.IsCursorVisible(cursor, true)) _visible = false;
-            return _visible;
+            window = _contactWindow;
+            chromium = true;
+        }
+        if (chromium && window != IntPtr.Zero
+            && ((cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0
+                || (window == _contactWindow && _contactChromium && cursor.hCursor == IntPtr.Zero)))
+        {
+            bool allowed = !_windows.TryGetValue(window, out bool previous) || previous;
+            if (cursor.hCursor != IntPtr.Zero) allowed &= NativeMethods.IsCursorVisible(cursor, true);
+            Remember(window, allowed);
+            return allowed;
         }
         bool visible = NativeMethods.IsCursorVisible(cursor, true);
-        if (chromium && window != IntPtr.Zero && visible)
-        {
-            _window = window;
-            _visible = true;
-        }
+        if (chromium) Remember(window, visible);
         return visible;
+    }
+
+    private void Remember(IntPtr window, bool visible)
+    {
+        if (window == IntPtr.Zero) return;
+        if (_windows.Count >= 128 && !_windows.ContainsKey(window)) _windows.Remove(_windows.Keys.First());
+        _windows[window] = visible;
     }
 
     internal void Reset()
     {
-        _window = IntPtr.Zero;
-        _visible = false;
+        _windows.Clear();
+        EndContact();
     }
 }

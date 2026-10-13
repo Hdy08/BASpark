@@ -207,7 +207,7 @@ namespace BASpark
         private void HandleMouseInput(uint message, NativeMethods.MSLLHOOKSTRUCT input)
         {
             bool touchLike = NativeMethods.IsTouchInput(input.dwExtraInfo);
-            if (!touchLike) _touchInputListener?.ObserveCursor();
+            if (!touchLike) _touchInputListener?.ObserveCursor(mouseInput: true);
             if (touchLike && _touchInputListener?.ShouldIgnorePromotedTouch(input.pt.x, input.pt.y) == true) return;
             switch (message)
             {
@@ -1430,6 +1430,8 @@ namespace BASpark
         private int _maxY;
         private long _lastTouchTime;
         private bool _hasRecentTouch;
+        private bool _touchSuppressesCursor;
+        private bool _hasMouseCursor;
 
         internal TouchInputListener(Action<TouchInputPhase, int, int> input)
         {
@@ -1453,12 +1455,22 @@ namespace BASpark
             }
         }
 
-        internal void ObserveCursor()
+        internal void ObserveCursor(bool mouseInput = false)
         {
+            if (mouseInput)
+            {
+                _touchSuppressesCursor = false;
+                _hasMouseCursor = true;
+            }
             if (_primary != null) return;
             var cursor = new NativeMethods.CURSORINFO { cbSize = Marshal.SizeOf<NativeMethods.CURSORINFO>() };
             if (NativeMethods.GetCursorInfo(out cursor))
-                _cursorState.Observe(cursor, NativeMethods.WindowFromPoint(cursor.ptScreenPos));
+            {
+                if (_touchSuppressesCursor && cursor.hCursor == IntPtr.Zero) return;
+                var target = ResolveCursorWindow(cursor.ptScreenPos);
+                if (target.Chromium && !_hasMouseCursor && cursor.hCursor == IntPtr.Zero) return;
+                _cursorState.Observe(cursor, target.Window);
+            }
         }
 
         internal bool IsCursorVisible(NativeMethods.POINT point)
@@ -1469,10 +1481,21 @@ namespace BASpark
                 _cursorState.Reset();
                 return false;
             }
+            var target = ResolveCursorWindow(point);
+            return _cursorState.IsVisible(cursor, target.Window, target.Chromium);
+        }
+
+        private static (IntPtr Window, bool Chromium) ResolveCursorWindow(NativeMethods.POINT point)
+        {
             IntPtr window = NativeMethods.WindowFromPoint(point);
             string className = NativeMethods.GetWindowClassName(window);
             bool chromium = className is "Chrome_RenderWidgetHostHWND" or "Chrome_WidgetWin_0" or "Chrome_WidgetWin_1";
-            return _cursorState.IsVisible(cursor, window, chromium);
+            if (chromium)
+            {
+                IntPtr root = NativeMethods.GetAncestor(window, NativeMethods.GA_ROOT);
+                if (root != IntPtr.Zero) window = root;
+            }
+            return (window, chromium);
         }
 
         private void CursorWinEventProc(IntPtr hook, uint eventType, IntPtr window, int objectId, int childId,
@@ -1496,6 +1519,7 @@ namespace BASpark
                     if (_primary?.Device == message.LParam)
                     {
                         _primary = null;
+                        _cursorState.EndContact();
                         _input(TouchInputPhase.Up, _lastX, _lastY);
                     }
                 }
@@ -1536,6 +1560,8 @@ namespace BASpark
             if (!wasDown && down && _primary == null)
             {
                 _primary = contact;
+                var target = ResolveCursorWindow(new NativeMethods.POINT { x = screenX, y = screenY });
+                _cursorState.BeginContact(target.Window, target.Chromium);
                 _minX = _maxX = screenX;
                 _minY = _maxY = screenY;
             }
@@ -1548,7 +1574,12 @@ namespace BASpark
             _maxY = Math.Max(_maxY, screenY);
             _lastTouchTime = Environment.TickCount64;
             _hasRecentTouch = true;
-            if (!down) _primary = null;
+            _touchSuppressesCursor = true;
+            if (!down)
+            {
+                _primary = null;
+                _cursorState.EndContact();
+            }
             _input(down ? wasDown ? TouchInputPhase.Move : TouchInputPhase.Down : TouchInputPhase.Up, screenX, screenY);
         }
 

@@ -647,7 +647,7 @@ public class WinUi3UiTests
     [Theory]
     [InlineData(true, true, true)]
     [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
     public void TouchscreenInput_WebViewRetainsItsOwnEligibilityWhenTouchClearsTheCursor(bool visible, bool sameWindow, bool expected)
     {
         var state = new TouchCursorState();
@@ -664,7 +664,7 @@ public class WinUi3UiTests
         Assert.Equal(expected, state.IsVisible(cursor, sameWindow ? window : new IntPtr(456), true));
         Assert.False(state.IsVisible(cursor, window, false));
         state.Reset();
-        Assert.False(state.IsVisible(cursor, window, true));
+        Assert.True(state.IsVisible(cursor, window, true));
     }
 
     [Theory]
@@ -690,12 +690,94 @@ public class WinUi3UiTests
         {
             state.Observe(cursor, mouseWindow);
             Assert.True(state.IsVisible(cursor, touchWindow, true));
-            Assert.False(state.IsVisible(cursor, mouseWindow, true));
+            Assert.True(state.IsVisible(cursor, mouseWindow, true));
             Assert.False(state.IsVisible(cursor, touchWindow, false));
         }
         cursor.flags = 0;
         state.Observe(cursor, mouseWindow);
         Assert.False(state.IsVisible(cursor, touchWindow, true));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void TouchscreenInput_WebViewCanStartWithAnAlreadySuppressedCursorWithoutMouseWarmup(bool chromium, bool expected)
+    {
+        var state = new TouchCursorState();
+        var window = new IntPtr(123);
+        var cursor = new NativeMethods.CURSORINFO { flags = NativeMethods.CURSOR_SUPPRESSED, hCursor = IntPtr.Zero };
+        Assert.Equal(expected, state.IsVisible(cursor, window, chromium));
+        Assert.False(state.IsVisible(cursor, IntPtr.Zero, chromium));
+        cursor.flags = 0;
+        Assert.False(state.IsVisible(cursor, window, chromium));
+        cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        Assert.False(state.IsVisible(cursor, window, chromium));
+    }
+
+    [Fact]
+    public void TouchscreenInput_WebViewRawContactCanStartAfterTouchClearsBothTheCursorAndSuppressionFlag()
+    {
+        var state = new TouchCursorState();
+        var window = new IntPtr(123);
+        var cursor = new NativeMethods.CURSORINFO { flags = 0, hCursor = IntPtr.Zero };
+        state.BeginContact(window, true);
+        Assert.True(state.IsVisible(cursor, window, true));
+        state.EndContact();
+        Assert.False(state.IsVisible(cursor, window, true));
+        state.BeginContact(window, true);
+        Assert.False(state.IsVisible(cursor, window, true));
+        state.Reset();
+        state.BeginContact(window, false);
+        Assert.False(state.IsVisible(cursor, window, false));
+    }
+
+    [Fact]
+    public void TouchscreenInput_WebViewKeepsEachWindowsKnownHiddenStateWhenAnotherWindowIsObserved()
+    {
+        var state = new TouchCursorState();
+        var hiddenWindow = new IntPtr(123);
+        var visibleWindow = new IntPtr(456);
+        var cursor = new NativeMethods.CURSORINFO { flags = 0, hCursor = IntPtr.Zero };
+        state.Observe(cursor, hiddenWindow);
+        cursor.flags = NativeMethods.CURSOR_SHOWING;
+        cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+        state.Observe(cursor, visibleWindow);
+        cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        cursor.hCursor = IntPtr.Zero;
+        Assert.False(state.IsVisible(cursor, hiddenWindow, true));
+        Assert.True(state.IsVisible(cursor, visibleWindow, true));
+        state.BeginContact(hiddenWindow, true);
+        Assert.False(state.IsVisible(cursor, visibleWindow, true));
+        state.EndContact();
+        Assert.True(state.IsVisible(cursor, visibleWindow, true));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TouchscreenInput_WebViewContactSurvivesLeavingItsWindowUntilTheFingerIsReleased(bool clearSuppressionFlag)
+    {
+        var state = new TouchCursorState();
+        var origin = new IntPtr(123);
+        var outside = new IntPtr(456);
+        var cursor = new NativeMethods.CURSORINFO
+        {
+            flags = NativeMethods.CURSOR_SHOWING,
+            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+        };
+        state.Observe(cursor, origin);
+        state.BeginContact(origin, true);
+        Assert.True(state.IsVisible(cursor, origin, true));
+        cursor.flags = clearSuppressionFlag ? 0 : NativeMethods.CURSOR_SUPPRESSED;
+        cursor.hCursor = IntPtr.Zero;
+        Assert.True(state.IsVisible(cursor, outside, false));
+        Assert.True(state.IsVisible(cursor, origin, true));
+        state.EndContact();
+        Assert.False(state.IsVisible(cursor, outside, false));
+        state.BeginContact(outside, false);
+        Assert.False(state.IsVisible(cursor, outside, false));
+        state.Reset();
+        Assert.False(state.IsVisible(cursor, outside, false));
     }
 
     [Fact]
