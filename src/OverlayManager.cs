@@ -1827,19 +1827,25 @@ namespace BASpark
             private readonly Dictionary<ushort, uint> _values = new();
             private readonly Dictionary<uint, (Contact Contact, uint RawX, uint RawY)> _activeCollections = new();
             private readonly Dictionary<uint, (bool Down, uint RawX, uint RawY, Contact Contact)> _frame = new();
+            private readonly Dictionary<uint, (bool Down, uint RawX, uint RawY, Contact Contact)> _pendingFrame = new();
+            private readonly Dictionary<byte, ushort> _contactCounts;
+            private int _expectedFrameContacts;
+            private byte _pendingReportId;
             private readonly Contact[] _contacts;
             private uint _orientation;
 
             private readonly record struct Contact(byte ReportId, ushort Collection, NativeMethods.HIDP_VALUE_CAPS AxisX,
                 NativeMethods.HIDP_VALUE_CAPS AxisY, ushort Tip, ushort? Id);
 
-            private TouchDevice(IntPtr device, byte[] preparsed, NativeMethods.HIDP_CAPS caps, Contact[] contacts)
+            private TouchDevice(IntPtr device, byte[] preparsed, NativeMethods.HIDP_CAPS caps, Contact[] contacts,
+                Dictionary<byte, ushort> contactCounts)
             {
                 _device = device;
                 _preparsed = preparsed;
                 _report = new byte[caps.InputReportByteLength];
                 _data = new NativeMethods.HIDP_DATA[caps.NumberInputDataIndices];
                 _contacts = contacts;
+                _contactCounts = contactCounts;
             }
 
             internal static TouchDevice? TryCreate(IntPtr device)
@@ -1877,7 +1883,10 @@ namespace BASpark
                         (ushort)(tip.DataIndexMin + 0x42 - tip.UsageMin), identifier.UsagePage == 13
                             ? (ushort)(identifier.DataIndexMin + 0x51 - identifier.UsageMin) : null));
                 }
-                return contacts.Count == 0 ? null : new TouchDevice(device, preparsed, caps, contacts.ToArray());
+                var contactCounts = values.Where(cap => cap.UsagePage == 13 && ContainsUsage(cap.UsageMin, cap.UsageMax, cap.IsRange, 0x54))
+                    .GroupBy(cap => cap.ReportId).ToDictionary(group => group.Key,
+                        group => (ushort)(group.First().DataIndexMin + 0x54 - group.First().UsageMin));
+                return contacts.Count == 0 ? null : new TouchDevice(device, preparsed, caps, contacts.ToArray(), contactCounts);
             }
 
             private static bool ContainsUsage(ushort minimum, ushort maximum, byte range, ushort usage) =>
@@ -1910,6 +1919,26 @@ namespace BASpark
                     if (!_frame.TryGetValue(id, out var existing) || down
                         || (!existing.Down && _activeCollections.GetValueOrDefault(id).Contact.Collection == contact.Collection))
                         _frame[id] = (down, rawX, rawY, contact);
+                }
+                if (_contactCounts.TryGetValue(reportId, out ushort contactCountIndex))
+                {
+                    uint contactCount = _values.GetValueOrDefault(contactCountIndex);
+                    if (contactCount > 128) return;
+                    if (contactCount > 0)
+                    {
+                        _pendingFrame.Clear();
+                        _pendingReportId = reportId;
+                        _expectedFrameContacts = contactCount > _frame.Count ? (int)contactCount : 0;
+                    }
+                    if (_expectedFrameContacts > 0 && _pendingReportId == reportId)
+                    {
+                        foreach (var pair in _frame) _pendingFrame[pair.Key] = pair.Value;
+                        if (_pendingFrame.Count < _expectedFrameContacts) return;
+                        _frame.Clear();
+                        foreach (var pair in _pendingFrame) _frame[pair.Key] = pair.Value;
+                        _pendingFrame.Clear();
+                        _expectedFrameContacts = 0;
+                    }
                 }
                 foreach (var pair in _activeCollections)
                 {

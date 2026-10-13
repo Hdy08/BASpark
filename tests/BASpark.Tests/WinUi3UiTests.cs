@@ -1289,6 +1289,66 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void MultiTouch_HybridHidFramesDoNotReleaseOtherContactsBetweenReports()
+    {
+        var device = TouchInputListener.TouchDevice.Create(new IntPtr(123), Array.Empty<byte>(),
+            new NativeMethods.HIDP_CAPS { InputReportByteLength = 12, NumberInputDataIndices = 5 },
+            [
+                new NativeMethods.HIDP_VALUE_CAPS
+                {
+                    UsagePage = 1, ReportId = 1, LinkCollection = 1, IsRange = 1, IsAbsolute = 1,
+                    BitSize = 16, LogicalMin = 0, LogicalMax = 1000, UsageMin = 0x30, UsageMax = 0x31, DataIndexMin = 0
+                },
+                new NativeMethods.HIDP_VALUE_CAPS
+                {
+                    UsagePage = 13, ReportId = 1, LinkCollection = 1, UsageMin = 0x51, DataIndexMin = 2
+                },
+                new NativeMethods.HIDP_VALUE_CAPS
+                {
+                    UsagePage = 13, ReportId = 1, UsageMin = 0x54, DataIndexMin = 4
+                }
+            ],
+            [new NativeMethods.HIDP_BUTTON_CAPS
+            {
+                UsagePage = 13, ReportId = 1, LinkCollection = 1, UsageMin = 0x42, DataIndexMin = 3
+            }]);
+        Assert.NotNull(device);
+        var received = new List<(uint Id, bool WasDown, bool Down)>();
+        void Receive(IntPtr source, uint id, bool wasDown, bool down, int horizontal, int vertical) => received.Add((id, wasDown, down));
+        var display = new NativeMethods.RECT { Right = 1001, Bottom = 1001 };
+        void Report(uint id, uint count, uint down)
+        {
+            NativeMethods.HIDP_DATA[] data =
+            [
+                new() { DataIndex = 0, Value = id * 100 }, new() { DataIndex = 1, Value = id * 100 },
+                new() { DataIndex = 2, Value = id }, new() { DataIndex = 3, Value = down },
+                new() { DataIndex = 4, Value = count }
+            ];
+            device.ProcessData(1, data, display, 1, Receive);
+        }
+        Report(1, 2, 1);
+        Assert.Empty(received);
+        Report(2, 0, 1);
+        Assert.Equal(new[] { (1U, false, true), (2U, false, true) }, received);
+        received.Clear();
+        Report(1, 2, 1);
+        Assert.Empty(received);
+        Report(2, 0, 1);
+        Assert.Equal(new[] { (1U, true, true), (2U, true, true) }, received);
+        received.Clear();
+        Report(1, 2, 0);
+        Assert.Empty(received);
+        Report(2, 0, 1);
+        Assert.Equal(new[] { (1U, true, false), (2U, true, true) }, received);
+        received.Clear();
+        Report(2, 1, 1);
+        Assert.Equal(new[] { (2U, true, true) }, received);
+        received.Clear();
+        device.ProcessData(1, ReadOnlySpan<NativeMethods.HIDP_DATA>.Empty, display, 1, Receive);
+        Assert.Equal(new[] { (2U, true, false) }, received);
+    }
+
+    [Fact]
     public void MultiTouch_FilteringOneContactDoesNotSuppressOrClearTheOtherContact()
     {
         bool previousMode = ConfigManager.IsTouchscreenMode;
