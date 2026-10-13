@@ -106,7 +106,8 @@ public class WinUi3UiTests
             Assert.Equal("0.1", (string?)input.Attribute("SmallChange"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("FractionDigits = precision", source, StringComparison.Ordinal);
-        Assert.Contains("slider.StepFrequency >= 1 ? 0 : 2", source, StringComparison.Ordinal);
+        Assert.Contains("GetSliderPrecision(slider)", source, StringComparison.Ordinal);
+        Assert.Contains("slider.StepFrequency >= 1 ? 0 : 2", ReadSource("src", "ControlPanelWindow.Advanced.cs"), StringComparison.Ordinal);
         Assert.Contains("IncrementNumberRounder", source, StringComparison.Ordinal);
     }
 
@@ -2745,7 +2746,7 @@ public class WinUi3UiTests
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
         styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle", "DefaultComboBoxItemStyle", "DefaultFlyoutPresenterStyle",
-            "TitleTextBlockStyle", "SubtitleTextBlockStyle", "BodyTextBlockStyle", "BodyStrongTextBlockStyle", "CaptionTextBlockStyle" });
+            "TitleTextBlockStyle", "SubtitleTextBlockStyle", "BodyTextBlockStyle", "BodyStrongTextBlockStyle", "BodyLargeTextBlockStyle", "CaptionTextBlockStyle" });
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
         {
@@ -3857,6 +3858,47 @@ public class WinUi3UiTests
         Assert.Equal("Wrap", (string?)log.Attribute("TextWrapping"));
         Assert.Same(GetNamedElement(panel, "LogScrollViewer"), log.Parent);
         Assert.DoesNotContain(GetNamedElement(panel, "PageLog").Descendants(), element => element.Name == Presentation + "TextBox");
+    }
+
+    [Fact]
+    public void AdvancedFx_UsesNativeCollapsedExpandersAndRequestedHeadingLevels()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement toggle = GetNamedElement(panel, "CheckBaClickAdvancedSettings");
+        Assert.Equal(Presentation + "ToggleSwitch", toggle.Name);
+        Assert.Same(GetNamedElement(panel, "SectionVisual"), GetSettingCard(toggle).Parent);
+        Assert.Equal("Collapsed", (string?)GetNamedElement(panel, "PanelBaClickAdvanced").Attribute("Visibility"));
+        XDocument design = LoadXaml("src", "DesignSystem.xaml");
+        XElement group = Assert.Single(design.Descendants(Presentation + "Style"),
+            item => (string?)item.Attribute(Xaml + "Key") == "BasAdvancedGroupTitleStyle");
+        Assert.Equal("{StaticResource BodyLargeTextBlockStyle}", (string?)group.Attribute("BasedOn"));
+        Assert.Contains(group.Elements(), item => (string?)item.Attribute("Property") == "FontWeight" &&
+            (string?)item.Attribute("Value") == "SemiBold");
+        Assert.Equal("{StaticResource BodyStrongTextBlockStyle}",
+            (string?)Assert.Single(design.Descendants(Presentation + "Style"),
+                item => (string?)item.Attribute(Xaml + "Key") == "BasAdvancedSectionTitleStyle").Attribute("BasedOn"));
+        string source = ReadSource("src", "ControlPanelWindow.Advanced.cs");
+        Assert.Contains("new Expander", source, StringComparison.Ordinal);
+        Assert.Contains("IsExpanded = false", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlTemplate", source, StringComparison.Ordinal);
+        Assert.Equal(new[] { "Advanced_sectionBasic", "Advanced_sectionClick", "Advanced_sectionShards", "Advanced_sectionTrail", "Advanced_sectionBloom" },
+            AdvancedFxSettings.Definitions.Select(item => item.GroupKey).Distinct().ToArray());
+        Assert.Equal(10, AdvancedFxSettings.Definitions.Select(item => item.SectionKey).Distinct().Count());
+    }
+
+    [Fact]
+    public void AdvancedFx_AllLabelsAndOptionsAreLocalized()
+    {
+        foreach (string file in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
+        {
+            XDocument resources = XDocument.Parse(ReadSource("src", file));
+            var values = resources.Root!.Elements("data").ToDictionary(item => (string)item.Attribute("name")!, item => item.Element("value")!.Value);
+            foreach (AdvancedFxSetting definition in AdvancedFxSettings.Definitions)
+                foreach (string key in new[] { definition.GroupKey, definition.SectionKey, definition.TitleKey }
+                             .Concat(definition.Options?.Select(item => item.TitleKey) ?? []))
+                    Assert.False(string.IsNullOrWhiteSpace(values[key]));
+            Assert.False(string.IsNullOrWhiteSpace(values["Advanced_Enable"]));
+        }
     }
 
     private static XElement GetSettingCard(XElement control) =>

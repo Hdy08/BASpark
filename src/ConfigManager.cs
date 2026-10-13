@@ -82,6 +82,8 @@ namespace BASpark
         public static double ClickEffectScale { get; set; } = 1.0;
         public static double EffectOpacity { get; set; } = 1.0;
         public static double GlowIntensity { get; set; } = 1.0;
+        public static bool EnableBaClickAdvancedSettings { get; set; }
+        public static string BaClickAdvancedSettings { get; set; } = "{}";
         public static double EffectSpeed { get; set; } = 1.0;
         public static bool UseLinkedAnimationSpeed { get; set; } = true;
         public static bool ApplyCurveDraw { get; set; } = false;
@@ -154,6 +156,8 @@ namespace BASpark
                         }
                         else EffectOpacity = Math.Clamp(Convert.ToDouble(key.GetValue("EffectOpacity", 1.0), CultureInfo.InvariantCulture), 0.1, 1.0);
                         GlowIntensity = Math.Clamp(Convert.ToDouble(key.GetValue("GlowIntensity", 1.0), CultureInfo.InvariantCulture), 0.0, 3.0);
+                        EnableBaClickAdvancedSettings = Convert.ToBoolean(key.GetValue("EnableBaClickAdvancedSettings", false));
+                        BaClickAdvancedSettings = AdvancedFxSettings.Normalize(key.GetValue("BaClickAdvancedSettings", "{}")?.ToString());
                         EffectSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("EffectSpeed", 1.0), CultureInfo.InvariantCulture), 0.2, 3.0);
                         UseLinkedAnimationSpeed = Convert.ToBoolean(key.GetValue("UseLinkedAnimationSpeed", true));
                         ApplyCurveDraw = Convert.ToBoolean(key.GetValue("ApplyCurveDraw", false));
@@ -425,6 +429,7 @@ namespace BASpark
                     using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegPath);
                     if (name == "MaxTouchEffects") value = ParseMaxTouchEffects(value);
                     if (name == "InputSamplingRate") value = ParseInputSamplingRate(value);
+                    if (name == "BaClickAdvancedSettings") value = AdvancedFxSettings.Normalize(Convert.ToString(value, CultureInfo.InvariantCulture));
                     if (name is "ParticleColor" or "EffectOpacity")
                     {
                         string color = name == "ParticleColor" ? Convert.ToString(value, CultureInfo.InvariantCulture)! : ParticleColor;

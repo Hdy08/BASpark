@@ -178,6 +178,8 @@ public sealed partial class ControlPanelWindow
 
     private static string DescribeBackupValue(string key, JsonElement value)
     {
+        if (AdvancedFxSettings.Find(key) is AdvancedFxSetting definition)
+            return Localization.Format("Backup_DataValue", AdvancedFxSettings.Describe(definition, value));
         string description;
         if (ConfigurationBackup.IsScreenKey(key))
             description = Localization.Get(value.GetProperty("IsEnabled").GetBoolean() ? "Basic_DarkModeOn" : "Basic_DarkModeOff");
@@ -333,6 +335,11 @@ public sealed partial class ControlPanelWindow
                 ComboLanguage.SelectedItem = ComboLanguage.Items.OfType<ComboBoxItem>().First(item => item.Tag as string == (string)language);
             if (values.TryGetValue("ParticleColor", out object? color)) _particleColor = (string)color;
             if (values.TryGetValue("EffectOpacity", out object? opacity)) _effectOpacity = (double)opacity;
+            if (values.ContainsKey("EnableBaClickAdvancedSettings") || values.ContainsKey("BaClickAdvancedSettings"))
+                LoadAdvancedSettings(values.TryGetValue("EnableBaClickAdvancedSettings", out object? advancedEnabled)
+                        ? (bool)advancedEnabled : CheckBaClickAdvancedSettings.IsOn,
+                    values.TryGetValue("BaClickAdvancedSettings", out object? advancedValues)
+                        ? (string)advancedValues : CaptureAdvancedSettings());
             if (values.TryGetValue("FilterProfiles", out object? profiles))
             {
                 Profiles.Clear();

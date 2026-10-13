@@ -801,4 +801,116 @@
     <data name="About_Sponsor" xml:space="preserve"><value>Sponsor</value></data>
     <data name="About_CopyFailed" xml:space="preserve"><value>Failed to copy: {0}</value></data>
     <data name="About_InfoUnavailable" xml:space="preserve"><value>Not available</value></data>
-  </root>
+    <data name="Visual_AdvancedSection" xml:space="preserve"><value>Advanced</value></data>
+    <data name="Advanced_Enable" xml:space="preserve"><value>Enable ba-click-fx advanced settings</value></data>
+    <data name="Advanced_DisplayHint" xml:space="preserve"><value>Display options apply to the transparent desktop overlay. Color, scale, opacity and glow intensity use the existing settings.</value></data>
+    <data name="Advanced_HdrHint" xml:space="preserve"><value>Applies when WebGPU HDR is selected and HDR is supported by the system.</value></data>
+    <data name="Advanced_HdrPreset" xml:space="preserve"><value>Highlight preset</value></data>
+    <data name="Advanced_HdrBalanced" xml:space="preserve"><value>Balanced white core (default)</value></data>
+    <data name="Advanced_HdrBright" xml:space="preserve"><value>Bright white core</value></data>
+    <data name="Advanced_HdrColor" xml:space="preserve"><value>Preserve original hue</value></data>
+    <data name="Advanced_HdrCustom" xml:space="preserve"><value>Custom</value></data>
+    <data name="Advanced_Clockwise" xml:space="preserve"><value>Clockwise</value></data>
+    <data name="Advanced_Counterclockwise" xml:space="preserve"><value>Counterclockwise</value></data>
+    <data name="Advanced_Forward" xml:space="preserve"><value>Forward</value></data>
+    <data name="Advanced_Reverse" xml:space="preserve"><value>Reverse</value></data>
+    <data name="Advanced_sectionBasic" xml:space="preserve"><value>Basic</value></data>
+    <data name="Advanced_displaySummary" xml:space="preserve"><value>Display</value></data>
+    <data name="Advanced_sectionClick" xml:space="preserve"><value>Click Effect</value></data>
+    <data name="Advanced_ringSummary" xml:space="preserve"><value>Ring</value></data>
+    <data name="Advanced_diskSummary" xml:space="preserve"><value>Disk</value></data>
+    <data name="Advanced_sectionShards" xml:space="preserve"><value>Shards</value></data>
+    <data name="Advanced_sharedShardsSummary" xml:space="preserve"><value>Shared</value></data>
+    <data name="Advanced_clickShardsSummary" xml:space="preserve"><value>Click Shards</value></data>
+    <data name="Advanced_trailShardsSummary" xml:space="preserve"><value>Trail Shards</value></data>
+    <data name="Advanced_sectionTrail" xml:space="preserve"><value>Cursor Trail</value></data>
+    <data name="Advanced_trailLayerSummary" xml:space="preserve"><value>Trail Layer</value></data>
+    <data name="Advanced_sectionBloom" xml:space="preserve"><value>Bloom</value></data>
+    <data name="Advanced_bloomPipelineSummary" xml:space="preserve"><value>Global Bloom</value></data>
+    <data name="Advanced_bloomClickSummary" xml:space="preserve"><value>Click Glow</value></data>
+    <data name="Advanced_bloomTrailSummary" xml:space="preserve"><value>Trail Glow</value></data>
+    <data name="Advanced_labelThemeColorMode" xml:space="preserve"><value>Color Mapping</value></data>
+    <data name="Advanced_themeColorModeRelativeOklch" xml:space="preserve"><value>Relative OKLCH (Recommended)</value></data>
+    <data name="Advanced_themeColorModeHueOnly" xml:space="preserve"><value>Hue Only (Compatible)</value></data>
+    <data name="Advanced_labelDpr" xml:space="preserve"><value>Max DPR</value></data>
+    <data name="Advanced_labelRenderMode" xml:space="preserve"><value>Render Mode</value></data>
+    <data name="Advanced_renderFullWebGPUStandard" xml:space="preserve"><value>WebGPU</value></data>
+    <data name="Advanced_renderFullWebGPU" xml:space="preserve"><value>WebGPU HDR (Experimental)</value></data>
+    <data name="Advanced_renderFullWebGL2" xml:space="preserve"><value>Full WebGL2</value></data>
+    <data name="Advanced_renderWebGL2Bloom" xml:space="preserve"><value>WebGL2 Bloom</value></data>
+    <data name="Advanced_renderSoftwareBloom" xml:space="preserve"><value>Software Bloom</value></data>
+    <data name="Advanced_renderNativeBloom" xml:space="preserve"><value>Native Glow</value></data>
+    <data name="Advanced_labelOverlayAlphaPolicy" xml:space="preserve"><value>Overlay Alpha Policy</value></data>
+    <data name="Advanced_overlayAlphaPolicyCoverage" xml:space="preserve"><value>Coverage Transport Sum</value></data>
+    <data name="Advanced_overlayAlphaPolicyVisualMax" xml:space="preserve"><value>Visual Maximum</value></data>
+    <data name="Advanced_labelOverlayColorCompensation" xml:space="preserve"><value>Overlay Color Compensation</value></data>
+    <data name="Advanced_overlayColorCompensationNone" xml:space="preserve"><value>None</value></data>
+    <data name="Advanced_overlayColorCompensationBrightCore" xml:space="preserve"><value>Light-background Bright Core</value></data>
+    <data name="Advanced_labelOverlayAlphaLimit" xml:space="preserve"><value>Overlay Alpha Limit</value></data>
+    <data name="Advanced_labelIsolatedCompositing" xml:space="preserve"><value>Isolated Compositing</value></data>
+    <data name="Advanced_labelLightBackgroundContrastAlpha" xml:space="preserve"><value>Light-background Contrast</value></data>
+    <data name="Advanced_labelWebGPUHdrPeak" xml:space="preserve"><value>Linear Peak</value></data>
+    <data name="Advanced_labelWebGPUHdrBrightness" xml:space="preserve"><value>HDR Overall Brightness</value></data>
+    <data name="Advanced_labelWebGPUHdrColorPreservation" xml:space="preserve"><value>HDR Hue Preservation</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteCore" xml:space="preserve"><value>White-core Strength</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteStart" xml:space="preserve"><value>White-core Start</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteEnd" xml:space="preserve"><value>White-core End</value></data>
+    <data name="Advanced_labelRingCount" xml:space="preserve"><value>Ring Count</value></data>
+    <data name="Advanced_labelRingHdr" xml:space="preserve"><value>Ring HDR Intensity</value></data>
+    <data name="Advanced_labelRingRadMin" xml:space="preserve"><value>Ring Radius Min</value></data>
+    <data name="Advanced_labelRingRadMax" xml:space="preserve"><value>Ring Radius Max</value></data>
+    <data name="Advanced_labelRingBandRatio" xml:space="preserve"><value>Ring Band Ratio</value></data>
+    <data name="Advanced_labelRingWStart" xml:space="preserve"><value>Ring Start Width Scale</value></data>
+    <data name="Advanced_labelRingWEnd" xml:space="preserve"><value>Ring End Width Scale</value></data>
+    <data name="Advanced_labelRingLife" xml:space="preserve"><value>Ring Lifetime</value></data>
+    <data name="Advanced_labelAngVelMul" xml:space="preserve"><value>Rotation Speed</value></data>
+    <data name="Advanced_labelArcSamples" xml:space="preserve"><value>Arc Samples</value></data>
+    <data name="Advanced_labelRadialSamples" xml:space="preserve"><value>Radial Samples</value></data>
+    <data name="Advanced_labelRingDir" xml:space="preserve"><value>Rotation Direction</value></data>
+    <data name="Advanced_labelDissolveDir" xml:space="preserve"><value>Dissolve Direction</value></data>
+    <data name="Advanced_labelDiskRadius" xml:space="preserve"><value>Disk Radius</value></data>
+    <data name="Advanced_labelDiskLife" xml:space="preserve"><value>Disk Lifetime</value></data>
+    <data name="Advanced_labelShardHdr" xml:space="preserve"><value>Shard HDR Intensity</value></data>
+    <data name="Advanced_labelShardRoundness" xml:space="preserve"><value>Shard Roundness</value></data>
+    <data name="Advanced_labelShardSizeMin" xml:space="preserve"><value>Shard Size Min</value></data>
+    <data name="Advanced_labelShardSizeMax" xml:space="preserve"><value>Shard Size Max</value></data>
+    <data name="Advanced_labelClickShards" xml:space="preserve"><value>Click Shard Count</value></data>
+    <data name="Advanced_labelClickShardLifeMin" xml:space="preserve"><value>Click Shard Life Min</value></data>
+    <data name="Advanced_labelClickShardLifeMax" xml:space="preserve"><value>Click Shard Life Max</value></data>
+    <data name="Advanced_labelClickShardRadius" xml:space="preserve"><value>Click Emission Radius</value></data>
+    <data name="Advanced_labelClickShardSpeedMin" xml:space="preserve"><value>Click Shard Speed Min</value></data>
+    <data name="Advanced_labelClickShardSpeedMax" xml:space="preserve"><value>Click Shard Speed Max</value></data>
+    <data name="Advanced_labelShardSpacing" xml:space="preserve"><value>Trail Shard Spacing</value></data>
+    <data name="Advanced_labelMaxShards" xml:space="preserve"><value>Trail Shard Limit</value></data>
+    <data name="Advanced_labelTrailShardLifeMin" xml:space="preserve"><value>Trail Shard Life Min</value></data>
+    <data name="Advanced_labelTrailShardLifeMax" xml:space="preserve"><value>Trail Shard Life Max</value></data>
+    <data name="Advanced_labelTrailShardRadius" xml:space="preserve"><value>Trail Emission Radius</value></data>
+    <data name="Advanced_labelTrailShardSpeedMin" xml:space="preserve"><value>Trail Shard Speed Min</value></data>
+    <data name="Advanced_labelTrailShardSpeedMax" xml:space="preserve"><value>Trail Shard Speed Max</value></data>
+    <data name="Advanced_labelTrailW" xml:space="preserve"><value>Trail Width</value></data>
+    <data name="Advanced_labelTrailGlowW" xml:space="preserve"><value>Outer Glow Width</value></data>
+    <data name="Advanced_labelTrailLife" xml:space="preserve"><value>Trail Lifetime</value></data>
+    <data name="Advanced_labelTrailOpacity" xml:space="preserve"><value>Trail Overall Opacity</value></data>
+    <data name="Advanced_labelGeomWidth" xml:space="preserve"><value>Geometry Width</value></data>
+    <data name="Advanced_labelMinVertDist" xml:space="preserve"><value>Min Vertex Distance</value></data>
+    <data name="Advanced_labelCornerVerts" xml:space="preserve"><value>Corner Vertices</value></data>
+    <data name="Advanced_labelCapVerts" xml:space="preserve"><value>Cap Vertices</value></data>
+    <data name="Advanced_labelBloomThreshold" xml:space="preserve"><value>Bloom Threshold</value></data>
+    <data name="Advanced_labelBloomSoftKnee" xml:space="preserve"><value>Bloom Soft Knee</value></data>
+    <data name="Advanced_labelBloomClamp" xml:space="preserve"><value>Bloom Clamp</value></data>
+    <data name="Advanced_labelBloomDiffusion" xml:space="preserve"><value>Bloom Diffusion</value></data>
+    <data name="Advanced_labelBloomResolution" xml:space="preserve"><value>Bloom Resolution Scale</value></data>
+    <data name="Advanced_labelBloomEmission" xml:space="preserve"><value>Bloom Emission Range</value></data>
+    <data name="Advanced_labelClickGlow" xml:space="preserve"><value>Click Glow Strength</value></data>
+    <data name="Advanced_labelBloomRing" xml:space="preserve"><value>Native Ring Blur</value></data>
+    <data name="Advanced_labelBloomDisk" xml:space="preserve"><value>Native Disk Blur</value></data>
+    <data name="Advanced_labelBloomDiskEmission" xml:space="preserve"><value>Disk Emission Strength</value></data>
+    <data name="Advanced_labelBloomRingCoreAlpha" xml:space="preserve"><value>Ring Core Emission Alpha</value></data>
+    <data name="Advanced_labelBloomDiskCoreAlpha" xml:space="preserve"><value>Disk Core Emission Alpha</value></data>
+    <data name="Advanced_labelBloomRingAlpha" xml:space="preserve"><value>Ring Glow Alpha</value></data>
+    <data name="Advanced_labelBloomDiskAlpha" xml:space="preserve"><value>Disk Glow Alpha</value></data>
+    <data name="Advanced_labelBloomTrail" xml:space="preserve"><value>Bloom Trail Emission Scale</value></data>
+    <data name="Advanced_labelBloomTrailAlpha" xml:space="preserve"><value>Native Trail Glow Alpha</value></data>
+    <data name="Advanced_labelBloomTrailEmission" xml:space="preserve"><value>Trail Emission Strength</value></data>
+    <data name="Advanced_labelBloomTrailCoverage" xml:space="preserve"><value>Trail Coverage Scale</value></data>
+</root>

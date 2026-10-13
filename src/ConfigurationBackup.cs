@@ -58,6 +58,8 @@ public static class ConfigurationBackup
         new("InputSamplingRate", "Nav_Visual", "Visual_TrailSamplingRate"),
         new("GlowIntensity", "Nav_Visual", "VisualReset_GlowIntensity"),
         new("ParticleColor", "Nav_Visual", "VisualReset_Color"),
+        new("EnableBaClickAdvancedSettings", "Nav_Visual", "Advanced_Enable"),
+        .. AdvancedFxSettings.Definitions.Select(item => new BackupSettingDefinition(item.Key, "Nav_Visual", item.TitleKey)),
         new("EnableEnvironmentFilter", "Nav_Filter", "Filter_Enable"),
         new("HideInFullscreen", "Nav_Filter", "Filter_Fullscreen"),
         new("ShowEffectOnDesktop", "Nav_Filter", "Filter_Desktop"),
@@ -84,8 +86,14 @@ public static class ConfigurationBackup
     public static ConfigurationBackupDocument Capture(IEnumerable<ScreenSelectionState> currentScreens)
     {
         var document = new ConfigurationBackupDocument();
+        Dictionary<string, JsonElement> advanced = AdvancedFxSettings.Parse(ConfigManager.BaClickAdvancedSettings);
         foreach (BackupSettingDefinition setting in Settings)
         {
+            if (AdvancedFxSettings.Find(setting.Key) is AdvancedFxSetting definition)
+            {
+                document.Data[setting.Key] = AdvancedFxSettings.GetValue(advanced, definition);
+                continue;
+            }
             PropertyInfo? property = typeof(ConfigManager).GetProperty(setting.Key);
             if (property == null) continue;
             object value = property.GetValue(null)!;
@@ -256,13 +264,24 @@ public static class ConfigurationBackup
         var values = new Dictionary<string, object>(StringComparer.Ordinal);
         foreach (var item in selected.Data)
         {
-            if (IsScreenKey(item.Key) || item.Key is "Profiles" or "Profile.Mode" or "Profile.Processes") continue;
+            if (IsScreenKey(item.Key) || item.Key is "Profiles" or "Profile.Mode" or "Profile.Processes" ||
+                AdvancedFxSettings.Find(item.Key) != null) continue;
             values[item.Key] = ReadSimpleValue(item.Key, item.Value);
             if (item.Key == "ParticleColor" && ColorPickerColorMath.TryParseArgbHex((string)values[item.Key], out var themeColor))
             {
                 values[item.Key] = ColorPickerColorMath.ToRgbString(themeColor);
                 values["EffectOpacity"] = themeColor.A / 255.0;
             }
+        }
+        if (selected.Data.Keys.Any(key => AdvancedFxSettings.Find(key) != null))
+        {
+            var advanced = AdvancedFxSettings.Definitions.ToDictionary(item => item.Path, item =>
+                current.Data.TryGetValue(item.Key, out JsonElement value) ? AdvancedFxSettings.Validate(item, value) : item.DefaultValue,
+                StringComparer.Ordinal);
+            foreach (var item in selected.Data)
+                if (AdvancedFxSettings.Find(item.Key) is AdvancedFxSetting definition)
+                    advanced[definition.Path] = AdvancedFxSettings.Validate(definition, item.Value);
+            values["BaClickAdvancedSettings"] = AdvancedFxSettings.Serialize(advanced);
         }
         if (selected.Data.Keys.Any(key => key is "Profiles" or "Profile.Mode" or "Profile.Processes"))
         {
@@ -371,6 +390,7 @@ public static class ConfigurationBackup
 
     private static object ReadSimpleValue(string key, JsonElement value)
     {
+        if (AdvancedFxSettings.Find(key) is AdvancedFxSetting definition) return AdvancedFxSettings.Validate(definition, value);
         if (key != "EffectOpacity" && !Settings.Any(setting => setting.Key == key)) throw InvalidValue(key);
         Type type = typeof(ConfigManager).GetProperty(key)?.PropertyType ?? throw InvalidValue(key);
         try

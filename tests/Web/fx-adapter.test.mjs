@@ -44,7 +44,7 @@ function createHarness(options = {})
 
       this.width = 800;
       this.height = 600;
-      this.config = { clickEnabled: true, trailEnabled: true, trailAlways: false, ...config };
+      this.config = { clickEnabled: true, trailEnabled: true, trailAlways: false, inputSamplingRate: 0, ...config };
       this.shards = [];
       this.trailStrokes = [];
       this.currentTrailStroke = null;
@@ -101,7 +101,10 @@ function createHarness(options = {})
 
     getFxConfig()
     {
+      if (this.fxConfig) return structuredClone(this.fxConfig);
       return {
+        rings: { count: 2, hdrIntensity: 5.992157, radiusMin: 68.92571232 },
+        disk: { radius: 64.8, lifetimeMs: 200 },
         trail: {
           lifetimeMs: 300,
           geometryWidth: 4,
@@ -118,6 +121,7 @@ function createHarness(options = {})
         },
         bloom: {
           intensity: 1.7,
+          threshold: 1, softKnee: 0, ringBlur: 80, resolutionScale: 0.5,
         },
       };
     }
@@ -184,6 +188,11 @@ function createHarness(options = {})
     setFxParams(patch, options)
     {
       calls.setFxParams.push({ patch, options });
+      for (const [path, value] of Object.entries(patch))
+      {
+        const segments = path.split('.');
+        this.fxConfig[segments[0]][segments[1]] = value;
+      }
       return { committed: true };
     }
 
@@ -201,15 +210,17 @@ function createHarness(options = {})
 
   if (options.vendorPointerInput)
   {
-    const vendorContext = { atob: (encoded) => Buffer.from(encoded, 'base64').toString('latin1'), structuredClone };
+    const vendorContext = { atob: (encoded) => Buffer.from(encoded, 'base64').toString('latin1'), structuredClone,
+      performance: { now: () => 1000 } };
     vm.runInNewContext(readFileSync(new URL('../../src/Web/vendor/ba-click-fx.iife.js', import.meta.url), 'utf8'), vendorContext);
     const prototype = vendorContext.BAClickFX.BAClickFX.prototype;
     for (const method of ['pointerDown', 'pointerMove', 'pointerUp', 'pointerCancel', '_normalizePointerInput',
       '_pointerMoveAtTime', '_beginTrailOwner', '_startTrailStroke', '_ensureCurrentTrailStroke',
-      '_appendPointerSample', '_releaseActivePointer'])
+      '_appendPointerSample', '_releaseActivePointer', '_acceptInputSample', '_isInputSampleDue'])
       FakeFx.prototype[method] = prototype[method];
     FakeFx.prototype._getScale = function () { return this.config.scale; };
     FakeFx.prototype._requestRender = function () {};
+    FakeFx.prototype._invalidateCanvasBoundsScope = function () {};
     FakeFx.prototype._spawnTrailShards = function () {};
     FakeFx.prototype._spawnClick = function (horizontal, vertical) { calls.booms.push([horizontal, vertical]); };
   }
@@ -309,6 +320,89 @@ test('initializes the vendored renderer in manual WebView2 mode', () =>
       'baclickfxhostcompositingchange',
     ],
   );
+});
+
+test('advanced settings at their defaults leave all existing effects unchanged', () =>
+{
+  const { window, fx, calls } = createHarness();
+  window.updateEffectSettings(1.4, 2.2, 0.6, 1.5, 0.7, 1.8);
+  const before = JSON.stringify({ config: fx.config, parameters: fx.fxConfig });
+  const configCalls = calls.updateConfig.length;
+  const parameterCalls = calls.setFxParams.length;
+  assert.equal(window.updateBaClickAdvancedSettings(true, { config: {}, parameters: {} }), true);
+  assert.equal(window.updateBaClickAdvancedSettings(false, { config: { renderMode: 'native-bloom' }, parameters: { 'trail.width': 7 } }), true);
+  assert.equal(JSON.stringify({ config: fx.config, parameters: fx.fxConfig }), before);
+  assert.equal(calls.updateConfig.length, configCalls);
+  assert.equal(calls.setFxParams.length, parameterCalls);
+  assert.equal(fx.config.themeColorMode, 'hue-only');
+});
+
+test('advanced shapes compose with existing scales and restore cleanly when disabled', () =>
+{
+  const { window, fx, calls } = createHarness();
+  window.updateEffectSettings(2, 1, 0.6, 1.2, 0.8, 1.8);
+  const advanced = { config: { renderMode: 'native-bloom', maxDpr: 1.5, themeColorMode: 'relative-oklch' },
+    parameters: { 'trail.width': 5.5, 'trail.minVertexDistance': 7, 'rings.count': 4, 'bloom.threshold': 2 } };
+  assert.equal(window.updateBaClickAdvancedSettings(true, advanced), true);
+  assert.equal(fx.fxConfig.trail.width, 11);
+  assert.equal(fx.fxConfig.trail.minVertexDistance, 14);
+  assert.equal(fx.fxConfig.rings.count, 4);
+  assert.equal(fx.fxConfig.bloom.threshold, 2);
+  assert.equal(fx.fxConfig.bloom.intensity, 1.7 * 1.8);
+  assert.equal(fx.config.effectBackend, 'canvas2d');
+  assert.equal(fx.config.bloomBackend, 'native');
+  assert.equal(fx.config.opacity, 0.6);
+  assert.equal(fx.config.clickTimeScale, 0.8);
+  assert.equal(fx.config.hostCompositingSurface, 'transparent-window');
+  const parameterCalls = calls.setFxParams.length;
+  assert.equal(window.updateBaClickAdvancedSettings(true, advanced), true);
+  assert.equal(calls.setFxParams.length, parameterCalls);
+  window.updateEffectSettings(3, 1, 0.6, 1.2, 0.8, 1.8);
+  assert.equal(fx.fxConfig.trail.width, 16.5);
+  assert.equal(window.updateBaClickAdvancedSettings(false, advanced), true);
+  assert.equal(fx.fxConfig.trail.width, 9);
+  assert.equal(fx.fxConfig.trail.minVertexDistance, 15);
+  assert.equal(fx.fxConfig.rings.count, 2);
+  assert.equal(fx.fxConfig.bloom.threshold, 1);
+  assert.equal(fx.fxConfig.bloom.intensity, 1.7 * 1.8);
+  assert.equal(fx.config.effectBackend, 'webgl2');
+  assert.equal(fx.config.bloomBackend, 'webgl2');
+  assert.equal(fx.config.maxDpr, 2);
+  assert.equal(fx.config.themeColorMode, 'hue-only');
+});
+
+test('advanced render modes retain transparent-window capabilities and explicit software Bloom', () =>
+{
+  const { window, fx, canvasListeners } = createHarness();
+  for (const [mode, backend, bloom, hdr] of [
+    ['full-webgpu-sdr', 'webgpu', 'webgl2', false], ['full-webgpu', 'webgpu', 'webgl2', true],
+    ['webgl2-bloom', 'canvas2d', 'webgl2', true], ['software-bloom', 'canvas2d', 'software', true],
+    ['native-bloom', 'canvas2d', 'native', true], ['full-webgl2', 'webgl2', 'webgl2', true],
+  ])
+  {
+    assert.equal(window.updateBaClickAdvancedSettings(true, { config: { renderMode: mode }, parameters: {} }), true);
+    assert.equal(fx.config.effectBackend, backend);
+    assert.equal(fx.config.bloomBackend, bloom);
+    assert.equal(fx.config.webgpuPreferHdr, hdr);
+    assert.equal(fx.config.outputCompositing, 'browser-overlay');
+    assert.equal(fx.config.hostCompositing, 'source-over');
+    assert.equal(fx.config.hostCompositingSurface, 'transparent-window');
+  }
+  window.updateBaClickAdvancedSettings(true, { config: { renderMode: 'software-bloom' }, parameters: {} });
+  fx.resolvedEffectBackend = 'canvas2d';
+  fx.resolvedBloomBackend = 'software';
+  canvasListeners.get('baclickfxbackendchange')({ detail: {} });
+  assert.equal(fx.config.bloomBackend, 'software');
+});
+
+test('advanced settings reject host compositing changes and duplicate global glow controls', () =>
+{
+  const { window, fx, calls } = createHarness();
+  const original = JSON.stringify(fx.config);
+  assert.equal(window.updateBaClickAdvancedSettings(true, { config: { hostCompositingSurface: 'dom-backdrop' } }), false);
+  assert.equal(window.updateBaClickAdvancedSettings(true, { parameters: { 'bloom.intensity': 4 } }), false);
+  assert.equal(JSON.stringify(fx.config), original);
+  assert.equal(calls.messages.filter(message => message.type === 'error').length, 2);
 });
 
 test('multi-touch keeps simultaneous clicks and independent trails in one vendored renderer', () =>

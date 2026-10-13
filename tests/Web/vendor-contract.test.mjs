@@ -6,7 +6,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const expectedSha256 =
-  '4953175F158A671E15AF896D102BEA2D211CD6B515D81267A4CDEA50507B797C';
+  '602EB9ADB0590E39A9B4028B9ACC2F1E7FE5E771A01E48E87B36FBB6D11A73D2';
 const vendorPath = new URL(
   '../../src/Web/vendor/ba-click-fx.iife.js',
   import.meta.url,
@@ -322,6 +322,28 @@ test('cross-screen legacy followers share the head beyond the departing edge', (
     assert.equal(arrival.spark.isDown, false);
     assert.ok(departure.spark.trail.length > 0);
   }
+});
+
+test('full renderer advanced defaults exactly match the native settings definitions', () =>
+{
+  const context = { atob: encoded => Buffer.from(encoded, 'base64').toString('latin1'), structuredClone };
+  vm.runInNewContext(readFileSync(vendorPath, 'utf8'), context);
+  const definitions = readFileSync(new URL('../../src/AdvancedFxSettings.cs', import.meta.url), 'utf8');
+  const numbers = [...definitions.matchAll(/Number\("([^"]+)", "[^"]+", "[^"]+", "[^"]+", ([\d.e+-]+), ([\d.e+-]+), ([\d.e+-]+), ([\d.e+-]+), (true|false)\)/g)];
+  assert.equal(numbers.filter(item => item[6] === 'true').length, 58);
+  for (const match of numbers.filter(item => item[6] === 'true'))
+  {
+    const [path, value] = [match[1], Number(match[2])];
+    const baseline = path.split('.').reduce((group, key) => group[key], context.BAClickFX.UNITY_FX_TOUCH);
+    assert.equal(value, baseline, path);
+    assert.equal(context.BAClickFX.applyFxParamPatch({ [path]: value }, { strict: true }).committed, true, path);
+  }
+  const config = context.BAClickFX.createConfig({ effectBackend: 'webgpu', bloomBackend: 'software', maxDpr: 3,
+    themeColorMode: 'relative-oklch', outputCompositing: 'browser-overlay', hostCompositingSurface: 'transparent-window' });
+  assert.equal(config.effectBackend, 'webgpu');
+  assert.equal(config.bloomBackend, 'software');
+  assert.equal(config.themeColorMode, 'relative-oklch');
+  assert.equal(config.maxDpr, 3);
 });
 
 test('vendored IIFE exposes every host API required by BASpark', () =>

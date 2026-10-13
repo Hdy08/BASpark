@@ -1,7 +1,9 @@
 Package: ba-click-fx
-Version: v1.2.23 (BASpark patched)
-Commit: d1cf1d544ab1aacbc0238cc873d9b5a1a1a53106
-Artifact: dist/ba-click-fx.iife.js
-Upstream SHA256: 038A80308F04517BFF69C0A8AB37776F1D0412D80E455E8508E21F51FA7B3839
-BASpark SHA256: 4953175F158A671E15AF896D102BEA2D211CD6B515D81267A4CDEA50507B797C
-Patch: Restored the scale-aware trail sample distance to reduce redundant geometry.
+Version: v1.3.13 (full edition)
+Commit: 0687b5cdf170d19c22bcb90a94476bca8db7cadc
+Artifact: ba-click-fx-v1.3.13-full.zip / ba-click-fx.js
+Release ZIP SHA256: E49D4620BCF0952CEF389CF4C62C9663FF46B2588117FF296C08C9804FE1FBF6
+Upstream SHA256: 9B99A7044CB5CB6AD3D5AF8500F0F2F691B2DAB714AE7EA77F74C3F3DBA9DEA6
+BASpark SHA256: 602EB9ADB0590E39A9B4028B9ACC2F1E7FE5E771A01E48E87B36FBB6D11A73D2
+Packaging: esbuild 0.28.2, ESM to IIFE, BAClickFX global, ES2020, minified, inline legal notices.
+Patch: None. All full-edition backends, APIs and 512x512 texture resources are retained.

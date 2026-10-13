@@ -801,4 +801,116 @@
     <data name="About_Sponsor" xml:space="preserve"><value>赞助</value></data>
     <data name="About_CopyFailed" xml:space="preserve"><value>复制失败：{0}</value></data>
     <data name="About_InfoUnavailable" xml:space="preserve"><value>未提供</value></data>
-  </root>
+    <data name="Visual_AdvancedSection" xml:space="preserve"><value>高级</value></data>
+    <data name="Advanced_Enable" xml:space="preserve"><value>启用 ba-click-fx 高级设置</value></data>
+    <data name="Advanced_DisplayHint" xml:space="preserve"><value>仅列出适用于透明桌面叠加层的显示参数；主题颜色、缩放、不透明度及辉光亮度使用现有设置。</value></data>
+    <data name="Advanced_HdrHint" xml:space="preserve"><value>仅在 WebGPU HDR 模式且系统支持 HDR 时生效。</value></data>
+    <data name="Advanced_HdrPreset" xml:space="preserve"><value>高光预设</value></data>
+    <data name="Advanced_HdrBalanced" xml:space="preserve"><value>平衡白核（默认）</value></data>
+    <data name="Advanced_HdrBright" xml:space="preserve"><value>明亮白核</value></data>
+    <data name="Advanced_HdrColor" xml:space="preserve"><value>保留原始色相</value></data>
+    <data name="Advanced_HdrCustom" xml:space="preserve"><value>自定义</value></data>
+    <data name="Advanced_Clockwise" xml:space="preserve"><value>顺时针</value></data>
+    <data name="Advanced_Counterclockwise" xml:space="preserve"><value>逆时针</value></data>
+    <data name="Advanced_Forward" xml:space="preserve"><value>正向</value></data>
+    <data name="Advanced_Reverse" xml:space="preserve"><value>反向</value></data>
+    <data name="Advanced_sectionBasic" xml:space="preserve"><value>基础</value></data>
+    <data name="Advanced_displaySummary" xml:space="preserve"><value>显示</value></data>
+    <data name="Advanced_sectionClick" xml:space="preserve"><value>点击特效</value></data>
+    <data name="Advanced_ringSummary" xml:space="preserve"><value>圆环</value></data>
+    <data name="Advanced_diskSummary" xml:space="preserve"><value>光盘</value></data>
+    <data name="Advanced_sectionShards" xml:space="preserve"><value>碎片</value></data>
+    <data name="Advanced_sharedShardsSummary" xml:space="preserve"><value>通用参数</value></data>
+    <data name="Advanced_clickShardsSummary" xml:space="preserve"><value>点击碎片</value></data>
+    <data name="Advanced_trailShardsSummary" xml:space="preserve"><value>拖尾碎片</value></data>
+    <data name="Advanced_sectionTrail" xml:space="preserve"><value>拖尾轨迹</value></data>
+    <data name="Advanced_trailLayerSummary" xml:space="preserve"><value>轨迹图层</value></data>
+    <data name="Advanced_sectionBloom" xml:space="preserve"><value>Bloom</value></data>
+    <data name="Advanced_bloomPipelineSummary" xml:space="preserve"><value>全局 Bloom</value></data>
+    <data name="Advanced_bloomClickSummary" xml:space="preserve"><value>点击辉光</value></data>
+    <data name="Advanced_bloomTrailSummary" xml:space="preserve"><value>拖尾辉光</value></data>
+    <data name="Advanced_labelThemeColorMode" xml:space="preserve"><value>颜色作用</value></data>
+    <data name="Advanced_themeColorModeRelativeOklch" xml:space="preserve"><value>相对 OKLCH（推荐）</value></data>
+    <data name="Advanced_themeColorModeHueOnly" xml:space="preserve"><value>仅色相（兼容）</value></data>
+    <data name="Advanced_labelDpr" xml:space="preserve"><value>最大 DPR</value></data>
+    <data name="Advanced_labelRenderMode" xml:space="preserve"><value>渲染模式</value></data>
+    <data name="Advanced_renderFullWebGPUStandard" xml:space="preserve"><value>WebGPU</value></data>
+    <data name="Advanced_renderFullWebGPU" xml:space="preserve"><value>WebGPU HDR（实验）</value></data>
+    <data name="Advanced_renderFullWebGL2" xml:space="preserve"><value>纯 WebGL2</value></data>
+    <data name="Advanced_renderWebGL2Bloom" xml:space="preserve"><value>WebGL2 Bloom</value></data>
+    <data name="Advanced_renderSoftwareBloom" xml:space="preserve"><value>软件 Bloom</value></data>
+    <data name="Advanced_renderNativeBloom" xml:space="preserve"><value>原生辉光</value></data>
+    <data name="Advanced_labelOverlayAlphaPolicy" xml:space="preserve"><value>覆盖层 Alpha 策略</value></data>
+    <data name="Advanced_overlayAlphaPolicyCoverage" xml:space="preserve"><value>Coverage 传输和</value></data>
+    <data name="Advanced_overlayAlphaPolicyVisualMax" xml:space="preserve"><value>旧版视觉最大值</value></data>
+    <data name="Advanced_labelOverlayColorCompensation" xml:space="preserve"><value>覆盖层颜色补偿</value></data>
+    <data name="Advanced_overlayColorCompensationNone" xml:space="preserve"><value>不补偿</value></data>
+    <data name="Advanced_overlayColorCompensationBrightCore" xml:space="preserve"><value>浅色背景高能核心</value></data>
+    <data name="Advanced_labelOverlayAlphaLimit" xml:space="preserve"><value>覆盖层 Alpha 上限</value></data>
+    <data name="Advanced_labelIsolatedCompositing" xml:space="preserve"><value>隔离合成</value></data>
+    <data name="Advanced_labelLightBackgroundContrastAlpha" xml:space="preserve"><value>浅色背景对比</value></data>
+    <data name="Advanced_labelWebGPUHdrPeak" xml:space="preserve"><value>线性峰值</value></data>
+    <data name="Advanced_labelWebGPUHdrBrightness" xml:space="preserve"><value>HDR 整体亮度</value></data>
+    <data name="Advanced_labelWebGPUHdrColorPreservation" xml:space="preserve"><value>HDR 色相保持</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteCore" xml:space="preserve"><value>白核强度</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteStart" xml:space="preserve"><value>白核起点</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteEnd" xml:space="preserve"><value>白核终点</value></data>
+    <data name="Advanced_labelRingCount" xml:space="preserve"><value>圆环数量</value></data>
+    <data name="Advanced_labelRingHdr" xml:space="preserve"><value>圆环 HDR 强度</value></data>
+    <data name="Advanced_labelRingRadMin" xml:space="preserve"><value>圆环起始半径</value></data>
+    <data name="Advanced_labelRingRadMax" xml:space="preserve"><value>圆环终止半径</value></data>
+    <data name="Advanced_labelRingBandRatio" xml:space="preserve"><value>圆环带宽比例</value></data>
+    <data name="Advanced_labelRingWStart" xml:space="preserve"><value>圆环起始厚度倍率</value></data>
+    <data name="Advanced_labelRingWEnd" xml:space="preserve"><value>圆环终止厚度倍率</value></data>
+    <data name="Advanced_labelRingLife" xml:space="preserve"><value>圆环寿命</value></data>
+    <data name="Advanced_labelAngVelMul" xml:space="preserve"><value>旋转速度倍率</value></data>
+    <data name="Advanced_labelArcSamples" xml:space="preserve"><value>弧线采样精度</value></data>
+    <data name="Advanced_labelRadialSamples" xml:space="preserve"><value>径向采样精度</value></data>
+    <data name="Advanced_labelRingDir" xml:space="preserve"><value>旋转方向</value></data>
+    <data name="Advanced_labelDissolveDir" xml:space="preserve"><value>溶解方向</value></data>
+    <data name="Advanced_labelDiskRadius" xml:space="preserve"><value>光盘半径</value></data>
+    <data name="Advanced_labelDiskLife" xml:space="preserve"><value>光盘寿命</value></data>
+    <data name="Advanced_labelShardHdr" xml:space="preserve"><value>碎片 HDR 强度</value></data>
+    <data name="Advanced_labelShardRoundness" xml:space="preserve"><value>碎片圆角</value></data>
+    <data name="Advanced_labelShardSizeMin" xml:space="preserve"><value>碎片最小尺寸</value></data>
+    <data name="Advanced_labelShardSizeMax" xml:space="preserve"><value>碎片最大尺寸</value></data>
+    <data name="Advanced_labelClickShards" xml:space="preserve"><value>点击碎片数量</value></data>
+    <data name="Advanced_labelClickShardLifeMin" xml:space="preserve"><value>点击碎片最短寿命</value></data>
+    <data name="Advanced_labelClickShardLifeMax" xml:space="preserve"><value>点击碎片最长寿命</value></data>
+    <data name="Advanced_labelClickShardRadius" xml:space="preserve"><value>点击发射半径</value></data>
+    <data name="Advanced_labelClickShardSpeedMin" xml:space="preserve"><value>点击碎片最低速度</value></data>
+    <data name="Advanced_labelClickShardSpeedMax" xml:space="preserve"><value>点击碎片最高速度</value></data>
+    <data name="Advanced_labelShardSpacing" xml:space="preserve"><value>拖尾碎片间距</value></data>
+    <data name="Advanced_labelMaxShards" xml:space="preserve"><value>拖尾碎片上限</value></data>
+    <data name="Advanced_labelTrailShardLifeMin" xml:space="preserve"><value>拖尾碎片最短寿命</value></data>
+    <data name="Advanced_labelTrailShardLifeMax" xml:space="preserve"><value>拖尾碎片最长寿命</value></data>
+    <data name="Advanced_labelTrailShardRadius" xml:space="preserve"><value>拖尾发射半径</value></data>
+    <data name="Advanced_labelTrailShardSpeedMin" xml:space="preserve"><value>拖尾碎片最低速度</value></data>
+    <data name="Advanced_labelTrailShardSpeedMax" xml:space="preserve"><value>拖尾碎片最高速度</value></data>
+    <data name="Advanced_labelTrailW" xml:space="preserve"><value>拖尾宽度</value></data>
+    <data name="Advanced_labelTrailGlowW" xml:space="preserve"><value>外发光宽度</value></data>
+    <data name="Advanced_labelTrailLife" xml:space="preserve"><value>拖尾寿命</value></data>
+    <data name="Advanced_labelTrailOpacity" xml:space="preserve"><value>拖尾整体透明度</value></data>
+    <data name="Advanced_labelGeomWidth" xml:space="preserve"><value>几何带宽</value></data>
+    <data name="Advanced_labelMinVertDist" xml:space="preserve"><value>最小采样间距</value></data>
+    <data name="Advanced_labelCornerVerts" xml:space="preserve"><value>折点圆角顶点数</value></data>
+    <data name="Advanced_labelCapVerts" xml:space="preserve"><value>端帽顶点数</value></data>
+    <data name="Advanced_labelBloomThreshold" xml:space="preserve"><value>Bloom 阈值</value></data>
+    <data name="Advanced_labelBloomSoftKnee" xml:space="preserve"><value>Bloom 柔化膝点</value></data>
+    <data name="Advanced_labelBloomClamp" xml:space="preserve"><value>Bloom 亮度钳位</value></data>
+    <data name="Advanced_labelBloomDiffusion" xml:space="preserve"><value>Bloom 扩散</value></data>
+    <data name="Advanced_labelBloomResolution" xml:space="preserve"><value>Bloom 分辨率倍率</value></data>
+    <data name="Advanced_labelBloomEmission" xml:space="preserve"><value>Bloom 发射范围</value></data>
+    <data name="Advanced_labelClickGlow" xml:space="preserve"><value>点击辉光强度</value></data>
+    <data name="Advanced_labelBloomRing" xml:space="preserve"><value>原生圆环模糊</value></data>
+    <data name="Advanced_labelBloomDisk" xml:space="preserve"><value>原生光盘模糊</value></data>
+    <data name="Advanced_labelBloomDiskEmission" xml:space="preserve"><value>光盘发射强度</value></data>
+    <data name="Advanced_labelBloomRingCoreAlpha" xml:space="preserve"><value>圆环核心发射 Alpha</value></data>
+    <data name="Advanced_labelBloomDiskCoreAlpha" xml:space="preserve"><value>光盘核心发射 Alpha</value></data>
+    <data name="Advanced_labelBloomRingAlpha" xml:space="preserve"><value>圆环辉光 Alpha</value></data>
+    <data name="Advanced_labelBloomDiskAlpha" xml:space="preserve"><value>光盘辉光 Alpha</value></data>
+    <data name="Advanced_labelBloomTrail" xml:space="preserve"><value>Bloom 拖尾发射校准</value></data>
+    <data name="Advanced_labelBloomTrailAlpha" xml:space="preserve"><value>原生拖尾辉光 Alpha</value></data>
+    <data name="Advanced_labelBloomTrailEmission" xml:space="preserve"><value>拖尾发射强度</value></data>
+    <data name="Advanced_labelBloomTrailCoverage" xml:space="preserve"><value>拖尾覆盖倍率</value></data>
+</root>

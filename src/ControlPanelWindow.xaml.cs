@@ -513,6 +513,7 @@ public sealed partial class ControlPanelWindow : UserControl
                     button.Resources.ThemeDictionaries[theme.Key] = resources;
                 }
             BindCollections();
+            SetupAdvancedSettings();
             SetupSliderPairs();
             ConfigureInputControls();
             foreach (var selector in new[] { RadioDarkMode, RadioClickType })
@@ -786,8 +787,13 @@ public sealed partial class ControlPanelWindow : UserControl
                      CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMiddleClickTrigger,
                      CheckScreenshotCompatibilityMode, CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.General);
-        foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw })
+        foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw, CheckBaClickAdvancedSettings })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Visual);
+        foreach (Control control in _advancedControls.Values)
+        {
+            if (control is ToggleSwitch toggle) TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Visual);
+            if (control is ComboBox combo) TrackSettingsProperty(combo, ComboBox.SelectedIndexProperty, SettingsSections.Visual);
+        }
         foreach (ComboBox combo in new[] { ComboLanguage, ComboProfiles, ComboProcessFilterMode })
             TrackSettingsProperty(combo, ComboBox.SelectedIndexProperty, SettingsSections.General);
         foreach (RadioButtons selector in new[] { RadioDarkMode, RadioClickType })
@@ -841,7 +847,7 @@ public sealed partial class ControlPanelWindow : UserControl
         if (_numberInputs.TryGetValue(box, out TextBox? input) && input.FocusState != FocusState.Unfocused &&
             box.NumberFormatter is Windows.Globalization.NumberFormatting.INumberParser parser &&
             parser.ParseDouble(input.Text) is double value && double.IsFinite(value))
-            return Math.Round(Math.Clamp(value, slider.Minimum, slider.Maximum), slider.StepFrequency >= 1 ? 0 : 2);
+            return Math.Round(Math.Clamp(value, slider.Minimum, slider.Maximum), GetSliderPrecision(slider));
         return Math.Round(slider.Value, 2);
     }
 
@@ -854,7 +860,7 @@ public sealed partial class ControlPanelWindow : UserControl
             color = ToRgbString(pending);
             opacity = Math.Clamp(pending.A / 255.0, 0.1, 1);
         }
-        return JsonSerializer.Serialize(new
+        var settings = JsonSerializer.SerializeToNode(new
         {
             UseLinkedEffectScale = CheckLinkedEffectScale.IsOn,
             EffectScale = GetPendingSliderValue(SliderScale), TrailEffectScale = GetPendingSliderValue(SliderTrailScale),
@@ -864,8 +870,12 @@ public sealed partial class ControlPanelWindow : UserControl
             ClickAnimationSpeed = GetPendingSliderValue(SliderClickAnimSpeed),
             ApplyCurveDraw = CheckApplyCurveDraw.IsOn,
             InputSamplingRate = _samplingRateFormatter.ToStoredValue(GetPendingSliderValue(SliderTrailSamplingRate)),
-            ParticleColor = color, EffectOpacity = Math.Round(opacity, 2)
-        });
+            ParticleColor = color, EffectOpacity = Math.Round(opacity, 2),
+            EnableBaClickAdvancedSettings = CheckBaClickAdvancedSettings.IsOn
+        })!.AsObject();
+        foreach (AdvancedFxSetting definition in AdvancedFxSettings.Definitions)
+            settings[definition.Key] = System.Text.Json.Nodes.JsonNode.Parse(CaptureAdvancedValue(definition).GetRawText());
+        return settings.ToJsonString();
     }
 
     private string CaptureScreenSettings() => JsonSerializer.Serialize(ScreenOptions
@@ -980,7 +990,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _boxToSlider[box] = slider;
         slider.ValueChanged += EffectSlider_ValueChanged;
         box.ValueChanged += EffectNumberBox_ValueChanged;
-        int precision = slider.StepFrequency >= 1 ? 0 : 2;
+        int precision = GetSliderPrecision(slider);
         box.NumberFormatter = new Windows.Globalization.NumberFormatting.DecimalFormatter
         {
             IntegerDigits = 1,
@@ -1046,7 +1056,9 @@ public sealed partial class ControlPanelWindow : UserControl
             foreach (Slider slider in _pendingSliderFeedback)
             {
                 NumberBox box = _sliderToBox[slider];
-                double value = Math.Round(slider.Value, slider.StepFrequency >= 1 ? 0 : 2);
+                double value = slider.Tag is AdvancedFxSetting definition &&
+                    Math.Abs(slider.Value - definition.DefaultValue.GetDouble()) < 0.000000001
+                    ? slider.Value : Math.Round(slider.Value, GetSliderPrecision(slider));
                 if (box.Value != value) box.Value = value;
             }
             _pendingSliderFeedback.Clear();
@@ -1074,7 +1086,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _suppressValueSync = true;
         try
         {
-            double value = Math.Round(sender.Value, slider.StepFrequency >= 1 ? 0 : 2);
+            double value = Math.Round(sender.Value, GetSliderPrecision(slider));
             if (slider == SliderMaxTouchEffects || slider == SliderTrailSamplingRate)
             {
                 SettingNumberFormatter formatter = slider == SliderMaxTouchEffects ? _touchEffectLimitFormatter : _samplingRateFormatter;
@@ -1087,7 +1099,7 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             _suppressValueSync = false;
         }
-
+        if (slider.Tag is AdvancedFxSetting definition) AdvancedSettingChanged(definition);
     }
 
     private void ConfigureInputControls()
@@ -1254,6 +1266,7 @@ public sealed partial class ControlPanelWindow : UserControl
         SubTabFilterLabel.Text = Localization.Get("Nav_Filter");
         SubTabMultiScreenLabel.Text = Localization.Get("Nav_MultiScreen");
         ApplyBackupLocalizedText();
+        ApplyAdvancedLocalizedText();
         TabLogLabel.Text = Localization.Get("Nav_Log");
         TabAboutLabel.Text = Localization.Get("Nav_About");
         AppTitleBar.Title = Localization.Get("App_Title_ControlPanel");
@@ -2227,6 +2240,7 @@ public sealed partial class ControlPanelWindow : UserControl
         SliderTrailAnimSpeed.Value = ConfigManager.TrailAnimationSpeed;
         SliderClickAnimSpeed.Value = ConfigManager.ClickAnimationSpeed;
         SliderTrailSamplingRate.Value = _samplingRateFormatter.ToSliderValue(ConfigManager.InputSamplingRate);
+        LoadAdvancedSettings(ConfigManager.EnableBaClickAdvancedSettings, ConfigManager.BaClickAdvancedSettings);
         SyncSliderAndBoxValues();
         UpdateColorPreview(_particleColor);
 
@@ -3072,6 +3086,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 _effectOpacity = 1;
                 UpdateColorPreview(_particleColor);
             });
+        RebuildAdvancedResetItems();
     }
 
     private void RefreshVisualResetRows(string? filter)
@@ -3213,6 +3228,8 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
         if (!await SetModalOverlayVisibleAsync(VisualResetOverlay, visible: false) || _isClosed) return;
+        UpdateAdvancedSettingsVisibility();
+        UpdateAdvancedHdrControls();
         try
         {
             foreach (VisualResetItem item in selected) item.Save?.Invoke();
@@ -3628,6 +3645,8 @@ public sealed partial class ControlPanelWindow : UserControl
         ConfigManager.Save("TrailEffectScale", trailEffectScale);
         ConfigManager.Save("ClickEffectScale", clickEffectScale);
         ConfigManager.Save("GlowIntensity", glowIntensity);
+        ConfigManager.Save("EnableBaClickAdvancedSettings", CheckBaClickAdvancedSettings.IsOn);
+        ConfigManager.Save("BaClickAdvancedSettings", CaptureAdvancedSettings());
         ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
         ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
         ConfigManager.Save("TrailAnimationSpeed", trailAnimSpeed);

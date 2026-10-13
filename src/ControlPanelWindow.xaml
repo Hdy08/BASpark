@@ -1181,6 +1181,21 @@
                                     </Grid>
                                 </Expander>
                             </Border>
+                            <TextBlock x:Name="TxtVisualAdvancedTitle" Style="{StaticResource BasSettingsSectionTitleStyle}" />
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Header, ElementName=CheckBaClickAdvancedSettings}"
+                                               Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" />
+                                    <ToggleSwitch x:Name="CheckBaClickAdvancedSettings" Grid.Column="1"
+                                                  Style="{StaticResource BasSettingToggleStyle}" Toggled="BaClickAdvancedSettings_Changed"
+                                                  AutomationProperties.Name="{Binding Header, ElementName=CheckBaClickAdvancedSettings}" />
+                                </Grid>
+                            </Border>
+                            <StackPanel x:Name="PanelBaClickAdvanced" Visibility="Collapsed" />
                         </StackPanel>
 
                         <!-- ===== 环境过滤 ===== -->

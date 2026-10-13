@@ -8,12 +8,37 @@
     const POINTER_STATE_KEYS = Object.freeze([
         'activePointerId', 'activePointerSource', 'lastPointerPosition', 'lastPointerTime',
         'trailDistanceSinceShard', 'currentTrailStroke', 'activeTrailOwnerId',
+        'lastInputSampleSourceTime',
     ]);
     const INPUT_STATE_KEYS = Object.freeze([
         'pointerId', 'inputMode', 'alwaysTrailEnabled', 'effectiveAlwaysTrail',
         'activePointerKind', 'strokeId', 'lastBoomX', 'lastBoomY', 'lastBoomTime', 'lastMoveX', 'lastMoveY',
     ]);
     const DEFAULT_COLOR = '#4ca7ff';
+    const BASE_RENDER_CONFIG = Object.freeze({
+        inputSource: 'manual', effectBackend: 'webgl2', bloomBackend: 'webgl2',
+        themeColorMode: 'hue-only', outputCompositing: 'browser-overlay',
+        overlayAlphaPolicy: 'visual-max', overlayColorCompensation: 'none', overlayAlphaLimit: 0.85,
+        hostCompositing: 'source-over', hostCompositingSurface: 'transparent-window',
+        isolatedCompositing: false, lightBackgroundContrastAlpha: 0, maxDpr: 2,
+        webgpuPreferHdr: true, webgpuHdrPeak: 3, webgpuHdrBrightness: 1,
+        webgpuHdrColorPreservation: 0, webgpuHdrWhiteCore: 0.6,
+        webgpuHdrWhiteStart: 1, webgpuHdrWhiteEnd: 5,
+    });
+    const ADVANCED_RENDER_OPTIONS = Object.freeze([
+        'themeColorMode', 'maxDpr', 'overlayAlphaPolicy', 'overlayColorCompensation',
+        'overlayAlphaLimit', 'isolatedCompositing', 'lightBackgroundContrastAlpha',
+        'webgpuHdrPeak', 'webgpuHdrBrightness', 'webgpuHdrColorPreservation',
+        'webgpuHdrWhiteCore', 'webgpuHdrWhiteStart', 'webgpuHdrWhiteEnd',
+    ]);
+    const ADVANCED_RENDER_MODES = Object.freeze({
+        'full-webgl2': { effectBackend: 'webgl2', bloomBackend: 'webgl2', webgpuPreferHdr: true },
+        'full-webgpu-sdr': { effectBackend: 'webgpu', bloomBackend: 'webgl2', webgpuPreferHdr: false },
+        'full-webgpu': { effectBackend: 'webgpu', bloomBackend: 'webgl2', webgpuPreferHdr: true },
+        'webgl2-bloom': { effectBackend: 'canvas2d', bloomBackend: 'webgl2', webgpuPreferHdr: true },
+        'software-bloom': { effectBackend: 'canvas2d', bloomBackend: 'software', webgpuPreferHdr: true },
+        'native-bloom': { effectBackend: 'canvas2d', bloomBackend: 'native', webgpuPreferHdr: true },
+    });
     const HOST_GENERATION =
         typeof window.__basparkRendererGeneration === 'string'
             ? window.__basparkRendererGeneration
@@ -63,6 +88,12 @@
         appliedTrailScaleRatio: 1,
         glowIntensityBaseline: null,
         appliedGlowIntensity: 1,
+        advancedEnabled: false,
+        advancedSettings: { config: {}, parameters: {} },
+        advancedFxBaseline: null,
+        appliedAdvancedConfig: {},
+        appliedAdvancedParameters: {},
+        advancedSignature: null,
         lastBoomX: -1,
         lastBoomY: -1,
         lastBoomTime: 0,
@@ -73,6 +104,11 @@
     function clamp(value, minimum, maximum)
     {
         return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    function hasOwnValue(value, key)
+    {
+        return Object.prototype.hasOwnProperty.call(value, key);
     }
 
     function errorMessage(error)
@@ -314,6 +350,60 @@
         applyTrailShardScale();
         applyGlowIntensity();
     }
+
+    function applyAdvancedSettings()
+    {
+        if (!state.fx || !state.advancedFxBaseline) return true;
+        const config = state.advancedEnabled ? state.advancedSettings.config || {} : {};
+        const parameters = state.advancedEnabled ? state.advancedSettings.parameters || {} : {};
+        const signature = JSON.stringify({ config, parameters });
+        if (signature === state.advancedSignature) return true;
+        const configPatch = {};
+        for (const key of new Set([...Object.keys(state.appliedAdvancedConfig), ...Object.keys(config)]))
+        {
+            if (key === 'renderMode')
+            {
+                const mode = config.renderMode || 'full-webgl2';
+                if (!hasOwnValue(ADVANCED_RENDER_MODES, mode)) throw new Error('Invalid advanced render mode.');
+                Object.assign(configPatch, ADVANCED_RENDER_MODES[mode]);
+            }
+            else if (ADVANCED_RENDER_OPTIONS.includes(key))
+            {
+                configPatch[key] = hasOwnValue(config, key) ? config[key] : BASE_RENDER_CONFIG[key];
+            }
+            else throw new Error(`Unsupported advanced render setting: ${key}`);
+        }
+        const patch = {};
+        const baselineChanges = {};
+        for (const path of new Set([...Object.keys(state.appliedAdvancedParameters), ...Object.keys(parameters)]))
+        {
+            if (!/^(rings|disk|shards|trail|bloom)\.[A-Za-z]+$/.test(path) || path === 'bloom.intensity')
+                throw new Error(`Unsupported advanced effect parameter: ${path}`);
+            const value = hasOwnValue(parameters, path) ? parameters[path] : readFxConfigNumber(state.advancedFxBaseline, path);
+            if (!Number.isFinite(value)) throw new Error(`Invalid advanced effect parameter: ${path}`);
+            if (TRAIL_SCALE_PARAM_PATHS.includes(path))
+            {
+                baselineChanges[path] = value;
+                patch[path] = value * getTrailScaleRatio();
+            }
+            else patch[path] = value;
+        }
+        if (Object.keys(patch).length && state.fx.setFxParams(patch, { strict: true })?.committed !== true)
+            throw new Error('Advanced effect parameters could not be applied.');
+        Object.assign(state.trailScaleBaseline, baselineChanges);
+        if (Object.keys(configPatch).length) state.fx.updateConfig(configPatch);
+        state.appliedAdvancedConfig = { ...config };
+        state.appliedAdvancedParameters = { ...parameters };
+        state.advancedSignature = signature;
+        return true;
+    }
+
+    window.updateBaClickAdvancedSettings = function (enabled, settings)
+    {
+        state.advancedEnabled = enabled === true;
+        state.advancedSettings = settings && typeof settings === 'object' ? settings : { config: {}, parameters: {} };
+        return invokeFx('updateBaClickAdvancedSettings', applyAdvancedSettings);
+    };
 
     function parseRgbColor(rgbString)
     {
@@ -1023,7 +1113,9 @@
 
         if (
             backendState.resolvedEffectBackend !== 'webgl2' &&
-            backendState.resolvedBloomBackend === 'software'
+            backendState.resolvedEffectBackend !== 'webgpu' &&
+            backendState.resolvedBloomBackend === 'software' &&
+            state.fx.config.bloomBackend !== 'software'
         )
         {
             // 全屏 Float32 软件 Bloom 对桌面覆盖层代价过高，GPU 不可用时改用原生辉光。
@@ -1053,25 +1145,10 @@
                 throw new Error('ba-click-fx IIFE 未在适配器之前注入');
             }
 
-            state.fx = new window.BAClickFX.BAClickFX(
-                {
-                    inputSource: 'manual',
-                    // WebView2 无法读取窗口后的桌面背景；使用 source-over，
-                    // 再以浅色背景补偿和 Alpha 上限提高未知背景上的可见性。
-                    effectBackend: 'webgl2',
-                    bloomBackend: 'webgl2',
-                    outputCompositing: 'browser-overlay',
-                    overlayAlphaPolicy: 'visual-max',
-                    overlayColorCompensation: 'none',
-                    overlayAlphaLimit: 0.85,
-                    hostCompositing: 'source-over',
-                    hostCompositingSurface: 'transparent-window',
-                    isolatedCompositing: false,
-                    lightBackgroundContrastAlpha: 0,
-                    maxDpr: 2,
-                });
+            state.fx = new window.BAClickFX.BAClickFX({ ...BASE_RENDER_CONFIG });
             captureTrailScaleBaseline();
             captureGlowIntensityBaseline();
+            state.advancedFxBaseline = state.fx.getFxConfig();
 
             const bloomBackendEventName =
                 window.BAClickFX.BLOOM_BACKEND_CHANGE_EVENT ||
@@ -1099,6 +1176,7 @@
             applyInputContext();
             applyColor();
             applyEffectSettings();
+            applyAdvancedSettings();
 
             if (state.paused)
             {

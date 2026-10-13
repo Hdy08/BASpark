@@ -933,8 +933,10 @@ internal sealed class OverlayWindow : IDisposable
         string trailStr = trailSpeed.ToString("F2", CultureInfo.InvariantCulture);
         string clickStr = clickSpeed.ToString("F2", CultureInfo.InvariantCulture);
         string glowStr = glowIntensity.ToString("F2", CultureInfo.InvariantCulture);
-
-        ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({trailScaleStr}, {clickScaleStr}, {opacityStr}, {trailStr}, {clickStr}, {glowStr});");
+        string advanced = AdvancedFxSettings.RendererPayload(ConfigManager.BaClickAdvancedSettings);
+        string advancedEnabled = ConfigManager.EnableBaClickAdvancedSettings ? "true" : "false";
+        ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({trailScaleStr}, {clickScaleStr}, {opacityStr}, {trailStr}, {clickStr}, {glowStr});" +
+            $"if(window.updateBaClickAdvancedSettings) window.updateBaClickAdvancedSettings({advancedEnabled}, {advanced});");
     }
 
     public void UpdateInputSamplingRate(int hz)

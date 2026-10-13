@@ -4,6 +4,97 @@ namespace BASpark.Tests;
 
 public sealed class ConfigurationBackupTests
 {
+    [Fact]
+    public void AdvancedFx_DefaultsProduceNoRendererOverrides()
+    {
+        Assert.Equal(72, AdvancedFxSettings.Definitions.Count);
+        Assert.Equal(72, AdvancedFxSettings.Definitions.Select(item => item.Path).Distinct().Count());
+        var defaults = AdvancedFxSettings.Definitions.ToDictionary(item => item.Path,
+            item => AdvancedFxSettings.Validate(item, item.DefaultValue));
+        Assert.Equal("{}", AdvancedFxSettings.Serialize(defaults));
+        using JsonDocument renderer = JsonDocument.Parse(AdvancedFxSettings.RendererPayload(AdvancedFxSettings.Serialize(defaults)));
+        Assert.Empty(renderer.RootElement.GetProperty("config").EnumerateObject());
+        Assert.Empty(renderer.RootElement.GetProperty("parameters").EnumerateObject());
+        Assert.DoesNotContain(AdvancedFxSettings.Definitions, item => item.Path is "scale" or "opacity" or "themeColor" or
+            "clickTimeScale" or "trailTimeScale" or "inputSamplingRate" or "bloom.intensity" or "inputSource" or
+            "outputCompositing" or "hostCompositing" or "hostCompositingSurface");
+    }
+
+    [Fact]
+    public void AdvancedFx_PersistencePreservesExactDefaultsAndSeparatesRenderParameters()
+    {
+        const string content = "{\"rings.count\":4,\"trail.width\":7.23,\"bloom.resolutionScale\":0.25,\"renderMode\":\"native-bloom\",\"rings.hdrIntensity\":5.992157}";
+        string normalized = AdvancedFxSettings.Serialize(AdvancedFxSettings.Parse(content, strict: true));
+        Assert.Equal(normalized, AdvancedFxSettings.Normalize(normalized));
+        Assert.DoesNotContain("rings.hdrIntensity", normalized, StringComparison.Ordinal);
+        using JsonDocument payload = JsonDocument.Parse(AdvancedFxSettings.RendererPayload(normalized));
+        Assert.Equal("native-bloom", payload.RootElement.GetProperty("config").GetProperty("renderMode").GetString());
+        Assert.Equal(7.23, payload.RootElement.GetProperty("parameters").GetProperty("trail.width").GetDouble());
+        Assert.Equal(4, payload.RootElement.GetProperty("parameters").GetProperty("rings.count").GetInt32());
+        Assert.False(payload.RootElement.GetProperty("parameters").TryGetProperty("bloom.intensity", out _));
+        Assert.Equal("{}", AdvancedFxSettings.Normalize("invalid saved data"));
+        Assert.Equal("{}", AdvancedFxSettings.Normalize("{\"rings.count\":99}"));
+    }
+
+    [Theory]
+    [InlineData("rings.count", "6.1")]
+    [InlineData("rings.count", "7")]
+    [InlineData("trail.width", "0")]
+    [InlineData("bloom.resolutionScale", "0.01")]
+    [InlineData("rings.rotationDirection", "0")]
+    [InlineData("maxDpr", "4")]
+    [InlineData("renderMode", "\"unknown\"")]
+    [InlineData("themeColorMode", "true")]
+    [InlineData("isolatedCompositing", "1")]
+    public void AdvancedFx_InvalidPersistedAndImportedValuesAreRejected(string path, string value)
+    {
+        string content = "{\"" + path + "\":" + value + "}";
+        Assert.Throws<InvalidDataException>(() => AdvancedFxSettings.Parse(content, strict: true));
+        var backup = new ConfigurationBackupDocument();
+        using JsonDocument data = JsonDocument.Parse(value);
+        backup.Data[AdvancedFxSettings.KeyPrefix + path] = data.RootElement.Clone();
+        Assert.Throws<InvalidDataException>(() => ConfigurationBackup.Parse(ConfigurationBackup.Serialize(backup)));
+    }
+
+    [Fact]
+    public void AdvancedFx_IndividualImportPreservesUnselectedSettingsAndMasterSwitch()
+    {
+        ConfigurationBackupDocument source = CreateFixture();
+        source.Data["BaClickFx/rings.count"] = JsonSerializer.SerializeToElement(3);
+        source.Data["BaClickFx/trail.width"] = JsonSerializer.SerializeToElement(9.1);
+        source.Data["EnableBaClickAdvancedSettings"] = JsonSerializer.SerializeToElement(true);
+        ConfigurationBackupDocument current = CreateFixture();
+        current.Data["BaClickFx/rings.count"] = JsonSerializer.SerializeToElement(5);
+        current.Data["BaClickFx/trail.width"] = JsonSerializer.SerializeToElement(7.23);
+        current.Data["BaClickFx/bloom.threshold"] = JsonSerializer.SerializeToElement(1.4);
+        var values = ConfigurationBackup.BuildImportValues(source, ["BaClickFx/rings.count"], current);
+        Assert.Equal("BaClickAdvancedSettings", Assert.Single(values.Keys));
+        Dictionary<string, JsonElement> advanced = AdvancedFxSettings.Parse((string)values["BaClickAdvancedSettings"], strict: true);
+        Assert.Equal(3, advanced["rings.count"].GetInt32());
+        Assert.Equal(7.23, advanced["trail.width"].GetDouble());
+        Assert.Equal(1.4, advanced["bloom.threshold"].GetDouble());
+        Assert.DoesNotContain("EnableBaClickAdvancedSettings", values.Keys);
+    }
+
+    [Fact]
+    public void AdvancedFx_AllDefaultsCanBeBackedUpAndLegacyBackupsRemainSelective()
+    {
+        var source = new ConfigurationBackupDocument();
+        foreach (AdvancedFxSetting definition in AdvancedFxSettings.Definitions)
+            source.Data[definition.Key] = definition.DefaultValue;
+        source.Data["EnableBaClickAdvancedSettings"] = JsonSerializer.SerializeToElement(false);
+        ConfigurationBackupDocument parsed = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source));
+        Assert.Equal(73, parsed.Data.Count);
+        Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(parsed, parsed.Data.Keys, CreateFixture());
+        Assert.False((bool)values["EnableBaClickAdvancedSettings"]);
+        Assert.Equal("{}", values["BaClickAdvancedSettings"]);
+        ConfigurationBackupDocument selected = ConfigurationBackup.Select(parsed, ["BaClickFx/disk.radius"]);
+        Assert.Equal("BaClickFx/disk.radius", Assert.Single(selected.Data.Keys));
+        Dictionary<string, object> legacy = ConfigurationBackup.BuildImportValues(CreateFixture(), ["GlowIntensity"], parsed);
+        Assert.Equal(1.25, legacy["GlowIntensity"]);
+        Assert.DoesNotContain("BaClickAdvancedSettings", legacy.Keys);
+    }
+
     private static ConfigurationBackupDocument CreateFixture(string id = "profile-a", string name = "Profile A",
         ProcessFilterModeOption mode = ProcessFilterModeOption.Blacklist, params string[] processes)
     {
