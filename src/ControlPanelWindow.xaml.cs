@@ -180,7 +180,7 @@ public sealed class SelectionCardTemplateSelector : DataTemplateSelector
 {
     public DataTemplate CardTemplate { get; set; } = null!;
     public DataTemplate HeadingTemplate { get; set; } = null!;
-    protected override DataTemplate SelectTemplateCore(object item) => item is string ? HeadingTemplate : CardTemplate;
+    protected override DataTemplate SelectTemplateCore(object item) => item is SelectionGroup ? HeadingTemplate : CardTemplate;
     protected override DataTemplate SelectTemplateCore(object item, DependencyObject container) => SelectTemplateCore(item);
 }
 
@@ -453,9 +453,6 @@ public sealed partial class ControlPanelWindow : UserControl
     private string? _pendingLanguage;
     private enum ResetScope { Visual, Basic, Filter, Screens, All }
     private ResetScope _resetScope;
-    [Flags]
-    private enum SettingsSections { General = 1, Visual = 2, Screens = 4, All = 7 }
-    private sealed record SettingsState(string General, string Visual, string Screens);
     private SettingsState? _savedSettingsState;
     private SettingsState? _currentSettingsState;
     private SettingsSections _pendingSettingsSections;
@@ -489,13 +486,7 @@ public sealed partial class ControlPanelWindow : UserControl
         try
         {
             foreach (SelectionToolbar toolbar in _selectionToolbars.Values)
-            {
-                var icon = CreateSelectionIcon("InvertSelectionIconData");
-                toolbar.Invert.Content = icon;
-                icon.RenderTransformOrigin = new Point(0.5, 0.5);
-                icon.RenderTransform = new ScaleTransform();
-                toolbar.SelectAll.Content = toolbar.SelectAllIcon = CreateSelectionIcon("SelectAllIconData");
-            }
+                InitializeSelectionToolbar(toolbar);
             _languageAtLoad = string.IsNullOrWhiteSpace(ConfigManager.UiLanguage)
                 ? Localization.CurrentCultureName
                 : ConfigManager.UiLanguage;
@@ -553,6 +544,7 @@ public sealed partial class ControlPanelWindow : UserControl
             UpdatePageVisibility();
             InitLogView();
             InitializeSettingsTracking();
+            SetupPageHeaders();
 
             _host.CloseRequested += ControlPanelWindow_Closed;
             _host.SizeChanged += (_, _) => UpdateCaptionButtonState();
@@ -785,8 +777,10 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         foreach (ToggleSwitch toggle in new[] { CheckMasterSwitch, CheckAutoStart, CheckStartSilent, CheckHideTrayIcon,
                      CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMiddleClickTrigger,
-                     CheckScreenshotCompatibilityMode, CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop })
-            TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.General);
+                     CheckScreenshotCompatibilityMode })
+            TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Basic);
+        foreach (ToggleSwitch toggle in new[] { CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop })
+            TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Filter);
         foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw, CheckBaClickAdvancedSettings })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Visual);
         foreach (Control control in _advancedControls.Values)
@@ -794,13 +788,14 @@ public sealed partial class ControlPanelWindow : UserControl
             if (control is ToggleSwitch toggle) TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Visual);
             if (control is ComboBox combo) TrackSettingsProperty(combo, ComboBox.SelectedIndexProperty, SettingsSections.Visual);
         }
-        foreach (ComboBox combo in new[] { ComboLanguage, ComboProfiles, ComboProcessFilterMode })
-            TrackSettingsProperty(combo, ComboBox.SelectedIndexProperty, SettingsSections.General);
+        TrackSettingsProperty(ComboLanguage, ComboBox.SelectedIndexProperty, SettingsSections.Basic);
+        foreach (ComboBox combo in new[] { ComboProfiles, ComboProcessFilterMode })
+            TrackSettingsProperty(combo, ComboBox.SelectedIndexProperty, SettingsSections.Filter);
         foreach (RadioButtons selector in new[] { RadioDarkMode, RadioClickType })
-            TrackSettingsProperty(selector, RadioButtons.SelectedIndexProperty, SettingsSections.General);
+            TrackSettingsProperty(selector, RadioButtons.SelectedIndexProperty, SettingsSections.Basic);
         foreach (Slider slider in _sliderToBox.Keys)
             TrackSettingsProperty(slider, Slider.ValueProperty,
-                slider == SliderMaxTouchEffects ? SettingsSections.General : SettingsSections.Visual);
+                slider == SliderMaxTouchEffects ? SettingsSections.Basic : SettingsSections.Visual);
         TrackSettingsProperty(EffectColorPicker, ColorPicker.ColorProperty, SettingsSections.Visual);
         TrackSettingsProperty(EffectColorHexInput, TextBox.TextProperty, SettingsSections.Visual);
         Profiles.CollectionChanged += GeneralSettingsCollectionChanged;
@@ -819,22 +814,26 @@ public sealed partial class ControlPanelWindow : UserControl
     }
 
     private void GeneralSettingsCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args) =>
-        QueueSettingsChangeCheck(SettingsSections.General);
+        QueueSettingsChangeCheck(SettingsSections.Filter);
 
     private void ScreenSettingsCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args) =>
         QueueSettingsChangeCheck(SettingsSections.Screens);
 
-    private string CaptureGeneralSettings() => JsonSerializer.Serialize(new
+    private string CaptureBasicSettings() => JsonSerializer.Serialize(new
     {
         UiLanguage = GetSelectedLanguage(), DarkMode = GetSelectedDarkMode(), ClickTriggerType = GetSelectedClickTrigger(),
         IsEffectEnabled = CheckMasterSwitch.IsOn, AutoStart = CheckAutoStart.IsOn, StartSilent = CheckStartSilent.IsOn,
         HideTrayIcon = CheckHideTrayIcon.IsOn, EnableAlwaysTrailEffect = CheckAlwaysTrailEffectSwitch.IsOn,
         RunAsAdmin = CheckRunAsAdmin.IsOn, IsTouchscreenMode = CheckTouchscreenMode.IsOn,
         MaxTouchEffects = _touchEffectLimitFormatter.ToStoredValue(GetPendingSliderValue(SliderMaxTouchEffects)),
-        EnableMiddleClickTrigger = CheckMiddleClickTrigger.IsOn, ScreenshotCompatibilityMode = CheckScreenshotCompatibilityMode.IsOn,
+        EnableMiddleClickTrigger = CheckMiddleClickTrigger.IsOn, ScreenshotCompatibilityMode = CheckScreenshotCompatibilityMode.IsOn
+    });
+
+    private string CaptureFilterSettings() => JsonSerializer.Serialize(new
+    {
         EnableEnvironmentFilter = CheckEnvironmentFilter.IsOn, HideInFullscreen = CheckHideInFullscreen.IsOn,
         ShowEffectOnDesktop = CheckShowEffectOnDesktop.IsOn, ActiveProfileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
-        Profiles = Profiles.OrderBy(profile => profile.Id, StringComparer.Ordinal).Select(profile => new
+        Profiles = Profiles.Select(profile => new
         {
             profile.Id, profile.Name, profile.Mode,
             Processes = profile.Processes.Select(name => name.ToUpperInvariant()).OrderBy(name => name, StringComparer.Ordinal).ToArray()
@@ -882,21 +881,24 @@ public sealed partial class ControlPanelWindow : UserControl
         .OrderBy(item => item.IdentityKey, StringComparer.Ordinal).ThenBy(item => item.DeviceName, StringComparer.Ordinal)
         .Select(item => new { item.IdentityKey, item.DeviceName, item.IsEnabled }).ToArray());
 
-    private SettingsState CaptureSettingsState() => new(CaptureGeneralSettings(), CaptureVisualSettings(), CaptureScreenSettings());
+    private SettingsState CaptureSettingsState() => new(CaptureBasicSettings(), CaptureVisualSettings(), CaptureScreenSettings(), CaptureFilterSettings());
 
     private void CaptureSettingsBaseline()
     {
         _savedSettingsState = _currentSettingsState = CaptureSettingsState();
         BtnApplySettings.IsEnabled = false;
+        BtnUndoSettings.IsEnabled = false;
     }
 
     private void MarkResetSettingsSaved(IEnumerable<VisualResetItem> selected)
     {
         if (_savedSettingsState == null) return;
-        var general = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.General)!.AsObject();
+        var basic = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.Basic)!.AsObject();
+        var filter = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.Filter)!.AsObject();
         var visual = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.Visual)!.AsObject();
         var screens = System.Text.Json.Nodes.JsonNode.Parse(_savedSettingsState.Screens)!.AsArray();
-        var currentGeneral = System.Text.Json.Nodes.JsonNode.Parse(CaptureGeneralSettings())!.AsObject();
+        var currentBasic = System.Text.Json.Nodes.JsonNode.Parse(CaptureBasicSettings())!.AsObject();
+        var currentFilter = System.Text.Json.Nodes.JsonNode.Parse(CaptureFilterSettings())!.AsObject();
         var currentVisual = System.Text.Json.Nodes.JsonNode.Parse(CaptureVisualSettings())!.AsObject();
         var currentScreens = System.Text.Json.Nodes.JsonNode.Parse(CaptureScreenSettings())!.AsArray();
         foreach (VisualResetItem item in selected)
@@ -911,8 +913,8 @@ public sealed partial class ControlPanelWindow : UserControl
             else if (key.StartsWith("Profile.", StringComparison.Ordinal))
             {
                 string property = key["Profile.".Length..];
-                var savedProfile = general["Profiles"]!.AsArray().FirstOrDefault(profile => profile!["Id"]!.GetValue<string>() == item.SelectionId);
-                var currentProfile = currentGeneral["Profiles"]!.AsArray().FirstOrDefault(profile => profile!["Id"]!.GetValue<string>() == item.SelectionId);
+                var savedProfile = filter["Profiles"]!.AsArray().FirstOrDefault(profile => profile!["Id"]!.GetValue<string>() == item.SelectionId);
+                var currentProfile = currentFilter["Profiles"]!.AsArray().FirstOrDefault(profile => profile!["Id"]!.GetValue<string>() == item.SelectionId);
                 if (savedProfile != null && currentProfile != null) savedProfile[property] = currentProfile[property]!.DeepClone();
             }
             else if (currentVisual.ContainsKey(key))
@@ -920,13 +922,17 @@ public sealed partial class ControlPanelWindow : UserControl
                 visual[key] = currentVisual[key]?.DeepClone();
                 if (key == "ParticleColor") visual["EffectOpacity"] = currentVisual["EffectOpacity"]?.DeepClone();
             }
-            else if (currentGeneral.ContainsKey(key))
+            else if (currentBasic.ContainsKey(key))
             {
-                general[key] = currentGeneral[key]?.DeepClone();
-                if (key == "Profiles") general["ActiveProfileId"] = currentGeneral["ActiveProfileId"]?.DeepClone();
+                basic[key] = currentBasic[key]?.DeepClone();
+            }
+            else if (currentFilter.ContainsKey(key))
+            {
+                filter[key] = currentFilter[key]?.DeepClone();
+                if (key == "Profiles") filter["ActiveProfileId"] = currentFilter["ActiveProfileId"]?.DeepClone();
             }
         }
-        _savedSettingsState = new SettingsState(general.ToJsonString(), visual.ToJsonString(), screens.ToJsonString());
+        _savedSettingsState = new SettingsState(basic.ToJsonString(), visual.ToJsonString(), screens.ToJsonString(), filter.ToJsonString());
         UpdateApplySettingsState(SettingsSections.All);
     }
 
@@ -957,10 +963,12 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateApplySettingsState(SettingsSections sections)
     {
         if (_savedSettingsState == null || _currentSettingsState == null) return;
-        if (sections.HasFlag(SettingsSections.General)) _currentSettingsState = _currentSettingsState with { General = CaptureGeneralSettings() };
+        if (sections.HasFlag(SettingsSections.Basic)) _currentSettingsState = _currentSettingsState with { Basic = CaptureBasicSettings() };
+        if (sections.HasFlag(SettingsSections.Filter)) _currentSettingsState = _currentSettingsState with { Filter = CaptureFilterSettings() };
         if (sections.HasFlag(SettingsSections.Visual)) _currentSettingsState = _currentSettingsState with { Visual = CaptureVisualSettings() };
         if (sections.HasFlag(SettingsSections.Screens)) _currentSettingsState = _currentSettingsState with { Screens = CaptureScreenSettings() };
-        BtnApplySettings.IsEnabled = !_isApplyingSettings && _currentSettingsState != _savedSettingsState;
+        BtnApplySettings.IsEnabled = BtnUndoSettings.IsEnabled = !_isApplyingSettings &&
+            _currentSettingsState.HasChanges(_savedSettingsState, CurrentSettingsPage);
     }
 
     private void BindCollections()
@@ -1134,7 +1142,7 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             _numberInputs[number] = input;
             TrackSettingsProperty(input, TextBox.TextProperty,
-                number == TxtMaxTouchEffectsValue ? SettingsSections.General : SettingsSections.Visual);
+                number == TxtMaxTouchEffectsValue ? SettingsSections.Basic : SettingsSections.Visual);
         }
         input.Padding = new Thickness(10, 0, 6, 0);
         input.VerticalContentAlignment = VerticalAlignment.Center;
@@ -1282,6 +1290,8 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtStatusLabel.Text = Localization.Get("Welcome_StatusLabel");
         TxtClicksLabel.Text = Localization.Get("Welcome_ClicksLabel");
         BtnApplySettings.Content = Localization.Get("Settings_Apply");
+        BtnUndoSettings.Content = Localization.Get("Settings_Undo");
+        TxtScreensTitle.Text = Localization.Get("MultiScreen_Displays");
         TxtBasicTitle.Text = Localization.Get("Basic_Interface");
         TxtBasicTriggerTitle.Text = Localization.Get("Basic_Trigger");
         TxtBasicRuntimeTitle.Text = Localization.Get("Basic_Runtime");
@@ -1373,7 +1383,6 @@ public sealed partial class ControlPanelWindow : UserControl
         BtnRepoCialloKing.Content = Localization.Get("About_OpenRepository");
         BtnRepoWinUI.Content = Localization.Get("About_OpenRepository");
         BtnResetSettings.Content = Localization.Get("Settings_Reset");
-        BtnScreensReset.Content = Localization.Get("Settings_ResetPage");
         TxtOverlayRunning.Text = Localization.Get("Overlay_RunningProcess");
         SearchRunningProcess.PlaceholderText = Localization.Get("Overlay_SearchProcesses");
         BtnOverlayCancel.Content = Localization.Get("Overlay_Cancel");
@@ -1407,6 +1416,7 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateConfiguredProcessSummary();
         foreach (var tracker in _comboWidthTrackers) tracker.Refresh();
         foreach (ItemsControl list in _selectionToolbars.Keys) UpdateSelectionToolbar(list);
+        RefreshPageHeaders();
     }
 
     private static void SetRadioContent(RadioButtons container, int index, string key)
@@ -2127,6 +2137,8 @@ public sealed partial class ControlPanelWindow : UserControl
         SetPageVisible(SectionMultiScreen, ReferenceEquals(incoming, SectionMultiScreen), incoming);
         SetPageVisible(SectionBackup, ReferenceEquals(incoming, SectionBackup), incoming);
         UpdateMinimumWindowWidth();
+        UpdateApplySettingsState(SettingsSections.All);
+        RefreshPageHeaders();
     }
 
     // ==================================================================
@@ -2304,8 +2316,8 @@ public sealed partial class ControlPanelWindow : UserControl
         ScrollBarVisibility visibility = ScrollBarVisibility.Auto;
 
         SettingsContentScrollViewer.VerticalScrollBarVisibility = visibility;
-        PageWelcome.VerticalScrollBarVisibility = visibility;
-        PageAbout.VerticalScrollBarVisibility = visibility;
+        WelcomeScrollViewer.VerticalScrollBarVisibility = visibility;
+        AboutScrollViewer.VerticalScrollBarVisibility = visibility;
         LogScrollViewer.VerticalScrollBarVisibility = visibility;
     }
 
@@ -3091,23 +3103,10 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void RefreshVisualResetRows(string? filter)
     {
-        var rows = new List<object>();
-        string? group = null;
-        foreach (VisualResetItem item in VisualResetItems)
-        {
-            if (!string.IsNullOrWhiteSpace(filter) &&
-                !item.Title.Contains(filter, StringComparison.OrdinalIgnoreCase) &&
-                !item.Subtitle.Contains(filter, StringComparison.OrdinalIgnoreCase) &&
-                !item.Group.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
-            if (_resetScope != ResetScope.Screens && group != item.Group)
-            {
-                group = item.Group;
-                rows.Add(group);
-            }
-            rows.Add(item);
-        }
-        ListVisualResetItems.ItemsSource = rows;
-        RefreshSelectionToolbar(ListVisualResetItems);
+        SetGroupedSelectionRows(ListVisualResetItems, VisualResetItems.Where(item => string.IsNullOrWhiteSpace(filter) ||
+            item.Title.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+            item.Subtitle.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+            item.Group.Contains(filter, StringComparison.OrdinalIgnoreCase)), item => ((VisualResetItem)item).Group);
     }
 
     private void RefreshSelectionToolbar(ItemsControl list)
@@ -3131,15 +3130,30 @@ public sealed partial class ControlPanelWindow : UserControl
         (Viewbox)Microsoft.UI.Xaml.Markup.XamlReader.Load(
             $"<Viewbox xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"16\" Height=\"16\" Stretch=\"Uniform\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"><PathIcon Width=\"9\" Height=\"9\" Data=\"{Resources[resourceKey]}\" /></Viewbox>");
 
+    private void InitializeSelectionToolbar(SelectionToolbar toolbar)
+    {
+        var icon = CreateSelectionIcon("InvertSelectionIconData");
+        toolbar.Invert.Content = icon;
+        icon.RenderTransformOrigin = new Point(0.5, 0.5);
+        icon.RenderTransform = new ScaleTransform();
+        toolbar.SelectAll.Content = toolbar.SelectAllIcon = CreateSelectionIcon("SelectAllIconData");
+    }
+
     private void UpdateSelectionToolbar(ItemsControl list)
     {
         if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
-        bool allSelected = toolbar.Items.Count > 0 && toolbar.Items.All(item => item.IsSelected);
         bool available = list != ListBackupItems || !_backupBusy;
-        toolbar.Invert.IsEnabled = toolbar.SelectAll.IsEnabled = toolbar.Items.Count > 0 && available;
+        UpdateSelectionButtons(toolbar, available);
         toolbar.Confirm.IsEnabled = available && toolbar.Items.Any(item => item.IsSelected);
         toolbar.EmptyMessage.Text = Localization.Get("Overlay_NoSearchResults");
         toolbar.EmptyMessage.Visibility = toolbar.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSectionSelectionToolbars(list);
+    }
+
+    private void UpdateSelectionButtons(SelectionToolbar toolbar, bool available)
+    {
+        bool allSelected = toolbar.Items.Count > 0 && toolbar.Items.All(item => item.IsSelected);
+        toolbar.Invert.IsEnabled = toolbar.SelectAll.IsEnabled = toolbar.Items.Count > 0 && available;
         string invertLabel = Localization.Get("Overlay_InvertSelection");
         string selectLabel = Localization.Get(allSelected ? "Overlay_ClearSelection" : "Overlay_SelectAll");
         ToolTipService.SetToolTip(toolbar.Invert, invertLabel);
@@ -3157,14 +3171,17 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ChangeSelection(object sender, bool invert)
     {
-        if (sender is not Button { Tag: ItemsControl list } button || !button.IsEnabled ||
+        if (sender is not Button button || !button.IsEnabled) return;
+        ItemsControl? list = button.Tag is SelectionGroup group ? group.List : button.Tag as ItemsControl;
+        if (list == null ||
             !_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
-        bool select = !toolbar.Items.All(item => item.IsSelected);
+        List<SelectionCardItem> items = button.Tag is SelectionGroup selectedGroup
+            ? selectedGroup.Items.Where(toolbar.Items.Contains).ToList() : toolbar.Items;
         _changingSelection = true;
         try
         {
-            foreach (SelectionCardItem item in toolbar.Items) item.IsSelected = invert ? !item.IsSelected : select;
-            if (invert && toolbar.Invert.Content is Viewbox { RenderTransform: ScaleTransform mirror }) mirror.ScaleX = -mirror.ScaleX;
+            SelectionBatch.Change(items, invert);
+            if (invert && button.Content is Viewbox { RenderTransform: ScaleTransform mirror }) mirror.ScaleX = -mirror.ScaleX;
         }
         finally
         {
@@ -3578,13 +3595,18 @@ public sealed partial class ControlPanelWindow : UserControl
     private async void SaveSettings_Click(object sender, RoutedEventArgs e)
     {
         Focus(FocusState.Programmatic);
-        UpdateApplySettingsState(SettingsSections.All);
+        SettingsSections page = CurrentSettingsPage;
+        UpdateApplySettingsState(page);
         if (!BtnApplySettings.IsEnabled) return;
         _isApplyingSettings = true;
-        BtnApplySettings.IsEnabled = false;
+        BtnApplySettings.IsEnabled = BtnUndoSettings.IsEnabled = false;
         try
         {
-            await SaveSettingsCoreAsync();
+            await SaveSettingsCoreAsync(page);
+        }
+        catch (Exception)
+        {
+            if (!_isClosed) await ShowMessageAsync(Localization.Get("Msg_SettingsSaveFailed"));
         }
         finally
         {
@@ -3593,156 +3615,68 @@ public sealed partial class ControlPanelWindow : UserControl
         }
     }
 
-    private async Task SaveSettingsCoreAsync()
+    private async Task SaveSettingsCoreAsync(SettingsSections page)
     {
-        DarkModeOption selectedDarkMode = GetSelectedDarkMode();
-        string? selectedLanguage = GetSelectedLanguage() ?? _pendingLanguage;
-        bool languageChanged = !string.IsNullOrWhiteSpace(selectedLanguage) &&
+        SettingsState current = _currentSettingsState!;
+        Dictionary<string, object> values = current.GetValues(page);
+        string? selectedLanguage = page == SettingsSections.Basic ? (string?)values.GetValueOrDefault("UiLanguage") : null;
+        bool languageChanged = selectedLanguage != null &&
             !string.Equals(selectedLanguage, _languageAtLoad, StringComparison.OrdinalIgnoreCase);
-
-        if (!string.IsNullOrWhiteSpace(selectedLanguage))
+        bool screensChanged = false;
+        if (page == SettingsSections.Screens)
         {
-            ConfigManager.Save("UiLanguage", selectedLanguage);
+            HashSet<string> selectedIds = ScreenOptions.Where(item => item.IsEnabled)
+                .Select(item => item.DeviceName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (selectedIds.Count == 0)
+            {
+                await ShowMessageAsync(Localization.Get("Msg_MinOneScreen"));
+                return;
+            }
+            screensChanged = !ConfigManager.ResolveEnabledScreenDeviceNames(
+                ScreenOptions.Select(CreateScreenIdentityInfo)).SetEquals(selectedIds);
+            if (!ConfigManager.SaveScreenSelections(ScreenOptions.Select(item => new ScreenSelectionState
+                {
+                    IdentityKey = item.IdentityKey, DeviceName = item.DeviceName,
+                    DisplayName = item.DisplayName, IsEnabled = item.IsEnabled
+                })))
+                throw new IOException(Localization.Get("Msg_SettingsSaveFailed"));
+        }
+        else if (!ConfigManager.SaveBackupValues(values))
+        {
+            throw new IOException(Localization.Get("Msg_SettingsSaveFailed"));
+        }
+
+        _savedSettingsState = _savedSettingsState!.Accept(current, page);
+        ApplyPageRuntimeSettings(page, screensChanged);
+        if (page != SettingsSections.Basic) return;
+
+        if (selectedLanguage != null)
+        {
             Localization.ApplyCulture(selectedLanguage);
+            _languageAtLoad = selectedLanguage;
+            _pendingLanguage = selectedLanguage;
         }
-
-        bool useLinkedEffectScale = CheckLinkedEffectScale.IsOn;
-        double trailEffectScale = Math.Round(SliderTrailScale.Value, 2);
-        double clickEffectScale = Math.Round(SliderClickScale.Value, 2);
-        double effectScaleForRegistry = Math.Round(SliderScale.Value, 2);
-
-        double effectOpacity = Math.Round(_effectOpacity, 2);
-        double glowIntensity = Math.Round(SliderGlow.Value, 2);
-
-        bool useLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsOn;
-        double trailAnimSpeed = Math.Round(SliderTrailAnimSpeed.Value, 2);
-        double clickAnimSpeed = Math.Round(SliderClickAnimSpeed.Value, 2);
-        double effectSpeedForRegistry = Math.Round(SliderSpeed.Value, 2);
-
-        int inputSamplingRate = _samplingRateFormatter.ToStoredValue(SliderTrailSamplingRate.Value);
-        bool autoStartEnabled = CheckAutoStart.IsOn;
-        bool startSilentEnabled = CheckStartSilent.IsOn;
-        bool hideTrayIcon = CheckHideTrayIcon.IsOn;
-        bool runAsAdminEnabled = CheckRunAsAdmin.IsOn;
-        bool isTouchscreenEnabled = CheckTouchscreenMode.IsOn;
-        bool middleClickEnabled = CheckMiddleClickTrigger.IsOn;
-        bool screenshotCompatibilityEnabled = CheckScreenshotCompatibilityMode.IsOn;
-        int clickType = GetSelectedClickTrigger();
-
-
-        // 保存配置组
-        string activeId = (ComboProfiles.SelectedItem as FilterProfile)?.Id ?? string.Empty;
-        ConfigManager.SaveProfiles(Profiles.ToList(), activeId);
-
-        ConfigManager.Save("RunAsAdmin", runAsAdminEnabled);
-        ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
-        ConfigManager.Save("MaxTouchEffects", _touchEffectLimitFormatter.ToStoredValue(SliderMaxTouchEffects.Value));
-        ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsOn);
-        ConfigManager.Save("AutoStart", autoStartEnabled);
-        ConfigManager.Save("ParticleColor", ColorPickerColorMath.CombineThemeColor(_particleColor, effectOpacity));
-        ConfigManager.Save("EffectScale", effectScaleForRegistry);
-        ConfigManager.Save("UseLinkedEffectScale", useLinkedEffectScale);
-        ConfigManager.Save("TrailEffectScale", trailEffectScale);
-        ConfigManager.Save("ClickEffectScale", clickEffectScale);
-        ConfigManager.Save("GlowIntensity", glowIntensity);
-        ConfigManager.Save("EnableBaClickAdvancedSettings", CheckBaClickAdvancedSettings.IsOn);
-        ConfigManager.Save("BaClickAdvancedSettings", CaptureAdvancedSettings());
-        ConfigManager.Save("UseLinkedAnimationSpeed", useLinkedAnimationSpeed);
-        ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
-        ConfigManager.Save("TrailAnimationSpeed", trailAnimSpeed);
-        ConfigManager.Save("ClickAnimationSpeed", clickAnimSpeed);
-        ConfigManager.Save("InputSamplingRate", inputSamplingRate);
-        ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
-        ConfigManager.Save("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch.IsOn);
-        ApplyScrollbarSettings();
-        ConfigManager.Save("DarkMode", selectedDarkMode);
-        ConfigManager.Save("StartSilent", startSilentEnabled);
-        ConfigManager.Save("HideTrayIcon", hideTrayIcon);
-        App.Tray?.SetHidden(hideTrayIcon);
-        ConfigManager.Save("EnableEnvironmentFilter", CheckEnvironmentFilter.IsOn);
-        ConfigManager.Save("HideInFullscreen", CheckHideInFullscreen.IsOn);
-        ConfigManager.Save("ShowEffectOnDesktop", CheckShowEffectOnDesktop.IsOn);
-        ConfigManager.Save("ClickTriggerType", clickType);
-        ConfigManager.Save("EnableMiddleClickTrigger", middleClickEnabled);
-        ConfigManager.Save("ScreenshotCompatibilityMode", screenshotCompatibilityEnabled);
-        ConfigManager.Save("ApplyCurveDraw", CheckApplyCurveDraw.IsOn);
-
-        HashSet<string> previousEnabledScreenIds = ConfigManager.ResolveEnabledScreenDeviceNames(
-            ScreenOptions.Select(CreateScreenIdentityInfo));
-        HashSet<string> selectedIds = ScreenOptions
-            .Where(item => item.IsEnabled)
-            .Select(item => item.DeviceName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        if (selectedIds.Count == 0)
+        if (languageChanged)
         {
-            await ShowMessageAsync(Localization.Get("Msg_MinOneScreen"));
-            return;
+            ApplyLocalizedText();
+            ReloadScreenLabels();
+            App.Tray?.RefreshLocalization();
         }
-
-        // 保存当前可见屏幕的启用状态，离线屏幕的旧设置会在 ConfigManager 中保留
-        ConfigManager.SaveScreenSelections(ScreenOptions.Select(item => new ScreenSelectionState
-        {
-            IdentityKey = item.IdentityKey,
-            DeviceName = item.DeviceName,
-            DisplayName = item.DisplayName,
-            IsEnabled = item.IsEnabled
-        }));
-
-        ApplyAutoStartSettings();
-
-        App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
-        GetUiEffectScales(out double overlayTrailScale, out double overlayClickScale);
-        GetUiAnimationSpeeds(out double overlayTrailSpeed, out double overlayClickSpeed);
-        App.Overlay?.UpdateEffectSettings(overlayTrailScale, overlayClickScale, effectOpacity, overlayTrailSpeed, overlayClickSpeed, glowIntensity);
-        App.Overlay?.UpdateInputSamplingRate(inputSamplingRate);
-        App.Overlay?.RefreshEnvironmentFilterState();
-        App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);
-        App.Overlay?.UpdateScreenshotCompatibilityMode(screenshotCompatibilityEnabled);
-        App.Overlay?.SetCurveDraw(CheckApplyCurveDraw.IsOn);
-        if (!previousEnabledScreenIds.SetEquals(selectedIds))
-        {
-            App.Overlay?.RefreshScreenSelection();
-        }
-
-        CaptureSettingsBaseline();
         using (WindowsIdentity identity = WindowsIdentity.GetCurrent())
         {
             bool isCurrentAdmin = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
-            if (runAsAdminEnabled && !isCurrentAdmin)
-            {
-                bool restartAsAdmin = await ConfirmAsync(
-                    Localization.Get("Msg_AdminRestart"));
-
-                if (restartAsAdmin)
-                {
-                    _skipSaveOnClosing = true;
-                    (Application.Current as App)?.RestartApplicationFromPanel();
-                    return;
-                }
-            }
-        }
-
-        if (languageChanged)
-        {
-            // 与迁移前一致：先整体重刷文案（旧版是 UiLocalizer.ApplyControlPanel），再询问是否重启。
-            ApplyLocalizedText();
-            LoadScreenOptions();
-            _languageAtLoad = selectedLanguage!;
-
-            bool restart = await ConfirmAsync(
-                Localization.Get("Msg_LanguageRestart"));
-
-            if (restart)
+            if (ConfigManager.RunAsAdmin && !isCurrentAdmin && await ConfirmAsync(Localization.Get("Msg_AdminRestart")))
             {
                 _skipSaveOnClosing = true;
                 (Application.Current as App)?.RestartApplicationFromPanel();
                 return;
             }
         }
-
-
-        ApplyDarkMode();
+        if (languageChanged && await ConfirmAsync(Localization.Get("Msg_LanguageRestart")))
+        {
+            _skipSaveOnClosing = true;
+            (Application.Current as App)?.RestartApplicationFromPanel();
+        }
     }
 
     // ==================================================================
@@ -4356,6 +4290,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         _navigationIndicators.Clear();
         foreach (var callback in _settingsCallbacks) callback.Control.UnregisterPropertyChangedCallback(callback.Property, callback.Token);
+        foreach (StickySectionTracker tracker in _stickyTrackers) tracker.Dispose();
         Profiles.CollectionChanged -= GeneralSettingsCollectionChanged;
         CurrentProfileProcesses.CollectionChanged -= GeneralSettingsCollectionChanged;
         CurrentProfileProcesses.CollectionChanged -= ConfiguredProcesses_CollectionChanged;

@@ -671,6 +671,15 @@
     <data name="Reset_EmptyList" xml:space="preserve">
       <value>空进程列表</value>
     </data>
+    <data name="Settings_Undo" xml:space="preserve">
+      <value>放弃更改</value>
+    </data>
+    <data name="Settings_ResetSection" xml:space="preserve">
+      <value>重置此分组设置</value>
+    </data>
+    <data name="MultiScreen_Displays" xml:space="preserve">
+      <value>显示器</value>
+    </data>
     <data name="Settings_ResetPage" xml:space="preserve">
       <value>重置本页设置</value>
     </data>
@@ -801,7 +810,7 @@
     <data name="About_Sponsor" xml:space="preserve"><value>赞助</value></data>
     <data name="About_CopyFailed" xml:space="preserve"><value>复制失败：{0}</value></data>
     <data name="About_InfoUnavailable" xml:space="preserve"><value>未提供</value></data>
-    <data name="Visual_AdvancedSection" xml:space="preserve"><value>高级</value></data>
+    <data name="Visual_AdvancedSection" xml:space="preserve"><value>更多</value></data>
     <data name="Advanced_Enable" xml:space="preserve"><value>启用 ba-click-fx 高级设置</value></data>
     <data name="Advanced_HdrHint" xml:space="preserve"><value>仅在 WebGPU HDR 模式且系统支持 HDR 时生效。</value></data>
     <data name="Advanced_HdrPreset" xml:space="preserve"><value>高光预设</value></data>

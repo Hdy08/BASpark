@@ -160,9 +160,11 @@ public class WinUi3UiTests
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement template = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionHeadingTemplate");
-        XElement title = Assert.Single(template.Elements());
+        XElement header = Assert.Single(template.Elements());
+        XElement title = Assert.Single(header.Elements(), item => item.Name.LocalName == "TextBlock");
         Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)title.Attribute("Style"));
-        Assert.Equal("0,8,16,8", (string?)title.Attribute("Margin"));
+        Assert.Equal("0,8,0,8", (string?)header.Attribute("Margin"));
+        Assert.Equal(2, header.Elements().Count(item => item.Name.LocalName == "Button"));
     }
 
     [Theory]
@@ -290,11 +292,14 @@ public class WinUi3UiTests
         Assert.DoesNotContain("DarkMode_Changed", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("DarkMode_Changed", source, StringComparison.Ordinal);
 
-        int saveIndex = source.IndexOf("ConfigManager.Save(\"DarkMode\"", StringComparison.Ordinal);
+        int saveIndex = source.IndexOf("ConfigManager.SaveBackupValues(values)", StringComparison.Ordinal);
         Assert.True(saveIndex >= 0, "SaveSettings must persist DarkMode.");
 
-        int applyIndex = source.IndexOf("ApplyDarkMode(", saveIndex, StringComparison.Ordinal);
+        int applyIndex = source.IndexOf("ApplyPageRuntimeSettings(page", saveIndex, StringComparison.Ordinal);
         Assert.True(applyIndex > saveIndex, "DarkMode must be applied after it is persisted.");
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        Assert.Contains("if (page == SettingsSections.Basic)", pages, StringComparison.Ordinal);
+        Assert.Contains("ApplyDarkMode();", pages, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3068,10 +3073,11 @@ public class WinUi3UiTests
         foreach (string group in new[] { "Basic", "Visual", "Filter", "Screen" })
             Assert.Contains("Rebuild" + group + "ResetItems()", source, StringComparison.Ordinal);
         Assert.Contains("item.Group.Contains(filter", source, StringComparison.Ordinal);
-        Assert.Contains("_resetScope != ResetScope.Screens && group != item.Group", source, StringComparison.Ordinal);
-        Assert.Contains("rows.Add(group)", source, StringComparison.Ordinal);
-        Assert.Contains("rows.Add(item)", source, StringComparison.Ordinal);
-        Assert.Contains("ListVisualResetItems.ItemsSource = rows", source, StringComparison.Ordinal);
+        Assert.Contains("SetGroupedSelectionRows(ListVisualResetItems", source, StringComparison.Ordinal);
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        Assert.Contains("items.GroupBy(groupName)", pages, StringComparison.Ordinal);
+        Assert.Contains("rows.AddRange(heading.Items)", pages, StringComparison.Ordinal);
+        Assert.Contains("list.ItemsSource = rows", pages, StringComparison.Ordinal);
         XElement card = GetNamedElement(panel, "SelectionCard");
         Assert.Equal("{StaticResource BasSettingCardStyle}", (string?)card.Attribute("Style"));
         Assert.Contains(card.Descendants(), element => (string?)element.Attribute("Style") == "{StaticResource BasSettingTitleStyle}");
@@ -3307,8 +3313,9 @@ public class WinUi3UiTests
         Assert.DoesNotContain("BtnResetAll", ReadSource("src", "ControlPanelWindow.xaml"), StringComparison.Ordinal);
         Assert.DoesNotContain("ResetConfig_Click", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        foreach (string name in new[] { "BtnBasicReset", "BtnVisualReset", "BtnFilterReset", "BtnScreensReset" })
+        foreach (string name in new[] { "BtnBasicReset", "BtnVisualReset", "BtnFilterReset" })
             Assert.Contains(name + ".Content = Localization.Get(\"Settings_ResetPage\")", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(panel.Descendants(), item => (string?)item.Attribute(Xaml + "Name") == "BtnScreensReset");
         foreach (string file in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
         {
             XDocument resources = LoadXaml("src", file);
@@ -3335,7 +3342,8 @@ public class WinUi3UiTests
         Assert.DoesNotContain("NativeMessageBox", confirm, StringComparison.Ordinal);
         Assert.Contains("MarkResetSettingsSaved(selected)", confirm, StringComparison.Ordinal);
         Assert.Contains("visual[key] = currentVisual[key]?.DeepClone()", source, StringComparison.Ordinal);
-        Assert.Contains("general[key] = currentGeneral[key]?.DeepClone()", source, StringComparison.Ordinal);
+        Assert.Contains("basic[key] = currentBasic[key]?.DeepClone()", source, StringComparison.Ordinal);
+        Assert.Contains("filter[key] = currentFilter[key]?.DeepClone()", source, StringComparison.Ordinal);
         Assert.Contains("_particleColor = \"76,167,255\"", source, StringComparison.Ordinal);
     }
 
@@ -3346,7 +3354,7 @@ public class WinUi3UiTests
         Assert.Equal("False", (string?)GetNamedElement(panel, "BtnApplySettings").Attribute("IsEnabled"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("InitializeSettingsTracking()", source, StringComparison.Ordinal);
-        Assert.Contains("_currentSettingsState != _savedSettingsState", source, StringComparison.Ordinal);
+        Assert.Contains("_currentSettingsState.HasChanges(_savedSettingsState, CurrentSettingsPage)", source, StringComparison.Ordinal);
         Assert.Contains("RegisterPropertyChangedCallback", source, StringComparison.Ordinal);
         Assert.Contains("DispatcherQueuePriority.Low", source, StringComparison.Ordinal);
         Assert.Contains("Profiles.CollectionChanged +=", source, StringComparison.Ordinal);
@@ -3893,7 +3901,8 @@ public class WinUi3UiTests
         Assert.DoesNotContain("Advanced_DisplayHint", source, StringComparison.Ordinal);
         XElement expanderStyle = Assert.Single(design.Descendants(Presentation + "Style"),
             item => (string?)item.Attribute(Xaml + "Key") == "BasAdvancedExpanderStyle");
-        Assert.Equal("{StaticResource DefaultExpanderStyle}", (string?)expanderStyle.Attribute("BasedOn"));
+        Assert.Null(expanderStyle.Attribute("BasedOn"));
+        Assert.DoesNotContain(expanderStyle.Elements(), item => (string?)item.Attribute("Property") == "Template");
         XElement cardStyle = Assert.Single(design.Descendants(Presentation + "Style"),
             item => (string?)item.Attribute(Xaml + "Key") == "BasSettingCardStyle");
         Assert.Equal((string?)cardStyle.Elements().Single(item => (string?)item.Attribute("Property") == "CornerRadius").Attribute("Value"),
@@ -3919,6 +3928,127 @@ public class WinUi3UiTests
             Assert.False(string.IsNullOrWhiteSpace(values["Advanced_EnableDescription"]));
             Assert.DoesNotContain("Advanced_DisplayHint", values.Keys);
         }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(8)]
+    [InlineData(4)]
+    public void PageSettings_AcceptOnlyTheSelectedPageAndKeepOtherDrafts(int pageId)
+    {
+        SettingsSections page = (SettingsSections)pageId;
+        var saved = new SettingsState("basic-saved", "visual-saved", "screens-saved", "filter-saved");
+        var pending = new SettingsState("basic-pending", "visual-pending", "screens-pending", "filter-pending");
+        SettingsState accepted = saved.Accept(pending, page);
+        foreach (SettingsSections section in new[] { SettingsSections.Basic, SettingsSections.Visual, SettingsSections.Filter, SettingsSections.Screens })
+        {
+            Assert.Equal(section == page ? pending.GetPage(section) : saved.GetPage(section), accepted.GetPage(section));
+            Assert.Equal(section != page, pending.HasChanges(accepted, section));
+        }
+        Assert.False(pending.HasChanges(accepted, 0));
+    }
+
+    [Fact]
+    public void PageSettings_SaveAndDiscardValuesPreservePageBoundariesAndAdvancedPrecision()
+    {
+        var saved = new SettingsState(
+            "{\"UiLanguage\":\"zh-CN\",\"DarkMode\":2,\"MaxTouchEffects\":1}",
+            "{\"EffectScale\":1.2,\"ParticleColor\":\"76,167,255\",\"EffectOpacity\":0.75,\"EnableBaClickAdvancedSettings\":true,\"BaClickFx/overlayAlphaLimit\":0.85}",
+            "[{\"IdentityKey\":\"screen\",\"DeviceName\":\"DISPLAY1\",\"IsEnabled\":true}]",
+            "{\"EnableEnvironmentFilter\":true,\"Profiles\":[{\"Id\":\"profile\",\"Name\":\"Saved\",\"Mode\":1,\"Processes\":[\"saved.exe\"]}],\"ActiveProfileId\":\"profile\"}");
+        Dictionary<string, object> basic = saved.GetValues(SettingsSections.Basic);
+        Assert.Equal(new[] { "DarkMode", "MaxTouchEffects", "UiLanguage" }, basic.Keys.Order().ToArray());
+        Assert.IsType<DarkModeOption>(basic["DarkMode"]);
+        Dictionary<string, object> visual = saved.GetValues(SettingsSections.Visual);
+        Assert.Equal(0.75, visual["EffectOpacity"]);
+        Assert.Equal(0.85, AdvancedFxSettings.Parse((string)visual["BaClickAdvancedSettings"])["overlayAlphaLimit"].GetDouble());
+        Assert.DoesNotContain("MaxTouchEffects", visual.Keys);
+        Assert.DoesNotContain("FilterProfiles", visual.Keys);
+        Dictionary<string, object> filter = saved.GetValues(SettingsSections.Filter);
+        Assert.Equal(new[] { "ActiveProfileId", "EnableEnvironmentFilter", "FilterProfiles" }, filter.Keys.Order().ToArray());
+        FilterProfile profile = System.Text.Json.JsonSerializer.Deserialize<List<FilterProfile>>((string)filter["FilterProfiles"])!.Single();
+        Assert.Equal(new[] { "saved.exe" }, profile.Processes);
+        Assert.Equal(saved.Screens, saved.GetValues(SettingsSections.Screens)["ScreenSelections"]);
+        Assert.Empty(saved.GetValues(0));
+    }
+
+    [Fact]
+    public void PageSettings_SectionResetsAndDiscardDoNotPersistOrApply()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        string reset = source[source.IndexOf("private void ResetSection_Click", StringComparison.Ordinal)..source.IndexOf("private void ApplyPageRuntimeSettings", StringComparison.Ordinal)];
+        Assert.Contains("item.Restore?.Invoke()", reset, StringComparison.Ordinal);
+        Assert.Contains("ApplyBackupValuesToPanel(_savedSettingsState.GetValues(CurrentSettingsPage))", reset, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfigManager.Save", reset, StringComparison.Ordinal);
+        Assert.DoesNotContain("App.Overlay", reset, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApplyDarkMode", reset, StringComparison.Ordinal);
+        Assert.DoesNotContain("item.Save", reset, StringComparison.Ordinal);
+        Assert.Contains("_savedSettingsState = _savedSettingsState!.Accept(current, page)", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PageSettings_KeepPageTitlesSectionActionsAndResetButtonsOutsideTheScrollContent()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string name in new[] { "TxtWelcomeTitle", "TxtSettingsTitle", "TxtLogTitle", "TxtAboutTitle", "TxtStatsTitle",
+                     "TxtActiveSettingsSection", "TxtActiveAboutSection", "BtnBasicReset", "BtnVisualReset", "BtnFilterReset", "BtnResetSection" })
+            Assert.DoesNotContain(GetNamedElement(panel, name).Ancestors(), item => item.Name.LocalName == "ScrollViewer");
+        XElement discard = GetNamedElement(panel, "BtnUndoSettings");
+        XElement apply = GetNamedElement(panel, "BtnApplySettings");
+        Assert.Same(apply.Parent, discard.Parent);
+        Assert.Same(apply, discard.ElementsAfterSelf().First());
+        Assert.Null(discard.Attribute("Style"));
+        Assert.Equal("False", (string?)discard.Attribute("IsEnabled"));
+        Assert.DoesNotContain(panel.Descendants(), item => (string?)item.Attribute(Xaml + "Name") == "BtnScreensReset");
+        Assert.Contains("TxtScreensTitle.Text = Localization.Get(\"MultiScreen_Displays\")", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+        Assert.Equal("放弃更改", LoadXaml("src", "Strings.resx").Descendants("data").Single(item =>
+            (string?)item.Attribute("name") == "Settings_Undo").Element("value")!.Value);
+    }
+
+    [Fact]
+    public void PageSettings_DialogGroupButtonsAlignWithGlobalButtonsAndRetainNativeScrolling()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        foreach (string prefix in new[] { "Reset", "Backup" })
+        {
+            XElement group = GetNamedElement(panel, prefix + "GroupHeader");
+            Assert.DoesNotContain(group.Ancestors(), item => item.Name.LocalName == "ScrollViewer");
+            Assert.Equal("8", (string?)group.Attribute("ColumnSpacing"));
+            foreach (string suffix in new[] { "Invert", "SelectAll" })
+            {
+                XElement local = GetNamedElement(panel, "Btn" + prefix + "Group" + suffix);
+                XElement global = GetNamedElement(panel, "Btn" + prefix + suffix);
+                foreach (string property in new[] { "Width", "Height", "Padding", "MinWidth", "Grid.Column", "Click" })
+                    Assert.Equal((string?)global.Attribute(property), (string?)local.Attribute(property));
+            }
+        }
+        string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        Assert.Contains("scroll.ViewChanged += ViewChanged", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ChangeView", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DispatcherQueueTimer", source, StringComparison.Ordinal);
+        Assert.Contains("selectedGroup.Items.Where(toolbar.Items.Contains)", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PageSettings_GroupSelectionChangesImmediatelyWithoutAffectingOtherOrHiddenItems()
+    {
+        var first = new ProcessItem { ProcessName = "first.exe" };
+        var second = new ProcessItem { ProcessName = "second.exe", IsSelected = true };
+        var otherGroup = new ProcessItem { ProcessName = "other.exe", IsSelected = true };
+        var hidden = new ProcessItem { ProcessName = "hidden.exe" };
+        SelectionCardItem[] visibleGroup = [first, second];
+        SelectionBatch.Change(visibleGroup, invert: false);
+        Assert.True(first.IsSelected);
+        Assert.True(second.IsSelected);
+        SelectionBatch.Change(visibleGroup, invert: false);
+        Assert.False(first.IsSelected);
+        Assert.False(second.IsSelected);
+        for (int index = 0; index < 51; index++) SelectionBatch.Change(visibleGroup, invert: true);
+        Assert.True(first.IsSelected);
+        Assert.True(second.IsSelected);
+        Assert.True(otherGroup.IsSelected);
+        Assert.False(hidden.IsSelected);
     }
 
     private static XElement GetSettingCard(XElement control) =>

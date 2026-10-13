@@ -339,7 +339,7 @@
 
     <Style x:Key="BasAdvancedSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}" />
 
-    <Style x:Key="BasAdvancedExpanderStyle" TargetType="Expander" BasedOn="{StaticResource DefaultExpanderStyle}">
+    <Style x:Key="BasAdvancedExpanderStyle" TargetType="Expander">
         <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         <Setter Property="MinWidth" Value="0" />
     </Style>

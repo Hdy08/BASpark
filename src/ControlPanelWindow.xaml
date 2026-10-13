@@ -59,7 +59,18 @@
             </Border>
         </DataTemplate>
         <DataTemplate x:Key="SelectionHeadingTemplate">
-            <TextBlock Text="{Binding}" Style="{StaticResource BasSectionTitleStyle}" Margin="0,8,16,8" IsHitTestVisible="False" />
+            <Grid ColumnSpacing="8" Margin="0,8,0,8" Loaded="SelectionHeading_Loaded" Unloaded="SelectionHeading_Unloaded">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Title}" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Tag="{Binding}" Click="InvertSelection_Click"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                <Button Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Tag="{Binding}" Click="SelectAll_Click"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+            </Grid>
         </DataTemplate>
         <local:SelectionCardTemplateSelector x:Key="SelectionCardTemplates"
             CardTemplate="{StaticResource SelectionCardTemplate}" HeadingTemplate="{StaticResource SelectionHeadingTemplate}" />
@@ -197,10 +208,13 @@
         <Grid>
 
             <!-- ===== 首页 ===== -->
-            <ScrollViewer x:Name="PageWelcome"
-                          Padding="28,20,28,28"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel>
+            <Grid x:Name="PageWelcome" Padding="28,20,28,28">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -218,9 +232,10 @@
                                Text=""
                                Margin="0,4,0,24"
                                Style="{StaticResource BasPageSubtitleStyle}" />
+                </StackPanel>
 
                     <!-- 实时统计 -->
-                    <Grid x:Name="StatsHeader" Margin="0,8,0,8" ColumnSpacing="16">
+                    <Grid x:Name="StatsHeader" Grid.Row="1" Margin="0,8,0,8" ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -238,6 +253,8 @@
                             </ToggleButton.Resources>
                         </ToggleButton>
                     </Grid>
+                <ScrollViewer x:Name="WelcomeScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
                     <Border Style="{StaticResource BasSettingCardStyle}">
                         <Grid ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
@@ -267,11 +284,13 @@
                         </Grid>
                     </Border>
                 </StackPanel>
-            </ScrollViewer>
+                </ScrollViewer>
+            </Grid>
 
             <!-- ===== 设置 ===== -->
             <Grid x:Name="PageSettings" Visibility="Collapsed">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
@@ -293,28 +312,40 @@
                         <Button x:Name="BtnResetSettings" Content="" Click="OpenAllResetOverlay_Click"
                                 Style="{StaticResource BasDangerButtonStyle}" MinWidth="0">
                         </Button>
+                        <Button x:Name="BtnUndoSettings" IsEnabled="False" Content="" Click="DiscardSettings_Click" MinWidth="0" />
                         <Button x:Name="BtnApplySettings" IsEnabled="False" Content="" Click="SaveSettings_Click"
                                 Style="{StaticResource AccentButtonStyle}" MinWidth="0" />
                     </StackPanel>
                 </Grid>
 
+                <Grid Grid.Row="1" Padding="28,8,28,8" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtActiveSettingsSection" Style="{StaticResource BasSettingsSectionTitleStyle}" Margin="0" VerticalAlignment="Center" />
+                        <Button x:Name="BtnResetSection" Width="32" Height="32" MinWidth="0" Padding="0" Click="ResetSection_Click">
+                            <FontIcon Glyph="&#xE777;" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="BtnBasicReset" Content="" MinWidth="0" Click="ResetBasicDefaults_Click" />
+                        <Button x:Name="BtnVisualReset" Content="" MinWidth="0" Click="OpenVisualResetOverlay_Click" />
+                        <Button x:Name="BtnFilterReset" Content="" MinWidth="0" Click="ResetFilterDefaults_Click" />
+                        <Button x:Name="BtnRefreshScreens" Content="" Click="RefreshScreenOptions_Click" />
+                    </StackPanel>
+                </Grid>
+
                 <ScrollViewer x:Name="SettingsContentScrollViewer"
-                              Grid.Row="1"
+                              Grid.Row="2"
                               Padding="28,0,28,28"
                               VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
+                    <StackPanel x:Name="SettingsContent">
 
                         <!-- ===== 基础设置 ===== -->
                         <StackPanel x:Name="SectionBasic">
-                            <Grid ColumnSpacing="12" Margin="0,8,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="TxtBasicTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}"
-                                           Margin="0" VerticalAlignment="Center" />
-                                <Button x:Name="BtnBasicReset" Grid.Column="1" Content="" MinWidth="0" Click="ResetBasicDefaults_Click" />
-                            </Grid>
+                            <TextBlock x:Name="TxtBasicTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -633,25 +664,7 @@
 
                         <!-- ===== 视觉表现 ===== -->
                         <StackPanel x:Name="SectionVisual" Visibility="Collapsed">
-                            <Grid ColumnSpacing="12" Margin="0,8,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock
-                                    x:Name="TxtVisualTitle"
-                                    Grid.Column="0"
-                                    Text=""
-                                    Style="{StaticResource BasSettingsSectionTitleStyle}"
-                                    VerticalAlignment="Center"
-                                    Margin="0" />
-                                <Button
-                                    x:Name="BtnVisualReset"
-                                    Grid.Column="1"
-                                    Content=""
-                                    MinWidth="0"
-                                    Click="OpenVisualResetOverlay_Click" />
-                            </Grid>
+                            <TextBlock x:Name="TxtVisualTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1208,15 +1221,7 @@
 
                         <!-- ===== 环境过滤 ===== -->
                         <StackPanel x:Name="SectionFilter" Visibility="Collapsed">
-                            <Grid ColumnSpacing="12" Margin="0,8,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="TxtFilterTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}"
-                                           Margin="0" VerticalAlignment="Center" />
-                                <Button x:Name="BtnFilterReset" Grid.Column="1" Content="" MinWidth="0" Click="ResetFilterDefaults_Click" />
-                            </Grid>
+                            <TextBlock x:Name="TxtFilterTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1450,16 +1455,7 @@
 
                         <!-- ===== 多屏管理 ===== -->
                         <StackPanel x:Name="SectionMultiScreen" Visibility="Collapsed">
-                            <Grid ColumnSpacing="12" Margin="0,8,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                    <Button x:Name="BtnRefreshScreens" Content="" Click="RefreshScreenOptions_Click" />
-                                    <Button x:Name="BtnScreensReset" Content="" Click="ResetScreenDefaults_Click" />
-                                </StackPanel>
-                            </Grid>
+                            <TextBlock x:Name="TxtScreensTitle" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <StackPanel
                                 x:Name="PanelScreenOptions"
                                 Spacing="0" />
@@ -1544,13 +1540,19 @@
             </Grid>
 
             <!-- ===== 关于 ===== -->
-            <ScrollViewer x:Name="PageAbout"
-                          Visibility="Collapsed"
-                          Padding="28,20,28,28"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel>
+            <Grid x:Name="PageAbout" Visibility="Collapsed" Padding="28,20,28,28">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0">
                     <TextBlock x:Name="TxtAboutTitle" Text="" Style="{StaticResource BasSettingsPageTitleStyle}" />
                     <TextBlock x:Name="TxtAboutDescription" Text="" Margin="0,8,0,0" Style="{StaticResource BasCaptionStyle}" />
+                </StackPanel>
+                <TextBlock x:Name="TxtActiveAboutSection" Grid.Row="1" Style="{StaticResource BasSettingsSectionTitleStyle}" />
+                <ScrollViewer x:Name="AboutScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="AboutContent">
                     <TextBlock x:Name="TxtBuildInfoTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                     <Border Style="{StaticResource BasSettingCardStyle}">
                         <Grid ColumnSpacing="16">
@@ -1685,7 +1687,8 @@
                         </Grid>
                     </Border>
                 </StackPanel>
-            </ScrollViewer>
+                </ScrollViewer>
+            </Grid>
         </Grid>
         </Border>
 
@@ -1796,7 +1799,24 @@
                             <PathIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                     </Grid>
-                    <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid x:Name="ResetGroupHeader" ColumnSpacing="8" Margin="0,8,0,8" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="TxtResetGroup" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
+                            <Button x:Name="BtnResetGroupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Click="InvertSelection_Click"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                            <Button x:Name="BtnResetGroupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Click="SelectAll_Click"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                        </Grid>
+                    <ScrollViewer x:Name="ResetItemsScrollViewer" Grid.Row="1" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl x:Name="ListVisualResetItems"
                                       MinHeight="0" HorizontalContentAlignment="Stretch"
@@ -1808,6 +1828,7 @@
                             <ItemsControl.ItemContainerTransitions><TransitionCollection /></ItemsControl.ItemContainerTransitions>
                         </ItemsControl>
                     </ScrollViewer>
+                    </Grid>
                     <TextBlock x:Name="TxtResetNoResults" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,16"
                                HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource BasCaptionStyle}" />
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" HorizontalAlignment="Right">
@@ -1856,7 +1877,24 @@
                             <PathIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Button>
                     </Grid>
-                    <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid x:Name="BackupGroupHeader" ColumnSpacing="8" Margin="0,8,0,8" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="TxtBackupGroup" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
+                            <Button x:Name="BtnBackupGroupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Click="InvertSelection_Click"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                            <Button x:Name="BtnBackupGroupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Click="SelectAll_Click"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+                        </Grid>
+                    <ScrollViewer x:Name="BackupItemsScrollViewer" Grid.Row="1" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl x:Name="ListBackupItems" MinHeight="0"
                                       HorizontalContentAlignment="Stretch"
@@ -1868,6 +1906,7 @@
                             <ItemsControl.ItemContainerTransitions><TransitionCollection /></ItemsControl.ItemContainerTransitions>
                         </ItemsControl>
                     </ScrollViewer>
+                    </Grid>
                     <TextBlock x:Name="TxtBackupNoResults" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,16"
                                HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource BasCaptionStyle}" />
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,16,0,0"

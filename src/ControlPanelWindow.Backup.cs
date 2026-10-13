@@ -123,7 +123,7 @@ public sealed partial class ControlPanelWindow
     private ConfigurationBackupDocument CapturePendingBackup()
     {
         ConfigurationBackupDocument document = CaptureSavedBackup();
-        foreach (string content in new[] { CaptureGeneralSettings(), CaptureVisualSettings() })
+        foreach (string content in new[] { CaptureBasicSettings(), CaptureFilterSettings(), CaptureVisualSettings() })
         {
             using JsonDocument json = JsonDocument.Parse(content);
             foreach (BackupSettingDefinition definition in ConfigurationBackup.Settings)
@@ -207,18 +207,10 @@ public sealed partial class ControlPanelWindow
     {
         if (ListBackupItems == null) return;
         string filter = SearchBackupItems.Text.Trim();
-        var rows = new List<object>();
-        string? group = null;
-        foreach (BackupSelectionItem item in _backupItems.Where(item => string.IsNullOrEmpty(filter) ||
+        SetGroupedSelectionRows(ListBackupItems, _backupItems.Where(item => string.IsNullOrEmpty(filter) ||
                      item.Title.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
                      item.Group.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                     item.Subtitle.Contains(filter, StringComparison.OrdinalIgnoreCase)))
-        {
-            if (group != item.Group) { group = item.Group; rows.Add(group); }
-            rows.Add(item);
-        }
-        ListBackupItems.ItemsSource = rows;
-        RefreshSelectionToolbar(ListBackupItems);
+                     item.Subtitle.Contains(filter, StringComparison.OrdinalIgnoreCase)), item => ((BackupSelectionItem)item).Group);
     }
 
     private async void CloseBackupOverlay_Click(object sender, RoutedEventArgs args)
@@ -402,26 +394,29 @@ public sealed partial class ControlPanelWindow
     private void MarkImportedSettingsSaved(IReadOnlyCollection<string> selected)
     {
         if (_savedSettingsState == null) return;
-        var general = JsonNode.Parse(_savedSettingsState.General)!.AsObject();
+        var basic = JsonNode.Parse(_savedSettingsState.Basic)!.AsObject();
+        var filter = JsonNode.Parse(_savedSettingsState.Filter)!.AsObject();
         var visual = JsonNode.Parse(_savedSettingsState.Visual)!.AsObject();
         var screens = JsonNode.Parse(_savedSettingsState.Screens)!.AsArray();
-        var currentGeneral = JsonNode.Parse(CaptureGeneralSettings())!.AsObject();
+        var currentBasic = JsonNode.Parse(CaptureBasicSettings())!.AsObject();
+        var currentFilter = JsonNode.Parse(CaptureFilterSettings())!.AsObject();
         var currentVisual = JsonNode.Parse(CaptureVisualSettings())!.AsObject();
         foreach (string key in selected)
         {
-            if (currentGeneral.ContainsKey(key)) general[key] = currentGeneral[key]?.DeepClone();
+            if (currentBasic.ContainsKey(key)) basic[key] = currentBasic[key]?.DeepClone();
+            if (currentFilter.ContainsKey(key)) filter[key] = currentFilter[key]?.DeepClone();
             if (currentVisual.ContainsKey(key)) visual[key] = currentVisual[key]?.DeepClone();
             if (key == "ParticleColor") visual["EffectOpacity"] = currentVisual["EffectOpacity"]?.DeepClone();
         }
         if (selected.Any(key => key is "Profiles" or "Profile.Mode" or "Profile.Processes"))
         {
-            general["Profiles"] = JsonSerializer.SerializeToNode(ConfigManager.GetProfiles().OrderBy(profile => profile.Id, StringComparer.Ordinal)
+            filter["Profiles"] = JsonSerializer.SerializeToNode(ConfigManager.GetProfiles()
                 .Select(profile => new
                 {
                     profile.Id, profile.Name, profile.Mode,
                     Processes = profile.Processes.Select(name => name.ToUpperInvariant()).OrderBy(name => name, StringComparer.Ordinal).ToArray()
                 }));
-            general["ActiveProfileId"] = ConfigManager.ActiveProfileId;
+            filter["ActiveProfileId"] = ConfigManager.ActiveProfileId;
         }
         var currentScreens = JsonNode.Parse(CaptureScreenSettings())!.AsArray();
         foreach (string key in selected.Where(ConfigurationBackup.IsScreenKey))
@@ -430,7 +425,7 @@ public sealed partial class ControlPanelWindow
             var currentScreen = currentScreens.FirstOrDefault(item => ConfigurationBackup.GetScreenKey(item!.Deserialize<ScreenSelectionState>()!) == key);
             if (savedScreen != null && currentScreen != null) savedScreen["IsEnabled"] = currentScreen["IsEnabled"]!.DeepClone();
         }
-        _savedSettingsState = new SettingsState(general.ToJsonString(), visual.ToJsonString(), screens.ToJsonString());
+        _savedSettingsState = new SettingsState(basic.ToJsonString(), visual.ToJsonString(), screens.ToJsonString(), filter.ToJsonString());
         UpdateApplySettingsState(SettingsSections.All);
     }
 }
