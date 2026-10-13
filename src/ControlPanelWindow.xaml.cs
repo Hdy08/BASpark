@@ -730,7 +730,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void InitializeSettingsTracking()
     {
         foreach (ToggleSwitch toggle in new[] { CheckMasterSwitch, CheckAutoStart, CheckStartSilent, CheckHideTrayIcon,
-                     CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMultiTouchEffects, CheckMiddleClickTrigger,
+                     CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMiddleClickTrigger,
                      CheckScreenshotCompatibilityMode, CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.General);
         foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw, CheckFollowDisplayRefreshRate })
@@ -740,7 +740,8 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (RadioButtons selector in new[] { RadioDarkMode, RadioClickType })
             TrackSettingsProperty(selector, RadioButtons.SelectedIndexProperty, SettingsSections.General);
         foreach (Slider slider in _sliderToBox.Keys)
-            TrackSettingsProperty(slider, Slider.ValueProperty, SettingsSections.Visual);
+            TrackSettingsProperty(slider, Slider.ValueProperty,
+                slider == SliderMaxTouchEffects ? SettingsSections.General : SettingsSections.Visual);
         TrackSettingsProperty(EffectColorPicker, ColorPicker.ColorProperty, SettingsSections.Visual);
         TrackSettingsProperty(EffectColorHexInput, TextBox.TextProperty, SettingsSections.Visual);
         Profiles.CollectionChanged += GeneralSettingsCollectionChanged;
@@ -770,7 +771,7 @@ public sealed partial class ControlPanelWindow : UserControl
         IsEffectEnabled = CheckMasterSwitch.IsOn, AutoStart = CheckAutoStart.IsOn, StartSilent = CheckStartSilent.IsOn,
         HideTrayIcon = CheckHideTrayIcon.IsOn, EnableAlwaysTrailEffect = CheckAlwaysTrailEffectSwitch.IsOn,
         RunAsAdmin = CheckRunAsAdmin.IsOn, IsTouchscreenMode = CheckTouchscreenMode.IsOn,
-        EnableMultiTouchEffects = CheckMultiTouchEffects.IsOn,
+        MaxTouchEffects = (int)Math.Round(GetPendingSliderValue(SliderMaxTouchEffects)),
         EnableMiddleClickTrigger = CheckMiddleClickTrigger.IsOn, ScreenshotCompatibilityMode = CheckScreenshotCompatibilityMode.IsOn,
         EnableEnvironmentFilter = CheckEnvironmentFilter.IsOn, HideInFullscreen = CheckHideInFullscreen.IsOn,
         ShowEffectOnDesktop = CheckShowEffectOnDesktop.IsOn, ActiveProfileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
@@ -913,6 +914,7 @@ public sealed partial class ControlPanelWindow : UserControl
         RegisterSliderPair(SliderTrailAnimSpeed, TxtTrailSpeedValue);
         RegisterSliderPair(SliderClickAnimSpeed, TxtClickSpeedValue);
         RegisterSliderPair(SliderTrailRefresh, TxtTrailRefreshValue);
+        RegisterSliderPair(SliderMaxTouchEffects, TxtMaxTouchEffectsValue);
 
         CheckFollowDisplayRefreshRate.Toggled += FollowDisplayRefreshRate_Toggled;
         SyncSliderAndBoxValues();
@@ -1054,7 +1056,8 @@ public sealed partial class ControlPanelWindow : UserControl
         if (control is NumberBox number && !_numberInputs.ContainsKey(number))
         {
             _numberInputs[number] = input;
-            TrackSettingsProperty(input, TextBox.TextProperty, SettingsSections.Visual);
+            TrackSettingsProperty(input, TextBox.TextProperty,
+                number == TxtMaxTouchEffectsValue ? SettingsSections.General : SettingsSections.Visual);
         }
         input.Padding = new Thickness(10, 0, 6, 0);
         input.VerticalContentAlignment = VerticalAlignment.Center;
@@ -1239,7 +1242,8 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckRunAsAdmin.Header = Localization.Get("Basic_RunAsAdmin");
         TxtRunAsAdminHint.Text = Localization.Get("Basic_RunAsAdminHint");
         CheckTouchscreenMode.Header = Localization.Get("Basic_Touchscreen");
-        CheckMultiTouchEffects.Header = Localization.Get("Basic_MultiTouch");
+        TxtMaxTouchEffects.Text = Localization.Get("Basic_MaxTouchEffects");
+        TxtMaxTouchEffectsHint.Text = Localization.Get("Basic_MaxTouchEffectsHint");
         TxtTouchscreenHint.Text = Localization.Get("Basic_TouchscreenHint");
         TxtVisualTitle.Text = Localization.Get("Visual_Title");
         BtnVisualReset.Content = Localization.Get("Settings_ResetPage");
@@ -2106,7 +2110,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckShowEffectOnDesktop.IsOn = ConfigManager.ShowEffectOnDesktop;
         CheckRunAsAdmin.IsOn = ConfigManager.RunAsAdmin;
         CheckTouchscreenMode.IsOn = ConfigManager.IsTouchscreenMode;
-        CheckMultiTouchEffects.IsOn = ConfigManager.EnableMultiTouchEffects;
+        SliderMaxTouchEffects.Value = ConfigManager.MaxTouchEffects;
         CheckMiddleClickTrigger.IsOn = ConfigManager.EnableMiddleClickTrigger;
         CheckScreenshotCompatibilityMode.IsOn = ConfigManager.ScreenshotCompatibilityMode;
 
@@ -2250,7 +2254,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void CheckTouchscreenMode_Changed(object sender, RoutedEventArgs args) => UpdateMultiTouchPanelVisibility(animate: true);
 
     private void UpdateMultiTouchPanelVisibility(bool animate = false) =>
-        SetSettingsVisibility(SectionBasic, animate, (PanelMultiTouchEffects, CheckTouchscreenMode.IsOn));
+        SetSettingsVisibility(SectionBasic, animate, (PanelMaxTouchEffects, CheckTouchscreenMode.IsOn));
 
     private void SetSettingsVisibility(Panel section, bool animate, params (FrameworkElement Element, bool Visible)[] changes)
     {
@@ -2864,10 +2868,15 @@ public sealed partial class ControlPanelWindow : UserControl
         AddPageResetItem(group, TxtClickType.Text, Localization.Get("Basic_LeftClick"), "ClickTriggerType",
             () => RadioClickType.SelectedIndex = 0, () => SaveResetValue("ClickTriggerType", 0));
         foreach (var setting in new[] { (CheckMiddleClickTrigger, "EnableMiddleClickTrigger"),
-                     (CheckTouchscreenMode, "IsTouchscreenMode"), (CheckMultiTouchEffects, "EnableMultiTouchEffects"),
+                     (CheckTouchscreenMode, "IsTouchscreenMode"),
                      (CheckScreenshotCompatibilityMode, "ScreenshotCompatibilityMode"), (CheckAutoStart, "AutoStart"),
                      (CheckStartSilent, "StartSilent"), (CheckHideTrayIcon, "HideTrayIcon"), (CheckRunAsAdmin, "RunAsAdmin") })
+        {
             AddToggleResetItem(group, setting.Item1, false, setting.Item2);
+            if (setting.Item1 == CheckTouchscreenMode)
+                AddPageResetItem(group, TxtMaxTouchEffects.Text, "1", "MaxTouchEffects",
+                    () => SliderMaxTouchEffects.Value = 1, () => SaveResetValue("MaxTouchEffects", 1));
+        }
     }
 
     private void RebuildFilterResetItems()
@@ -3516,7 +3525,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         ConfigManager.Save("RunAsAdmin", runAsAdminEnabled);
         ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
-        ConfigManager.Save("EnableMultiTouchEffects", CheckMultiTouchEffects.IsOn);
+        ConfigManager.Save("MaxTouchEffects", (int)Math.Round(SliderMaxTouchEffects.Value));
         ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsOn);
         ConfigManager.Save("AutoStart", autoStartEnabled);
         ConfigManager.Save("ParticleColor", ColorPickerColorMath.CombineThemeColor(_particleColor, effectOpacity));

@@ -96,8 +96,11 @@
     <data name="Basic_Touchscreen" xml:space="preserve">
       <value>Enable touch effects</value>
     </data>
-    <data name="Basic_MultiTouch" xml:space="preserve">
-      <value>Enable multi-touch effects</value>
+    <data name="Basic_MaxTouchEffects" xml:space="preserve">
+      <value>Maximum effect count</value>
+    </data>
+    <data name="Basic_MaxTouchEffectsHint" xml:space="preserve">
+      <value>0 means unlimited</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
       <value>Also trigger effects from actual touch input. Effects remain disabled when the system or an app explicitly hides the cursor.</value>

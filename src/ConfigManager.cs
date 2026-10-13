@@ -95,7 +95,7 @@ namespace BASpark
         public static string FilterProfiles { get; set; } = "";
         public static string ActiveProfileId { get; set; } = "";
         public static bool IsTouchscreenMode { get; set; } = false;
-        public static bool EnableMultiTouchEffects { get; set; } = false;
+        public static int MaxTouchEffects { get; set; } = 1;
         public static int ClickTriggerType { get; set; } = 0; // 0:左, 1:右, 2:左右
         public static bool EnableMiddleClickTrigger { get; set; } = false;
         public static bool ScreenshotCompatibilityMode { get; set; } = false;
@@ -166,7 +166,7 @@ namespace BASpark
                         HideInFullscreen = Convert.ToBoolean(key.GetValue("HideInFullscreen", true));
                         ShowEffectOnDesktop = Convert.ToBoolean(key.GetValue("ShowEffectOnDesktop", true));
                         IsTouchscreenMode = Convert.ToBoolean(key.GetValue("IsTouchscreenMode", false));
-                        EnableMultiTouchEffects = Convert.ToBoolean(key.GetValue("EnableMultiTouchEffects", false));
+                        MaxTouchEffects = ParseMaxTouchEffects(key.GetValue("MaxTouchEffects"), key.GetValue("EnableMultiTouchEffects"));
                         ClickTriggerType = Convert.ToInt32(key.GetValue("ClickTriggerType", 0), CultureInfo.InvariantCulture);
                         EnableMiddleClickTrigger = Convert.ToBoolean(key.GetValue("EnableMiddleClickTrigger", false));
                         ScreenshotCompatibilityMode = Convert.ToBoolean(key.GetValue("ScreenshotCompatibilityMode", false));
@@ -408,6 +408,10 @@ namespace BASpark
             }
         }
 
+        internal static int ParseMaxTouchEffects(object? value, object? legacyValue = null) => value == null
+            ? Convert.ToBoolean(legacyValue, CultureInfo.InvariantCulture) ? 0 : 1
+            : Math.Clamp(Convert.ToInt32(value, CultureInfo.InvariantCulture), 0, 10);
+
         public static bool Save(string name, object value)
         {
             try
@@ -415,6 +419,7 @@ namespace BASpark
                 lock (_syncLock)
                 {
                     using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegPath);
+                    if (name == "MaxTouchEffects") value = ParseMaxTouchEffects(value);
                     if (name is "ParticleColor" or "EffectOpacity")
                     {
                         string color = name == "ParticleColor" ? Convert.ToString(value, CultureInfo.InvariantCulture)! : ParticleColor;
@@ -733,7 +738,7 @@ namespace BASpark
                     _profiles.Clear();
                     _cachedFilterEntries.Clear();
                     IsTouchscreenMode = false;
-                    EnableMultiTouchEffects = false;
+                    MaxTouchEffects = 1;
                     ClickTriggerType = 0;
                     EnableMiddleClickTrigger = false;
                     ScreenshotCompatibilityMode = false;

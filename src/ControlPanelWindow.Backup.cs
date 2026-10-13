@@ -187,6 +187,8 @@ public sealed partial class ControlPanelWindow
         }
         else if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
             description = Localization.Get(value.GetBoolean() ? "Basic_DarkModeOn" : "Basic_DarkModeOff");
+        else if (key == "MaxTouchEffects" && value.GetInt32() == 0)
+            description = Localization.Get("Basic_MaxTouchEffectsHint");
         else if (value.ValueKind == JsonValueKind.Number)
             description = value.GetDouble().ToString("0.##", CultureInfo.CurrentCulture);
         else
@@ -305,7 +307,6 @@ public sealed partial class ControlPanelWindow
                          ("IsEffectEnabled", CheckMasterSwitch), ("AutoStart", CheckAutoStart), ("StartSilent", CheckStartSilent),
                          ("HideTrayIcon", CheckHideTrayIcon), ("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch),
                          ("RunAsAdmin", CheckRunAsAdmin), ("IsTouchscreenMode", CheckTouchscreenMode),
-                         ("EnableMultiTouchEffects", CheckMultiTouchEffects),
                          ("EnableMiddleClickTrigger", CheckMiddleClickTrigger), ("ScreenshotCompatibilityMode", CheckScreenshotCompatibilityMode),
                          ("EnableEnvironmentFilter", CheckEnvironmentFilter), ("HideInFullscreen", CheckHideInFullscreen),
                          ("ShowEffectOnDesktop", CheckShowEffectOnDesktop), ("UseLinkedEffectScale", CheckLinkedEffectScale),
@@ -317,7 +318,8 @@ public sealed partial class ControlPanelWindow
                      {
                          ("EffectScale", SliderScale), ("TrailEffectScale", SliderTrailScale), ("ClickEffectScale", SliderClickScale),
                          ("GlowIntensity", SliderGlow), ("EffectSpeed", SliderSpeed), ("TrailAnimationSpeed", SliderTrailAnimSpeed),
-                         ("ClickAnimationSpeed", SliderClickAnimSpeed), ("TrailRefreshRate", SliderTrailRefresh)
+                         ("ClickAnimationSpeed", SliderClickAnimSpeed), ("TrailRefreshRate", SliderTrailRefresh),
+                         ("MaxTouchEffects", SliderMaxTouchEffects)
                      })
                 if (values.TryGetValue(item.Item1, out object? value)) item.Item2.Value = Convert.ToDouble(value);
             if (values.TryGetValue("DarkMode", out object? darkMode)) SelectDarkMode((DarkModeOption)darkMode);

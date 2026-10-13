@@ -17,9 +17,10 @@ public class WinUi3UiTests
 {
     private sealed class MultiTouchScope : IDisposable
     {
-        private readonly bool _previous = ConfigManager.EnableMultiTouchEffects;
-        internal MultiTouchScope(bool enabled) => ConfigManager.EnableMultiTouchEffects = enabled;
-        public void Dispose() => ConfigManager.EnableMultiTouchEffects = _previous;
+        private readonly int _previous = ConfigManager.MaxTouchEffects;
+        internal MultiTouchScope(bool enabled) : this(enabled ? 0 : 1) { }
+        internal MultiTouchScope(int maximum) => ConfigManager.MaxTouchEffects = maximum;
+        public void Dispose() => ConfigManager.MaxTouchEffects = _previous;
     }
     private sealed class SystemGestureCursorScope : IDisposable
     {
@@ -100,7 +101,8 @@ public class WinUi3UiTests
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         Assert.Equal("10", (string?)GetNamedElement(panel, "SliderTrailRefresh").Attribute("StepFrequency"));
         Assert.Equal("10", (string?)GetNamedElement(panel, "TxtTrailRefreshValue").Attribute("SmallChange"));
-        foreach (XElement input in panel.Descendants(Presentation + "NumberBox").Where(element => (string?)element.Attribute(Xaml + "Name") != "TxtTrailRefreshValue"))
+        foreach (XElement input in panel.Descendants(Presentation + "NumberBox").Where(element =>
+                     (string?)element.Attribute(Xaml + "Name") is not ("TxtTrailRefreshValue" or "TxtMaxTouchEffectsValue")))
             Assert.Equal("0.1", (string?)input.Attribute("SmallChange"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("FractionDigits = precision", source, StringComparison.Ordinal);
@@ -1127,27 +1129,141 @@ public class WinUi3UiTests
         Assert.Equal((next, TouchInputPhase.Up), received[^1]);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(10)]
+    public void TouchEffectLimit_AdmitsOnlyTheConfiguredCountAndReusesReleasedSlots(int maximum)
+    {
+        using var mode = new MultiTouchScope(maximum);
+        var received = new List<(long PointerId, TouchInputPhase Phase)>();
+        using var listener = new TouchInputListener((pointerId, phase, screenX, screenY) => received.Add((pointerId, phase)));
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contact = typeof(TouchInputListener).GetMethod("HandleContact", members)!
+            .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
+        for (uint index = 0; index < 12; index++) contact(new IntPtr(1), index, false, true, 200, 300);
+        int count = maximum == 0 ? 12 : maximum;
+        Assert.Equal(count, received.Count);
+        Assert.All(received, input => Assert.Equal(TouchInputPhase.Down, input.Phase));
+        long[] admitted = received.Select(input => input.PointerId).ToArray();
+        received.Clear();
+        for (uint index = 0; index < 12; index++) contact(new IntPtr(1), index, true, true, 250, 350);
+        Assert.Equal(admitted, received.Select(input => input.PointerId));
+        Assert.All(received, input => Assert.Equal(TouchInputPhase.Move, input.Phase));
+        received.Clear();
+        contact(new IntPtr(1), 0, true, false, 250, 350);
+        Assert.Equal((admitted[0], TouchInputPhase.Up), Assert.Single(received));
+        received.Clear();
+        for (uint index = 1; index < 12; index++) contact(new IntPtr(1), index, true, true, 260, 360);
+        Assert.Equal(admitted.Skip(1), received.Select(input => input.PointerId));
+        contact(new IntPtr(1), 12, false, true, 300, 400);
+        long added = received[^1].PointerId;
+        Assert.Equal(TouchInputPhase.Down, received[^1].Phase);
+        Assert.DoesNotContain(added, admitted);
+        received.Clear();
+        for (uint index = 1; index <= 12; index++) contact(new IntPtr(1), index, true, false, 300, 400);
+        Assert.Equal(admitted.Skip(1).Append(added), received.Select(input => input.PointerId));
+        Assert.All(received, input => Assert.Equal(TouchInputPhase.Up, input.Phase));
+    }
+
+    [Fact]
+    public void TouchEffectLimit_ChangingTheLimitReleasesOnlyExcessContactsAndDoesNotPromoteHeldFingers()
+    {
+        using var mode = new MultiTouchScope(0);
+        var received = new List<(long PointerId, TouchInputPhase Phase)>();
+        using var listener = new TouchInputListener((pointerId, phase, screenX, screenY) => received.Add((pointerId, phase)));
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contact = typeof(TouchInputListener).GetMethod("HandleContact", members)!
+            .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
+        for (uint index = 0; index < 5; index++) contact(new IntPtr(1), index, false, true, 200, 300);
+        long[] admitted = received.Select(input => input.PointerId).ToArray();
+        received.Clear();
+        ConfigManager.MaxTouchEffects = 2;
+        listener.UpdateEffectLimit();
+        Assert.Equal(admitted.Skip(2), received.Select(input => input.PointerId));
+        Assert.All(received, input => Assert.Equal(TouchInputPhase.Up, input.Phase));
+        received.Clear();
+        for (uint index = 0; index < 5; index++) contact(new IntPtr(1), index, true, true, 250, 350);
+        Assert.Equal(admitted.Take(2), received.Select(input => input.PointerId));
+        received.Clear();
+        ConfigManager.MaxTouchEffects = 0;
+        listener.UpdateEffectLimit();
+        for (uint index = 2; index < 5; index++) contact(new IntPtr(1), index, true, true, 260, 360);
+        Assert.Empty(received);
+        contact(new IntPtr(1), 5, false, true, 300, 400);
+        Assert.Equal(TouchInputPhase.Down, Assert.Single(received).Phase);
+    }
+
+    [Fact]
+    public void TouchEffectLimit_RuntimeReductionKeepsExistingAllowedTrails()
+    {
+        using var mode = new MultiTouchScope(2);
+        bool previousTouchMode = ConfigManager.IsTouchscreenMode;
+        using var manager = new OverlayManager();
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contacts = (Dictionary<long, OverlayManager.TouchTrailState>)typeof(OverlayManager).GetField("_touchContacts", members)!.GetValue(manager)!;
+        var trails = Enumerable.Range(2, 5).Select(pointerId => new OverlayManager.TouchTrailState(pointerId, pointerId, new NativeMethods.POINT())).ToArray();
+        foreach (OverlayManager.TouchTrailState trail in trails)
+        {
+            trail.History.Enqueue(new TrailSample(100, 200, 0));
+            contacts.Add(trail.PointerId, trail);
+        }
+        try
+        {
+            manager.UpdateTouchMode(true);
+            Assert.Equal(new long[] { 2, 3 }, contacts.Keys);
+            Assert.All(trails.Take(2), trail => Assert.Single(trail.History));
+            Assert.All(trails.Skip(2), trail => Assert.Empty(trail.History));
+            ConfigManager.MaxTouchEffects = 0;
+            manager.UpdateTouchMode(true);
+            Assert.Equal(2, contacts.Count);
+            ConfigManager.MaxTouchEffects = 1;
+            manager.UpdateTouchMode(true);
+            Assert.Equal(2, Assert.Single(contacts).Key);
+            Assert.Empty(trails[1].History);
+        }
+        finally
+        {
+            ConfigManager.IsTouchscreenMode = previousTouchMode;
+        }
+    }
+
     [Fact]
     public void MultiTouch_SettingsCardUsesTheExistingConditionalAnimationAndPrecedesScreenshotMode()
     {
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement section = GetNamedElement(document, "SectionBasic");
         XElement touch = GetNamedElement(document, "CheckTouchscreenMode");
-        XElement multi = GetNamedElement(document, "PanelMultiTouchEffects");
+        XElement multi = GetNamedElement(document, "PanelMaxTouchEffects");
         XElement screenshot = GetNamedElement(document, "CheckScreenshotCompatibilityMode");
         XElement TouchCard(XElement control) => control.Ancestors().Single(element => element.Parent == section);
         var children = section.Elements().ToList();
         Assert.True(children.IndexOf(TouchCard(touch)) < children.IndexOf(multi));
         Assert.True(children.IndexOf(multi) < children.IndexOf(TouchCard(screenshot)));
         Assert.Equal("Collapsed", (string?)multi.Attribute("Visibility"));
-        Assert.Equal("ToggleSwitch", GetNamedElement(document, "CheckMultiTouchEffects").Name.LocalName);
+        XElement slider = GetNamedElement(document, "SliderMaxTouchEffects");
+        XElement input = GetNamedElement(document, "TxtMaxTouchEffectsValue");
+        Assert.Equal("Slider", slider.Name.LocalName);
+        Assert.Equal("NumberBox", input.Name.LocalName);
+        foreach (XElement control in new[] { slider, input })
+        {
+            Assert.Equal("0", (string?)control.Attribute("Minimum"));
+            Assert.Equal("10", (string?)control.Attribute("Maximum"));
+            Assert.Equal("1", (string?)control.Attribute("Value"));
+        }
+        Assert.Equal("1", (string?)slider.Attribute("StepFrequency"));
+        Assert.Equal("1", (string?)input.Attribute("SmallChange"));
+        Assert.Equal("Compact", (string?)input.Attribute("SpinButtonPlacementMode"));
+        Assert.Equal((string?)GetNamedElement(document, "TxtTrailRefreshValue").Attribute("Width"), (string?)input.Attribute("Width"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        Assert.Contains("SetSettingsVisibility(SectionBasic, animate, (PanelMultiTouchEffects, CheckTouchscreenMode.IsOn))", source, StringComparison.Ordinal);
-        Assert.Contains("ConfigManager.Save(\"EnableMultiTouchEffects\", CheckMultiTouchEffects.IsOn)", source, StringComparison.Ordinal);
+        Assert.Contains("SetSettingsVisibility(SectionBasic, animate, (PanelMaxTouchEffects, CheckTouchscreenMode.IsOn))", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.Save(\"MaxTouchEffects\", (int)Math.Round(SliderMaxTouchEffects.Value))", source, StringComparison.Ordinal);
         foreach (string language in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
         {
             XDocument strings = XDocument.Parse(ReadSource("src", language));
-            Assert.Single(strings.Descendants("data"), element => (string?)element.Attribute("name") == "Basic_MultiTouch");
+            Assert.Single(strings.Descendants("data"), element => (string?)element.Attribute("name") == "Basic_MaxTouchEffects");
+            Assert.Single(strings.Descendants("data"), element => (string?)element.Attribute("name") == "Basic_MaxTouchEffectsHint");
             if (language == "Strings.resx") Assert.Equal("启用触摸特效", strings.Descendants("data")
                 .Single(element => (string?)element.Attribute("name") == "Basic_Touchscreen").Element("value")!.Value);
         }

@@ -40,7 +40,7 @@ public static class ConfigurationBackup
         new("ClickTriggerType", "Basic_Title", "Basic_ClickType"),
         new("EnableMiddleClickTrigger", "Basic_Title", "Basic_MiddleClick"),
         new("IsTouchscreenMode", "Basic_Title", "Basic_Touchscreen"),
-        new("EnableMultiTouchEffects", "Basic_Title", "Basic_MultiTouch"),
+        new("MaxTouchEffects", "Basic_Title", "Basic_MaxTouchEffects"),
         new("ScreenshotCompatibilityMode", "Basic_Title", "Basic_ScreenshotMode"),
         new("AutoStart", "Basic_Title", "Basic_AutoStart"),
         new("StartSilent", "Basic_Title", "Basic_StartSilent"),
@@ -70,6 +70,7 @@ public static class ConfigurationBackup
         {
             ["TotalClicks"] = (0, int.MaxValue),
             ["ClickTriggerType"] = (0, 2),
+            ["MaxTouchEffects"] = (0, 10),
             ["EffectScale"] = (0.5, 3),
             ["TrailEffectScale"] = (0.5, 3),
             ["ClickEffectScale"] = (0.5, 3),
@@ -171,6 +172,11 @@ public static class ConfigurationBackup
             if (document == null || document.Format != "BASpark.Configuration" || document.Version != 1 ||
                 document.Data == null || document.Data.Count is 0 or > 1024)
                 throw new InvalidDataException(Localization.Get("Backup_InvalidFile"));
+            if (document.Data.Remove("EnableMultiTouchEffects", out JsonElement legacyMultiTouch))
+            {
+                if (legacyMultiTouch.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw InvalidValue("MaxTouchEffects");
+                document.Data.TryAdd("MaxTouchEffects", JsonSerializer.SerializeToElement(legacyMultiTouch.GetBoolean() ? 0 : 1));
+            }
             foreach (var item in document.Data) ValidateValue(item.Key, item.Value);
             if (document.Data.TryGetValue("EffectOpacity", out JsonElement legacyOpacity))
             {

@@ -490,22 +490,42 @@
                                     </Grid>
                                 </Grid>
                             </Border>
-                            <Border x:Name="PanelMultiTouchEffects" Visibility="Collapsed" Style="{StaticResource BasSettingCardStyle}">
+                            <Border x:Name="PanelMaxTouchEffects" Visibility="Collapsed" Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Header, ElementName=CheckMultiTouchEffects}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock x:Name="TxtMaxTouchEffects" Text="" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock x:Name="TxtMaxTouchEffectsHint" Text="" Style="{StaticResource BasCaptionStyle}" />
                                     </StackPanel>
-                                    <ToggleSwitch
-                                        x:Name="CheckMultiTouchEffects"
-                                        Grid.Column="1"
-                                        Header=""
-                                        VerticalAlignment="Center"
-                                        Style="{StaticResource BasSettingToggleStyle}"
-                                        AutomationProperties.Name="{Binding Header, ElementName=CheckMultiTouchEffects}" />
+                                    <Grid Grid.Column="1" ColumnSpacing="8" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Slider
+                                            x:Name="SliderMaxTouchEffects"
+                                            Grid.Column="0"
+                                            Minimum="0"
+                                            Maximum="10"
+                                            Value="1"
+                                            StepFrequency="1"
+                                            MinWidth="40"
+                                            AutomationProperties.Name="{Binding Text, ElementName=TxtMaxTouchEffects}" />
+                                        <NumberBox
+                                            x:Name="TxtMaxTouchEffectsValue"
+                                            Grid.Column="1"
+                                            Minimum="0"
+                                            Maximum="10"
+                                            Value="1"
+                                            SmallChange="1"
+                                            LargeChange="1"
+                                            SpinButtonPlacementMode="Compact"
+                                            Width="84"
+                                            AutomationProperties.Name="{Binding Text, ElementName=TxtMaxTouchEffects}" />
+                                    </Grid>
                                 </Grid>
                             </Border>
                             <Border Style="{StaticResource BasSettingCardStyle}">

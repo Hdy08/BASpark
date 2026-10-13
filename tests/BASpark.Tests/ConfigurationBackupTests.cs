@@ -193,7 +193,7 @@ public sealed class ConfigurationBackupTests
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
         Assert.Contains(ConfigurationBackup.Settings, item => item.Key == "TotalClicks");
         foreach (string key in new[] { "Profiles", "ParticleColor",
-                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "EnableMultiTouchEffects" })
+                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "MaxTouchEffects" })
             Assert.Contains(ConfigurationBackup.Settings, item => item.Key == key);
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key == "EffectOpacity");
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key is "Profile.Mode" or "Profile.Processes");
@@ -205,19 +205,64 @@ public sealed class ConfigurationBackupTests
         }
     }
 
-    [Fact]
-    public void MultiTouch_BackupSelectionRoundTripsTheIndependentToggle()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(10)]
+    public void TouchEffectLimit_BackupSelectionRoundTripsTheIndependentCount(int maximum)
     {
         ConfigurationBackupDocument source = CreateFixture();
-        source.Data["EnableMultiTouchEffects"] = JsonSerializer.SerializeToElement(true);
+        source.Data["MaxTouchEffects"] = JsonSerializer.SerializeToElement(maximum);
         source.Data["IsTouchscreenMode"] = JsonSerializer.SerializeToElement(false);
         ConfigurationBackupDocument imported = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(
-            ConfigurationBackup.Select(source, ["EnableMultiTouchEffects"])));
-        Assert.True(imported.Data["EnableMultiTouchEffects"].GetBoolean());
+            ConfigurationBackup.Select(source, ["MaxTouchEffects"])));
+        Assert.Equal(maximum, imported.Data["MaxTouchEffects"].GetInt32());
         Assert.DoesNotContain("IsTouchscreenMode", imported.Data.Keys);
-        Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(imported, ["EnableMultiTouchEffects"], CreateFixture());
-        Assert.Equal(true, values["EnableMultiTouchEffects"]);
+        Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(imported, ["MaxTouchEffects"], CreateFixture());
+        Assert.Equal(maximum, values["MaxTouchEffects"]);
         Assert.DoesNotContain("IsTouchscreenMode", values.Keys);
+    }
+
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 0)]
+    public void TouchEffectLimit_LegacyBackupsMigrateTheToggle(bool enabled, int maximum)
+    {
+        var source = new ConfigurationBackupDocument();
+        source.Data["EnableMultiTouchEffects"] = JsonSerializer.SerializeToElement(enabled);
+        var migrated = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source));
+        Assert.Equal(maximum, migrated.Data["MaxTouchEffects"].GetInt32());
+        Assert.DoesNotContain("EnableMultiTouchEffects", migrated.Data.Keys);
+        source.Data["MaxTouchEffects"] = JsonSerializer.SerializeToElement(3);
+        Assert.Equal(3, ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source)).Data["MaxTouchEffects"].GetInt32());
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("11")]
+    [InlineData("2.5")]
+    [InlineData("true")]
+    [InlineData("\"2\"")]
+    public void TouchEffectLimit_BackupRejectsOutOfRangeAndNonIntegerCounts(string json)
+    {
+        var source = new ConfigurationBackupDocument();
+        source.Data["MaxTouchEffects"] = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.Throws<InvalidDataException>(() => ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source)));
+    }
+
+    [Theory]
+    [InlineData(null, null, 1)]
+    [InlineData(null, false, 1)]
+    [InlineData(null, true, 0)]
+    [InlineData(0, true, 0)]
+    [InlineData(5, true, 5)]
+    [InlineData(10, false, 10)]
+    [InlineData(-1, false, 0)]
+    [InlineData(11, false, 10)]
+    public void TouchEffectLimit_StoredValuesPreferTheNewCountAndNormalizeTheRange(int? value, bool? legacy, int expected)
+    {
+        Assert.Equal(expected, ConfigManager.ParseMaxTouchEffects(value, legacy));
     }
 
     [Theory]

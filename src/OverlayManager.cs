@@ -131,9 +131,13 @@ namespace BASpark
         {
             ConfigManager.IsTouchscreenMode = enabled;
             if (!enabled) ReleaseTouchContacts(cancel: true);
-            else if (!ConfigManager.EnableMultiTouchEffects && _touchContacts.Count > 1) ReleaseTouchContacts(cancel: true);
+            else if (ConfigManager.MaxTouchEffects > 0)
+                foreach (TouchTrailState contact in _touchContacts.Values.OrderBy(contact => contact.PointerId)
+                             .Skip(ConfigManager.MaxTouchEffects).ToArray())
+                    ReleaseTouchContact(contact, cancel: true);
             if (!enabled && _isTouchLikeInput) ReleasePointerStateSilent();
             SyncTouchInputListener();
+            _touchInputListener?.UpdateEffectLimit();
             ForEachOverlay(w => w.UpdateTouchMode(enabled));
         }
         public void UpdateScreenshotCompatibilityMode(bool enabled)
@@ -207,7 +211,8 @@ namespace BASpark
             if (phase == TouchInputPhase.Down)
             {
                 if (!ConfigManager.IsClickEffectActive || ConfigManager.ClickTriggerType == 1) return;
-                if (!ConfigManager.EnableMultiTouchEffects && _touchContacts.Count > 0 && !_touchContacts.ContainsKey(pointerId)) return;
+                if (ConfigManager.MaxTouchEffects > 0 && _touchContacts.Count >= ConfigManager.MaxTouchEffects
+                    && !_touchContacts.ContainsKey(pointerId)) return;
                 if (_touchContacts.TryGetValue(pointerId, out contact)) ReleaseTouchContact(contact, cancel: true);
                 contact = new TouchTrailState(pointerId, ++_trailStrokeId, point);
             }
@@ -1602,7 +1607,7 @@ namespace BASpark
         private byte[] _buffer = Array.Empty<byte>();
         private readonly Dictionary<(IntPtr Device, uint Id), (long PointerId, int X, int Y)> _contacts = new();
         private long _nextPointerId = 1;
-        private long? _singlePointerId;
+        private readonly HashSet<long> _effectPointers = new();
         private int _minX;
         private int _minY;
         private int _maxX;
@@ -1738,7 +1743,8 @@ namespace BASpark
                 previous = (++_nextPointerId, screenX, screenY);
                 var target = ResolveCursorWindow(new NativeMethods.POINT { x = screenX, y = screenY });
                 _cursorState.BeginContact(target.Window, target.Chromium, previous.PointerId);
-                _singlePointerId ??= previous.PointerId;
+                if (ConfigManager.MaxTouchEffects == 0 || _effectPointers.Count < ConfigManager.MaxTouchEffects)
+                    _effectPointers.Add(previous.PointerId);
                 if (_contacts.Count == 0)
                 {
                     _minX = _maxX = screenX;
@@ -1760,7 +1766,7 @@ namespace BASpark
             else _contacts[contact] = (previous.PointerId, screenX, screenY);
             try
             {
-                if (ConfigManager.EnableMultiTouchEffects || _singlePointerId == previous.PointerId)
+                if (_effectPointers.Contains(previous.PointerId))
                     _input(previous.PointerId, down ? tracked ? TouchInputPhase.Move : TouchInputPhase.Down : TouchInputPhase.Up, screenX, screenY);
             }
             finally
@@ -1768,8 +1774,19 @@ namespace BASpark
                 if (!down)
                 {
                     _cursorState.EndContact(previous.PointerId);
-                    if (_singlePointerId == previous.PointerId) _singlePointerId = null;
+                    _effectPointers.Remove(previous.PointerId);
                 }
+            }
+        }
+
+        internal void UpdateEffectLimit()
+        {
+            if (ConfigManager.MaxTouchEffects == 0) return;
+            foreach (long pointerId in _effectPointers.Order().Skip(ConfigManager.MaxTouchEffects).ToArray())
+            {
+                _effectPointers.Remove(pointerId);
+                var contact = _contacts.Values.FirstOrDefault(contact => contact.PointerId == pointerId);
+                _input(pointerId, TouchInputPhase.Up, contact.X, contact.Y);
             }
         }
 
@@ -1798,7 +1815,7 @@ namespace BASpark
                 DestroyHandle();
             }
             _contacts.Clear();
-            _singlePointerId = null;
+            _effectPointers.Clear();
             _cursorState.Reset();
             _devices.Clear();
             _buffer = Array.Empty<byte>();

@@ -96,8 +96,11 @@
     <data name="Basic_Touchscreen" xml:space="preserve">
       <value>タッチエフェクトを有効にする</value>
     </data>
-    <data name="Basic_MultiTouch" xml:space="preserve">
-      <value>マルチタッチエフェクトを有効にする</value>
+    <data name="Basic_MaxTouchEffects" xml:space="preserve">
+      <value>エフェクトの最大数</value>
+    </data>
+    <data name="Basic_MaxTouchEffectsHint" xml:space="preserve">
+      <value>0 は無制限</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
       <value>実際のタッチ操作でもエフェクトを表示します。システムやアプリがカーソルを非表示にしている場合は表示しません。</value>
