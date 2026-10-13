@@ -1916,6 +1916,8 @@ namespace BASpark
                         || !_values.TryGetValue(contact.AxisY.DataIndexMin, out uint rawY)) continue;
                     uint id = contact.Id is ushort identifier ? _values.GetValueOrDefault(identifier) : contact.Collection;
                     bool down = _values.GetValueOrDefault(contact.Tip) != 0;
+                    if (!down && (!_activeCollections.TryGetValue(id, out var previous)
+                        || previous.Contact.ReportId != reportId || previous.Contact.Collection != contact.Collection)) continue;
                     if (!_frame.TryGetValue(id, out var existing) || down
                         || (!existing.Down && _activeCollections.GetValueOrDefault(id).Contact.Collection == contact.Collection))
                         _frame[id] = (down, rawX, rawY, contact);

@@ -1348,6 +1348,92 @@ public class WinUi3UiTests
         Assert.Equal(new[] { (2U, true, false) }, received);
     }
 
+    [Theory]
+    [InlineData(0U, 2)]
+    [InlineData(0U, 3)]
+    [InlineData(7U, 2)]
+    [InlineData(7U, 3)]
+    public void MultiTouch_HybridHidPaddingPreservesSimultaneousDragContacts(uint firstId, int contactCount)
+    {
+        using var mode = new MultiTouchScope(true);
+        var received = new List<(long PointerId, TouchInputPhase Phase, int Horizontal, int Vertical)>();
+        using var listener = new TouchInputListener((pointerId, phase, horizontal, vertical) =>
+            received.Add((pointerId, phase, horizontal, vertical)));
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contactInput = typeof(TouchInputListener).GetMethod("HandleContact", members)!
+            .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
+        var values = new List<NativeMethods.HIDP_VALUE_CAPS>();
+        var buttons = new List<NativeMethods.HIDP_BUTTON_CAPS>();
+        for (ushort collection = 1; collection <= 2; collection++)
+        {
+            ushort start = (ushort)((collection - 1) * 4);
+            values.Add(new NativeMethods.HIDP_VALUE_CAPS
+            {
+                UsagePage = 1, ReportId = 1, LinkCollection = collection, IsRange = 1, IsAbsolute = 1,
+                BitSize = 16, LogicalMin = 0, LogicalMax = 1000, UsageMin = 0x30, UsageMax = 0x31, DataIndexMin = start
+            });
+            values.Add(new NativeMethods.HIDP_VALUE_CAPS
+            {
+                UsagePage = 13, ReportId = 1, LinkCollection = collection, UsageMin = 0x51, DataIndexMin = (ushort)(start + 2)
+            });
+            buttons.Add(new NativeMethods.HIDP_BUTTON_CAPS
+            {
+                UsagePage = 13, ReportId = 1, LinkCollection = collection, UsageMin = 0x42, DataIndexMin = (ushort)(start + 3)
+            });
+        }
+        values.Add(new NativeMethods.HIDP_VALUE_CAPS { UsagePage = 13, ReportId = 1, UsageMin = 0x54, DataIndexMin = 8 });
+        var device = TouchInputListener.TouchDevice.Create(new IntPtr(123), Array.Empty<byte>(),
+            new NativeMethods.HIDP_CAPS { InputReportByteLength = 20, NumberInputDataIndices = 9 }, values.ToArray(), buttons.ToArray());
+        Assert.NotNull(device);
+        var display = new NativeMethods.RECT { Right = 1001, Bottom = 1001 };
+        void Report(int index, uint count, bool down, int step)
+        {
+            NativeMethods.HIDP_DATA[] data =
+            [
+                new() { DataIndex = 0, Value = (uint)(100 + index * 200 + step * 10) },
+                new() { DataIndex = 1, Value = (uint)(100 + index * 200) },
+                new() { DataIndex = 2, Value = firstId + (uint)index }, new() { DataIndex = 3, Value = down ? 1U : 0U },
+                new() { DataIndex = 4, Value = 0 }, new() { DataIndex = 5, Value = 0 },
+                new() { DataIndex = 6, Value = 0 }, new() { DataIndex = 7, Value = 0 },
+                new() { DataIndex = 8, Value = count }
+            ];
+            device.ProcessData(1, data, display, 1, contactInput);
+        }
+        for (int index = 0; index < contactCount; index++)
+            Report(index, index == 0 ? (uint)contactCount : 0U, true, 0);
+        Assert.Equal(contactCount, received.Count);
+        Assert.All(received, input => Assert.Equal(TouchInputPhase.Down, input.Phase));
+        long[] pointerIds = received.Select(input => input.PointerId).ToArray();
+        for (int step = 1; step <= 10; step++)
+        {
+            received.Clear();
+            for (int index = 0; index < contactCount; index++)
+            {
+                Report(index, index == 0 ? (uint)contactCount : 0U, true, step);
+                if (index < contactCount - 1) Assert.Empty(received);
+            }
+            Assert.Equal(contactCount, received.Count);
+            for (int index = 0; index < contactCount; index++)
+                Assert.Equal((pointerIds[index], TouchInputPhase.Move, 100 + index * 200 + step * 10, 100 + index * 200), received[index]);
+        }
+        received.Clear();
+        for (int index = 0; index < contactCount; index++)
+            Report(index, index == 0 ? (uint)contactCount : 0U, index != 0, 11);
+        Assert.Equal((pointerIds[0], TouchInputPhase.Up, 210, 100), received[0]);
+        Assert.All(received.Skip(1), input => Assert.Equal(TouchInputPhase.Move, input.Phase));
+        received.Clear();
+        for (int index = 1; index < contactCount; index++)
+            Report(index, index == 1 ? (uint)contactCount - 1 : 0U, true, 12);
+        Assert.Equal(contactCount - 1, received.Count);
+        for (int index = 1; index < contactCount; index++)
+            Assert.Equal((pointerIds[index], TouchInputPhase.Move, 220 + index * 200, 100 + index * 200), received[index - 1]);
+        received.Clear();
+        for (int index = 1; index < contactCount; index++)
+            Report(index, index == 1 ? (uint)contactCount - 1 : 0U, false, 12);
+        Assert.Equal(contactCount - 1, received.Count);
+        Assert.All(received, input => Assert.Equal(TouchInputPhase.Up, input.Phase));
+    }
+
     [Fact]
     public void MultiTouch_FilteringOneContactDoesNotSuppressOrClearTheOtherContact()
     {
