@@ -39,7 +39,7 @@ DefaultGroupName=BASpark
 AllowNoIcons=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-AppMutex=Global\BASpark_SingleInstance_Mutex
+AppMutex={code:GetBASparkAppMutex}
 CloseApplications=yes
 SetupIconFile=src\app.ico
 UninstallDisplayIcon={app}\BASpark.exe
@@ -59,11 +59,19 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 Name: "japanese"; MessagesFile: "Japanese.isl"
 
+[Messages]
+english.SetupAppRunningError=Setup has detected that %1 is currently running.%n%nClick OK to close it and continue installation, or Cancel to exit.
+chinesesimplified.SetupAppRunningError=安装程序发现 %1 当前正在运行。%n%n点击“确定”关闭正在运行的程序并继续安装，或点击“取消”退出。
+japanese.SetupAppRunningError=%1 は現在実行中です。%n%n「OK」をクリックするとアプリケーションを終了してインストールを続行します。「キャンセル」をクリックすると終了します。
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
-#ifdef UiAccessCertificateThumbprint
 [CustomMessages]
+CloseRunningBASparkFailed=Setup could not close BASpark. Close it completely from the system tray, then run Setup again.
+chinesesimplified.CloseRunningBASparkFailed=安装程序无法关闭 BASpark。请从系统托盘彻底退出程序，然后重新运行安装程序。
+japanese.CloseRunningBASparkFailed=BASpark を終了できませんでした。システムトレイから完全に終了し、インストーラーを再実行してください。
+#ifdef UiAccessCertificateThumbprint
 UiAccessCertificateConsent=Trust the signing certificate used only for BASpark to allow effects over selected system interfaces
 UiAccessCertificateRequired=Certificate trust is required for the UIAccess build. Setup made no changes.
 UiAccessCertificateSilentRequired=Silent installation requires /ACCEPTUIACCESSCERT=1.
@@ -112,6 +120,57 @@ Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags:
 #endif
 
 [Code]
+const
+  BASparkAppMutex = 'Global\BASpark_SingleInstance_Mutex';
+
+function GetBASparkAppMutex(Param: String): String;
+begin
+  if IsUninstaller then
+    Result := BASparkAppMutex
+  else
+    Result := '';
+end;
+
+function CloseRunningBASpark: Boolean;
+var
+  Attempt: Integer;
+  ResultCode: Integer;
+begin
+  Result := True;
+  if not CheckForMutexes(BASparkAppMutex) then
+    Exit;
+
+  Result := False;
+  if SuppressibleMsgBox(FmtMessage(SetupMessage(msgSetupAppRunningError), ['BASpark']),
+       mbError, MB_OKCANCEL, IDCANCEL) <> IDOK then
+    Exit;
+
+  ResultCode := -1;
+  if not Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM BASpark.exe /T',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Log('Failed to start taskkill: ' + IntToStr(ResultCode))
+  else
+    Log('BASpark shutdown exit code: ' + IntToStr(ResultCode));
+
+  for Attempt := 0 to 99 do
+  begin
+    if not CheckForMutexes(BASparkAppMutex) then
+    begin
+      Result := True;
+      Exit;
+    end;
+    Sleep(50);
+  end;
+
+  SuppressibleMsgBox(ExpandConstant('{cm:CloseRunningBASparkFailed}'),
+    mbError, MB_OK, IDOK);
+end;
+
+function InitializeSetup: Boolean;
+begin
+  Result := CloseRunningBASpark;
+end;
+
 #ifdef UiAccessCertificateThumbprint
 const
   UiAccessCertificateThumbprint = '{#UiAccessCertificateThumbprint}';
@@ -413,7 +472,7 @@ begin
   end;
 end;
 
-function PrepareToInstall(var NeedsRestart: Boolean): String;
+function PrepareUiAccessInstallation: String;
 var
   AppDirectoryNormalized: String;
   ConsentGranted: Boolean;
@@ -476,6 +535,19 @@ begin
     RollbackCurrentUiAccessCertificate;
 end;
 #endif
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if not CloseRunningBASpark then
+  begin
+    Result := ExpandConstant('{cm:CloseRunningBASparkFailed}');
+    Exit;
+  end;
+#ifdef UiAccessCertificateThumbprint
+  Result := PrepareUiAccessInstallation;
+#endif
+end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
