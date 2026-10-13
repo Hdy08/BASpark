@@ -116,7 +116,7 @@ namespace BASpark
 
         public static int GetRefreshRate(string deviceName, int fallback = 60)
         {
-            int normalizedFallback = Math.Clamp(fallback, 30, 360);
+            int normalizedFallback = Math.Clamp(fallback, 1, 1000);
             if (string.IsNullOrWhiteSpace(deviceName))
             {
                 return normalizedFallback;
@@ -134,7 +134,7 @@ namespace BASpark
                 if (EnumDisplaySettings(deviceName, ENUM_CURRENT_SETTINGS, ref mode) &&
                     mode.dmDisplayFrequency > 1)
                 {
-                    return Math.Clamp(mode.dmDisplayFrequency, 30, 360);
+                    return Math.Clamp(mode.dmDisplayFrequency, 1, 1000);
                 }
             }
             catch

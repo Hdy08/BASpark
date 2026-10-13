@@ -62,8 +62,10 @@ public class ScreenIdentityTests
 
     [Theory]
     [InlineData("", 60, 60)]
-    [InlineData(" ", 1, 30)]
-    [InlineData("BASpark.Invalid.Display", 999, 360)]
+    [InlineData(" ", 1, 1)]
+    [InlineData("BASpark.Invalid.Display", 999, 999)]
+    [InlineData("BASpark.Invalid.Display", 2000, 1000)]
+    [InlineData("BASpark.Invalid.Display", -1, 1)]
     public void GetRefreshRate_InvalidDeviceUsesClampedFallback(
         string deviceName,
         int fallback,

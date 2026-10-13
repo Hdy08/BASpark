@@ -55,8 +55,7 @@ public static class ConfigurationBackup
         new("TrailAnimationSpeed", "Visual_Title", "VisualReset_TrailSpeed"),
         new("ClickAnimationSpeed", "Visual_Title", "VisualReset_ClickSpeed"),
         new("ApplyCurveDraw", "Visual_Title", "Visual_CurveDraw"),
-        new("FollowDisplayRefreshRate", "Visual_Title", "Visual_FollowDisplayRefreshRate"),
-        new("TrailRefreshRate", "Visual_Title", "VisualReset_TrailRefresh"),
+        new("InputSamplingRate", "Visual_Title", "Visual_TrailSamplingRate"),
         new("GlowIntensity", "Visual_Title", "VisualReset_GlowIntensity"),
         new("ParticleColor", "Visual_Title", "VisualReset_Color"),
         new("EnableEnvironmentFilter", "Filter_Title", "Filter_Enable"),
@@ -79,7 +78,7 @@ public static class ConfigurationBackup
             ["TrailAnimationSpeed"] = (0.2, 3),
             ["ClickAnimationSpeed"] = (0.2, 3),
             ["EffectOpacity"] = (0.1, 1),
-            ["TrailRefreshRate"] = (30, 360)
+            ["InputSamplingRate"] = (-1, 1000)
         };
 
     public static ConfigurationBackupDocument Capture(IEnumerable<ScreenSelectionState> currentScreens)
@@ -176,6 +175,16 @@ public static class ConfigurationBackup
             {
                 if (legacyMultiTouch.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw InvalidValue("MaxTouchEffects");
                 document.Data.TryAdd("MaxTouchEffects", JsonSerializer.SerializeToElement(legacyMultiTouch.GetBoolean() ? 0 : 1));
+            }
+            bool hasLegacyRate = document.Data.Remove("TrailRefreshRate", out JsonElement legacyRate);
+            bool hasLegacyFollow = document.Data.Remove("FollowDisplayRefreshRate", out JsonElement legacyFollow);
+            if (hasLegacyRate || hasLegacyFollow)
+            {
+                if (hasLegacyRate && (legacyRate.ValueKind != JsonValueKind.Number || !legacyRate.TryGetInt32(out int rate) || rate is < -1 or > 1000) ||
+                    hasLegacyFollow && legacyFollow.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                    throw InvalidValue("InputSamplingRate");
+                document.Data.TryAdd("InputSamplingRate", JsonSerializer.SerializeToElement(ConfigManager.ParseInputSamplingRate(null,
+                    hasLegacyRate ? legacyRate.GetInt32() : null, hasLegacyFollow ? legacyFollow.GetBoolean() : null)));
             }
             foreach (var item in document.Data) ValidateValue(item.Key, item.Value);
             if (document.Data.TryGetValue("EffectOpacity", out JsonElement legacyOpacity))

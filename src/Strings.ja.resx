@@ -97,10 +97,16 @@
       <value>タッチエフェクトを有効にする</value>
     </data>
     <data name="Basic_MaxTouchEffects" xml:space="preserve">
-      <value>エフェクトの最大数</value>
+      <value>エフェクト数の上限</value>
     </data>
     <data name="Basic_MaxTouchEffectsHint" xml:space="preserve">
-      <value>0 は無制限</value>
+      <value>右端に動かすと無制限</value>
+    </data>
+    <data name="Settings_Unlimited" xml:space="preserve">
+      <value>無制限</value>
+    </data>
+    <data name="Settings_Display" xml:space="preserve">
+      <value>ディスプレイ</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
       <value>実際のタッチ操作でもエフェクトを表示します。システムやアプリがカーソルを非表示にしている場合は表示しません。</value>
@@ -503,10 +509,10 @@
     <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
       <value>既定 1.00 ×</value>
     </data>
-    <data name="VisualReset_TrailRefresh" xml:space="preserve">
-      <value>トレイル更新率</value>
+    <data name="VisualReset_TrailSamplingRate" xml:space="preserve">
+      <value>トレイルサンプリングレート</value>
     </data>
-    <data name="VisualReset_TrailRefresh_Sub" xml:space="preserve">
+    <data name="VisualReset_TrailSamplingRate_Sub" xml:space="preserve">
       <value>既定: ディスプレイに追従</value>
     </data>
     <data name="VisualReset_TrailSpeed" xml:space="preserve">
@@ -567,7 +573,7 @@
       <value>トレイルとクリックで同じアニメ速度を使用</value>
     </data>
     <data name="Visual_LinkedSpeedHint" xml:space="preserve">
-      <value>オフにするとトレイルとクリックの速度を個別に設定できます（下の更新率とは別）。</value>
+      <value>オフにするとトレイルとクリックの速度を個別に設定できます（下のサンプリングレートとは別）。</value>
     </data>
     <data name="Visual_LinkedScale" xml:space="preserve">
       <value>トレイルとクリックで同じ拡大率を使用</value>
@@ -580,12 +586,6 @@
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
       <value>60Hz以上のリフレッシュレートでの使用を推奨します。</value>
-    </data>
-    <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
-      <value>トレイル更新率をディスプレイに合わせる</value>
-    </data>
-    <data name="Visual_FollowDisplayRefreshRateHint" xml:space="preserve">
-      <value>オンにすると、トレイル更新率はマウスがあるディスプレイの更新率に自動設定されます。</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
       <value>不透明度</value>
@@ -611,8 +611,8 @@
     <data name="Visual_TrailAnimSpeed" xml:space="preserve">
       <value>トレイルのアニメ速度</value>
     </data>
-    <data name="Visual_TrailRefresh" xml:space="preserve">
-      <value>トレイル更新率</value>
+    <data name="Visual_TrailSamplingRate" xml:space="preserve">
+      <value>トレイルサンプリングレート</value>
     </data>
     <data name="WebView2_InitFailed" xml:space="preserve">
       <value>WebView2 の初期化に失敗しました: {0}</value>

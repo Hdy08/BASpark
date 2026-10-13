@@ -15,7 +15,7 @@ namespace BASpark
         UnifiedEffectScale = 1 << 0,
         EffectOpacity = 1 << 1,
         UnifiedAnimationSpeed = 1 << 2,
-        TrailRefreshRate = 1 << 3,
+        InputSamplingRate = 1 << 3,
         ParticleColor = 1 << 4,
         TrailAnimationSpeed = 1 << 5,
         ClickAnimationSpeed = 1 << 6,
@@ -87,8 +87,7 @@ namespace BASpark
         public static bool ApplyCurveDraw { get; set; } = false;
         public static double TrailAnimationSpeed { get; set; } = 1.0;
         public static double ClickAnimationSpeed { get; set; } = 1.0;
-        public static int TrailRefreshRate { get; set; } = 60;
-        public static bool FollowDisplayRefreshRate { get; set; } = true;
+        public static int InputSamplingRate { get; set; } = -1;
         public static bool EnableEnvironmentFilter { get; set; } = false;
         public static bool HideInFullscreen { get; set; } = true;
         public static bool ShowEffectOnDesktop { get; set; } = true;
@@ -160,8 +159,8 @@ namespace BASpark
                         ApplyCurveDraw = Convert.ToBoolean(key.GetValue("ApplyCurveDraw", false));
                         TrailAnimationSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("TrailAnimationSpeed", EffectSpeed), CultureInfo.InvariantCulture), 0.2, 3.0);
                         ClickAnimationSpeed = Math.Clamp(Convert.ToDouble(key.GetValue("ClickAnimationSpeed", EffectSpeed), CultureInfo.InvariantCulture), 0.2, 3.0);
-                        TrailRefreshRate = Math.Clamp(Convert.ToInt32(key.GetValue("TrailRefreshRate", 60), CultureInfo.InvariantCulture), 30, 360);
-                        FollowDisplayRefreshRate = Convert.ToBoolean(key.GetValue("FollowDisplayRefreshRate", true));
+                        InputSamplingRate = ParseInputSamplingRate(key.GetValue("InputSamplingRate"),
+                            key.GetValue("TrailRefreshRate"), key.GetValue("FollowDisplayRefreshRate"));
                         EnableEnvironmentFilter = Convert.ToBoolean(key.GetValue("EnableEnvironmentFilter", false));
                         HideInFullscreen = Convert.ToBoolean(key.GetValue("HideInFullscreen", true));
                         ShowEffectOnDesktop = Convert.ToBoolean(key.GetValue("ShowEffectOnDesktop", true));
@@ -396,10 +395,9 @@ namespace BASpark
                 Save("ClickAnimationSpeed", 1.0);
             }
 
-            if (flags.HasFlag(VisualAppearanceResetFlags.TrailRefreshRate))
+            if (flags.HasFlag(VisualAppearanceResetFlags.InputSamplingRate))
             {
-                Save("TrailRefreshRate", 60);
-                Save("FollowDisplayRefreshRate", true);
+                Save("InputSamplingRate", -1);
             }
 
             if (flags.HasFlag(VisualAppearanceResetFlags.ParticleColor))
@@ -412,6 +410,12 @@ namespace BASpark
             ? Convert.ToBoolean(legacyValue, CultureInfo.InvariantCulture) ? 0 : 1
             : Math.Clamp(Convert.ToInt32(value, CultureInfo.InvariantCulture), 0, 10);
 
+        internal static int ParseInputSamplingRate(object? value, object? legacyRate = null, object? legacyFollow = null) => value != null
+            ? Math.Clamp(Convert.ToInt32(value, CultureInfo.InvariantCulture), -1, 1000)
+            : legacyFollow != null && Convert.ToBoolean(legacyFollow, CultureInfo.InvariantCulture) || legacyRate == null && legacyFollow == null
+                ? -1
+                : Math.Clamp(Convert.ToInt32(legacyRate ?? 60, CultureInfo.InvariantCulture), -1, 1000);
+
         public static bool Save(string name, object value)
         {
             try
@@ -420,6 +424,7 @@ namespace BASpark
                 {
                     using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegPath);
                     if (name == "MaxTouchEffects") value = ParseMaxTouchEffects(value);
+                    if (name == "InputSamplingRate") value = ParseInputSamplingRate(value);
                     if (name is "ParticleColor" or "EffectOpacity")
                     {
                         string color = name == "ParticleColor" ? Convert.ToString(value, CultureInfo.InvariantCulture)! : ParticleColor;
@@ -452,6 +457,12 @@ namespace BASpark
                     else
                     {
                         key.SetValue(name, value);
+                    }
+
+                    if (name == "InputSamplingRate")
+                    {
+                        key.DeleteValue("TrailRefreshRate", false);
+                        key.DeleteValue("FollowDisplayRefreshRate", false);
                     }
 
                     var prop = _propertyCache.GetOrAdd(name, n => typeof(ConfigManager).GetProperty(n));
@@ -728,8 +739,7 @@ namespace BASpark
                     ApplyCurveDraw = false;
                     TrailAnimationSpeed = 1.0;
                     ClickAnimationSpeed = 1.0;
-                    TrailRefreshRate = 60;
-                    FollowDisplayRefreshRate = true;
+                    InputSamplingRate = -1;
                     EnableEnvironmentFilter = false;
                     HideInFullscreen = true;
                     ShowEffectOnDesktop = true;

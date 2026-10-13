@@ -97,10 +97,16 @@
       <value>Enable touch effects</value>
     </data>
     <data name="Basic_MaxTouchEffects" xml:space="preserve">
-      <value>Maximum effect count</value>
+      <value>Effect count limit</value>
     </data>
     <data name="Basic_MaxTouchEffectsHint" xml:space="preserve">
-      <value>0 means unlimited</value>
+      <value>Move to the far right for no limit</value>
+    </data>
+    <data name="Settings_Unlimited" xml:space="preserve">
+      <value>Unlimited</value>
+    </data>
+    <data name="Settings_Display" xml:space="preserve">
+      <value>Display</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
       <value>Also trigger effects from actual touch input. Effects remain disabled when the system or an app explicitly hides the cursor.</value>
@@ -503,10 +509,10 @@
     <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
       <value>Default 1.00 ×</value>
     </data>
-    <data name="VisualReset_TrailRefresh" xml:space="preserve">
-      <value>Trail refresh rate</value>
+    <data name="VisualReset_TrailSamplingRate" xml:space="preserve">
+      <value>Trail sampling rate</value>
     </data>
-    <data name="VisualReset_TrailRefresh_Sub" xml:space="preserve">
+    <data name="VisualReset_TrailSamplingRate_Sub" xml:space="preserve">
       <value>Default: follow display</value>
     </data>
     <data name="VisualReset_TrailSpeed" xml:space="preserve">
@@ -567,7 +573,7 @@
       <value>Use same animation speed for trail and click</value>
     </data>
     <data name="Visual_LinkedSpeedHint" xml:space="preserve">
-      <value>When off, trail and click speeds are independent of trail refresh rate below.</value>
+      <value>When off, trail and click speeds are independent of the trail sampling rate below.</value>
     </data>
     <data name="Visual_LinkedScale" xml:space="preserve">
       <value>Use same scale for trail and click</value>
@@ -580,12 +586,6 @@
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
       <value>Recommended for 60Hz and above.</value>
-    </data>
-    <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
-      <value>Match trail refresh rate to display</value>
-    </data>
-    <data name="Visual_FollowDisplayRefreshRateHint" xml:space="preserve">
-      <value>When enabled, the trail refresh rate follows the display under the mouse pointer.</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
       <value>Opacity</value>
@@ -611,8 +611,8 @@
     <data name="Visual_TrailAnimSpeed" xml:space="preserve">
       <value>Trail animation speed</value>
     </data>
-    <data name="Visual_TrailRefresh" xml:space="preserve">
-      <value>Trail refresh rate</value>
+    <data name="Visual_TrailSamplingRate" xml:space="preserve">
+      <value>Trail sampling rate</value>
     </data>
     <data name="WebView2_InitFailed" xml:space="preserve">
       <value>WebView2 initialization failed: {0}</value>

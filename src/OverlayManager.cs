@@ -42,8 +42,7 @@ namespace BASpark
         private long _lastPromotedTouchTimestamp;
         private NativeMethods.POINT _lastPromotedTouchPoint;
         private long _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / 60);
-        private int _manualTrailRefreshRate = 60;
-        private bool _followDisplayRefreshRate = true;
+        private int _inputSamplingRate = -1;
         private bool _isPrimaryPointerDown;
         private bool _isTouchLikeInput;
         private bool _isSuppressedByEnvironment;
@@ -90,7 +89,7 @@ namespace BASpark
 
         public void Start()
         {
-            UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
+            UpdateInputSamplingRate(ConfigManager.InputSamplingRate);
             RebuildWindows(forceRebuild: true);
             SetupGlobalHooks();
             RefreshEnvironmentFilterState();
@@ -106,11 +105,11 @@ namespace BASpark
         public void UpdateColor(string color) => ForEachOverlay(w => w.UpdateColor(color));
         public void UpdateEffectSettings(double trailScale, double clickScale, double opacity, double trailSpeed, double clickSpeed, double glowIntensity) =>
             ForEachOverlay(w => w.UpdateEffectSettings(trailScale, clickScale, opacity, trailSpeed, clickSpeed, glowIntensity));
-        public void UpdateTrailRefreshRate(int hz, bool followDisplayRefreshRate)
+        public void UpdateInputSamplingRate(int hz)
         {
-            _manualTrailRefreshRate = Math.Clamp(hz, 30, 360);
-            _followDisplayRefreshRate = followDisplayRefreshRate;
-            _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / _manualTrailRefreshRate);
+            _inputSamplingRate = ConfigManager.ParseInputSamplingRate(hz);
+            int idleSamplingRate = _inputSamplingRate == -1 ? 60 : _inputSamplingRate;
+            _idleMoveIntervalTimestamp = idleSamplingRate == 0 ? 0 : Math.Max(1, Stopwatch.Frequency / idleSamplingRate);
             _lastTrailThrottleOverlay = null;
             _lastMoveTimestamp = 0;
             foreach (TouchTrailState contact in _touchContacts.Values)
@@ -121,10 +120,10 @@ namespace BASpark
 
             foreach (var pair in _overlays)
             {
-                int effectiveRefreshRate = _followDisplayRefreshRate
-                    ? ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)
-                    : _manualTrailRefreshRate;
-                pair.Value.UpdateTrailRefreshRate(effectiveRefreshRate);
+                int effectiveSamplingRate = _inputSamplingRate == -1
+                    ? ScreenIdentity.GetRefreshRate(pair.Key)
+                    : _inputSamplingRate;
+                pair.Value.UpdateInputSamplingRate(effectiveSamplingRate);
             }
         }
         public void UpdateTouchMode(bool enabled)
@@ -1159,17 +1158,17 @@ namespace BASpark
 
             foreach (var pair in targetScreens)
             {
-                int refreshRate = _followDisplayRefreshRate
-                    ? ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)
-                    : _manualTrailRefreshRate;
+                int samplingRate = _inputSamplingRate == -1
+                    ? ScreenIdentity.GetRefreshRate(pair.Key)
+                    : _inputSamplingRate;
                 if (_overlays.TryGetValue(pair.Key, out OverlayWindow? existing))
                 {
                     existing.UpdateScreen(pair.Value);
-                    existing.UpdateTrailRefreshRate(refreshRate);
+                    existing.UpdateInputSamplingRate(samplingRate);
                     continue;
                 }
 
-                var win = new OverlayWindow(pair.Value, refreshRate);
+                var win = new OverlayWindow(pair.Value, samplingRate);
                 _overlays[pair.Key] = win;
                 win.SetEnvironmentSuppressed(_isSuppressedByEnvironment);
                 if (_screenshotCaptureSessionActive) win.SetHiddenForExternalScreenshotCapture(true);
@@ -1544,7 +1543,7 @@ namespace BASpark
 
         private void RecoverAfterSystemResume()
         {
-            UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
+            UpdateInputSamplingRate(ConfigManager.InputSamplingRate);
             RebuildWindows(forceRebuild: true);
             SetupGlobalHooks();
             RefreshEnvironmentFilterState();

@@ -119,7 +119,7 @@ public sealed class ConfigurationBackupTests
     [InlineData("TotalClicks", "1.5")]
     [InlineData("TotalClicks", "2147483648")]
     [InlineData("EffectScale", "0.1")]
-    [InlineData("TrailRefreshRate", "400")]
+    [InlineData("InputSamplingRate", "1001")]
     [InlineData("EffectOpacity", "0")]
     [InlineData("GlowIntensity", "\"invalid\"")]
     [InlineData("StartSilent", "\"true\"")]
@@ -189,13 +189,14 @@ public sealed class ConfigurationBackupTests
     [Fact]
     public void SettingCatalog_CoversAllEditableSettingsAndStatisticsWithUniqueKeys()
     {
-        Assert.Equal(31, ConfigurationBackup.Settings.Count);
+        Assert.Equal(30, ConfigurationBackup.Settings.Count);
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
         Assert.Contains(ConfigurationBackup.Settings, item => item.Key == "TotalClicks");
         foreach (string key in new[] { "Profiles", "ParticleColor",
-                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "MaxTouchEffects" })
+                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "MaxTouchEffects", "InputSamplingRate" })
             Assert.Contains(ConfigurationBackup.Settings, item => item.Key == key);
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key == "EffectOpacity");
+        Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key is "TrailRefreshRate" or "FollowDisplayRefreshRate");
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key is "Profile.Mode" or "Profile.Processes");
         Assert.Equal("Filter_ProfileGroup", Assert.Single(ConfigurationBackup.Settings, item => item.Key == "Profiles").TitleKey);
         foreach (BackupSettingDefinition item in ConfigurationBackup.Settings)
@@ -263,6 +264,78 @@ public sealed class ConfigurationBackupTests
     public void TouchEffectLimit_StoredValuesPreferTheNewCountAndNormalizeTheRange(int? value, bool? legacy, int expected)
     {
         Assert.Equal(expected, ConfigManager.ParseMaxTouchEffects(value, legacy));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(60)]
+    [InlineData(400)]
+    [InlineData(1000)]
+    public void InputSamplingRate_BackupRoundTripsOnlyTheSelectedUnifiedSetting(int rate)
+    {
+        ConfigurationBackupDocument source = CreateFixture();
+        source.Data["InputSamplingRate"] = JsonSerializer.SerializeToElement(rate);
+        ConfigurationBackupDocument imported = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(
+            ConfigurationBackup.Select(source, ["InputSamplingRate"])));
+        Assert.Equal("InputSamplingRate", Assert.Single(imported.Data).Key);
+        Assert.Equal(rate, imported.Data["InputSamplingRate"].GetInt32());
+        Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(imported, ["InputSamplingRate"], CreateFixture());
+        Assert.Equal(rate, Assert.Single(values).Value);
+    }
+
+    [Theory]
+    [InlineData(true, 40, -1)]
+    [InlineData(false, 40, 40)]
+    [InlineData(false, 0, 0)]
+    [InlineData(false, 1000, 1000)]
+    public void InputSamplingRate_LegacyBackupsMigrateDisplayFollowingAndKeepManualValues(bool follow, int rate, int expected)
+    {
+        ConfigurationBackupDocument source = CreateFixture();
+        source.Data["FollowDisplayRefreshRate"] = JsonSerializer.SerializeToElement(follow);
+        source.Data["TrailRefreshRate"] = JsonSerializer.SerializeToElement(rate);
+        ConfigurationBackupDocument migrated = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source));
+        Assert.Equal(expected, migrated.Data["InputSamplingRate"].GetInt32());
+        Assert.DoesNotContain("FollowDisplayRefreshRate", migrated.Data.Keys);
+        Assert.DoesNotContain("TrailRefreshRate", migrated.Data.Keys);
+        source.Data["InputSamplingRate"] = JsonSerializer.SerializeToElement(0);
+        Assert.Equal(0, ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source)).Data["InputSamplingRate"].GetInt32());
+    }
+
+    [Theory]
+    [InlineData(null, null, null, -1)]
+    [InlineData(null, 40, true, -1)]
+    [InlineData(null, 40, false, 40)]
+    [InlineData(null, 1000, null, 1000)]
+    [InlineData(null, null, true, -1)]
+    [InlineData(null, null, false, 60)]
+    [InlineData(0, 40, true, 0)]
+    [InlineData(-1, 40, false, -1)]
+    [InlineData(400, 40, true, 400)]
+    [InlineData(-2, 40, false, -1)]
+    [InlineData(1001, 40, false, 1000)]
+    public void InputSamplingRate_StoredValuesNormalizeAndOverrideBothLegacyKeys(int? value, int? legacyRate, bool? legacyFollow, int expected)
+    {
+        Assert.Equal(expected, ConfigManager.ParseInputSamplingRate(value, legacyRate, legacyFollow));
+    }
+
+    [Theory]
+    [InlineData("InputSamplingRate", "-2")]
+    [InlineData("InputSamplingRate", "1001")]
+    [InlineData("InputSamplingRate", "1.5")]
+    [InlineData("InputSamplingRate", "true")]
+    [InlineData("InputSamplingRate", "\"0\"")]
+    [InlineData("TrailRefreshRate", "1001")]
+    [InlineData("TrailRefreshRate", "1.5")]
+    [InlineData("TrailRefreshRate", "true")]
+    [InlineData("TrailRefreshRate", "\"40\"")]
+    [InlineData("FollowDisplayRefreshRate", "1")]
+    public void InputSamplingRate_BackupsRejectInvalidNewAndLegacyValues(string key, string json)
+    {
+        ConfigurationBackupDocument source = CreateFixture();
+        source.Data[key] = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.Throws<InvalidDataException>(() => ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source)));
     }
 
     [Theory]

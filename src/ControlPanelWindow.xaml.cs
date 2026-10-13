@@ -35,6 +35,52 @@ using WinRT.Interop;
 
 namespace BASpark;
 
+public sealed class SettingNumberFormatter : Windows.Globalization.NumberFormatting.INumberFormatter2,
+    Windows.Globalization.NumberFormatting.INumberParser, Microsoft.UI.Xaml.Data.IValueConverter
+{
+    private readonly bool _samplingRate;
+    private int UnlimitedPosition => _samplingRate ? 1010 : 11;
+
+    public SettingNumberFormatter(bool samplingRate) => _samplingRate = samplingRate;
+
+    internal int ToSliderValue(int value) => _samplingRate
+        ? value < 0 ? 0 : value == 0 ? UnlimitedPosition : Math.Clamp(value, 1, 1000)
+        : value == 0 ? UnlimitedPosition : Math.Clamp(value, 1, 10);
+
+    internal int ToStoredValue(double value)
+    {
+        int position = (int)Math.Round(Math.Clamp(value, _samplingRate ? 0 : 1, UnlimitedPosition));
+        return position > (_samplingRate ? 1000 : 10) ? 0 : _samplingRate && position == 0 ? -1 : position;
+    }
+
+    public string FormatDouble(double value) => ToStoredValue(value) switch
+    {
+        0 => Localization.Get("Settings_Unlimited"),
+        -1 => Localization.Get("Settings_Display"),
+        int count => count.ToString(CultureInfo.CurrentCulture)
+    };
+
+    public string FormatInt(long value) => FormatDouble(value);
+    public string FormatUInt(ulong value) => FormatDouble(value);
+
+    public double? ParseDouble(string text)
+    {
+        text = text.Trim();
+        if (text == Localization.Get("Settings_Unlimited")) return UnlimitedPosition;
+        if (_samplingRate && text == Localization.Get("Settings_Display")) return 0;
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out double value) ||
+            !double.IsFinite(value) || value != Math.Truncate(value)) return null;
+        if (_samplingRate) return value is >= 0 and <= 1000 ? value : null;
+        return value == 0 ? UnlimitedPosition : value is >= 1 and <= 10 ? value : null;
+    }
+
+    public long? ParseInt(string text) => ParseDouble(text) is double value ? (long)value : null;
+    public ulong? ParseUInt(string text) => ParseDouble(text) is double value ? (ulong)value : null;
+    public object Convert(object value, Type targetType, object parameter, string language) => FormatDouble(System.Convert.ToDouble(value));
+    public object ConvertBack(object value, Type targetType, object parameter, string language) =>
+        ParseDouble(System.Convert.ToString(value) ?? string.Empty) is double position ? position : DependencyProperty.UnsetValue;
+}
+
 public sealed class ColorPresetLayout : NonVirtualizingLayout
 {
     private const int Columns = 8;
@@ -392,6 +438,8 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly List<SegmentedSelectorAnimator> _segmentedSelectors = new();
     private readonly Dictionary<Slider, NumberBox> _sliderToBox = new();
     private readonly Dictionary<NumberBox, Slider> _boxToSlider = new();
+    private readonly SettingNumberFormatter _touchEffectLimitFormatter = new(false);
+    private readonly SettingNumberFormatter _samplingRateFormatter = new(true);
 
     private bool _isLoading;
     private bool _isClosed;
@@ -733,7 +781,7 @@ public sealed partial class ControlPanelWindow : UserControl
                      CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMiddleClickTrigger,
                      CheckScreenshotCompatibilityMode, CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.General);
-        foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw, CheckFollowDisplayRefreshRate })
+        foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Visual);
         foreach (ComboBox combo in new[] { ComboLanguage, ComboProfiles, ComboProcessFilterMode })
             TrackSettingsProperty(combo, ComboBox.SelectedIndexProperty, SettingsSections.General);
@@ -771,7 +819,7 @@ public sealed partial class ControlPanelWindow : UserControl
         IsEffectEnabled = CheckMasterSwitch.IsOn, AutoStart = CheckAutoStart.IsOn, StartSilent = CheckStartSilent.IsOn,
         HideTrayIcon = CheckHideTrayIcon.IsOn, EnableAlwaysTrailEffect = CheckAlwaysTrailEffectSwitch.IsOn,
         RunAsAdmin = CheckRunAsAdmin.IsOn, IsTouchscreenMode = CheckTouchscreenMode.IsOn,
-        MaxTouchEffects = (int)Math.Round(GetPendingSliderValue(SliderMaxTouchEffects)),
+        MaxTouchEffects = _touchEffectLimitFormatter.ToStoredValue(GetPendingSliderValue(SliderMaxTouchEffects)),
         EnableMiddleClickTrigger = CheckMiddleClickTrigger.IsOn, ScreenshotCompatibilityMode = CheckScreenshotCompatibilityMode.IsOn,
         EnableEnvironmentFilter = CheckEnvironmentFilter.IsOn, HideInFullscreen = CheckHideInFullscreen.IsOn,
         ShowEffectOnDesktop = CheckShowEffectOnDesktop.IsOn, ActiveProfileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
@@ -784,9 +832,11 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private double GetPendingSliderValue(Slider slider)
     {
-        if (_numberInputs.TryGetValue(_sliderToBox[slider], out TextBox? input) && input.FocusState != FocusState.Unfocused &&
-            double.TryParse(input.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out double value) && double.IsFinite(value))
-            return Math.Round(Math.Clamp(value, slider.Minimum, slider.Maximum), 2);
+        NumberBox box = _sliderToBox[slider];
+        if (_numberInputs.TryGetValue(box, out TextBox? input) && input.FocusState != FocusState.Unfocused &&
+            box.NumberFormatter is Windows.Globalization.NumberFormatting.INumberParser parser &&
+            parser.ParseDouble(input.Text) is double value && double.IsFinite(value))
+            return Math.Round(Math.Clamp(value, slider.Minimum, slider.Maximum), slider.StepFrequency >= 1 ? 0 : 2);
         return Math.Round(slider.Value, 2);
     }
 
@@ -807,8 +857,9 @@ public sealed partial class ControlPanelWindow : UserControl
             UseLinkedAnimationSpeed = CheckLinkedAnimationSpeed.IsOn,
             EffectSpeed = GetPendingSliderValue(SliderSpeed), TrailAnimationSpeed = GetPendingSliderValue(SliderTrailAnimSpeed),
             ClickAnimationSpeed = GetPendingSliderValue(SliderClickAnimSpeed),
-            ApplyCurveDraw = CheckApplyCurveDraw.IsOn, FollowDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsOn,
-            TrailRefreshRate = GetPendingSliderValue(SliderTrailRefresh), ParticleColor = color, EffectOpacity = Math.Round(opacity, 2)
+            ApplyCurveDraw = CheckApplyCurveDraw.IsOn,
+            InputSamplingRate = _samplingRateFormatter.ToStoredValue(GetPendingSliderValue(SliderTrailSamplingRate)),
+            ParticleColor = color, EffectOpacity = Math.Round(opacity, 2)
         });
     }
 
@@ -905,7 +956,6 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void SetupSliderPairs()
     {
-        // SliderX + TxtXValue 一一对应；ValueChanged 大多已在 XAML 接线，TrailRefresh 由这里接线。
         RegisterSliderPair(SliderScale, TxtScaleValue);
         RegisterSliderPair(SliderTrailScale, TxtTrailScaleValue);
         RegisterSliderPair(SliderClickScale, TxtClickScaleValue);
@@ -913,10 +963,9 @@ public sealed partial class ControlPanelWindow : UserControl
         RegisterSliderPair(SliderSpeed, TxtSpeedValue);
         RegisterSliderPair(SliderTrailAnimSpeed, TxtTrailSpeedValue);
         RegisterSliderPair(SliderClickAnimSpeed, TxtClickSpeedValue);
-        RegisterSliderPair(SliderTrailRefresh, TxtTrailRefreshValue);
+        RegisterSliderPair(SliderTrailSamplingRate, TxtTrailSamplingRateValue);
         RegisterSliderPair(SliderMaxTouchEffects, TxtMaxTouchEffectsValue);
 
-        CheckFollowDisplayRefreshRate.Toggled += FollowDisplayRefreshRate_Toggled;
         SyncSliderAndBoxValues();
     }
 
@@ -937,6 +986,12 @@ public sealed partial class ControlPanelWindow : UserControl
                 RoundingAlgorithm = Windows.Globalization.NumberFormatting.RoundingAlgorithm.RoundHalfUp
             }
         };
+        if (slider == SliderMaxTouchEffects || slider == SliderTrailSamplingRate)
+        {
+            SettingNumberFormatter formatter = slider == SliderMaxTouchEffects ? _touchEffectLimitFormatter : _samplingRateFormatter;
+            box.NumberFormatter = formatter;
+            slider.ThumbToolTipValueConverter = formatter;
+        }
     }
 
     private void SyncSliderAndBoxValues()
@@ -1015,6 +1070,11 @@ public sealed partial class ControlPanelWindow : UserControl
         try
         {
             double value = Math.Round(sender.Value, slider.StepFrequency >= 1 ? 0 : 2);
+            if (slider == SliderMaxTouchEffects || slider == SliderTrailSamplingRate)
+            {
+                SettingNumberFormatter formatter = slider == SliderMaxTouchEffects ? _touchEffectLimitFormatter : _samplingRateFormatter;
+                value = formatter.ToSliderValue(formatter.ToStoredValue(value));
+            }
             if (sender.Value != value) sender.Value = value;
             slider.Value = value;
         }
@@ -1166,21 +1226,6 @@ public sealed partial class ControlPanelWindow : UserControl
         return null;
     }
 
-    private void FollowDisplayRefreshRate_Toggled(object sender, RoutedEventArgs e)
-    {
-        _ = sender;
-        _ = e;
-        UpdateTrailRefreshInterlock();
-    }
-
-    /// <summary>跟随显示器刷新率时，手动刷新率控件不可编辑。</summary>
-    private void UpdateTrailRefreshInterlock()
-    {
-        bool follow = CheckFollowDisplayRefreshRate.IsOn;
-        SliderTrailRefresh.IsEnabled = !follow;
-        TxtTrailRefreshValue.IsEnabled = !follow;
-    }
-
     // ==================================================================
     // 日志
     // ==================================================================
@@ -1260,9 +1305,9 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtClickAnimSpeed.Text = Localization.Get("Visual_ClickAnimSpeed");
         CheckApplyCurveDraw.Header = Localization.Get("Visual_CurveDraw");
         TxtCurveDrawHint.Text = Localization.Get("Visual_CurveDrawHint");
-        CheckFollowDisplayRefreshRate.Header = Localization.Get("Visual_FollowDisplayRefreshRate");
-        TxtFollowDisplayRefreshRateHint.Text = Localization.Get("Visual_FollowDisplayRefreshRateHint");
-        TxtTrailRefresh.Text = Localization.Get("Visual_TrailRefresh");
+        TxtTrailSamplingRate.Text = Localization.Get("Visual_TrailSamplingRate");
+        TxtMaxTouchEffectsValue.Text = _touchEffectLimitFormatter.FormatDouble(SliderMaxTouchEffects.Value);
+        TxtTrailSamplingRateValue.Text = _samplingRateFormatter.FormatDouble(SliderTrailSamplingRate.Value);
         TxtEffectColor.Text = Localization.Get("Visual_Color");
         TxtFilterTitle.Text = Localization.Get("Filter_Title");
         CheckEnvironmentFilter.Header = Localization.Get("Filter_Enable");
@@ -2110,7 +2155,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckShowEffectOnDesktop.IsOn = ConfigManager.ShowEffectOnDesktop;
         CheckRunAsAdmin.IsOn = ConfigManager.RunAsAdmin;
         CheckTouchscreenMode.IsOn = ConfigManager.IsTouchscreenMode;
-        SliderMaxTouchEffects.Value = ConfigManager.MaxTouchEffects;
+        SliderMaxTouchEffects.Value = _touchEffectLimitFormatter.ToSliderValue(ConfigManager.MaxTouchEffects);
         CheckMiddleClickTrigger.IsOn = ConfigManager.EnableMiddleClickTrigger;
         CheckScreenshotCompatibilityMode.IsOn = ConfigManager.ScreenshotCompatibilityMode;
 
@@ -2140,14 +2185,12 @@ public sealed partial class ControlPanelWindow : UserControl
         SliderSpeed.Value = ConfigManager.EffectSpeed;
         SliderTrailAnimSpeed.Value = ConfigManager.TrailAnimationSpeed;
         SliderClickAnimSpeed.Value = ConfigManager.ClickAnimationSpeed;
-        CheckFollowDisplayRefreshRate.IsOn = ConfigManager.FollowDisplayRefreshRate;
-        SliderTrailRefresh.Value = ConfigManager.TrailRefreshRate;
+        SliderTrailSamplingRate.Value = _samplingRateFormatter.ToSliderValue(ConfigManager.InputSamplingRate);
         SyncSliderAndBoxValues();
         UpdateColorPreview(_particleColor);
 
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
-        UpdateTrailRefreshInterlock();
 
         SelectDarkMode(ConfigManager.DarkMode);
     }
@@ -2940,7 +2983,8 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void AddVisualResetItem(VisualAppearanceResetFlags flags, string title, string key, object value, Action restore)
     {
-        object label = value is bool enabled ? Localization.Get(enabled ? "Basic_DarkModeOn" : "Basic_DarkModeOff") : value;
+        object label = key == "InputSamplingRate" ? _samplingRateFormatter.FormatDouble(_samplingRateFormatter.ToSliderValue((int)value))
+            : value is bool enabled ? Localization.Get(enabled ? "Basic_DarkModeOn" : "Basic_DarkModeOff") : value;
         var item = new VisualResetItem(flags, title, Localization.Format("Reset_DefaultValue", label))
         {
             Group = TxtVisualTitle.Text,
@@ -2964,9 +3008,8 @@ public sealed partial class ControlPanelWindow : UserControl
         AddVisualResetItem(VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), "TrailAnimationSpeed", 1.0, () => SliderTrailAnimSpeed.Value = 1);
         AddVisualResetItem(VisualAppearanceResetFlags.ClickAnimationSpeed, Localization.Get("VisualReset_ClickSpeed"), "ClickAnimationSpeed", 1.0, () => SliderClickAnimSpeed.Value = 1);
         AddVisualResetItem(VisualAppearanceResetFlags.None, CheckApplyCurveDraw.Header.ToString()!, "ApplyCurveDraw", false, () => CheckApplyCurveDraw.IsOn = false);
-        AddVisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, CheckFollowDisplayRefreshRate.Header.ToString()!, "FollowDisplayRefreshRate", true,
-            () => CheckFollowDisplayRefreshRate.IsOn = true);
-        AddVisualResetItem(VisualAppearanceResetFlags.TrailRefreshRate, Localization.Get("VisualReset_TrailRefresh"), "TrailRefreshRate", 60, () => SliderTrailRefresh.Value = 60);
+        AddVisualResetItem(VisualAppearanceResetFlags.InputSamplingRate, TxtTrailSamplingRate.Text, "InputSamplingRate", -1,
+            () => SliderTrailSamplingRate.Value = 0);
         AddVisualResetItem(VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), "GlowIntensity", 1.0, () => SliderGlow.Value = 1);
         AddVisualResetItem(VisualAppearanceResetFlags.ParticleColor | VisualAppearanceResetFlags.EffectOpacity,
             Localization.Get("VisualReset_Color"), "ParticleColor", ConfigManager.DefaultThemeColor,
@@ -3116,7 +3159,6 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateMultiTouchPanelVisibility();
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
-        UpdateTrailRefreshInterlock();
         if (!await SetModalOverlayVisibleAsync(VisualResetOverlay, visible: false) || _isClosed) return;
         try
         {
@@ -3127,7 +3169,7 @@ public sealed partial class ControlPanelWindow : UserControl
             ConfigManager.GetAnimationSpeedsForOverlay(out double trailSpeed, out double clickSpeed);
             App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
             App.Overlay?.UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSpeed, clickSpeed, ConfigManager.GlowIntensity);
-            App.Overlay?.UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
+            App.Overlay?.UpdateInputSamplingRate(ConfigManager.InputSamplingRate);
             App.Overlay?.SetCurveDraw(ConfigManager.ApplyCurveDraw);
             App.Overlay?.UpdateTouchMode(ConfigManager.IsTouchscreenMode);
             App.Overlay?.UpdateScreenshotCompatibilityMode(ConfigManager.ScreenshotCompatibilityMode);
@@ -3507,8 +3549,7 @@ public sealed partial class ControlPanelWindow : UserControl
         double clickAnimSpeed = Math.Round(SliderClickAnimSpeed.Value, 2);
         double effectSpeedForRegistry = Math.Round(SliderSpeed.Value, 2);
 
-        int trailRefreshRate = (int)Math.Round(SliderTrailRefresh.Value);
-        bool followDisplayRefreshRate = CheckFollowDisplayRefreshRate.IsOn;
+        int inputSamplingRate = _samplingRateFormatter.ToStoredValue(SliderTrailSamplingRate.Value);
         bool autoStartEnabled = CheckAutoStart.IsOn;
         bool startSilentEnabled = CheckStartSilent.IsOn;
         bool hideTrayIcon = CheckHideTrayIcon.IsOn;
@@ -3525,7 +3566,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         ConfigManager.Save("RunAsAdmin", runAsAdminEnabled);
         ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
-        ConfigManager.Save("MaxTouchEffects", (int)Math.Round(SliderMaxTouchEffects.Value));
+        ConfigManager.Save("MaxTouchEffects", _touchEffectLimitFormatter.ToStoredValue(SliderMaxTouchEffects.Value));
         ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsOn);
         ConfigManager.Save("AutoStart", autoStartEnabled);
         ConfigManager.Save("ParticleColor", ColorPickerColorMath.CombineThemeColor(_particleColor, effectOpacity));
@@ -3538,8 +3579,7 @@ public sealed partial class ControlPanelWindow : UserControl
         ConfigManager.Save("EffectSpeed", effectSpeedForRegistry);
         ConfigManager.Save("TrailAnimationSpeed", trailAnimSpeed);
         ConfigManager.Save("ClickAnimationSpeed", clickAnimSpeed);
-        ConfigManager.Save("TrailRefreshRate", trailRefreshRate);
-        ConfigManager.Save("FollowDisplayRefreshRate", followDisplayRefreshRate);
+        ConfigManager.Save("InputSamplingRate", inputSamplingRate);
         ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
         ConfigManager.Save("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch.IsOn);
         ApplyScrollbarSettings();
@@ -3583,7 +3623,7 @@ public sealed partial class ControlPanelWindow : UserControl
         GetUiEffectScales(out double overlayTrailScale, out double overlayClickScale);
         GetUiAnimationSpeeds(out double overlayTrailSpeed, out double overlayClickSpeed);
         App.Overlay?.UpdateEffectSettings(overlayTrailScale, overlayClickScale, effectOpacity, overlayTrailSpeed, overlayClickSpeed, glowIntensity);
-        App.Overlay?.UpdateTrailRefreshRate(trailRefreshRate, followDisplayRefreshRate);
+        App.Overlay?.UpdateInputSamplingRate(inputSamplingRate);
         App.Overlay?.RefreshEnvironmentFilterState();
         App.Overlay?.UpdateTouchMode(isTouchscreenEnabled);
         App.Overlay?.UpdateScreenshotCompatibilityMode(screenshotCompatibilityEnabled);
@@ -4216,7 +4256,6 @@ public sealed partial class ControlPanelWindow : UserControl
             pair.Key.ValueChanged -= EffectSlider_ValueChanged;
             pair.Value.ValueChanged -= EffectNumberBox_ValueChanged;
         }
-        CheckFollowDisplayRefreshRate.Toggled -= FollowDisplayRefreshRate_Toggled;
         foreach (TextBox input in _numberInputs.Values) input.Loaded -= InputControl_Loaded;
         EffectColorHexInput.Loaded -= InputControl_Loaded;
         NewProfileNameInput.Loaded -= InputControl_Loaded;

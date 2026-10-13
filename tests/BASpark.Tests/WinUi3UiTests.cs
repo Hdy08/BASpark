@@ -96,13 +96,13 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void NumericInputs_KeepTwoDecimalPlacesAndAnIntegerRefreshRateWithTenUnitSteps()
+    public void NumericInputs_KeepTwoDecimalPlacesAndAnIntegerSamplingRateWithTenUnitSteps()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
-        Assert.Equal("10", (string?)GetNamedElement(panel, "SliderTrailRefresh").Attribute("StepFrequency"));
-        Assert.Equal("10", (string?)GetNamedElement(panel, "TxtTrailRefreshValue").Attribute("SmallChange"));
+        Assert.Equal("10", (string?)GetNamedElement(panel, "SliderTrailSamplingRate").Attribute("StepFrequency"));
+        Assert.Equal("10", (string?)GetNamedElement(panel, "TxtTrailSamplingRateValue").Attribute("SmallChange"));
         foreach (XElement input in panel.Descendants(Presentation + "NumberBox").Where(element =>
-                     (string?)element.Attribute(Xaml + "Name") is not ("TxtTrailRefreshValue" or "TxtMaxTouchEffectsValue")))
+                     (string?)element.Attribute(Xaml + "Name") is not ("TxtTrailSamplingRateValue" or "TxtMaxTouchEffectsValue")))
             Assert.Equal("0.1", (string?)input.Attribute("SmallChange"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("FractionDigits = precision", source, StringComparison.Ordinal);
@@ -310,26 +310,158 @@ public class WinUi3UiTests
         Assert.True(children.IndexOf(card) < children.IndexOf(GetNamedElement(document, "PanelSplitAnimationSpeed")));
     }
 
+    [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
+    private delegate int NativeFormatDouble(IntPtr formatter, double value, out IntPtr text);
+
+    [Theory]
+    [InlineData(false, 11)]
+    [InlineData(true, 0)]
+    [InlineData(true, 1010)]
+    public void SettingEndpoints_NativeNumberFormatterCallsReturnTheSpecialLabels(bool samplingRate, double position)
+    {
+        var formatter = new SettingNumberFormatter(samplingRate);
+        IntPtr pointer = WinRT.MarshalInterface<Windows.Globalization.NumberFormatting.INumberFormatter2>.FromManaged(formatter);
+        IntPtr text = IntPtr.Zero;
+        try
+        {
+            IntPtr vtable = System.Runtime.InteropServices.Marshal.ReadIntPtr(pointer);
+            IntPtr method = System.Runtime.InteropServices.Marshal.ReadIntPtr(vtable, 8 * IntPtr.Size);
+            NativeFormatDouble format = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<NativeFormatDouble>(method);
+            Assert.Equal(0, format(pointer, position, out text));
+            Assert.Equal(formatter.FormatDouble(position), WinRT.MarshalString.FromAbi(text));
+        }
+        finally
+        {
+            WinRT.MarshalString.DisposeAbi(text);
+            WinRT.MarshalInterface<Windows.Globalization.NumberFormatting.INumberFormatter2>.DisposeAbi(pointer);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, 0, 11)]
+    [InlineData(false, 1, 1)]
+    [InlineData(false, 5, 5)]
+    [InlineData(false, 10, 10)]
+    [InlineData(true, -1, 0)]
+    [InlineData(true, 0, 1010)]
+    [InlineData(true, 1, 1)]
+    [InlineData(true, 40, 40)]
+    [InlineData(true, 999, 999)]
+    [InlineData(true, 1000, 1000)]
+    public void SettingEndpoints_RoundTripStorageTextAndSliderPositions(bool samplingRate, int stored, int position)
+    {
+        var formatter = new SettingNumberFormatter(samplingRate);
+        Assert.Equal(position, formatter.ToSliderValue(stored));
+        Assert.Equal(stored, formatter.ToStoredValue(position));
+        Assert.Equal(position, formatter.ParseDouble(formatter.FormatDouble(position)));
+        Assert.Equal(position, formatter.ParseInt(formatter.FormatInt(position)));
+        Assert.Equal((ulong)position, formatter.ParseUInt(formatter.FormatUInt((ulong)position)));
+        string text = formatter.FormatDouble(position);
+        Assert.Equal(text, formatter.Convert(position, typeof(string), null!, Localization.CurrentCultureName));
+        Assert.Equal((double)position, formatter.ConvertBack(text, typeof(double), null!, Localization.CurrentCultureName));
+    }
+
+    [Theory]
+    [InlineData("zh-CN", "显示器", "不限制", "特效数量上限", "拖尾采样率")]
+    [InlineData("en", "Display", "Unlimited", "Effect count limit", "Trail sampling rate")]
+    [InlineData("ja", "ディスプレイ", "無制限", "エフェクト数の上限", "トレイルサンプリングレート")]
+    public void SettingEndpoints_TranslateBothSpecialValuesAndAssociatedTitles(string language, string display, string unlimited,
+        string countTitle, string samplingTitle)
+    {
+        string previous = Localization.CurrentCultureName;
+        try
+        {
+            Localization.ApplyCulture(language);
+            var sampling = new SettingNumberFormatter(true);
+            var count = new SettingNumberFormatter(false);
+            Assert.Equal(display, sampling.FormatDouble(0));
+            Assert.Equal(unlimited, sampling.FormatDouble(1010));
+            Assert.Equal(unlimited, count.FormatDouble(11));
+            Assert.Equal(0, sampling.ParseDouble(display));
+            Assert.Equal(1010, sampling.ParseDouble(unlimited));
+            Assert.Equal(11, count.ParseDouble(unlimited));
+            Assert.Equal(countTitle, Localization.Get("Basic_MaxTouchEffects"));
+            Assert.Equal(samplingTitle, Localization.Get("Visual_TrailSamplingRate"));
+            Assert.DoesNotContain("拖尾刷新率", Localization.Get("Visual_LinkedSpeedHint"), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Localization.ApplyCulture(previous);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, "0", 11)]
+    [InlineData(false, "1", 1)]
+    [InlineData(false, "10", 10)]
+    [InlineData(false, "11", null)]
+    [InlineData(false, "-1", null)]
+    [InlineData(false, "1.5", null)]
+    [InlineData(true, "0", 0)]
+    [InlineData(true, "1", 1)]
+    [InlineData(true, "1000", 1000)]
+    [InlineData(true, "1001", null)]
+    [InlineData(true, "1010", null)]
+    [InlineData(true, "-1", null)]
+    [InlineData(true, "2.5", null)]
+    [InlineData(true, "NaN", null)]
+    [InlineData(true, "Infinity", null)]
+    [InlineData(true, "", null)]
+    public void SettingEndpoints_InputsAcceptOnlyIntegersInTheVisibleRange(bool samplingRate, string text, int? expected)
+    {
+        Assert.Equal((double?)expected, new SettingNumberFormatter(samplingRate).ParseDouble(text));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(40)]
+    [InlineData(400)]
+    [InlineData(1000)]
+    public void TrailSamplingRate_AppliesToEveryOverlayAndUnlimitedDisablesInputThrottling(int rate)
+    {
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        using var manager = new OverlayManager();
+        var overlays = (Dictionary<string, OverlayWindow>)typeof(OverlayManager).GetField("_overlays", members)!.GetValue(manager)!;
+        overlays.Add("first-invalid-display", (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow)));
+        overlays.Add("second-invalid-display", (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow)));
+        try
+        {
+            manager.UpdateInputSamplingRate(rate);
+            int effective = rate == -1 ? 60 : rate;
+            long expected = effective == 0 ? 0 : Math.Max(1, System.Diagnostics.Stopwatch.Frequency / effective);
+            Assert.All(overlays.Values, overlay => Assert.Equal(expected, overlay.TrailMoveIntervalTimestamp));
+            Assert.Equal(expected, typeof(OverlayManager).GetField("_idleMoveIntervalTimestamp", members)!.GetValue(manager));
+            Assert.Equal(0L, typeof(OverlayManager).GetField("_lastMoveTimestamp", members)!.GetValue(manager));
+            manager.UpdateInputSamplingRate(rate == 0 ? 1000 : 0);
+            Assert.All(overlays.Values, overlay => Assert.Equal(rate == 0 ? Math.Max(1, System.Diagnostics.Stopwatch.Frequency / 1000) : 0,
+                overlay.TrailMoveIntervalTimestamp));
+        }
+        finally
+        {
+            overlays.Clear();
+        }
+    }
+
     [Fact]
-    public void TrailRefreshRate_CanFollowTheDisplayAndKeepsTheManualRange()
+    public void TrailSamplingRate_CombinesDisplayManualAndUnlimitedModesInOneNativeCard()
     {
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
-        XElement toggle = GetNamedElement(document, "CheckFollowDisplayRefreshRate");
-        XElement hint = GetNamedElement(document, "TxtFollowDisplayRefreshRateHint");
-        XElement slider = GetNamedElement(document, "SliderTrailRefresh");
-        XElement numberBox = GetNamedElement(document, "TxtTrailRefreshValue");
-        AssertSettingHint(toggle, hint);
-        Assert.Equal("30", (string?)slider.Attribute("Minimum"));
-        Assert.Equal("360", (string?)slider.Attribute("Maximum"));
-        Assert.Equal("30", (string?)numberBox.Attribute("Minimum"));
-        Assert.Equal("360", (string?)numberBox.Attribute("Maximum"));
+        XElement slider = GetNamedElement(document, "SliderTrailSamplingRate");
+        XElement numberBox = GetNamedElement(document, "TxtTrailSamplingRateValue");
+        Assert.DoesNotContain(document.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "CheckFollowDisplayRefreshRate");
+        Assert.Equal("0", (string?)slider.Attribute("Minimum"));
+        Assert.Equal("1010", (string?)slider.Attribute("Maximum"));
+        Assert.Equal("0", (string?)numberBox.Attribute("Minimum"));
+        Assert.Equal("1010", (string?)numberBox.Attribute("Maximum"));
+        Assert.Equal("Auto", (string?)numberBox.Attribute("Width"));
+        Assert.Equal("84", (string?)numberBox.Attribute("MinWidth"));
 
         string configSource = ReadSource("src", "ConfigManager.cs");
         string overlaySource = ReadSource("src", "OverlayManager.cs");
-        Assert.Contains("TrailRefreshRate { get; set; } = 60", configSource, StringComparison.Ordinal);
-        Assert.Contains("FollowDisplayRefreshRate { get; set; } = true", configSource, StringComparison.Ordinal);
-        Assert.Contains("Math.Clamp(hz, 30, 360)", overlaySource, StringComparison.Ordinal);
-        Assert.Contains("ScreenIdentity.GetRefreshRate(pair.Key, _manualTrailRefreshRate)", overlaySource, StringComparison.Ordinal);
+        Assert.Contains("InputSamplingRate { get; set; } = -1", configSource, StringComparison.Ordinal);
+        Assert.Contains("ScreenIdentity.GetRefreshRate(pair.Key)", overlaySource, StringComparison.Ordinal);
         Assert.Contains("RouteTrailMove(target, cursorX, cursorY", overlaySource, StringComparison.Ordinal);
         Assert.Contains("long moveInterval = target?.TrailMoveIntervalTimestamp", overlaySource, StringComparison.Ordinal);
         Assert.Contains("RestartDisplaySettingsRecoveryTimer", overlaySource, StringComparison.Ordinal);
@@ -363,10 +495,10 @@ public class WinUi3UiTests
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement slider = GetNamedElement(document, "SliderGlow");
         XElement numberBox = GetNamedElement(document, "TxtGlowValue");
-        XElement trailRefreshText = GetNamedElement(document, "TxtTrailRefresh");
+        XElement trailSamplingText = GetNamedElement(document, "TxtTrailSamplingRate");
         XElement effectColor = GetNamedElement(document, "TxtEffectColor");
         List<XElement> children = GetNamedElement(document, "SectionVisual").Descendants().ToList();
-        Assert.True(children.IndexOf(trailRefreshText) < children.IndexOf(effectColor));
+        Assert.True(children.IndexOf(trailSamplingText) < children.IndexOf(effectColor));
         Assert.Equal("0", (string?)slider.Attribute("Minimum"));
         Assert.Equal("3", (string?)slider.Attribute("Maximum"));
         Assert.Equal("0", (string?)numberBox.Attribute("Minimum"));
@@ -1248,17 +1380,18 @@ public class WinUi3UiTests
         Assert.Equal("NumberBox", input.Name.LocalName);
         foreach (XElement control in new[] { slider, input })
         {
-            Assert.Equal("0", (string?)control.Attribute("Minimum"));
-            Assert.Equal("10", (string?)control.Attribute("Maximum"));
+            Assert.Equal("1", (string?)control.Attribute("Minimum"));
+            Assert.Equal("11", (string?)control.Attribute("Maximum"));
             Assert.Equal("1", (string?)control.Attribute("Value"));
         }
         Assert.Equal("1", (string?)slider.Attribute("StepFrequency"));
         Assert.Equal("1", (string?)input.Attribute("SmallChange"));
         Assert.Equal("Compact", (string?)input.Attribute("SpinButtonPlacementMode"));
-        Assert.Equal((string?)GetNamedElement(document, "TxtTrailRefreshValue").Attribute("Width"), (string?)input.Attribute("Width"));
+        Assert.Equal("84", (string?)input.Attribute("MinWidth"));
+        Assert.Equal((string?)GetNamedElement(document, "TxtTrailSamplingRateValue").Attribute("Width"), (string?)input.Attribute("Width"));
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("SetSettingsVisibility(SectionBasic, animate, (PanelMaxTouchEffects, CheckTouchscreenMode.IsOn))", source, StringComparison.Ordinal);
-        Assert.Contains("ConfigManager.Save(\"MaxTouchEffects\", (int)Math.Round(SliderMaxTouchEffects.Value))", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.Save(\"MaxTouchEffects\", _touchEffectLimitFormatter.ToStoredValue(SliderMaxTouchEffects.Value))", source, StringComparison.Ordinal);
         foreach (string language in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
         {
             XDocument strings = XDocument.Parse(ReadSource("src", language));
@@ -1917,7 +2050,7 @@ public class WinUi3UiTests
         using var firstHost = new LayeredWindowHost();
         using var secondHost = new LayeredWindowHost();
         using var manager = new OverlayManager();
-        manager.UpdateTrailRefreshRate(40, false);
+        manager.UpdateInputSamplingRate(40);
         var first = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
         var second = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
         typeof(OverlayWindow).GetField("_host", members)!.SetValue(first, firstHost);
@@ -2252,7 +2385,7 @@ public class WinUi3UiTests
             "CheckAutoStart", "CheckStartSilent", "CheckHideTrayIcon", "CheckRunAsAdmin", "CheckTouchscreenMode",
             "CheckLinkedEffectScale", "SliderScale", "SliderTrailScale", "SliderClickScale",
             "SliderGlow", "CheckLinkedAnimationSpeed", "SliderSpeed", "SliderTrailAnimSpeed", "SliderClickAnimSpeed",
-            "CheckApplyCurveDraw", "CheckFollowDisplayRefreshRate", "SliderTrailRefresh",
+            "CheckApplyCurveDraw", "SliderTrailSamplingRate",
             "CheckEnvironmentFilter", "CheckHideInFullscreen", "CheckShowEffectOnDesktop",
             "ComboProfiles", "ComboProcessFilterMode", "ListConfiguredProcesses"
         ];
@@ -2314,7 +2447,6 @@ public class WinUi3UiTests
     [InlineData("CheckLinkedEffectScale", "TxtLinkedScaleHint")]
     [InlineData("CheckLinkedAnimationSpeed", "TxtLinkedSpeedHint")]
     [InlineData("CheckApplyCurveDraw", "TxtCurveDrawHint")]
-    [InlineData("CheckFollowDisplayRefreshRate", "TxtFollowDisplayRefreshRateHint")]
     public void SettingHints_RemainUnderTheTitleInTheSameCard(string controlName, string hintName)
     {
         XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");

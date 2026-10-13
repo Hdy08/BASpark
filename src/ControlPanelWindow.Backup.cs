@@ -188,7 +188,9 @@ public sealed partial class ControlPanelWindow
         else if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
             description = Localization.Get(value.GetBoolean() ? "Basic_DarkModeOn" : "Basic_DarkModeOff");
         else if (key == "MaxTouchEffects" && value.GetInt32() == 0)
-            description = Localization.Get("Basic_MaxTouchEffectsHint");
+            description = Localization.Get("Settings_Unlimited");
+        else if (key == "InputSamplingRate" && value.GetInt32() is -1 or 0)
+            description = Localization.Get(value.GetInt32() == -1 ? "Settings_Display" : "Settings_Unlimited");
         else if (value.ValueKind == JsonValueKind.Number)
             description = value.GetDouble().ToString("0.##", CultureInfo.CurrentCulture);
         else
@@ -310,18 +312,20 @@ public sealed partial class ControlPanelWindow
                          ("EnableMiddleClickTrigger", CheckMiddleClickTrigger), ("ScreenshotCompatibilityMode", CheckScreenshotCompatibilityMode),
                          ("EnableEnvironmentFilter", CheckEnvironmentFilter), ("HideInFullscreen", CheckHideInFullscreen),
                          ("ShowEffectOnDesktop", CheckShowEffectOnDesktop), ("UseLinkedEffectScale", CheckLinkedEffectScale),
-                         ("UseLinkedAnimationSpeed", CheckLinkedAnimationSpeed), ("ApplyCurveDraw", CheckApplyCurveDraw),
-                         ("FollowDisplayRefreshRate", CheckFollowDisplayRefreshRate)
+                         ("UseLinkedAnimationSpeed", CheckLinkedAnimationSpeed), ("ApplyCurveDraw", CheckApplyCurveDraw)
                      })
                 if (values.TryGetValue(item.Item1, out object? value)) item.Item2.IsOn = (bool)value;
             foreach (var item in new[]
                      {
                          ("EffectScale", SliderScale), ("TrailEffectScale", SliderTrailScale), ("ClickEffectScale", SliderClickScale),
                          ("GlowIntensity", SliderGlow), ("EffectSpeed", SliderSpeed), ("TrailAnimationSpeed", SliderTrailAnimSpeed),
-                         ("ClickAnimationSpeed", SliderClickAnimSpeed), ("TrailRefreshRate", SliderTrailRefresh),
-                         ("MaxTouchEffects", SliderMaxTouchEffects)
+                         ("ClickAnimationSpeed", SliderClickAnimSpeed)
                      })
                 if (values.TryGetValue(item.Item1, out object? value)) item.Item2.Value = Convert.ToDouble(value);
+            if (values.TryGetValue("MaxTouchEffects", out object? maximum))
+                SliderMaxTouchEffects.Value = _touchEffectLimitFormatter.ToSliderValue((int)maximum);
+            if (values.TryGetValue("InputSamplingRate", out object? samplingRate))
+                SliderTrailSamplingRate.Value = _samplingRateFormatter.ToSliderValue((int)samplingRate);
             if (values.TryGetValue("DarkMode", out object? darkMode)) SelectDarkMode((DarkModeOption)darkMode);
             if (values.TryGetValue("ClickTriggerType", out object? trigger)) RadioClickType.SelectedIndex = (int)trigger;
             if (values.TryGetValue("UiLanguage", out object? language))
@@ -359,7 +363,6 @@ public sealed partial class ControlPanelWindow
         UpdateMultiTouchPanelVisibility();
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
-        UpdateTrailRefreshInterlock();
         ClickCountText.Text = Localization.Format("Welcome_ClicksUnit", ConfigManager.TotalClicks);
     }
 
@@ -370,7 +373,7 @@ public sealed partial class ControlPanelWindow
         ConfigManager.GetAnimationSpeedsForOverlay(out double trailSpeed, out double clickSpeed);
         App.Overlay?.UpdateColor(ConfigManager.ParticleColor);
         App.Overlay?.UpdateEffectSettings(trailScale, clickScale, ConfigManager.EffectOpacity, trailSpeed, clickSpeed, ConfigManager.GlowIntensity);
-        App.Overlay?.UpdateTrailRefreshRate(ConfigManager.TrailRefreshRate, ConfigManager.FollowDisplayRefreshRate);
+        App.Overlay?.UpdateInputSamplingRate(ConfigManager.InputSamplingRate);
         App.Overlay?.SetCurveDraw(ConfigManager.ApplyCurveDraw);
         App.Overlay?.UpdateTouchMode(ConfigManager.IsTouchscreenMode);
         App.Overlay?.UpdateScreenshotCompatibilityMode(ConfigManager.ScreenshotCompatibilityMode);

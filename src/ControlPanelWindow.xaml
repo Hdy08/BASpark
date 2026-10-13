@@ -508,8 +508,8 @@
                                         <Slider
                                             x:Name="SliderMaxTouchEffects"
                                             Grid.Column="0"
-                                            Minimum="0"
-                                            Maximum="10"
+                                            Minimum="1"
+                                            Maximum="11"
                                             Value="1"
                                             StepFrequency="1"
                                             MinWidth="40"
@@ -517,13 +517,14 @@
                                         <NumberBox
                                             x:Name="TxtMaxTouchEffectsValue"
                                             Grid.Column="1"
-                                            Minimum="0"
-                                            Maximum="10"
+                                            Minimum="1"
+                                            Maximum="11"
                                             Value="1"
                                             SmallChange="1"
                                             LargeChange="1"
                                             SpinButtonPlacementMode="Compact"
-                                            Width="84"
+                                            MinWidth="84"
+                                            Width="Auto"
                                             AutomationProperties.Name="{Binding Text, ElementName=TxtMaxTouchEffects}" />
                                     </Grid>
                                 </Grid>
@@ -977,33 +978,11 @@
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Header, ElementName=CheckFollowDisplayRefreshRate}" Style="{StaticResource BasSettingTitleStyle}" />
-                                        <TextBlock
-                                            x:Name="TxtFollowDisplayRefreshRateHint"
-                                            Text=""
-                                            Style="{StaticResource BasCaptionStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <ToggleSwitch
-                                            x:Name="CheckFollowDisplayRefreshRate"
-                                            Header=""
-                                            Style="{StaticResource BasSettingToggleStyle}"
-                                            AutomationProperties.Name="{Binding Header, ElementName=CheckFollowDisplayRefreshRate}" />
-                                    </Grid>
-                                </Grid>
-                            </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
                                         <ColumnDefinition Width="*" MinWidth="140" MaxWidth="240" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
                                         <TextBlock
-                                            x:Name="TxtTrailRefresh"
+                                            x:Name="TxtTrailSamplingRate"
                                             Text=""
                                             Style="{StaticResource BasSettingTitleStyle}" />
                                     </StackPanel>
@@ -1014,22 +993,23 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <Slider
-                                                x:Name="SliderTrailRefresh"
+                                                x:Name="SliderTrailSamplingRate"
                                                 Grid.Column="0"
-                                                Minimum="30"
-                                                Maximum="360"
+                                                Minimum="0"
+                                                Maximum="1010"
                                                 StepFrequency="10"
                                                 MinWidth="40"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtTrailRefresh}" />
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtTrailSamplingRate}" />
                                             <NumberBox
-                                                x:Name="TxtTrailRefreshValue"
+                                                x:Name="TxtTrailSamplingRateValue"
                                                 Grid.Column="1"
-                                                Minimum="30"
-                                                Maximum="360"
+                                                Minimum="0"
+                                                Maximum="1010"
                                                 SmallChange="10"
                                                 SpinButtonPlacementMode="Compact"
-                                                Width="84"
-                                                AutomationProperties.Name="{Binding Text, ElementName=TxtTrailRefresh}" />
+                                                MinWidth="84"
+                                                Width="Auto"
+                                                AutomationProperties.Name="{Binding Text, ElementName=TxtTrailSamplingRate}" />
                                         </Grid>
                                     </Grid>
                                 </Grid>

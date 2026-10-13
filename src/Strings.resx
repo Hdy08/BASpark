@@ -97,10 +97,16 @@
       <value>启用触摸特效</value>
     </data>
     <data name="Basic_MaxTouchEffects" xml:space="preserve">
-      <value>最大特效数量</value>
+      <value>特效数量上限</value>
     </data>
     <data name="Basic_MaxTouchEffectsHint" xml:space="preserve">
-      <value>0 为不限制</value>
+      <value>拖到最右端为不限制</value>
+    </data>
+    <data name="Settings_Unlimited" xml:space="preserve">
+      <value>不限制</value>
+    </data>
+    <data name="Settings_Display" xml:space="preserve">
+      <value>显示器</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
       <value>开启后，实际触摸输入也可触发特效；系统或应用主动隐藏鼠标指针时仍不触发。</value>
@@ -503,10 +509,10 @@
     <data name="VisualReset_GlowIntensity_Sub" xml:space="preserve">
       <value>默认 1.00 ×</value>
     </data>
-    <data name="VisualReset_TrailRefresh" xml:space="preserve">
-      <value>拖尾刷新率</value>
+    <data name="VisualReset_TrailSamplingRate" xml:space="preserve">
+      <value>拖尾采样率</value>
     </data>
-    <data name="VisualReset_TrailRefresh_Sub" xml:space="preserve">
+    <data name="VisualReset_TrailSamplingRate_Sub" xml:space="preserve">
       <value>默认跟随显示器</value>
     </data>
     <data name="VisualReset_TrailSpeed" xml:space="preserve">
@@ -567,7 +573,7 @@
       <value>拖尾与点击使用同一动画速度</value>
     </data>
     <data name="Visual_LinkedSpeedHint" xml:space="preserve">
-      <value>关闭此项后可单独加快或减慢拖尾衰减与移动粒子，而不影响点击波纹与爆发粒子，与下方「拖尾刷新率」不同。</value>
+      <value>关闭此项后可单独加快或减慢拖尾衰减与移动粒子，而不影响点击波纹与爆发粒子，与下方「拖尾采样率」不同。</value>
     </data>
     <data name="Visual_LinkedScale" xml:space="preserve">
       <value>拖尾与点击使用同一缩放比例</value>
@@ -580,12 +586,6 @@
     </data>
     <data name="Visual_CurveDrawHint" xml:space="preserve">
       <value>建议在60Hz及以上刷新率开启。</value>
-    </data>
-    <data name="Visual_FollowDisplayRefreshRate" xml:space="preserve">
-      <value>拖尾刷新率跟随显示器</value>
-    </data>
-    <data name="Visual_FollowDisplayRefreshRateHint" xml:space="preserve">
-      <value>开启此项后拖尾刷新率自动设置为鼠标所在显示器的刷新率。</value>
     </data>
     <data name="Visual_Opacity" xml:space="preserve">
       <value>不透明度</value>
@@ -611,8 +611,8 @@
     <data name="Visual_TrailAnimSpeed" xml:space="preserve">
       <value>拖尾动画速度</value>
     </data>
-    <data name="Visual_TrailRefresh" xml:space="preserve">
-      <value>拖尾刷新率</value>
+    <data name="Visual_TrailSamplingRate" xml:space="preserve">
+      <value>拖尾采样率</value>
     </data>
     <data name="WebView2_InitFailed" xml:space="preserve">
       <value>WebView2 初始化失败: {0}</value>

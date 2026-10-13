@@ -68,7 +68,7 @@ internal sealed class OverlayWindow : IDisposable
     private bool _controllerInitialized;
     private readonly WebViewUnresponsiveTracker _unresponsiveTracker = new();
 
-    internal OverlayWindow(ScreenInfo screen, int trailRefreshRate)
+    internal OverlayWindow(ScreenInfo screen, int inputSamplingRate)
     {
         _screenDeviceName = screen.DeviceName;
         _screenBounds = new NativeMethods.RECT
@@ -80,7 +80,7 @@ internal sealed class OverlayWindow : IDisposable
         };
 
         _host = new LayeredWindowHost();
-        UpdateTrailRefreshRate(trailRefreshRate);
+        UpdateInputSamplingRate(inputSamplingRate);
         UpdateRendererBounds();
 
         InitRealtimeTopmostHook();
@@ -937,10 +937,10 @@ internal sealed class OverlayWindow : IDisposable
         ExecuteScript($"if(window.updateEffectSettings) window.updateEffectSettings({trailScaleStr}, {clickScaleStr}, {opacityStr}, {trailStr}, {clickStr}, {glowStr});");
     }
 
-    public void UpdateTrailRefreshRate(int hz)
+    public void UpdateInputSamplingRate(int hz)
     {
-        int clampedHz = Math.Clamp(hz, 30, 360);
-        _trailMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / clampedHz);
+        int clampedHz = Math.Clamp(hz, 0, 1000);
+        _trailMoveIntervalTimestamp = clampedHz == 0 ? 0 : Math.Max(1, Stopwatch.Frequency / clampedHz);
     }
 
     public void SetCurveDraw(bool enabled)
