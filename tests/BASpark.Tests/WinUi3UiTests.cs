@@ -2376,7 +2376,7 @@ public class WinUi3UiTests
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement surface = GetNamedElement(panel, "ContentSurface");
         Assert.Equal("{ThemeResource BasSettingsPageBackgroundBrush}", (string?)surface.Attribute("Background"));
-        Assert.Equal("6,0,0,0", (string?)surface.Attribute("CornerRadius"));
+        Assert.Equal("8,0,0,0", (string?)surface.Attribute("CornerRadius"));
         Assert.Equal("{StaticResource BasSettingsPageTitleStyle}", (string?)GetNamedElement(panel, "TxtSettingsTitle").Attribute("Style"));
     }
 
@@ -2443,7 +2443,7 @@ public class WinUi3UiTests
         var setters = cardStyle.Elements().ToDictionary(element => (string)element.Attribute("Property")!, element => (string?)element.Attribute("Value"));
         Assert.Equal("60", setters["MinHeight"]);
         Assert.Equal("16,12", setters["Padding"]);
-        Assert.Equal("0,0,0,6", setters["Margin"]);
+        Assert.Equal("0,0,0,4", setters["Margin"]);
     }
 
     [Theory]
@@ -3125,7 +3125,7 @@ public class WinUi3UiTests
             Assert.Single(list.Descendants(), element => element.Name.LocalName == "TransitionCollection");
         }
         XElement container = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionCardContainerStyle");
-        Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,16,6");
+        Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,16,4");
         XElement card = GetNamedElement(panel, "SelectionCard");
         Assert.Equal("SelectionCard_PointerPressed", (string?)card.Attribute("PointerPressed"));
         Assert.Equal("SelectionCard_PointerReleased", (string?)card.Attribute("PointerReleased"));

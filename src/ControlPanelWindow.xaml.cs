@@ -1625,7 +1625,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _colorContentHost = FindVisualDescendant<Border>(EffectColorExpander, "ExpanderContentHost");
         Visual visual = ElementCompositionPreview.GetElementVisual(EffectColorCard);
         _colorCardGeometry ??= visual.Compositor.CreateRoundedRectangleGeometry();
-        _colorCardGeometry.CornerRadius = new Vector2(6);
+        _colorCardGeometry.CornerRadius = new Vector2(4);
         visual.Clip = visual.Compositor.CreateGeometricClip(_colorCardGeometry);
         if (_colorCardAnimating || _colorContentHost == null) return;
         _colorContentHost.Height = EffectColorExpander.IsExpanded ? double.NaN : 0;
@@ -3505,9 +3505,9 @@ public sealed partial class ControlPanelWindow : UserControl
         else
         {
             border.BorderThickness = new Thickness(1);
-            border.CornerRadius = new CornerRadius(6);
+            border.CornerRadius = new CornerRadius(4);
             border.Padding = new Thickness(16, 12, 16, 12);
-            border.Margin = new Thickness(0, 0, 0, 6);
+            border.Margin = new Thickness(0, 0, 0, 4);
             border.MinHeight = 60;
         }
 

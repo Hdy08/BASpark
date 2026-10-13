@@ -165,13 +165,13 @@
 
     <!-- ==================== 排版与间距（与主题无关） ==================== -->
 
-    <x:Double x:Key="BasCardCornerRadiusValue">8</x:Double>
-    <CornerRadius x:Key="BasCardCornerRadius">8</CornerRadius>
-    <CornerRadius x:Key="BasSettingCardCornerRadius">6</CornerRadius>
+    <x:Double x:Key="BasCardCornerRadiusValue">4</x:Double>
+    <CornerRadius x:Key="BasCardCornerRadius">4</CornerRadius>
+    <CornerRadius x:Key="BasSettingCardCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="BasControlCornerRadius">4</CornerRadius>
     <Thickness x:Key="BasCardPadding">16</Thickness>
     <Thickness x:Key="BasPagePadding">28</Thickness>
-    <Thickness x:Key="BasCardMargin">0,0,0,12</Thickness>
+    <Thickness x:Key="BasCardMargin">0,0,0,4</Thickness>
     <Thickness x:Key="ContentDialogPadding">16</Thickness>
     <Thickness x:Key="ContentDialogSeparatorThickness">0</Thickness>
     <Thickness x:Key="BasStartupContentMargin">24,20,24,0</Thickness>
@@ -237,7 +237,7 @@
         <Setter Property="Background" Value="{ThemeResource BasLayerBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource BasControlStrokeBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
+        <Setter Property="CornerRadius" Value="8" />
         <Setter Property="Padding" Value="{StaticResource BasCardPadding}" />
         <Setter Property="Margin" Value="0" />
     </Style>
@@ -246,7 +246,7 @@
         <Setter Property="Background" Value="{ThemeResource BasLayerBrush}" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource BasControlStrokeBrush}" />
-        <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
+        <Setter Property="CornerRadius" Value="8" />
     </Style>
 
     <Style x:Key="BasNativeDialogScrimStyle" TargetType="Rectangle">
@@ -254,6 +254,7 @@
     </Style>
 
     <Style x:Key="BasStartupInfoBarStyle" TargetType="InfoBar">
+        <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
         <Setter Property="IsOpen" Value="True" />
         <Setter Property="IsClosable" Value="False" />
         <Setter Property="IsIconVisible" Value="True" />
@@ -350,7 +351,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         <Setter Property="Padding" Value="16,12" />
-        <Setter Property="Margin" Value="0,0,0,6" />
+        <Setter Property="Margin" Value="0,0,0,4" />
         <Setter Property="MinHeight" Value="60" />
     </Style>
 

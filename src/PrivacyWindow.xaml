@@ -42,7 +42,7 @@
 
         <ScrollViewer Grid.Row="1" Margin="{StaticResource BasStartupContentMargin}"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="12">
+            <StackPanel Spacing="4">
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="VersionText" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="TxtTagline" Style="{StaticResource BasCaptionStyle}" TextWrapping="NoWrap" />

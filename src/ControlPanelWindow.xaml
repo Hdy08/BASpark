@@ -76,7 +76,7 @@
             CardTemplate="{StaticResource SelectionCardTemplate}" HeadingTemplate="{StaticResource SelectionHeadingTemplate}" />
         <Style x:Key="SelectionCardContainerStyle" TargetType="ContentPresenter">
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,16,6" />
+            <Setter Property="Margin" Value="0,0,16,4" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
     </UserControl.Resources>
@@ -204,7 +204,7 @@
         <!-- ==================== 内容区 ==================== -->
         <Border x:Name="ContentSurface" Grid.Column="1"
                 Background="{ThemeResource BasSettingsPageBackgroundBrush}"
-                CornerRadius="6,0,0,0">
+                CornerRadius="8,0,0,0">
         <Grid>
 
             <!-- ===== 首页 ===== -->

@@ -52,7 +52,7 @@ public sealed partial class ControlPanelWindow
                     Content = content, IsExpanded = false,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                    Margin = new Thickness(0, 0, 0, 6)
+                    Margin = new Thickness(0, 0, 0, 4)
                 });
             }
         }
