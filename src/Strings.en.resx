@@ -803,7 +803,6 @@
     <data name="About_InfoUnavailable" xml:space="preserve"><value>Not available</value></data>
     <data name="Visual_AdvancedSection" xml:space="preserve"><value>Advanced</value></data>
     <data name="Advanced_Enable" xml:space="preserve"><value>Enable ba-click-fx advanced settings</value></data>
-    <data name="Advanced_DisplayHint" xml:space="preserve"><value>Display options apply to the transparent desktop overlay. Color, scale, opacity and glow intensity use the existing settings.</value></data>
     <data name="Advanced_HdrHint" xml:space="preserve"><value>Applies when WebGPU HDR is selected and HDR is supported by the system.</value></data>
     <data name="Advanced_HdrPreset" xml:space="preserve"><value>Highlight preset</value></data>
     <data name="Advanced_HdrBalanced" xml:space="preserve"><value>Balanced white core (default)</value></data>
@@ -913,4 +912,77 @@
     <data name="Advanced_labelBloomTrailAlpha" xml:space="preserve"><value>Native Trail Glow Alpha</value></data>
     <data name="Advanced_labelBloomTrailEmission" xml:space="preserve"><value>Trail Emission Strength</value></data>
     <data name="Advanced_labelBloomTrailCoverage" xml:space="preserve"><value>Trail Coverage Scale</value></data>
+    <data name="Advanced_EnableDescription" xml:space="preserve"><value>Customize effect shapes, rendering and glow; disable to use defaults.</value></data>
+    <data name="Advanced_labelThemeColorModeDescription" xml:space="preserve"><value>Choose hue-only tinting or relative lightness and chroma mapping.</value></data>
+    <data name="Advanced_labelDprDescription" xml:space="preserve"><value>Limit pixel density; higher values improve clarity at greater cost.</value></data>
+    <data name="Advanced_labelRenderModeDescription" xml:space="preserve"><value>Choose how effects and glow are rendered.</value></data>
+    <data name="Advanced_labelOverlayAlphaPolicyDescription" xml:space="preserve"><value>Choose how opacity is combined between effects and glow.</value></data>
+    <data name="Advanced_labelOverlayColorCompensationDescription" xml:space="preserve"><value>Compensate bright core colors after transparent compositing.</value></data>
+    <data name="Advanced_labelOverlayAlphaLimitDescription" xml:space="preserve"><value>Cap overlay opacity to let the background show through.</value></data>
+    <data name="Advanced_labelIsolatedCompositingDescription" xml:space="preserve"><value>Combine effects in an isolated layer before compositing.</value></data>
+    <data name="Advanced_labelLightBackgroundContrastAlphaDescription" xml:space="preserve"><value>Increase effect outline contrast on light backgrounds.</value></data>
+    <data name="Advanced_labelWebGPUHdrPeakDescription" xml:space="preserve"><value>Limit HDR highlight brightness; applies only in HDR mode.</value></data>
+    <data name="Advanced_labelWebGPUHdrBrightnessDescription" xml:space="preserve"><value>Adjust HDR output brightness; applies only in HDR mode.</value></data>
+    <data name="Advanced_labelWebGPUHdrColorPreservationDescription" xml:space="preserve"><value>Adjust how strongly HDR highlights retain their color.</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteCoreDescription" xml:space="preserve"><value>Adjust whitening of HDR highlight cores.</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteStartDescription" xml:space="preserve"><value>Brightness at which HDR highlights begin whitening.</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteEndDescription" xml:space="preserve"><value>Brightness at which HDR highlight whitening is complete.</value></data>
+    <data name="Advanced_labelRingCountDescription" xml:space="preserve"><value>Number of rings created by each click.</value></data>
+    <data name="Advanced_labelRingHdrDescription" xml:space="preserve"><value>Adjust ring material emission energy.</value></data>
+    <data name="Advanced_labelRingRadMinDescription" xml:space="preserve"><value>Lower bound of the random ring radius.</value></data>
+    <data name="Advanced_labelRingRadMaxDescription" xml:space="preserve"><value>Upper bound of the random ring radius.</value></data>
+    <data name="Advanced_labelRingBandRatioDescription" xml:space="preserve"><value>Ring band thickness relative to its outer radius.</value></data>
+    <data name="Advanced_labelRingWStartDescription" xml:space="preserve"><value>Ring thickness multiplier at the start of its animation.</value></data>
+    <data name="Advanced_labelRingWEndDescription" xml:space="preserve"><value>Ring thickness multiplier at the end of its animation.</value></data>
+    <data name="Advanced_labelRingLifeDescription" xml:space="preserve"><value>Ring lifetime in milliseconds.</value></data>
+    <data name="Advanced_labelAngVelMulDescription" xml:space="preserve"><value>Adjust the ring rotation speed multiplier.</value></data>
+    <data name="Advanced_labelArcSamplesDescription" xml:space="preserve"><value>Subdivide the circumference for smoother ring outlines.</value></data>
+    <data name="Advanced_labelRadialSamplesDescription" xml:space="preserve"><value>Subdivide the ring band across its width.</value></data>
+    <data name="Advanced_labelRingDirDescription" xml:space="preserve"><value>Choose clockwise or counterclockwise ring rotation.</value></data>
+    <data name="Advanced_labelDissolveDirDescription" xml:space="preserve"><value>Choose the direction of ring texture dissolution.</value></data>
+    <data name="Advanced_labelDiskRadiusDescription" xml:space="preserve"><value>Adjust the base radius of the click disk.</value></data>
+    <data name="Advanced_labelDiskLifeDescription" xml:space="preserve"><value>Disk lifetime in milliseconds.</value></data>
+    <data name="Advanced_labelShardHdrDescription" xml:space="preserve"><value>Adjust emission energy for click and trail shards.</value></data>
+    <data name="Advanced_labelShardRoundnessDescription" xml:space="preserve"><value>Round triangular shards toward circular shapes.</value></data>
+    <data name="Advanced_labelShardSizeMinDescription" xml:space="preserve"><value>Lower bound of random shard sizes.</value></data>
+    <data name="Advanced_labelShardSizeMaxDescription" xml:space="preserve"><value>Upper bound of random shard sizes.</value></data>
+    <data name="Advanced_labelClickShardsDescription" xml:space="preserve"><value>Number of shards created by each click.</value></data>
+    <data name="Advanced_labelClickShardLifeMinDescription" xml:space="preserve"><value>Minimum click shard lifetime in milliseconds.</value></data>
+    <data name="Advanced_labelClickShardLifeMaxDescription" xml:space="preserve"><value>Maximum click shard lifetime in milliseconds.</value></data>
+    <data name="Advanced_labelClickShardRadiusDescription" xml:space="preserve"><value>Initial emission radius for click shards.</value></data>
+    <data name="Advanced_labelClickShardSpeedMinDescription" xml:space="preserve"><value>Minimum initial movement speed of click shards.</value></data>
+    <data name="Advanced_labelClickShardSpeedMaxDescription" xml:space="preserve"><value>Maximum initial movement speed of click shards.</value></data>
+    <data name="Advanced_labelShardSpacingDescription" xml:space="preserve"><value>Distance between shard emissions along a trail.</value></data>
+    <data name="Advanced_labelMaxShardsDescription" xml:space="preserve"><value>Maximum trail shards retained per trail.</value></data>
+    <data name="Advanced_labelTrailShardLifeMinDescription" xml:space="preserve"><value>Minimum trail shard lifetime in milliseconds.</value></data>
+    <data name="Advanced_labelTrailShardLifeMaxDescription" xml:space="preserve"><value>Maximum trail shard lifetime in milliseconds.</value></data>
+    <data name="Advanced_labelTrailShardRadiusDescription" xml:space="preserve"><value>Emission radius of shards around the trail.</value></data>
+    <data name="Advanced_labelTrailShardSpeedMinDescription" xml:space="preserve"><value>Minimum initial movement speed of trail shards.</value></data>
+    <data name="Advanced_labelTrailShardSpeedMaxDescription" xml:space="preserve"><value>Maximum initial movement speed of trail shards.</value></data>
+    <data name="Advanced_labelTrailWDescription" xml:space="preserve"><value>Adjust trail width in compatibility rendering.</value></data>
+    <data name="Advanced_labelTrailGlowWDescription" xml:space="preserve"><value>Adjust outer trail glow width in native glow fallback.</value></data>
+    <data name="Advanced_labelTrailLifeDescription" xml:space="preserve"><value>Time each trail point remains visible, in milliseconds.</value></data>
+    <data name="Advanced_labelTrailOpacityDescription" xml:space="preserve"><value>Adjust opacity of the trail layer independently.</value></data>
+    <data name="Advanced_labelGeomWidthDescription" xml:space="preserve"><value>Adjust the base width of the trail mesh.</value></data>
+    <data name="Advanced_labelMinVertDistDescription" xml:space="preserve"><value>Minimum distance between trail vertices; smaller is finer.</value></data>
+    <data name="Advanced_labelCornerVertsDescription" xml:space="preserve"><value>Adjust subdivisions around trail corners.</value></data>
+    <data name="Advanced_labelCapVertsDescription" xml:space="preserve"><value>Adjust subdivisions at trail ends.</value></data>
+    <data name="Advanced_labelBloomThresholdDescription" xml:space="preserve"><value>Brightness above which pixels contribute to Bloom.</value></data>
+    <data name="Advanced_labelBloomSoftKneeDescription" xml:space="preserve"><value>Soften the glow transition around the threshold.</value></data>
+    <data name="Advanced_labelBloomClampDescription" xml:space="preserve"><value>Limit the brightness entering Bloom.</value></data>
+    <data name="Advanced_labelBloomDiffusionDescription" xml:space="preserve"><value>Adjust how far glow spreads outward.</value></data>
+    <data name="Advanced_labelBloomResolutionDescription" xml:space="preserve"><value>Resolution scale for glow calculations; higher costs more.</value></data>
+    <data name="Advanced_labelBloomEmissionDescription" xml:space="preserve"><value>Adjust the brightness range used to encode glow energy.</value></data>
+    <data name="Advanced_labelClickGlowDescription" xml:space="preserve"><value>Adjust glow source intensity for rings and disks.</value></data>
+    <data name="Advanced_labelBloomRingDescription" xml:space="preserve"><value>Adjust ring blur radius in native glow fallback.</value></data>
+    <data name="Advanced_labelBloomDiskDescription" xml:space="preserve"><value>Adjust disk blur radius in native glow fallback.</value></data>
+    <data name="Advanced_labelBloomDiskEmissionDescription" xml:space="preserve"><value>Adjust disk emission energy entering Bloom.</value></data>
+    <data name="Advanced_labelBloomRingCoreAlphaDescription" xml:space="preserve"><value>Adjust opacity of ring cores as glow sources.</value></data>
+    <data name="Advanced_labelBloomDiskCoreAlphaDescription" xml:space="preserve"><value>Adjust opacity of disk cores as glow sources.</value></data>
+    <data name="Advanced_labelBloomRingAlphaDescription" xml:space="preserve"><value>Adjust opacity of native ring glow.</value></data>
+    <data name="Advanced_labelBloomDiskAlphaDescription" xml:space="preserve"><value>Adjust opacity of native disk glow.</value></data>
+    <data name="Advanced_labelBloomTrailDescription" xml:space="preserve"><value>Adjust opacity of the trail as a glow source.</value></data>
+    <data name="Advanced_labelBloomTrailAlphaDescription" xml:space="preserve"><value>Adjust opacity of native trail glow.</value></data>
+    <data name="Advanced_labelBloomTrailEmissionDescription" xml:space="preserve"><value>Adjust trail emission energy entering Bloom.</value></data>
+    <data name="Advanced_labelBloomTrailCoverageDescription" xml:space="preserve"><value>Adjust the width multiplier of the trail glow source.</value></data>
 </root>

@@ -298,12 +298,12 @@ test('initializes the vendored renderer in manual WebView2 mode', () =>
   assert.equal(harness.fx.config.outputCompositing, 'browser-overlay');
   assert.equal(harness.fx.config.overlayAlphaPolicy, 'visual-max');
   assert.equal(harness.fx.config.overlayColorCompensation, 'none');
-  assert.equal(harness.fx.config.overlayAlphaLimit, 0.85);
+  assert.equal(harness.fx.config.overlayAlphaLimit, 250 / 255);
   assert.equal(harness.fx.config.hostCompositing, 'source-over');
   assert.equal(harness.fx.config.hostCompositingSurface, 'transparent-window');
   assert.equal(harness.fx.config.isolatedCompositing, false);
   assert.equal(harness.fx.config.lightBackgroundContrastAlpha, 0);
-  assert.equal(harness.fx.config.maxDpr, 2);
+  assert.equal(harness.fx.config.maxDpr, 1);
   assert.equal(harness.calls.updateConfig.at(-1).scale, 2 / 3);
   assert.equal(harness.calls.setCompositingReference.length, 0);
   assert.equal(harness.calls.messages.at(-1).type, 'ready');
@@ -334,14 +334,14 @@ test('advanced settings at their defaults leave all existing effects unchanged',
   assert.equal(JSON.stringify({ config: fx.config, parameters: fx.fxConfig }), before);
   assert.equal(calls.updateConfig.length, configCalls);
   assert.equal(calls.setFxParams.length, parameterCalls);
-  assert.equal(fx.config.themeColorMode, 'hue-only');
+  assert.equal(fx.config.themeColorMode, 'relative-oklch');
 });
 
 test('advanced shapes compose with existing scales and restore cleanly when disabled', () =>
 {
   const { window, fx, calls } = createHarness();
   window.updateEffectSettings(2, 1, 0.6, 1.2, 0.8, 1.8);
-  const advanced = { config: { renderMode: 'native-bloom', maxDpr: 1.5, themeColorMode: 'relative-oklch' },
+  const advanced = { config: { renderMode: 'native-bloom', maxDpr: 1.5, themeColorMode: 'hue-only', overlayAlphaLimit: 0.6 },
     parameters: { 'trail.width': 5.5, 'trail.minVertexDistance': 7, 'rings.count': 4, 'bloom.threshold': 2 } };
   assert.equal(window.updateBaClickAdvancedSettings(true, advanced), true);
   assert.equal(fx.fxConfig.trail.width, 11);
@@ -351,6 +351,8 @@ test('advanced shapes compose with existing scales and restore cleanly when disa
   assert.equal(fx.fxConfig.bloom.intensity, 1.7 * 1.8);
   assert.equal(fx.config.effectBackend, 'canvas2d');
   assert.equal(fx.config.bloomBackend, 'native');
+  assert.equal(fx.config.themeColorMode, 'hue-only');
+  assert.equal(fx.config.overlayAlphaLimit, 0.6);
   assert.equal(fx.config.opacity, 0.6);
   assert.equal(fx.config.clickTimeScale, 0.8);
   assert.equal(fx.config.hostCompositingSurface, 'transparent-window');
@@ -367,8 +369,22 @@ test('advanced shapes compose with existing scales and restore cleanly when disa
   assert.equal(fx.fxConfig.bloom.intensity, 1.7 * 1.8);
   assert.equal(fx.config.effectBackend, 'webgl2');
   assert.equal(fx.config.bloomBackend, 'webgl2');
-  assert.equal(fx.config.maxDpr, 2);
-  assert.equal(fx.config.themeColorMode, 'hue-only');
+  assert.equal(fx.config.maxDpr, 1);
+  assert.equal(fx.config.themeColorMode, 'relative-oklch');
+  assert.equal(fx.config.overlayAlphaLimit, 250 / 255);
+});
+
+test('display defaults match the full library with advanced settings enabled or disabled', () =>
+{
+  const vendor = vm.createContext({ atob: value => Buffer.from(value, 'base64').toString('binary') });
+  vm.runInContext(readFileSync(new URL('../../src/Web/vendor/ba-click-fx.iife.js', import.meta.url), 'utf8'), vendor);
+  const { window, fx } = createHarness();
+  for (const enabled of [false, true, false, true])
+  {
+    window.updateBaClickAdvancedSettings(enabled, { config: {}, parameters: {} });
+    for (const key of ['maxDpr', 'themeColorMode', 'overlayAlphaLimit'])
+      assert.equal(fx.config[key], vendor.BAClickFX.CONFIG[key], `${key}: advanced=${enabled}`);
+  }
 });
 
 test('advanced render modes retain transparent-window capabilities and explicit software Bloom', () =>

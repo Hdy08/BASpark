@@ -17,10 +17,10 @@
     const DEFAULT_COLOR = '#4ca7ff';
     const BASE_RENDER_CONFIG = Object.freeze({
         inputSource: 'manual', effectBackend: 'webgl2', bloomBackend: 'webgl2',
-        themeColorMode: 'hue-only', outputCompositing: 'browser-overlay',
-        overlayAlphaPolicy: 'visual-max', overlayColorCompensation: 'none', overlayAlphaLimit: 0.85,
+        themeColorMode: 'relative-oklch', outputCompositing: 'browser-overlay',
+        overlayAlphaPolicy: 'visual-max', overlayColorCompensation: 'none', overlayAlphaLimit: 250 / 255,
         hostCompositing: 'source-over', hostCompositingSurface: 'transparent-window',
-        isolatedCompositing: false, lightBackgroundContrastAlpha: 0, maxDpr: 2,
+        isolatedCompositing: false, lightBackgroundContrastAlpha: 0, maxDpr: 1,
         webgpuPreferHdr: true, webgpuHdrPeak: 3, webgpuHdrBrightness: 1,
         webgpuHdrColorPreservation: 0, webgpuHdrWhiteCore: 0.6,
         webgpuHdrWhiteStart: 1, webgpuHdrWhiteEnd: 5,

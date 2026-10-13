@@ -2745,7 +2745,7 @@ public class WinUi3UiTests
             .Select(style => (string?)style.Attribute(Xaml + "Key"))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
-        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle", "DefaultComboBoxItemStyle", "DefaultFlyoutPresenterStyle",
+        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle", "DefaultComboBoxItemStyle", "DefaultFlyoutPresenterStyle", "DefaultExpanderStyle",
             "TitleTextBlockStyle", "SubtitleTextBlockStyle", "BodyTextBlockStyle", "BodyStrongTextBlockStyle", "BodyLargeTextBlockStyle", "CaptionTextBlockStyle" });
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
@@ -3867,7 +3867,12 @@ public class WinUi3UiTests
         XElement toggle = GetNamedElement(panel, "CheckBaClickAdvancedSettings");
         Assert.Equal(Presentation + "ToggleSwitch", toggle.Name);
         Assert.Same(GetNamedElement(panel, "SectionVisual"), GetSettingCard(toggle).Parent);
-        Assert.Equal("Collapsed", (string?)GetNamedElement(panel, "PanelBaClickAdvanced").Attribute("Visibility"));
+        XElement list = GetNamedElement(panel, "BaClickAdvancedList");
+        Assert.Equal(Presentation + "Expander", list.Name);
+        Assert.Equal("False", (string?)list.Attribute("IsExpanded"));
+        Assert.Equal("BaClickAdvancedList_Loaded", (string?)list.Attribute("Loaded"));
+        Assert.Same(list, GetNamedElement(panel, "PanelBaClickAdvanced").Parent);
+        Assert.Null(GetNamedElement(panel, "PanelBaClickAdvanced").Attribute("Visibility"));
         XDocument design = LoadXaml("src", "DesignSystem.xaml");
         XElement group = Assert.Single(design.Descendants(Presentation + "Style"),
             item => (string?)item.Attribute(Xaml + "Key") == "BasAdvancedGroupTitleStyle");
@@ -3881,6 +3886,19 @@ public class WinUi3UiTests
         Assert.Contains("new Expander", source, StringComparison.Ordinal);
         Assert.Contains("IsExpanded = false", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ControlTemplate", source, StringComparison.Ordinal);
+        Assert.Contains("BaClickAdvancedList.IsExpanded = CheckBaClickAdvancedSettings.IsOn", source, StringComparison.Ordinal);
+        Assert.Contains("header.Visibility = Visibility.Collapsed", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetSettingsVisibility", source, StringComparison.Ordinal);
+        Assert.Contains("CreateAdvancedLabel(setting.DescriptionKey, \"BasCaptionStyle\")", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Advanced_DisplayHint", source, StringComparison.Ordinal);
+        XElement expanderStyle = Assert.Single(design.Descendants(Presentation + "Style"),
+            item => (string?)item.Attribute(Xaml + "Key") == "BasAdvancedExpanderStyle");
+        Assert.Equal("{StaticResource DefaultExpanderStyle}", (string?)expanderStyle.Attribute("BasedOn"));
+        XElement cardStyle = Assert.Single(design.Descendants(Presentation + "Style"),
+            item => (string?)item.Attribute(Xaml + "Key") == "BasSettingCardStyle");
+        Assert.Equal((string?)cardStyle.Elements().Single(item => (string?)item.Attribute("Property") == "CornerRadius").Attribute("Value"),
+            (string?)expanderStyle.Elements().Single(item => (string?)item.Attribute("Property") == "CornerRadius").Attribute("Value"));
+        Assert.Contains("Application.Current.Resources[\"BasAdvancedExpanderStyle\"]", source, StringComparison.Ordinal);
         Assert.Equal(new[] { "Advanced_sectionBasic", "Advanced_sectionClick", "Advanced_sectionShards", "Advanced_sectionTrail", "Advanced_sectionBloom" },
             AdvancedFxSettings.Definitions.Select(item => item.GroupKey).Distinct().ToArray());
         Assert.Equal(10, AdvancedFxSettings.Definitions.Select(item => item.SectionKey).Distinct().Count());
@@ -3894,10 +3912,12 @@ public class WinUi3UiTests
             XDocument resources = XDocument.Parse(ReadSource("src", file));
             var values = resources.Root!.Elements("data").ToDictionary(item => (string)item.Attribute("name")!, item => item.Element("value")!.Value);
             foreach (AdvancedFxSetting definition in AdvancedFxSettings.Definitions)
-                foreach (string key in new[] { definition.GroupKey, definition.SectionKey, definition.TitleKey }
+                foreach (string key in new[] { definition.GroupKey, definition.SectionKey, definition.TitleKey, definition.DescriptionKey }
                              .Concat(definition.Options?.Select(item => item.TitleKey) ?? []))
                     Assert.False(string.IsNullOrWhiteSpace(values[key]));
             Assert.False(string.IsNullOrWhiteSpace(values["Advanced_Enable"]));
+            Assert.False(string.IsNullOrWhiteSpace(values["Advanced_EnableDescription"]));
+            Assert.DoesNotContain("Advanced_DisplayHint", values.Keys);
         }
     }
 

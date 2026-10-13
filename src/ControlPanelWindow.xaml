@@ -1188,14 +1188,22 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{Binding Header, ElementName=CheckBaClickAdvancedSettings}"
-                                               Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" />
+                                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckBaClickAdvancedSettings}"
+                                                   Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock x:Name="TxtBaClickAdvancedDescription" Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
                                     <ToggleSwitch x:Name="CheckBaClickAdvancedSettings" Grid.Column="1"
                                                   Style="{StaticResource BasSettingToggleStyle}" Toggled="BaClickAdvancedSettings_Changed"
                                                   AutomationProperties.Name="{Binding Header, ElementName=CheckBaClickAdvancedSettings}" />
                                 </Grid>
                             </Border>
-                            <StackPanel x:Name="PanelBaClickAdvanced" Visibility="Collapsed" />
+                            <Expander x:Name="BaClickAdvancedList" IsExpanded="False" MinWidth="0" MinHeight="0"
+                                      Padding="0" BorderThickness="0" Background="Transparent"
+                                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                      Loaded="BaClickAdvancedList_Loaded">
+                                <StackPanel x:Name="PanelBaClickAdvanced" />
+                            </Expander>
                         </StackPanel>
 
                         <!-- ===== 环境过滤 ===== -->

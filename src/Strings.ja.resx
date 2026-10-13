@@ -803,7 +803,6 @@
     <data name="About_InfoUnavailable" xml:space="preserve"><value>情報がありません</value></data>
     <data name="Visual_AdvancedSection" xml:space="preserve"><value>詳細</value></data>
     <data name="Advanced_Enable" xml:space="preserve"><value>ba-click-fx の詳細設定を有効にする</value></data>
-    <data name="Advanced_DisplayHint" xml:space="preserve"><value>透明なデスクトップレイヤーで利用できる表示項目です。色、倍率、不透明度、輝きの強度は既存の設定を使用します。</value></data>
     <data name="Advanced_HdrHint" xml:space="preserve"><value>WebGPU HDR モードで、システムが HDR に対応している場合に適用されます。</value></data>
     <data name="Advanced_HdrPreset" xml:space="preserve"><value>ハイライトのプリセット</value></data>
     <data name="Advanced_HdrBalanced" xml:space="preserve"><value>バランス（既定）</value></data>
@@ -913,4 +912,77 @@
     <data name="Advanced_labelBloomTrailAlpha" xml:space="preserve"><value>ネイティブ軌跡の輝きの Alpha</value></data>
     <data name="Advanced_labelBloomTrailEmission" xml:space="preserve"><value>軌跡の放出強度</value></data>
     <data name="Advanced_labelBloomTrailCoverage" xml:space="preserve"><value>軌跡のカバレッジ倍率</value></data>
+    <data name="Advanced_EnableDescription" xml:space="preserve"><value>形状、描画、グローを調整します。無効時は既定の設定を使用します。</value></data>
+    <data name="Advanced_labelThemeColorModeDescription" xml:space="preserve"><value>テーマ色で色相のみ、または明度と彩度も調整します。</value></data>
+    <data name="Advanced_labelDprDescription" xml:space="preserve"><value>描画の画素密度の上限です。高いほど鮮明になり、負荷が増えます。</value></data>
+    <data name="Advanced_labelRenderModeDescription" xml:space="preserve"><value>エフェクトとグローの描画方式を選択します。</value></data>
+    <data name="Advanced_labelOverlayAlphaPolicyDescription" xml:space="preserve"><value>エフェクトとグローを重ねる際の不透明度の配分を選択します。</value></data>
+    <data name="Advanced_labelOverlayColorCompensationDescription" xml:space="preserve"><value>透明合成後の明るい中心部分の色を補正します。</value></data>
+    <data name="Advanced_labelOverlayAlphaLimitDescription" xml:space="preserve"><value>オーバーレイの不透明度を制限し、背景を透かします。</value></data>
+    <data name="Advanced_labelIsolatedCompositingDescription" xml:space="preserve"><value>独立したレイヤー内でエフェクトをまとめてから合成します。</value></data>
+    <data name="Advanced_labelLightBackgroundContrastAlphaDescription" xml:space="preserve"><value>明るい背景でエフェクトの輪郭を見やすくします。</value></data>
+    <data name="Advanced_labelWebGPUHdrPeakDescription" xml:space="preserve"><value>HDR ハイライトの最大輝度です。HDR モードでのみ有効です。</value></data>
+    <data name="Advanced_labelWebGPUHdrBrightnessDescription" xml:space="preserve"><value>HDR 出力の明るさです。HDR モードでのみ有効です。</value></data>
+    <data name="Advanced_labelWebGPUHdrColorPreservationDescription" xml:space="preserve"><value>HDR ハイライトで元の色を保持する程度です。</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteCoreDescription" xml:space="preserve"><value>HDR ハイライトの中心を白くする程度です。</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteStartDescription" xml:space="preserve"><value>HDR ハイライトが白くなり始める輝度です。</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteEndDescription" xml:space="preserve"><value>HDR ハイライトの白色への移行が完了する輝度です。</value></data>
+    <data name="Advanced_labelRingCountDescription" xml:space="preserve"><value>クリックごとに生成するリングの数です。</value></data>
+    <data name="Advanced_labelRingHdrDescription" xml:space="preserve"><value>リングのマテリアルの発光エネルギーです。</value></data>
+    <data name="Advanced_labelRingRadMinDescription" xml:space="preserve"><value>ランダムなリング半径の下限です。</value></data>
+    <data name="Advanced_labelRingRadMaxDescription" xml:space="preserve"><value>ランダムなリング半径の上限です。</value></data>
+    <data name="Advanced_labelRingBandRatioDescription" xml:space="preserve"><value>外半径に対するリングの帯の太さの比率です。</value></data>
+    <data name="Advanced_labelRingWStartDescription" xml:space="preserve"><value>リングのアニメーション開始時の太さの倍率です。</value></data>
+    <data name="Advanced_labelRingWEndDescription" xml:space="preserve"><value>リングのアニメーション終了時の太さの倍率です。</value></data>
+    <data name="Advanced_labelRingLifeDescription" xml:space="preserve"><value>リングが表示されてから消えるまでの時間です。単位はミリ秒です。</value></data>
+    <data name="Advanced_labelAngVelMulDescription" xml:space="preserve"><value>リングの回転速度の倍率です。</value></data>
+    <data name="Advanced_labelArcSamplesDescription" xml:space="preserve"><value>円周方向の分割数です。高いほど輪郭が滑らかになります。</value></data>
+    <data name="Advanced_labelRadialSamplesDescription" xml:space="preserve"><value>リングの幅方向の分割数です。高いほど細かなメッシュになります。</value></data>
+    <data name="Advanced_labelRingDirDescription" xml:space="preserve"><value>リングの回転方向を選択します。</value></data>
+    <data name="Advanced_labelDissolveDirDescription" xml:space="preserve"><value>リングのテクスチャが溶解する方向です。</value></data>
+    <data name="Advanced_labelDiskRadiusDescription" xml:space="preserve"><value>クリック時の光の円盤の基本半径です。</value></data>
+    <data name="Advanced_labelDiskLifeDescription" xml:space="preserve"><value>光の円盤が消えるまでの時間です。単位はミリ秒です。</value></data>
+    <data name="Advanced_labelShardHdrDescription" xml:space="preserve"><value>クリックと軌跡の破片の発光エネルギーです。</value></data>
+    <data name="Advanced_labelShardRoundnessDescription" xml:space="preserve"><value>三角形の破片を徐々に丸くします。</value></data>
+    <data name="Advanced_labelShardSizeMinDescription" xml:space="preserve"><value>ランダムな破片サイズの下限です。</value></data>
+    <data name="Advanced_labelShardSizeMaxDescription" xml:space="preserve"><value>ランダムな破片サイズの上限です。</value></data>
+    <data name="Advanced_labelClickShardsDescription" xml:space="preserve"><value>クリックごとに生成する破片の数です。</value></data>
+    <data name="Advanced_labelClickShardLifeMinDescription" xml:space="preserve"><value>クリックの破片の最短寿命です。単位はミリ秒です。</value></data>
+    <data name="Advanced_labelClickShardLifeMaxDescription" xml:space="preserve"><value>クリックの破片の最長寿命です。単位はミリ秒です。</value></data>
+    <data name="Advanced_labelClickShardRadiusDescription" xml:space="preserve"><value>クリックの破片の初期発生範囲です。</value></data>
+    <data name="Advanced_labelClickShardSpeedMinDescription" xml:space="preserve"><value>クリックの破片の初期移動速度の下限です。</value></data>
+    <data name="Advanced_labelClickShardSpeedMaxDescription" xml:space="preserve"><value>クリックの破片の初期移動速度の上限です。</value></data>
+    <data name="Advanced_labelShardSpacingDescription" xml:space="preserve"><value>軌跡に沿って破片を生成する距離間隔です。</value></data>
+    <data name="Advanced_labelMaxShardsDescription" xml:space="preserve"><value>各軌跡で同時に保持する破片の上限です。</value></data>
+    <data name="Advanced_labelTrailShardLifeMinDescription" xml:space="preserve"><value>軌跡の破片の最短寿命です。単位はミリ秒です。</value></data>
+    <data name="Advanced_labelTrailShardLifeMaxDescription" xml:space="preserve"><value>軌跡の破片の最長寿命です。単位はミリ秒です。</value></data>
+    <data name="Advanced_labelTrailShardRadiusDescription" xml:space="preserve"><value>軌跡の周囲に破片を生成する範囲です。</value></data>
+    <data name="Advanced_labelTrailShardSpeedMinDescription" xml:space="preserve"><value>軌跡の破片の初期移動速度の下限です。</value></data>
+    <data name="Advanced_labelTrailShardSpeedMaxDescription" xml:space="preserve"><value>軌跡の破片の初期移動速度の上限です。</value></data>
+    <data name="Advanced_labelTrailWDescription" xml:space="preserve"><value>互換描画時の軌跡の幅です。</value></data>
+    <data name="Advanced_labelTrailGlowWDescription" xml:space="preserve"><value>ネイティブグローに切り替わった際の軌跡の外側の光の幅です。</value></data>
+    <data name="Advanced_labelTrailLifeDescription" xml:space="preserve"><value>軌跡の各点を保持する時間です。単位はミリ秒です。</value></data>
+    <data name="Advanced_labelTrailOpacityDescription" xml:space="preserve"><value>軌跡レイヤーの不透明度を個別に調整します。</value></data>
+    <data name="Advanced_labelGeomWidthDescription" xml:space="preserve"><value>軌跡メッシュの基本幅です。</value></data>
+    <data name="Advanced_labelMinVertDistDescription" xml:space="preserve"><value>軌跡の頂点間の最小距離です。小さいほど細かくなります。</value></data>
+    <data name="Advanced_labelCornerVertsDescription" xml:space="preserve"><value>軌跡の曲がり角の丸みの分割数です。</value></data>
+    <data name="Advanced_labelCapVertsDescription" xml:space="preserve"><value>軌跡の両端の丸みの分割数です。</value></data>
+    <data name="Advanced_labelBloomThresholdDescription" xml:space="preserve"><value>この輝度を超える部分が Bloom の対象になります。</value></data>
+    <data name="Advanced_labelBloomSoftKneeDescription" xml:space="preserve"><value>輝度のしきい値付近でグローへの移行を滑らかにします。</value></data>
+    <data name="Advanced_labelBloomClampDescription" xml:space="preserve"><value>Bloom に入力する最大輝度です。</value></data>
+    <data name="Advanced_labelBloomDiffusionDescription" xml:space="preserve"><value>グローが外側へ広がる範囲です。</value></data>
+    <data name="Advanced_labelBloomResolutionDescription" xml:space="preserve"><value>グロー計算の解像度倍率です。高いほど負荷が増えます。</value></data>
+    <data name="Advanced_labelBloomEmissionDescription" xml:space="preserve"><value>グローの発光エネルギーを格納する輝度範囲です。</value></data>
+    <data name="Advanced_labelClickGlowDescription" xml:space="preserve"><value>リングと光の円盤のグロー源の強度をまとめて調整します。</value></data>
+    <data name="Advanced_labelBloomRingDescription" xml:space="preserve"><value>ネイティブグロー使用時のリングのぼかし範囲です。</value></data>
+    <data name="Advanced_labelBloomDiskDescription" xml:space="preserve"><value>ネイティブグロー使用時の光の円盤のぼかし範囲です。</value></data>
+    <data name="Advanced_labelBloomDiskEmissionDescription" xml:space="preserve"><value>光の円盤から Bloom に入力する発光エネルギーです。</value></data>
+    <data name="Advanced_labelBloomRingCoreAlphaDescription" xml:space="preserve"><value>グロー源となるリングの中心部分の不透明度です。</value></data>
+    <data name="Advanced_labelBloomDiskCoreAlphaDescription" xml:space="preserve"><value>グロー源となる光の円盤の中心部分の不透明度です。</value></data>
+    <data name="Advanced_labelBloomRingAlphaDescription" xml:space="preserve"><value>ネイティブのリンググローの不透明度です。</value></data>
+    <data name="Advanced_labelBloomDiskAlphaDescription" xml:space="preserve"><value>ネイティブの光の円盤のグローの不透明度です。</value></data>
+    <data name="Advanced_labelBloomTrailDescription" xml:space="preserve"><value>グロー源となる軌跡の不透明度です。</value></data>
+    <data name="Advanced_labelBloomTrailAlphaDescription" xml:space="preserve"><value>ネイティブの軌跡グローの不透明度です。</value></data>
+    <data name="Advanced_labelBloomTrailEmissionDescription" xml:space="preserve"><value>軌跡から Bloom に入力する発光エネルギーです。</value></data>
+    <data name="Advanced_labelBloomTrailCoverageDescription" xml:space="preserve"><value>軌跡のグロー源の幅の倍率です。</value></data>
 </root>

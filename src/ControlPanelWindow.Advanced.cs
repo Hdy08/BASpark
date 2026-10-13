@@ -40,8 +40,6 @@ public sealed partial class ControlPanelWindow
             foreach (var section in group.GroupBy(item => item.SectionKey))
             {
                 var content = new StackPanel();
-                if (section.Key == "Advanced_displaySummary")
-                    content.Children.Add(CreateAdvancedLabel("Advanced_DisplayHint", "BasCaptionStyle"));
                 foreach (AdvancedFxSetting setting in section)
                 {
                     if (setting.Path == HdrPaths[0]) content.Children.Add(CreateHdrPresetCard());
@@ -49,6 +47,7 @@ public sealed partial class ControlPanelWindow
                 }
                 PanelBaClickAdvanced.Children.Add(new Expander
                 {
+                    Style = (Style)Application.Current.Resources["BasAdvancedExpanderStyle"],
                     Header = CreateAdvancedLabel(section.Key, "BasAdvancedSectionTitleStyle"),
                     Content = content, IsExpanded = false,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -78,8 +77,10 @@ public sealed partial class ControlPanelWindow
     {
         Grid grid = CreateAdvancedCardGrid();
         TextBlock label = CreateAdvancedLabel(setting.TitleKey, "BasSettingTitleStyle");
-        label.VerticalAlignment = VerticalAlignment.Center;
-        grid.Children.Add(label);
+        var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(label);
+        text.Children.Add(CreateAdvancedLabel(setting.DescriptionKey, "BasCaptionStyle"));
+        grid.Children.Add(text);
         FrameworkElement content;
         Control control;
         if (setting.Options != null || setting.Path is "rings.rotationDirection" or "rings.dissolveDirection")
@@ -160,6 +161,7 @@ public sealed partial class ControlPanelWindow
     {
         TxtVisualAdvancedTitle.Text = Localization.Get("Visual_AdvancedSection");
         CheckBaClickAdvancedSettings.Header = Localization.Get("Advanced_Enable");
+        TxtBaClickAdvancedDescription.Text = Localization.Get("Advanced_EnableDescription");
         foreach (var pair in _advancedLabels) pair.Key.Text = Localization.Get(pair.Value);
         foreach (AdvancedFxSetting setting in AdvancedFxSettings.Definitions)
         {
@@ -282,10 +284,17 @@ public sealed partial class ControlPanelWindow
         finally { _updatingAdvancedControls = previous; }
     }
 
-    private void BaClickAdvancedSettings_Changed(object sender, RoutedEventArgs args) => UpdateAdvancedSettingsVisibility(animate: true);
+    private void BaClickAdvancedList_Loaded(object sender, RoutedEventArgs args)
+    {
+        BaClickAdvancedList.ApplyTemplate();
+        if (FindVisualDescendant<ToggleButton>(BaClickAdvancedList, "ExpanderHeader") is ToggleButton header)
+            header.Visibility = Visibility.Collapsed;
+    }
 
-    private void UpdateAdvancedSettingsVisibility(bool animate = false) =>
-        SetSettingsVisibility(SectionVisual, animate, (PanelBaClickAdvanced, CheckBaClickAdvancedSettings.IsOn));
+    private void BaClickAdvancedSettings_Changed(object sender, RoutedEventArgs args) => UpdateAdvancedSettingsVisibility();
+
+    private void UpdateAdvancedSettingsVisibility() =>
+        BaClickAdvancedList.IsExpanded = CheckBaClickAdvancedSettings.IsOn;
 
     private static int GetSliderPrecision(Slider slider) => slider.Tag is AdvancedFxSetting setting
         ? setting.Precision : slider.StepFrequency >= 1 ? 0 : 2;

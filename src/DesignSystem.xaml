@@ -167,6 +167,7 @@
 
     <x:Double x:Key="BasCardCornerRadiusValue">8</x:Double>
     <CornerRadius x:Key="BasCardCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="BasSettingCardCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="BasControlCornerRadius">4</CornerRadius>
     <Thickness x:Key="BasCardPadding">16</Thickness>
     <Thickness x:Key="BasPagePadding">28</Thickness>
@@ -338,11 +339,16 @@
 
     <Style x:Key="BasAdvancedSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}" />
 
+    <Style x:Key="BasAdvancedExpanderStyle" TargetType="Expander" BasedOn="{StaticResource DefaultExpanderStyle}">
+        <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
+        <Setter Property="MinWidth" Value="0" />
+    </Style>
+
     <Style x:Key="BasSettingCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{ThemeResource BasSettingsCardBackgroundBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource BasSettingsCardBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         <Setter Property="Padding" Value="16,12" />
         <Setter Property="Margin" Value="0,0,0,6" />
         <Setter Property="MinHeight" Value="60" />

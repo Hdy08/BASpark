@@ -10,6 +10,7 @@ internal sealed record AdvancedFxSetting(string Path, string GroupKey, string Se
     IReadOnlyList<AdvancedFxOption>? Options = null)
 {
     internal string Key => AdvancedFxSettings.KeyPrefix + Path;
+    internal string DescriptionKey => TitleKey + "Description";
     internal int Precision => Step >= 1 ? 0 : Math.Max(2, (int)Math.Ceiling(-Math.Log10(Step)));
 }
 
@@ -19,12 +20,12 @@ internal static class AdvancedFxSettings
 
     internal static IReadOnlyList<AdvancedFxSetting> Definitions { get; } =
     [
-Choice("themeColorMode", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelThemeColorMode", "hue-only", [new("relative-oklch", "Advanced_themeColorModeRelativeOklch"), new("hue-only", "Advanced_themeColorModeHueOnly")]),
-        Number("maxDpr", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelDpr", 2, 1, 3, 0.1, false),
+        Choice("themeColorMode", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelThemeColorMode", "relative-oklch", [new("relative-oklch", "Advanced_themeColorModeRelativeOklch"), new("hue-only", "Advanced_themeColorModeHueOnly")]),
+        Number("maxDpr", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelDpr", 1, 1, 3, 0.1, false),
         Choice("renderMode", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelRenderMode", "full-webgl2", [new("full-webgpu-sdr", "Advanced_renderFullWebGPUStandard"), new("full-webgpu", "Advanced_renderFullWebGPU"), new("full-webgl2", "Advanced_renderFullWebGL2"), new("webgl2-bloom", "Advanced_renderWebGL2Bloom"), new("software-bloom", "Advanced_renderSoftwareBloom"), new("native-bloom", "Advanced_renderNativeBloom")]),
         Choice("overlayAlphaPolicy", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelOverlayAlphaPolicy", "visual-max", [new("coverage", "Advanced_overlayAlphaPolicyCoverage"), new("visual-max", "Advanced_overlayAlphaPolicyVisualMax")]),
         Choice("overlayColorCompensation", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelOverlayColorCompensation", "none", [new("none", "Advanced_overlayColorCompensationNone"), new("bright-core", "Advanced_overlayColorCompensationBrightCore")]),
-        Number("overlayAlphaLimit", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelOverlayAlphaLimit", 0.85, 0, 1, 0.00392156862745098, false),
+        Number("overlayAlphaLimit", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelOverlayAlphaLimit", 250.0 / 255, 0, 1, 0.00392156862745098, false),
         Boolean("isolatedCompositing", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelIsolatedCompositing", false),
         Number("lightBackgroundContrastAlpha", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelLightBackgroundContrastAlpha", 0, 0, 1, 0.01, false),
         Number("webgpuHdrPeak", "Advanced_sectionBasic", "Advanced_displaySummary", "Advanced_labelWebGPUHdrPeak", 3, 2, 4, 0.01, false),

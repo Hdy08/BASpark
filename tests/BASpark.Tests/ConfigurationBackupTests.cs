@@ -5,6 +5,16 @@ namespace BASpark.Tests;
 public sealed class ConfigurationBackupTests
 {
     [Fact]
+    public void AdvancedFx_DisplayDefaultsMatchTheFullLibrary()
+    {
+        Assert.Equal(1, AdvancedFxSettings.Find("BaClickFx/maxDpr")!.DefaultValue.GetDouble());
+        Assert.Equal("relative-oklch", AdvancedFxSettings.Find("BaClickFx/themeColorMode")!.DefaultValue.GetString());
+        Assert.Equal(250.0 / 255, AdvancedFxSettings.Find("BaClickFx/overlayAlphaLimit")!.DefaultValue.GetDouble());
+        Assert.Equal("{}", AdvancedFxSettings.Normalize("{\"maxDpr\":1,\"themeColorMode\":\"relative-oklch\",\"overlayAlphaLimit\":0.9803921568627451}"));
+        Assert.Contains("hue-only", AdvancedFxSettings.Normalize("{\"maxDpr\":2,\"themeColorMode\":\"hue-only\",\"overlayAlphaLimit\":0.85}"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AdvancedFx_DefaultsProduceNoRendererOverrides()
     {
         Assert.Equal(72, AdvancedFxSettings.Definitions.Count);

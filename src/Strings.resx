@@ -803,7 +803,6 @@
     <data name="About_InfoUnavailable" xml:space="preserve"><value>未提供</value></data>
     <data name="Visual_AdvancedSection" xml:space="preserve"><value>高级</value></data>
     <data name="Advanced_Enable" xml:space="preserve"><value>启用 ba-click-fx 高级设置</value></data>
-    <data name="Advanced_DisplayHint" xml:space="preserve"><value>仅列出适用于透明桌面叠加层的显示参数；主题颜色、缩放、不透明度及辉光亮度使用现有设置。</value></data>
     <data name="Advanced_HdrHint" xml:space="preserve"><value>仅在 WebGPU HDR 模式且系统支持 HDR 时生效。</value></data>
     <data name="Advanced_HdrPreset" xml:space="preserve"><value>高光预设</value></data>
     <data name="Advanced_HdrBalanced" xml:space="preserve"><value>平衡白核（默认）</value></data>
@@ -913,4 +912,77 @@
     <data name="Advanced_labelBloomTrailAlpha" xml:space="preserve"><value>原生拖尾辉光 Alpha</value></data>
     <data name="Advanced_labelBloomTrailEmission" xml:space="preserve"><value>拖尾发射强度</value></data>
     <data name="Advanced_labelBloomTrailCoverage" xml:space="preserve"><value>拖尾覆盖倍率</value></data>
+    <data name="Advanced_EnableDescription" xml:space="preserve"><value>自定义特效形状、渲染与辉光；关闭后使用默认参数。</value></data>
+    <data name="Advanced_labelThemeColorModeDescription" xml:space="preserve"><value>选择主题色改变色相或同时改变明度与彩度。</value></data>
+    <data name="Advanced_labelDprDescription" xml:space="preserve"><value>限制渲染像素密度；越高越清晰，开销越大。</value></data>
+    <data name="Advanced_labelRenderModeDescription" xml:space="preserve"><value>选择特效与辉光的渲染方式。</value></data>
+    <data name="Advanced_labelOverlayAlphaPolicyDescription" xml:space="preserve"><value>决定特效与辉光叠加时如何分配透明度。</value></data>
+    <data name="Advanced_labelOverlayColorCompensationDescription" xml:space="preserve"><value>补偿透明合成后的亮芯颜色。</value></data>
+    <data name="Advanced_labelOverlayAlphaLimitDescription" xml:space="preserve"><value>限制覆盖层最大不透明度，让背景适度透出。</value></data>
+    <data name="Advanced_labelIsolatedCompositingDescription" xml:space="preserve"><value>先在独立图层内合并特效，再与背景合成。</value></data>
+    <data name="Advanced_labelLightBackgroundContrastAlphaDescription" xml:space="preserve"><value>增加浅色背景上特效轮廓的对比度。</value></data>
+    <data name="Advanced_labelWebGPUHdrPeakDescription" xml:space="preserve"><value>限制 HDR 高光的最大亮度；仅 HDR 模式生效。</value></data>
+    <data name="Advanced_labelWebGPUHdrBrightnessDescription" xml:space="preserve"><value>调节 HDR 最终画面的亮度；仅 HDR 模式生效。</value></data>
+    <data name="Advanced_labelWebGPUHdrColorPreservationDescription" xml:space="preserve"><value>调节 HDR 高光保留原始颜色的程度。</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteCoreDescription" xml:space="preserve"><value>调节 HDR 高光中心变白的程度。</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteStartDescription" xml:space="preserve"><value>开始将 HDR 高光向白色过渡的亮度。</value></data>
+    <data name="Advanced_labelWebGPUHdrWhiteEndDescription" xml:space="preserve"><value>完成 HDR 高光向白色过渡的亮度。</value></data>
+    <data name="Advanced_labelRingCountDescription" xml:space="preserve"><value>每次点击生成的圆环数量。</value></data>
+    <data name="Advanced_labelRingHdrDescription" xml:space="preserve"><value>调节圆环材质的发光能量。</value></data>
+    <data name="Advanced_labelRingRadMinDescription" xml:space="preserve"><value>随机圆环半径范围的下限。</value></data>
+    <data name="Advanced_labelRingRadMaxDescription" xml:space="preserve"><value>随机圆环半径范围的上限。</value></data>
+    <data name="Advanced_labelRingBandRatioDescription" xml:space="preserve"><value>环带厚度相对于外半径的比例。</value></data>
+    <data name="Advanced_labelRingWStartDescription" xml:space="preserve"><value>圆环动画开始时的厚度倍率。</value></data>
+    <data name="Advanced_labelRingWEndDescription" xml:space="preserve"><value>圆环动画结束时的厚度倍率。</value></data>
+    <data name="Advanced_labelRingLifeDescription" xml:space="preserve"><value>圆环从出现到消失的时间，单位毫秒。</value></data>
+    <data name="Advanced_labelAngVelMulDescription" xml:space="preserve"><value>调节圆环旋转的速度倍率。</value></data>
+    <data name="Advanced_labelArcSamplesDescription" xml:space="preserve"><value>沿圆周细分网格；越高轮廓越平滑。</value></data>
+    <data name="Advanced_labelRadialSamplesDescription" xml:space="preserve"><value>沿环带宽度细分网格；越高网格越精细。</value></data>
+    <data name="Advanced_labelRingDirDescription" xml:space="preserve"><value>选择圆环顺时针或逆时针旋转。</value></data>
+    <data name="Advanced_labelDissolveDirDescription" xml:space="preserve"><value>选择圆环纹理溶解的方向。</value></data>
+    <data name="Advanced_labelDiskRadiusDescription" xml:space="preserve"><value>调节点击光盘的基础半径。</value></data>
+    <data name="Advanced_labelDiskLifeDescription" xml:space="preserve"><value>光盘从出现到消失的时间，单位毫秒。</value></data>
+    <data name="Advanced_labelShardHdrDescription" xml:space="preserve"><value>调节点击和拖尾碎片的发光能量。</value></data>
+    <data name="Advanced_labelShardRoundnessDescription" xml:space="preserve"><value>将三角形碎片逐渐圆化。</value></data>
+    <data name="Advanced_labelShardSizeMinDescription" xml:space="preserve"><value>随机碎片尺寸范围的下限。</value></data>
+    <data name="Advanced_labelShardSizeMaxDescription" xml:space="preserve"><value>随机碎片尺寸范围的上限。</value></data>
+    <data name="Advanced_labelClickShardsDescription" xml:space="preserve"><value>每次点击生成的碎片数量。</value></data>
+    <data name="Advanced_labelClickShardLifeMinDescription" xml:space="preserve"><value>点击碎片寿命的下限，单位毫秒。</value></data>
+    <data name="Advanced_labelClickShardLifeMaxDescription" xml:space="preserve"><value>点击碎片寿命的上限，单位毫秒。</value></data>
+    <data name="Advanced_labelClickShardRadiusDescription" xml:space="preserve"><value>点击碎片的初始发射范围。</value></data>
+    <data name="Advanced_labelClickShardSpeedMinDescription" xml:space="preserve"><value>点击碎片初始移动速度的下限。</value></data>
+    <data name="Advanced_labelClickShardSpeedMaxDescription" xml:space="preserve"><value>点击碎片初始移动速度的上限。</value></data>
+    <data name="Advanced_labelShardSpacingDescription" xml:space="preserve"><value>沿拖尾生成碎片的距离间隔。</value></data>
+    <data name="Advanced_labelMaxShardsDescription" xml:space="preserve"><value>每条轨迹同时保留的拖尾碎片上限。</value></data>
+    <data name="Advanced_labelTrailShardLifeMinDescription" xml:space="preserve"><value>拖尾碎片寿命的下限，单位毫秒。</value></data>
+    <data name="Advanced_labelTrailShardLifeMaxDescription" xml:space="preserve"><value>拖尾碎片寿命的上限，单位毫秒。</value></data>
+    <data name="Advanced_labelTrailShardRadiusDescription" xml:space="preserve"><value>拖尾碎片相对于轨迹的发射范围。</value></data>
+    <data name="Advanced_labelTrailShardSpeedMinDescription" xml:space="preserve"><value>拖尾碎片初始移动速度的下限。</value></data>
+    <data name="Advanced_labelTrailShardSpeedMaxDescription" xml:space="preserve"><value>拖尾碎片初始移动速度的上限。</value></data>
+    <data name="Advanced_labelTrailWDescription" xml:space="preserve"><value>调节兼容绘制路径中的拖尾宽度。</value></data>
+    <data name="Advanced_labelTrailGlowWDescription" xml:space="preserve"><value>调节原生辉光回退时的拖尾外发光宽度。</value></data>
+    <data name="Advanced_labelTrailLifeDescription" xml:space="preserve"><value>轨迹点保留的时间，单位毫秒。</value></data>
+    <data name="Advanced_labelTrailOpacityDescription" xml:space="preserve"><value>单独调节拖尾图层的不透明度。</value></data>
+    <data name="Advanced_labelGeomWidthDescription" xml:space="preserve"><value>调节拖尾实际网格的基础宽度。</value></data>
+    <data name="Advanced_labelMinVertDistDescription" xml:space="preserve"><value>轨迹顶点间的最小距离；越小越精细。</value></data>
+    <data name="Advanced_labelCornerVertsDescription" xml:space="preserve"><value>增加轨迹转弯处的圆角细分。</value></data>
+    <data name="Advanced_labelCapVertsDescription" xml:space="preserve"><value>增加轨迹两端的圆角细分。</value></data>
+    <data name="Advanced_labelBloomThresholdDescription" xml:space="preserve"><value>高于此亮度的区域才产生 Bloom。</value></data>
+    <data name="Advanced_labelBloomSoftKneeDescription" xml:space="preserve"><value>柔化亮度阈值附近的辉光过渡。</value></data>
+    <data name="Advanced_labelBloomClampDescription" xml:space="preserve"><value>限制进入 Bloom 的最高亮度。</value></data>
+    <data name="Advanced_labelBloomDiffusionDescription" xml:space="preserve"><value>调节辉光向外扩散的范围。</value></data>
+    <data name="Advanced_labelBloomResolutionDescription" xml:space="preserve"><value>辉光计算的分辨率倍率；越高开销越大。</value></data>
+    <data name="Advanced_labelBloomEmissionDescription" xml:space="preserve"><value>调节辉光能量编码的亮度范围。</value></data>
+    <data name="Advanced_labelClickGlowDescription" xml:space="preserve"><value>同时调节圆环和光盘的辉光源强度。</value></data>
+    <data name="Advanced_labelBloomRingDescription" xml:space="preserve"><value>调节原生辉光回退时的圆环模糊范围。</value></data>
+    <data name="Advanced_labelBloomDiskDescription" xml:space="preserve"><value>调节原生辉光回退时的光盘模糊范围。</value></data>
+    <data name="Advanced_labelBloomDiskEmissionDescription" xml:space="preserve"><value>调节光盘提供给 Bloom 的发光能量。</value></data>
+    <data name="Advanced_labelBloomRingCoreAlphaDescription" xml:space="preserve"><value>调节圆环核心作为辉光源的不透明度。</value></data>
+    <data name="Advanced_labelBloomDiskCoreAlphaDescription" xml:space="preserve"><value>调节光盘核心作为辉光源的不透明度。</value></data>
+    <data name="Advanced_labelBloomRingAlphaDescription" xml:space="preserve"><value>调节原生圆环辉光的不透明度。</value></data>
+    <data name="Advanced_labelBloomDiskAlphaDescription" xml:space="preserve"><value>调节原生光盘辉光的不透明度。</value></data>
+    <data name="Advanced_labelBloomTrailDescription" xml:space="preserve"><value>调节拖尾作为辉光源的不透明度。</value></data>
+    <data name="Advanced_labelBloomTrailAlphaDescription" xml:space="preserve"><value>调节原生拖尾辉光的不透明度。</value></data>
+    <data name="Advanced_labelBloomTrailEmissionDescription" xml:space="preserve"><value>调节拖尾提供给 Bloom 的发光能量。</value></data>
+    <data name="Advanced_labelBloomTrailCoverageDescription" xml:space="preserve"><value>调节拖尾辉光源的覆盖宽度倍率。</value></data>
 </root>
