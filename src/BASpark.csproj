@@ -29,9 +29,9 @@
     <WebView2LoaderPreference>Static</WebView2LoaderPreference>
     <WebView2EnableCsWinRTProjection>true</WebView2EnableCsWinRTProjection>
 
-    <Version>1.7.0</Version>
-    <AssemblyVersion>1.7.0</AssemblyVersion>
-    <FileVersion>1.7.0</FileVersion>
+    <Version>1.8.0</Version>
+    <AssemblyVersion>1.8.0</AssemblyVersion>
+    <FileVersion>1.8.0</FileVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
     <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
