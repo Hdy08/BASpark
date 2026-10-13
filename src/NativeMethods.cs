@@ -584,9 +584,14 @@ internal sealed class TouchCursorState
             chromium = true;
         }
         if (contact.Window != IntPtr.Zero && (cursor.flags & (NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED)) != 0
-            && _windows.TryGetValue(contact.Window, out bool originVisible) && originVisible
+            && (!_windows.TryGetValue(contact.Window, out bool originVisible) || originVisible)
             && (!_windows.TryGetValue(window, out bool targetVisible) || targetVisible)
-            && NativeMethods.IsSystemTouchGestureCursor(cursor.hCursor)) return true;
+            && (NativeMethods.IsSystemTouchGestureCursor(cursor.hCursor)
+                || (originVisible && (cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0 && cursor.hCursor == IntPtr.Zero)))
+        {
+            Remember(window, true);
+            return true;
+        }
         if (chromium && window != IntPtr.Zero
             && ((cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0
                 || (window == contact.Window && contact.Chromium && cursor.hCursor == IntPtr.Zero)))

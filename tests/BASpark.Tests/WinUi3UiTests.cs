@@ -1280,6 +1280,77 @@ public class WinUi3UiTests
     }
 
     [Theory]
+    [InlineData(NativeMethods.CURSOR_SHOWING)]
+    [InlineData(NativeMethods.CURSOR_SUPPRESSED)]
+    [InlineData(NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED)]
+    public void MultiTouch_GesturesCanStartAdditionalContactsInPreviouslyUnobservedWindows(int flags)
+    {
+        using var gesture = new SystemGestureCursorScope();
+        var state = new TouchCursorState();
+        var first = new IntPtr(123);
+        var second = new IntPtr(456);
+        var hidden = new IntPtr(789);
+        var cursor = new NativeMethods.CURSORINFO { flags = NativeMethods.CURSOR_SHOWING,
+            hCursor = System.Windows.Forms.Cursors.Arrow.Handle };
+        state.Observe(cursor, first);
+        state.Observe(new NativeMethods.CURSORINFO(), hidden);
+        state.BeginContact(first, false, 2);
+        Assert.True(state.IsVisible(cursor, first, false, 2));
+        cursor.flags = flags;
+        cursor.hCursor = gesture.Handle;
+        state.BeginContact(second, false, 3);
+        state.BeginContact(hidden, false, 4);
+        for (int frame = 0; frame < 30; frame++)
+        {
+            Assert.True(state.IsVisible(cursor, first, false, 2));
+            Assert.True(state.IsVisible(cursor, second, false, 3));
+            Assert.False(state.IsVisible(cursor, hidden, false, 4));
+        }
+        state.EndContact(2);
+        Assert.False(state.IsVisible(cursor, first, false, 2));
+        Assert.True(state.IsVisible(cursor, second, false, 3));
+        state.EndContact(3);
+        Assert.False(state.IsVisible(cursor, second, false, 3));
+        state.BeginContact(second, false, 5);
+        Assert.True(state.IsVisible(cursor, second, false, 5));
+        cursor.flags = 0;
+        cursor.hCursor = IntPtr.Zero;
+        Assert.False(state.IsVisible(cursor, second, false, 5));
+        cursor.flags = flags;
+        cursor.hCursor = gesture.Handle;
+        Assert.False(state.IsVisible(cursor, second, false, 5));
+    }
+
+    [Theory]
+    [InlineData(2, false)]
+    [InlineData(3, false)]
+    [InlineData(5, false)]
+    [InlineData(2, true)]
+    [InlineData(5, true)]
+    public void MultiTouch_GestureCursorCanTransitionToTouchSuppressionWithoutInterruptingContacts(int count, bool chromium)
+    {
+        using var gesture = new SystemGestureCursorScope();
+        var state = new TouchCursorState();
+        var cursor = new NativeMethods.CURSORINFO { flags = NativeMethods.CURSOR_SHOWING, hCursor = gesture.Handle };
+        for (int index = 0; index < count; index++)
+        {
+            var window = new IntPtr(123 + index);
+            state.BeginContact(window, chromium, index + 2);
+            Assert.True(state.IsVisible(cursor, window, chromium, index + 2));
+        }
+        cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        cursor.hCursor = IntPtr.Zero;
+        for (int frame = 0; frame < 30; frame++)
+            for (int index = 0; index < count; index++)
+                Assert.True(state.IsVisible(cursor, new IntPtr(123 + index), chromium, index + 2));
+        state.EndContact(2);
+        for (int index = 1; index < count; index++)
+            Assert.True(state.IsVisible(cursor, new IntPtr(123 + index), chromium, index + 2));
+        state.Reset();
+        Assert.False(state.IsVisible(cursor, new IntPtr(123), false, 2));
+    }
+
+    [Theory]
     [InlineData(200, 300, 0, true)]
     [InlineData(224, 324, 0, true)]
     [InlineData(225, 300, 0, false)]
