@@ -66,6 +66,9 @@ internal static class NativeMethods
     private static IntPtr _cachedCursorShape;
     private static bool _cachedCursorShapeVisible;
     private static long _cursorShapeCacheUntil;
+    private static IntPtr _cachedTouchGestureCursor;
+    private static bool _cachedTouchGestureCursorRecognized;
+    private static long _touchGestureCursorCacheUntil;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct POINT
@@ -93,6 +96,20 @@ internal static class NativeMethods
         public int flags;
         public IntPtr hCursor;
         public POINT ptScreenPos;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ICONINFOEX
+    {
+        public int cbSize;
+        public int fIcon;
+        public uint xHotspot;
+        public uint yHotspot;
+        public IntPtr hbmMask;
+        public IntPtr hbmColor;
+        public ushort wResID;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string? szModName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string? szResName;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -322,6 +339,12 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     internal static extern bool GetCursorInfo(out CURSORINFO pci);
 
+    [DllImport("user32.dll", EntryPoint = "GetIconInfoExW", CharSet = CharSet.Unicode)]
+    private static extern bool GetIconInfoEx(IntPtr cursor, ref ICONINFOEX info);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr bitmap);
+
     [DllImport("user32.dll")]
     internal static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
@@ -454,6 +477,31 @@ internal static class NativeMethods
         }
     }
 
+    internal static bool IsSystemTouchGestureCursor(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero) return false;
+        lock (CursorShapeGate)
+        {
+            long now = Environment.TickCount64;
+            if (_cachedTouchGestureCursor == handle && now < _touchGestureCursorCacheUntil)
+                return _cachedTouchGestureCursorRecognized;
+            var info = new ICONINFOEX { cbSize = Marshal.SizeOf<ICONINFOEX>() };
+            try
+            {
+                _cachedTouchGestureCursorRecognized = GetIconInfoEx(handle, ref info) && info.wResID == 1
+                    && string.Equals(info.szModName, Path.Combine(Environment.SystemDirectory, "NInput.dll"), StringComparison.OrdinalIgnoreCase);
+                _cachedTouchGestureCursor = handle;
+                _touchGestureCursorCacheUntil = now + 100;
+                return _cachedTouchGestureCursorRecognized;
+            }
+            finally
+            {
+                if (info.hbmMask != IntPtr.Zero) DeleteObject(info.hbmMask);
+                if (info.hbmColor != IntPtr.Zero) DeleteObject(info.hbmColor);
+            }
+        }
+    }
+
     private static bool HasVisibleCursorShape(IntPtr handle)
     {
         if (handle == IntPtr.Zero) return false;
@@ -509,9 +557,11 @@ internal sealed class TouchCursorState
     private readonly Dictionary<IntPtr, bool> _windows = new();
     private readonly Dictionary<long, (IntPtr Window, bool Chromium)> _contacts = new();
 
-    internal void Observe(NativeMethods.CURSORINFO cursor, IntPtr window)
+    internal void Observe(NativeMethods.CURSORINFO cursor, IntPtr window, bool touchInput = false)
     {
-        if ((cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0) return;
+        if ((cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0
+            || (touchInput && (cursor.flags & NativeMethods.CURSOR_SHOWING) != 0
+                && NativeMethods.IsSystemTouchGestureCursor(cursor.hCursor))) return;
         Remember(window, NativeMethods.IsCursorVisible(cursor, false));
     }
 
@@ -533,6 +583,10 @@ internal sealed class TouchCursorState
             window = contact.Window;
             chromium = true;
         }
+        if (contact.Window != IntPtr.Zero && (cursor.flags & (NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED)) != 0
+            && _windows.TryGetValue(contact.Window, out bool originVisible) && originVisible
+            && (!_windows.TryGetValue(window, out bool targetVisible) || targetVisible)
+            && NativeMethods.IsSystemTouchGestureCursor(cursor.hCursor)) return true;
         if (chromium && window != IntPtr.Zero
             && ((cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0
                 || (window == contact.Window && contact.Chromium && cursor.hCursor == IntPtr.Zero)))
@@ -543,7 +597,7 @@ internal sealed class TouchCursorState
             return allowed;
         }
         bool visible = NativeMethods.IsCursorVisible(cursor, true);
-        if (chromium) Remember(window, visible);
+        if (chromium || contact.Window != IntPtr.Zero) Remember(window, visible);
         return visible;
     }
 

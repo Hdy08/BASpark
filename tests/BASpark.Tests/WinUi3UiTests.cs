@@ -21,6 +21,18 @@ public class WinUi3UiTests
         internal MultiTouchScope(bool enabled) => ConfigManager.EnableMultiTouchEffects = enabled;
         public void Dispose() => ConfigManager.EnableMultiTouchEffects = _previous;
     }
+    private sealed class SystemGestureCursorScope : IDisposable
+    {
+        private readonly IntPtr _module = LoadLibraryEx(Path.Combine(Environment.SystemDirectory, "NInput.dll"), IntPtr.Zero, 0x800);
+        internal readonly IntPtr Handle;
+        internal SystemGestureCursorScope()
+        {
+            Assert.NotEqual(IntPtr.Zero, _module);
+            Handle = LoadCursor(_module, new IntPtr(1));
+            Assert.NotEqual(IntPtr.Zero, Handle);
+        }
+        public void Dispose() => FreeLibrary(_module);
+    }
     private static readonly XNamespace Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
     private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
@@ -41,6 +53,15 @@ public class WinUi3UiTests
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool DestroyCursor(IntPtr cursor);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "LoadLibraryExW", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern IntPtr LoadLibraryEx(string file, IntPtr reserved, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern bool FreeLibrary(IntPtr module);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "LoadCursorW")]
+    private static extern IntPtr LoadCursor(IntPtr module, IntPtr resource);
 
     [Fact]
     public void PauseActions_ShareOneRuntimeStateWithoutChangingSavedEffectPreferences()
@@ -1152,6 +1173,110 @@ public class WinUi3UiTests
         Assert.False(state.IsVisible(cursor, hidden, false, 3));
         state.Reset();
         Assert.False(state.IsVisible(cursor, hidden, false, 2));
+    }
+
+    [Theory]
+    [InlineData(NativeMethods.CURSOR_SHOWING)]
+    [InlineData(NativeMethods.CURSOR_SUPPRESSED)]
+    [InlineData(NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED)]
+    public void MultiTouch_SystemGestureCursorKeepsNativeTrailsIndependentUntilRelease(int flags)
+    {
+        using var gesture = new SystemGestureCursorScope();
+        Assert.True(NativeMethods.IsSystemTouchGestureCursor(gesture.Handle));
+        var state = new TouchCursorState();
+        var origin = new IntPtr(123);
+        var outside = new IntPtr(456);
+        var blocked = new IntPtr(789);
+        var cursor = new NativeMethods.CURSORINFO
+        {
+            flags = NativeMethods.CURSOR_SHOWING,
+            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+        };
+        state.Observe(cursor, origin);
+        state.Observe(cursor, outside);
+        state.Observe(new NativeMethods.CURSORINFO(), blocked);
+        state.BeginContact(origin, false, 2);
+        state.BeginContact(origin, false, 3);
+        Assert.True(state.IsVisible(cursor, origin, false, 2));
+        Assert.True(state.IsVisible(cursor, origin, false, 3));
+        cursor.flags = flags;
+        cursor.hCursor = gesture.Handle;
+        Assert.False(NativeMethods.IsCursorVisible(cursor, true));
+        for (int frame = 0; frame < 30; frame++)
+        {
+            Assert.True(state.IsVisible(cursor, origin, false, 2));
+            Assert.True(state.IsVisible(cursor, origin, false, 3));
+        }
+        Assert.True(state.IsVisible(cursor, outside, false, 2));
+        Assert.False(state.IsVisible(cursor, blocked, false, 2));
+        Assert.True(state.IsVisible(cursor, origin, false, 3));
+        state.EndContact(2);
+        Assert.False(state.IsVisible(cursor, origin, false, 2));
+        Assert.True(state.IsVisible(cursor, origin, false, 3));
+        state.EndContact(3);
+        Assert.False(state.IsVisible(cursor, origin, false, 3));
+        cursor.flags = NativeMethods.CURSOR_SHOWING;
+        state.Observe(cursor, origin, touchInput: true);
+        state.BeginContact(origin, false, 4);
+        Assert.True(state.IsVisible(cursor, origin, false, 4));
+        state.EndContact(4);
+        state.Observe(cursor, origin);
+        state.BeginContact(origin, false, 5);
+        Assert.False(state.IsVisible(cursor, origin, false, 5));
+        state.Reset();
+        Assert.False(state.IsVisible(cursor, origin, false, 5));
+    }
+
+    [Theory]
+    [InlineData(NativeMethods.CURSOR_SHOWING)]
+    [InlineData(NativeMethods.CURSOR_SUPPRESSED)]
+    public void MultiTouch_SystemGestureCursorPreservesExplicitHiddenAndTransparentFiltering(int flags)
+    {
+        using var gesture = new SystemGestureCursorScope();
+        Assert.True(NativeMethods.IsSystemTouchGestureCursor(gesture.Handle));
+        var state = new TouchCursorState();
+        var allowed = new IntPtr(123);
+        var blocked = new IntPtr(456);
+        var cursor = new NativeMethods.CURSORINFO
+        {
+            flags = NativeMethods.CURSOR_SHOWING,
+            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+        };
+        state.Observe(cursor, allowed);
+        state.Observe(new NativeMethods.CURSORINFO(), blocked);
+        state.BeginContact(allowed, false, 2);
+        state.BeginContact(blocked, false, 3);
+        Assert.True(state.IsVisible(cursor, allowed, false, 2));
+        cursor.flags = flags;
+        cursor.hCursor = gesture.Handle;
+        Assert.True(state.IsVisible(cursor, allowed, false, 2));
+        Assert.False(state.IsVisible(cursor, blocked, false, 3));
+        Assert.False(state.IsVisible(cursor, allowed, false, 4));
+        cursor.flags = 0;
+        state.Observe(cursor, allowed, touchInput: true);
+        Assert.False(state.IsVisible(cursor, allowed, false, 2));
+        cursor.flags = flags;
+        cursor.hCursor = IntPtr.Zero;
+        Assert.False(state.IsVisible(cursor, allowed, false, 2));
+        IntPtr transparent = CreateCursor(IntPtr.Zero, 0, 0, 32, 32,
+            Enumerable.Repeat((byte)255, 128).ToArray(), new byte[128]);
+        Assert.NotEqual(IntPtr.Zero, transparent);
+        try
+        {
+            cursor.flags = NativeMethods.CURSOR_SHOWING;
+            cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+            Assert.True(state.IsVisible(cursor, allowed, false, 2));
+            cursor.flags = flags;
+            cursor.hCursor = transparent;
+            state.Observe(cursor, allowed, touchInput: true);
+            Assert.False(state.IsVisible(cursor, allowed, false, 2));
+            cursor.hCursor = gesture.Handle;
+            Assert.False(state.IsVisible(cursor, allowed, false, 2));
+        }
+        finally
+        {
+            DestroyCursor(transparent);
+        }
     }
 
     [Theory]

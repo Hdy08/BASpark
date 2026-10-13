@@ -1648,7 +1648,7 @@ namespace BASpark
                 if (_touchSuppressesCursor && cursor.hCursor == IntPtr.Zero) return;
                 var target = ResolveCursorWindow(cursor.ptScreenPos);
                 if (target.Chromium && !_hasMouseCursor && cursor.hCursor == IntPtr.Zero) return;
-                _cursorState.Observe(cursor, target.Window);
+                _cursorState.Observe(cursor, target.Window, _touchSuppressesCursor);
             }
         }
 
