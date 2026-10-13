@@ -28,7 +28,8 @@ public sealed partial class ControlPanelWindow
     private void ApplyBackupLocalizedText()
     {
         SubTabBackupLabel.Text = Localization.Get("Backup_Title");
-        TxtBackupTitle.Text = Localization.Get("Backup_Title");
+        TxtBackupTitle.Text = Localization.Get("Backup_BackupSection");
+        TxtBackupRestoreTitle.Text = Localization.Get("Backup_RestoreSection");
         TxtExportConfiguration.Text = Localization.Get("Backup_ExportTitle");
         TxtExportConfigurationHint.Text = Localization.Get("Backup_ExportHint");
         TxtImportConfiguration.Text = Localization.Get("Backup_ImportTitle");

@@ -775,4 +775,15 @@
     <data name="Overlay_NoSearchResults" xml:space="preserve"><value>検索結果なし</value></data>
     <data name="Backup_ConfirmImport" xml:space="preserve"><value>インポートを確認</value></data>
     <data name="Backup_ConfirmExport" xml:space="preserve"><value>エクスポートを確認</value></data>
+    <data name="Basic_Interface" xml:space="preserve"><value>インターフェイス</value></data>
+    <data name="Basic_Trigger" xml:space="preserve"><value>トリガー</value></data>
+    <data name="Basic_Runtime" xml:space="preserve"><value>実行</value></data>
+    <data name="Visual_ScaleSection" xml:space="preserve"><value>スケール</value></data>
+    <data name="Visual_SpeedSection" xml:space="preserve"><value>速度</value></data>
+    <data name="Visual_SamplingSection" xml:space="preserve"><value>サンプリング</value></data>
+    <data name="Visual_OtherSection" xml:space="preserve"><value>その他</value></data>
+    <data name="Filter_BasicSection" xml:space="preserve"><value>基本</value></data>
+    <data name="Filter_AdvancedSection" xml:space="preserve"><value>詳細</value></data>
+    <data name="Backup_BackupSection" xml:space="preserve"><value>バックアップ</value></data>
+    <data name="Backup_RestoreSection" xml:space="preserve"><value>復元</value></data>
   </root>

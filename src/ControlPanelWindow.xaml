@@ -287,6 +287,8 @@
                         <TextBlock x:Name="TxtSettingsTitle"
                                    Text=""
                                    Style="{StaticResource BasSettingsPageTitleStyle}" />
+                        <TextBlock x:Name="TxtMultiScreenHint" Text="" Visibility="Collapsed"
+                                   Margin="0,8,0,0" Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -377,6 +379,7 @@
                                 </Grid>
                             </Border>
 
+                            <TextBlock x:Name="TxtBasicTriggerTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -551,6 +554,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
+                            <TextBlock x:Name="TxtBasicRuntimeTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -801,6 +805,7 @@
                                 </Border>
                             </StackPanel>
 
+                            <TextBlock x:Name="TxtVisualSpeedTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -951,6 +956,7 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
+                            <TextBlock x:Name="TxtVisualSamplingTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1014,6 +1020,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
+                            <TextBlock x:Name="TxtVisualOtherTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1244,6 +1251,7 @@
                                     </Grid>
                                 </Grid>
                             </Border>
+                            <TextBlock x:Name="TxtFilterAdvancedTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
@@ -1426,23 +1434,11 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock
-                                    x:Name="TxtMultiScreenTitle"
-                                    Grid.Column="0"
-                                    Text=""
-                                    Style="{StaticResource BasSettingsSectionTitleStyle}"
-                                    VerticalAlignment="Center"
-                                    Margin="0" />
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                                     <Button x:Name="BtnRefreshScreens" Content="" Click="RefreshScreenOptions_Click" />
                                     <Button x:Name="BtnScreensReset" Content="" Click="ResetScreenDefaults_Click" />
                                 </StackPanel>
                             </Grid>
-                            <TextBlock
-                                x:Name="TxtMultiScreenHint"
-                                Text=""
-                                Margin="0,0,0,12"
-                                Style="{StaticResource BasCaptionStyle}" />
                             <StackPanel
                                 x:Name="PanelScreenOptions"
                                 Spacing="0" />
@@ -1465,6 +1461,7 @@
                                             HorizontalAlignment="Right" VerticalAlignment="Center" Click="ExportConfiguration_Click" />
                                 </Grid>
                             </Border>
+                            <TextBlock x:Name="TxtBackupRestoreTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>

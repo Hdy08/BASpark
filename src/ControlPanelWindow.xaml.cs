@@ -698,11 +698,13 @@ public sealed partial class ControlPanelWindow : UserControl
         if (_isClosed || !RootGrid.IsLoaded) return;
         double contentWidth = 0;
         foreach (TextBlock title in new[] { TxtWelcomeTitle, TxtSettingsTitle, TxtLogTitle, TxtAboutTitle,
-                     TxtStatsTitle, TxtBasicTitle, TxtVisualTitle, TxtFilterTitle, TxtMultiScreenTitle, TxtBackupTitle })
+                     TxtStatsTitle, TxtBasicTitle, TxtBasicTriggerTitle, TxtBasicRuntimeTitle,
+                     TxtVisualTitle, TxtVisualSpeedTitle, TxtVisualSamplingTitle, TxtVisualOtherTitle,
+                     TxtFilterTitle, TxtFilterAdvancedTitle, TxtBackupTitle, TxtBackupRestoreTitle })
         {
             double width = MeasureSingleLineWidth(title);
             FrameworkElement heading = title;
-            if (heading.Parent is StackPanel { Children.Count: 1 } parent) heading = parent;
+            if (heading.Parent is StackPanel parent && parent.Parent is Grid) heading = parent;
             if (heading.Parent is Grid grid)
             {
                 foreach (FrameworkElement child in grid.Children.OfType<FrameworkElement>().Where(child => Grid.GetColumn(child) == 1))
@@ -1263,9 +1265,10 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateEffectsPauseButton();
         TxtStatusLabel.Text = Localization.Get("Welcome_StatusLabel");
         TxtClicksLabel.Text = Localization.Get("Welcome_ClicksLabel");
-        TxtSettingsTitle.Text = Localization.Get("Settings_Title");
         BtnApplySettings.Content = Localization.Get("Settings_Apply");
-        TxtBasicTitle.Text = Localization.Get("Basic_Title");
+        TxtBasicTitle.Text = Localization.Get("Basic_Interface");
+        TxtBasicTriggerTitle.Text = Localization.Get("Basic_Trigger");
+        TxtBasicRuntimeTitle.Text = Localization.Get("Basic_Runtime");
         TxtBasicLanguage.Text = Localization.Get("Basic_Language");
         TxtDarkMode.Text = Localization.Get("Basic_DarkMode");
         RadioDarkModeOff.Content = Localization.Get("Basic_DarkModeOff");
@@ -1290,7 +1293,10 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtMaxTouchEffects.Text = Localization.Get("Basic_MaxTouchEffects");
         TxtMaxTouchEffectsHint.Text = Localization.Get("Basic_MaxTouchEffectsHint");
         TxtTouchscreenHint.Text = Localization.Get("Basic_TouchscreenHint");
-        TxtVisualTitle.Text = Localization.Get("Visual_Title");
+        TxtVisualTitle.Text = Localization.Get("Visual_ScaleSection");
+        TxtVisualSpeedTitle.Text = Localization.Get("Visual_SpeedSection");
+        TxtVisualSamplingTitle.Text = Localization.Get("Visual_SamplingSection");
+        TxtVisualOtherTitle.Text = Localization.Get("Visual_OtherSection");
         BtnVisualReset.Content = Localization.Get("Settings_ResetPage");
         CheckLinkedEffectScale.Header = Localization.Get("Visual_LinkedScale");
         TxtLinkedScaleHint.Text = Localization.Get("Visual_LinkedScaleHint");
@@ -1309,7 +1315,8 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtMaxTouchEffectsValue.Text = _touchEffectLimitFormatter.FormatDouble(SliderMaxTouchEffects.Value);
         TxtTrailSamplingRateValue.Text = _samplingRateFormatter.FormatDouble(SliderTrailSamplingRate.Value);
         TxtEffectColor.Text = Localization.Get("Visual_Color");
-        TxtFilterTitle.Text = Localization.Get("Filter_Title");
+        TxtFilterTitle.Text = Localization.Get("Filter_BasicSection");
+        TxtFilterAdvancedTitle.Text = Localization.Get("Filter_AdvancedSection");
         CheckEnvironmentFilter.Header = Localization.Get("Filter_Enable");
         CheckHideInFullscreen.Header = Localization.Get("Filter_Fullscreen");
         CheckShowEffectOnDesktop.Header = Localization.Get("Filter_Desktop");
@@ -1322,10 +1329,9 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtAddProcess.Text = Localization.Get("Filter_AddProcess");
         BtnBrowseProcess.Content = Localization.Get("Filter_Browse");
         BtnSelectRunningProcess.Content = Localization.Get("Filter_SelectRunning");
-        TxtMultiScreenTitle.Text = Localization.Get("MultiScreen_Title");
         BtnRefreshScreens.Content = Localization.Get("MultiScreen_Refresh");
         TxtMultiScreenHint.Text = Localization.Get("MultiScreen_Hint");
-        TxtLogTitle.Text = Localization.Get("Log_Title");
+        TxtLogTitle.Text = Localization.Get("Nav_Log");
         BtnClearLog.Content = Localization.Get("Log_Clear");
         TxtLogHint.Text = Localization.Get("Log_Hint");
         TxtAboutTitle.Text = Localization.Get("About_Title");
@@ -1347,6 +1353,7 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtOverlayRename.Text = Localization.Get("Overlay_RenameProfile");
         BtnOverlayRenameCancel.Content = Localization.Get("Overlay_Cancel");
         BtnOverlayRenameConfirm.Content = Localization.Get("Overlay_ConfirmRename");
+        UpdateSettingsPageTitle();
         UpdateMinimumWindowWidth();
 
         // 点击方式三个单选项在标记里用的是 Name=（不是 x:Name=），没有生成字段，只能从容器里取。
@@ -2051,9 +2058,16 @@ public sealed partial class ControlPanelWindow : UserControl
         storyboard.Begin();
     }
 
+    private void UpdateSettingsPageTitle()
+    {
+        TxtSettingsTitle.Text = (_selectedSettingsItem?.Content as TextBlock ?? SubTabBasicLabel).Text;
+        TxtMultiScreenHint.Visibility = _selectedSettingsItem == SubTabMultiScreen ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void UpdateSettingsSectionVisibility()
     {
         StopSettingsAnimations();
+        UpdateSettingsPageTitle();
         // 四个子项之间切换同样需要过渡动画，因此逐个走 SetPageVisible（它会对
         // 「本次新进入」的那一项播放动画），而不是直接赋 Visibility。
         FrameworkElement? incoming = _selectedSettingsItem == SubTabBasic
@@ -2073,6 +2087,7 @@ public sealed partial class ControlPanelWindow : UserControl
         SetPageVisible(SectionFilter, ReferenceEquals(incoming, SectionFilter), incoming);
         SetPageVisible(SectionMultiScreen, ReferenceEquals(incoming, SectionMultiScreen), incoming);
         SetPageVisible(SectionBackup, ReferenceEquals(incoming, SectionBackup), incoming);
+        UpdateMinimumWindowWidth();
     }
 
     // ==================================================================
@@ -2899,35 +2914,43 @@ public sealed partial class ControlPanelWindow : UserControl
         if (!ConfigManager.Save(key, value)) throw new InvalidOperationException(Localization.Get("Msg_SettingsSaveFailed"));
     }
 
+    private string GetResetGroup(string pageKey, string sectionKey) =>
+        Localization.Get(_resetScope == ResetScope.All ? pageKey : sectionKey);
+
     private void RebuildBasicResetItems()
     {
-        string group = TxtBasicTitle.Text;
+        string group = GetResetGroup("Nav_Basic", "Basic_Interface");
         AddPageResetItem(group, TxtBasicLanguage.Text, Localization.Get("Basic_DarkModeSystem"), "UiLanguage", RestoreLanguageDefault,
             () => SaveResetValue("UiLanguage", GetSelectedLanguage() ?? Localization.CurrentCultureName));
         AddPageResetItem(group, TxtDarkMode.Text, Localization.Get("Basic_DarkModeSystem"), "DarkMode",
             () => SelectDarkMode(DarkModeOption.System), () => SaveResetValue("DarkMode", DarkModeOption.System));
+        group = GetResetGroup("Nav_Basic", "Basic_Trigger");
         AddToggleResetItem(group, CheckAlwaysTrailEffectSwitch, false, "EnableAlwaysTrailEffect");
         AddToggleResetItem(group, CheckMasterSwitch, true, "IsEffectEnabled");
         AddPageResetItem(group, TxtClickType.Text, Localization.Get("Basic_LeftClick"), "ClickTriggerType",
             () => RadioClickType.SelectedIndex = 0, () => SaveResetValue("ClickTriggerType", 0));
         foreach (var setting in new[] { (CheckMiddleClickTrigger, "EnableMiddleClickTrigger"),
                      (CheckTouchscreenMode, "IsTouchscreenMode"),
-                     (CheckScreenshotCompatibilityMode, "ScreenshotCompatibilityMode"), (CheckAutoStart, "AutoStart"),
-                     (CheckStartSilent, "StartSilent"), (CheckHideTrayIcon, "HideTrayIcon"), (CheckRunAsAdmin, "RunAsAdmin") })
+                     (CheckScreenshotCompatibilityMode, "ScreenshotCompatibilityMode") })
         {
             AddToggleResetItem(group, setting.Item1, false, setting.Item2);
             if (setting.Item1 == CheckTouchscreenMode)
                 AddPageResetItem(group, TxtMaxTouchEffects.Text, "1", "MaxTouchEffects",
                     () => SliderMaxTouchEffects.Value = 1, () => SaveResetValue("MaxTouchEffects", 1));
         }
+        group = GetResetGroup("Nav_Basic", "Basic_Runtime");
+        foreach (var setting in new[] { (CheckAutoStart, "AutoStart"), (CheckStartSilent, "StartSilent"),
+                     (CheckHideTrayIcon, "HideTrayIcon"), (CheckRunAsAdmin, "RunAsAdmin") })
+            AddToggleResetItem(group, setting.Item1, false, setting.Item2);
     }
 
     private void RebuildFilterResetItems()
     {
-        string group = TxtFilterTitle.Text;
+        string group = GetResetGroup("Nav_Filter", "Filter_BasicSection");
         AddToggleResetItem(group, CheckEnvironmentFilter, false, "EnableEnvironmentFilter");
         AddToggleResetItem(group, CheckHideInFullscreen, true, "HideInFullscreen");
         AddToggleResetItem(group, CheckShowEffectOnDesktop, true, "ShowEffectOnDesktop");
+        group = GetResetGroup("Nav_Filter", "Filter_AdvancedSection");
         AddPageResetItem(group, Localization.Get("Filter_ProfileGroup"), Localization.Get("Reset_DefaultProfile"), "Profiles", () =>
         {
             FilterProfile profile = Profiles.FirstOrDefault(item => item.Name == Localization.Get("Profile_Default"))
@@ -2948,7 +2971,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void RebuildScreenResetItems()
     {
         foreach (ScreenOptionItem screen in ScreenOptions)
-            AddPageResetItem(TxtMultiScreenTitle.Text, screen.Title, Localization.Get("Basic_DarkModeOn"), "Screen", () =>
+            AddPageResetItem(Localization.Get("Nav_MultiScreen"), screen.Title, Localization.Get("Basic_DarkModeOn"), "Screen", () =>
             {
                 screen.IsEnabled = true;
                 SyncScreenToggles();
@@ -2981,13 +3004,13 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void SearchVisualReset_TextChanged(object sender, TextChangedEventArgs args) => RefreshVisualResetRows(SearchVisualReset.Text);
 
-    private void AddVisualResetItem(VisualAppearanceResetFlags flags, string title, string key, object value, Action restore)
+    private void AddVisualResetItem(string group, VisualAppearanceResetFlags flags, string title, string key, object value, Action restore)
     {
         object label = key == "InputSamplingRate" ? _samplingRateFormatter.FormatDouble(_samplingRateFormatter.ToSliderValue((int)value))
             : value is bool enabled ? Localization.Get(enabled ? "Basic_DarkModeOn" : "Basic_DarkModeOff") : value;
         var item = new VisualResetItem(flags, title, Localization.Format("Reset_DefaultValue", label))
         {
-            Group = TxtVisualTitle.Text,
+            Group = group,
             Restore = restore,
             Save = () => SaveResetValue(key, value),
             SettingKey = key
@@ -2997,21 +3020,25 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void RebuildVisualResetItems()
     {
-        AddVisualResetItem(VisualAppearanceResetFlags.UnifiedEffectScale, CheckLinkedEffectScale.Header.ToString()!, "UseLinkedEffectScale", true,
+        string group = GetResetGroup("Nav_Visual", "Visual_ScaleSection");
+        AddVisualResetItem(group, VisualAppearanceResetFlags.UnifiedEffectScale, CheckLinkedEffectScale.Header.ToString()!, "UseLinkedEffectScale", true,
             () => CheckLinkedEffectScale.IsOn = true);
-        AddVisualResetItem(VisualAppearanceResetFlags.UnifiedEffectScale, Localization.Get("VisualReset_UnifiedScale"), "EffectScale", 1.0, () => SliderScale.Value = 1);
-        AddVisualResetItem(VisualAppearanceResetFlags.TrailEffectScale, Localization.Get("VisualReset_TrailScale"), "TrailEffectScale", 1.0, () => SliderTrailScale.Value = 1);
-        AddVisualResetItem(VisualAppearanceResetFlags.ClickEffectScale, Localization.Get("VisualReset_ClickScale"), "ClickEffectScale", 1.0, () => SliderClickScale.Value = 1);
-        AddVisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, CheckLinkedAnimationSpeed.Header.ToString()!, "UseLinkedAnimationSpeed", true,
+        AddVisualResetItem(group, VisualAppearanceResetFlags.UnifiedEffectScale, Localization.Get("VisualReset_UnifiedScale"), "EffectScale", 1.0, () => SliderScale.Value = 1);
+        AddVisualResetItem(group, VisualAppearanceResetFlags.TrailEffectScale, Localization.Get("VisualReset_TrailScale"), "TrailEffectScale", 1.0, () => SliderTrailScale.Value = 1);
+        AddVisualResetItem(group, VisualAppearanceResetFlags.ClickEffectScale, Localization.Get("VisualReset_ClickScale"), "ClickEffectScale", 1.0, () => SliderClickScale.Value = 1);
+        group = GetResetGroup("Nav_Visual", "Visual_SpeedSection");
+        AddVisualResetItem(group, VisualAppearanceResetFlags.UnifiedAnimationSpeed, CheckLinkedAnimationSpeed.Header.ToString()!, "UseLinkedAnimationSpeed", true,
             () => CheckLinkedAnimationSpeed.IsOn = true);
-        AddVisualResetItem(VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), "EffectSpeed", 1.0, () => SliderSpeed.Value = 1);
-        AddVisualResetItem(VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), "TrailAnimationSpeed", 1.0, () => SliderTrailAnimSpeed.Value = 1);
-        AddVisualResetItem(VisualAppearanceResetFlags.ClickAnimationSpeed, Localization.Get("VisualReset_ClickSpeed"), "ClickAnimationSpeed", 1.0, () => SliderClickAnimSpeed.Value = 1);
-        AddVisualResetItem(VisualAppearanceResetFlags.None, CheckApplyCurveDraw.Header.ToString()!, "ApplyCurveDraw", false, () => CheckApplyCurveDraw.IsOn = false);
-        AddVisualResetItem(VisualAppearanceResetFlags.InputSamplingRate, TxtTrailSamplingRate.Text, "InputSamplingRate", -1,
+        AddVisualResetItem(group, VisualAppearanceResetFlags.UnifiedAnimationSpeed, Localization.Get("VisualReset_UnifiedSpeed"), "EffectSpeed", 1.0, () => SliderSpeed.Value = 1);
+        AddVisualResetItem(group, VisualAppearanceResetFlags.TrailAnimationSpeed, Localization.Get("VisualReset_TrailSpeed"), "TrailAnimationSpeed", 1.0, () => SliderTrailAnimSpeed.Value = 1);
+        AddVisualResetItem(group, VisualAppearanceResetFlags.ClickAnimationSpeed, Localization.Get("VisualReset_ClickSpeed"), "ClickAnimationSpeed", 1.0, () => SliderClickAnimSpeed.Value = 1);
+        group = GetResetGroup("Nav_Visual", "Visual_SamplingSection");
+        AddVisualResetItem(group, VisualAppearanceResetFlags.None, CheckApplyCurveDraw.Header.ToString()!, "ApplyCurveDraw", false, () => CheckApplyCurveDraw.IsOn = false);
+        AddVisualResetItem(group, VisualAppearanceResetFlags.InputSamplingRate, TxtTrailSamplingRate.Text, "InputSamplingRate", -1,
             () => SliderTrailSamplingRate.Value = 0);
-        AddVisualResetItem(VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), "GlowIntensity", 1.0, () => SliderGlow.Value = 1);
-        AddVisualResetItem(VisualAppearanceResetFlags.ParticleColor | VisualAppearanceResetFlags.EffectOpacity,
+        group = GetResetGroup("Nav_Visual", "Visual_OtherSection");
+        AddVisualResetItem(group, VisualAppearanceResetFlags.GlowIntensity, Localization.Get("VisualReset_GlowIntensity"), "GlowIntensity", 1.0, () => SliderGlow.Value = 1);
+        AddVisualResetItem(group, VisualAppearanceResetFlags.ParticleColor | VisualAppearanceResetFlags.EffectOpacity,
             Localization.Get("VisualReset_Color"), "ParticleColor", ConfigManager.DefaultThemeColor,
             () =>
             {
@@ -3031,7 +3058,7 @@ public sealed partial class ControlPanelWindow : UserControl
                 !item.Title.Contains(filter, StringComparison.OrdinalIgnoreCase) &&
                 !item.Subtitle.Contains(filter, StringComparison.OrdinalIgnoreCase) &&
                 !item.Group.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
-            if (_resetScope == ResetScope.All && group != item.Group)
+            if (_resetScope != ResetScope.Screens && group != item.Group)
             {
                 group = item.Group;
                 rows.Add(group);

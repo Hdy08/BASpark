@@ -3014,7 +3014,7 @@ public class WinUi3UiTests
         foreach (string group in new[] { "Basic", "Visual", "Filter", "Screen" })
             Assert.Contains("Rebuild" + group + "ResetItems()", source, StringComparison.Ordinal);
         Assert.Contains("item.Group.Contains(filter", source, StringComparison.Ordinal);
-        Assert.Contains("_resetScope == ResetScope.All && group != item.Group", source, StringComparison.Ordinal);
+        Assert.Contains("_resetScope != ResetScope.Screens && group != item.Group", source, StringComparison.Ordinal);
         Assert.Contains("rows.Add(group)", source, StringComparison.Ordinal);
         Assert.Contains("rows.Add(item)", source, StringComparison.Ordinal);
         Assert.Contains("ListVisualResetItems.ItemsSource = rows", source, StringComparison.Ordinal);

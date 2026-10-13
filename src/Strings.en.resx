@@ -775,4 +775,15 @@
     <data name="Overlay_NoSearchResults" xml:space="preserve"><value>No search results</value></data>
     <data name="Backup_ConfirmImport" xml:space="preserve"><value>Confirm import</value></data>
     <data name="Backup_ConfirmExport" xml:space="preserve"><value>Confirm export</value></data>
+    <data name="Basic_Interface" xml:space="preserve"><value>Interface</value></data>
+    <data name="Basic_Trigger" xml:space="preserve"><value>Triggers</value></data>
+    <data name="Basic_Runtime" xml:space="preserve"><value>Runtime</value></data>
+    <data name="Visual_ScaleSection" xml:space="preserve"><value>Scale</value></data>
+    <data name="Visual_SpeedSection" xml:space="preserve"><value>Speed</value></data>
+    <data name="Visual_SamplingSection" xml:space="preserve"><value>Sampling</value></data>
+    <data name="Visual_OtherSection" xml:space="preserve"><value>Other</value></data>
+    <data name="Filter_BasicSection" xml:space="preserve"><value>Basic</value></data>
+    <data name="Filter_AdvancedSection" xml:space="preserve"><value>Advanced</value></data>
+    <data name="Backup_BackupSection" xml:space="preserve"><value>Backup</value></data>
+    <data name="Backup_RestoreSection" xml:space="preserve"><value>Restore</value></data>
   </root>

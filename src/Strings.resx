@@ -775,4 +775,15 @@
     <data name="Overlay_NoSearchResults" xml:space="preserve"><value>无搜索结果</value></data>
     <data name="Backup_ConfirmImport" xml:space="preserve"><value>确认导入</value></data>
     <data name="Backup_ConfirmExport" xml:space="preserve"><value>确认导出</value></data>
+    <data name="Basic_Interface" xml:space="preserve"><value>界面</value></data>
+    <data name="Basic_Trigger" xml:space="preserve"><value>触发</value></data>
+    <data name="Basic_Runtime" xml:space="preserve"><value>运行</value></data>
+    <data name="Visual_ScaleSection" xml:space="preserve"><value>缩放</value></data>
+    <data name="Visual_SpeedSection" xml:space="preserve"><value>速度</value></data>
+    <data name="Visual_SamplingSection" xml:space="preserve"><value>采样</value></data>
+    <data name="Visual_OtherSection" xml:space="preserve"><value>其他</value></data>
+    <data name="Filter_BasicSection" xml:space="preserve"><value>基础</value></data>
+    <data name="Filter_AdvancedSection" xml:space="preserve"><value>高级</value></data>
+    <data name="Backup_BackupSection" xml:space="preserve"><value>备份</value></data>
+    <data name="Backup_RestoreSection" xml:space="preserve"><value>恢复</value></data>
   </root>
