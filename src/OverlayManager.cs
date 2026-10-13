@@ -207,6 +207,7 @@ namespace BASpark
         private void HandleMouseInput(uint message, NativeMethods.MSLLHOOKSTRUCT input)
         {
             bool touchLike = NativeMethods.IsTouchInput(input.dwExtraInfo);
+            if (!touchLike) _touchInputListener?.ObserveCursor();
             if (touchLike && _touchInputListener?.ShouldIgnorePromotedTouch(input.pt.x, input.pt.y) == true) return;
             switch (message)
             {
@@ -837,7 +838,10 @@ namespace BASpark
                 return false;
             }
 
-            if (!NativeMethods.IsCursorVisible(allowTouchSuppression: touchLike && ConfigManager.IsTouchscreenMode))
+            bool cursorVisible = touchLike && ConfigManager.IsTouchscreenMode && _touchPoint is NativeMethods.POINT touchPoint
+                && _touchInputListener != null ? _touchInputListener.IsCursorVisible(touchPoint)
+                : NativeMethods.IsCursorVisible(allowTouchSuppression: touchLike && ConfigManager.IsTouchscreenMode);
+            if (!cursorVisible)
             {
                 ReleasePointerStateSilent();
                 return false;
@@ -1411,6 +1415,10 @@ namespace BASpark
     {
         private readonly Action<TouchInputPhase, int, int> _input;
         private readonly Action<IntPtr, uint, bool, bool, int, int> _contactInput;
+        private readonly TouchCursorState _cursorState = new();
+        private readonly NativeMethods.WinEventProc _cursorEventProc;
+        private IntPtr _cursorWinEventHook;
+        private IntPtr _cursorNameEventHook;
         private readonly Dictionary<IntPtr, TouchDevice?> _devices = new();
         private byte[] _buffer = Array.Empty<byte>();
         private (IntPtr Device, uint Id)? _primary;
@@ -1427,6 +1435,7 @@ namespace BASpark
         {
             _input = input;
             _contactInput = HandleContact;
+            _cursorEventProc = CursorWinEventProc;
             CreateHandle(new CreateParams { Caption = "BASpark.TouchInput", Parent = new IntPtr(-3) });
             var device = new NativeMethods.RAWINPUTDEVICE { UsagePage = 13, Usage = 4, Flags = 0x2100, Target = Handle };
             if (!NativeMethods.RegisterRawInputDevices([device], 1, (uint)Marshal.SizeOf<NativeMethods.RAWINPUTDEVICE>()))
@@ -1434,6 +1443,42 @@ namespace BASpark
                 Debug.WriteLine("Touch input registration failed: " + Marshal.GetLastWin32Error());
                 DestroyHandle();
             }
+            if (Handle != IntPtr.Zero)
+            {
+                _cursorWinEventHook = NativeMethods.SetWinEventHook(NativeMethods.EVENT_OBJECT_SHOW,
+                    NativeMethods.EVENT_OBJECT_HIDE, IntPtr.Zero, _cursorEventProc, 0, 0, NativeMethods.WINEVENT_OUTOFCONTEXT);
+                _cursorNameEventHook = NativeMethods.SetWinEventHook(NativeMethods.EVENT_OBJECT_NAMECHANGE,
+                    NativeMethods.EVENT_OBJECT_NAMECHANGE, IntPtr.Zero, _cursorEventProc, 0, 0, NativeMethods.WINEVENT_OUTOFCONTEXT);
+                ObserveCursor();
+            }
+        }
+
+        internal void ObserveCursor()
+        {
+            if (_primary != null) return;
+            var cursor = new NativeMethods.CURSORINFO { cbSize = Marshal.SizeOf<NativeMethods.CURSORINFO>() };
+            if (NativeMethods.GetCursorInfo(out cursor))
+                _cursorState.Observe(cursor, NativeMethods.WindowFromPoint(cursor.ptScreenPos));
+        }
+
+        internal bool IsCursorVisible(NativeMethods.POINT point)
+        {
+            var cursor = new NativeMethods.CURSORINFO { cbSize = Marshal.SizeOf<NativeMethods.CURSORINFO>() };
+            if (!NativeMethods.GetCursorInfo(out cursor))
+            {
+                _cursorState.Reset();
+                return false;
+            }
+            IntPtr window = NativeMethods.WindowFromPoint(point);
+            string className = NativeMethods.GetWindowClassName(window);
+            bool chromium = className is "Chrome_RenderWidgetHostHWND" or "Chrome_WidgetWin_0" or "Chrome_WidgetWin_1";
+            return _cursorState.IsVisible(cursor, window, chromium);
+        }
+
+        private void CursorWinEventProc(IntPtr hook, uint eventType, IntPtr window, int objectId, int childId,
+            uint threadId, uint eventTime)
+        {
+            if (objectId == -9) ObserveCursor();
         }
 
         internal bool ShouldIgnorePromotedTouch(int screenX, int screenY) => _hasRecentTouch
@@ -1509,6 +1554,16 @@ namespace BASpark
 
         public void Dispose()
         {
+            if (_cursorNameEventHook != IntPtr.Zero)
+            {
+                NativeMethods.UnhookWinEvent(_cursorNameEventHook);
+                _cursorNameEventHook = IntPtr.Zero;
+            }
+            if (_cursorWinEventHook != IntPtr.Zero)
+            {
+                NativeMethods.UnhookWinEvent(_cursorWinEventHook);
+                _cursorWinEventHook = IntPtr.Zero;
+            }
             if (Handle != IntPtr.Zero)
             {
                 var device = new NativeMethods.RAWINPUTDEVICE { UsagePage = 13, Usage = 4, Flags = 1 };
@@ -1516,6 +1571,7 @@ namespace BASpark
                 DestroyHandle();
             }
             _primary = null;
+            _cursorState.Reset();
             _devices.Clear();
             _buffer = Array.Empty<byte>();
         }

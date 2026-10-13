@@ -550,6 +550,8 @@ public class WinUi3UiTests
         var setup = typeof(OverlayManager).GetMethod("SetupGlobalHooks", members)!.CreateDelegate<Action>(manager);
         var hook = typeof(OverlayManager).GetField("_mouseHook", members)!;
         var touchListener = typeof(OverlayManager).GetField("_touchInputListener", members)!;
+        var cursorHook = typeof(TouchInputListener).GetField("_cursorWinEventHook", members)!;
+        var cursorNameHook = typeof(TouchInputListener).GetField("_cursorNameEventHook", members)!;
         try
         {
             ConfigManager.ScreenshotCompatibilityMode = false;
@@ -559,9 +561,13 @@ public class WinUi3UiTests
             Assert.NotEqual(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
             var firstListener = Assert.IsType<TouchInputListener>(touchListener.GetValue(manager));
             Assert.NotEqual(IntPtr.Zero, firstListener.Handle);
+            Assert.NotEqual(IntPtr.Zero, (IntPtr)cursorHook.GetValue(firstListener)!);
+            Assert.NotEqual(IntPtr.Zero, (IntPtr)cursorNameHook.GetValue(firstListener)!);
             setup();
             Assert.NotEqual(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
             Assert.Equal(IntPtr.Zero, firstListener.Handle);
+            Assert.Equal(IntPtr.Zero, (IntPtr)cursorHook.GetValue(firstListener)!);
+            Assert.Equal(IntPtr.Zero, (IntPtr)cursorNameHook.GetValue(firstListener)!);
             manager.UpdateTouchMode(false);
             Assert.Null(touchListener.GetValue(manager));
             manager.UpdateTouchMode(true);
@@ -570,6 +576,8 @@ public class WinUi3UiTests
             manager.Dispose();
             Assert.Equal(IntPtr.Zero, (IntPtr)hook.GetValue(manager)!);
             Assert.Equal(IntPtr.Zero, lastListener.Handle);
+            Assert.Equal(IntPtr.Zero, (IntPtr)cursorHook.GetValue(lastListener)!);
+            Assert.Equal(IntPtr.Zero, (IntPtr)cursorNameHook.GetValue(lastListener)!);
         }
         finally
         {
@@ -629,6 +637,62 @@ public class WinUi3UiTests
         {
             var cursorInfo = new NativeMethods.CURSORINFO { flags = flags, hCursor = transparent };
             Assert.False(NativeMethods.IsCursorVisible(cursorInfo, touch));
+        }
+        finally
+        {
+            DestroyCursor(transparent);
+        }
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void TouchscreenInput_WebViewRetainsItsOwnEligibilityWhenTouchClearsTheCursor(bool visible, bool sameWindow, bool expected)
+    {
+        var state = new TouchCursorState();
+        var window = new IntPtr(123);
+        var cursor = new NativeMethods.CURSORINFO
+        {
+            flags = visible ? NativeMethods.CURSOR_SHOWING : 0,
+            hCursor = visible ? System.Windows.Forms.Cursors.Arrow.Handle : IntPtr.Zero
+        };
+        state.Observe(cursor, window);
+        cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        cursor.hCursor = IntPtr.Zero;
+        state.Observe(cursor, window);
+        Assert.Equal(expected, state.IsVisible(cursor, sameWindow ? window : new IntPtr(456), true));
+        Assert.False(state.IsVisible(cursor, window, false));
+        state.Reset();
+        Assert.False(state.IsVisible(cursor, window, true));
+    }
+
+    [Fact]
+    public void TouchscreenInput_WebViewHiddenAndTransparentCursorsStayFilteredAfterTouch()
+    {
+        var state = new TouchCursorState();
+        var window = new IntPtr(123);
+        var cursor = new NativeMethods.CURSORINFO { flags = 0, hCursor = IntPtr.Zero };
+        state.Observe(cursor, window);
+        cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+        cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+        Assert.False(state.IsVisible(cursor, window, true));
+        IntPtr transparent = CreateCursor(IntPtr.Zero, 0, 0, 32, 32,
+            Enumerable.Repeat((byte)255, 128).ToArray(), new byte[128]);
+        Assert.NotEqual(IntPtr.Zero, transparent);
+        try
+        {
+            cursor.flags = NativeMethods.CURSOR_SHOWING;
+            cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+            state.Observe(cursor, window);
+            cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+            cursor.hCursor = transparent;
+            Assert.False(state.IsVisible(cursor, window, true));
+            cursor.flags = NativeMethods.CURSOR_SHOWING;
+            state.Observe(cursor, window);
+            cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
+            cursor.hCursor = IntPtr.Zero;
+            Assert.False(state.IsVisible(cursor, window, true));
         }
         finally
         {

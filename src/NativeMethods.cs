@@ -39,6 +39,9 @@ internal static class NativeMethods
     // ---- 窗口事件钩子 ---------------------------------------------------
     internal const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
     internal const uint EVENT_OBJECT_REORDER = 0x8004;
+    internal const uint EVENT_OBJECT_SHOW = 0x8002;
+    internal const uint EVENT_OBJECT_HIDE = 0x8003;
+    internal const uint EVENT_OBJECT_NAMECHANGE = 0x800C;
     internal const uint WINEVENT_OUTOFCONTEXT = 0x0000;
 
     internal const int WH_MOUSE_LL = 14;
@@ -498,5 +501,32 @@ internal static class NativeMethods
         x = pt.x;
         y = pt.y;
         return true;
+    }
+}
+
+internal sealed class TouchCursorState
+{
+    private IntPtr _window;
+    private bool _visible;
+
+    internal void Observe(NativeMethods.CURSORINFO cursor, IntPtr window)
+    {
+        if ((cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0) return;
+        _window = window;
+        _visible = NativeMethods.IsCursorVisible(cursor, false);
+    }
+
+    internal bool IsVisible(NativeMethods.CURSORINFO cursor, IntPtr window, bool chromium)
+    {
+        if (chromium && window != IntPtr.Zero && window == _window
+            && (cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0)
+            return _visible && (cursor.hCursor == IntPtr.Zero || NativeMethods.IsCursorVisible(cursor, true));
+        return NativeMethods.IsCursorVisible(cursor, true);
+    }
+
+    internal void Reset()
+    {
+        _window = IntPtr.Zero;
+        _visible = false;
     }
 }
