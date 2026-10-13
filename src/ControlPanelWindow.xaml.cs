@@ -730,7 +730,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void InitializeSettingsTracking()
     {
         foreach (ToggleSwitch toggle in new[] { CheckMasterSwitch, CheckAutoStart, CheckStartSilent, CheckHideTrayIcon,
-                     CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMiddleClickTrigger,
+                     CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMultiTouchEffects, CheckMiddleClickTrigger,
                      CheckScreenshotCompatibilityMode, CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.General);
         foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw, CheckFollowDisplayRefreshRate })
@@ -770,6 +770,7 @@ public sealed partial class ControlPanelWindow : UserControl
         IsEffectEnabled = CheckMasterSwitch.IsOn, AutoStart = CheckAutoStart.IsOn, StartSilent = CheckStartSilent.IsOn,
         HideTrayIcon = CheckHideTrayIcon.IsOn, EnableAlwaysTrailEffect = CheckAlwaysTrailEffectSwitch.IsOn,
         RunAsAdmin = CheckRunAsAdmin.IsOn, IsTouchscreenMode = CheckTouchscreenMode.IsOn,
+        EnableMultiTouchEffects = CheckMultiTouchEffects.IsOn,
         EnableMiddleClickTrigger = CheckMiddleClickTrigger.IsOn, ScreenshotCompatibilityMode = CheckScreenshotCompatibilityMode.IsOn,
         EnableEnvironmentFilter = CheckEnvironmentFilter.IsOn, HideInFullscreen = CheckHideInFullscreen.IsOn,
         ShowEffectOnDesktop = CheckShowEffectOnDesktop.IsOn, ActiveProfileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
@@ -1238,6 +1239,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckRunAsAdmin.Header = Localization.Get("Basic_RunAsAdmin");
         TxtRunAsAdminHint.Text = Localization.Get("Basic_RunAsAdminHint");
         CheckTouchscreenMode.Header = Localization.Get("Basic_Touchscreen");
+        CheckMultiTouchEffects.Header = Localization.Get("Basic_MultiTouch");
         TxtTouchscreenHint.Text = Localization.Get("Basic_TouchscreenHint");
         TxtVisualTitle.Text = Localization.Get("Visual_Title");
         BtnVisualReset.Content = Localization.Get("Settings_ResetPage");
@@ -2104,6 +2106,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckShowEffectOnDesktop.IsOn = ConfigManager.ShowEffectOnDesktop;
         CheckRunAsAdmin.IsOn = ConfigManager.RunAsAdmin;
         CheckTouchscreenMode.IsOn = ConfigManager.IsTouchscreenMode;
+        CheckMultiTouchEffects.IsOn = ConfigManager.EnableMultiTouchEffects;
         CheckMiddleClickTrigger.IsOn = ConfigManager.EnableMiddleClickTrigger;
         CheckScreenshotCompatibilityMode.IsOn = ConfigManager.ScreenshotCompatibilityMode;
 
@@ -2120,6 +2123,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         UpdateClickEffectPanelVisibility();
         UpdateEnvironmentFilterInterlock();
+        UpdateMultiTouchPanelVisibility();
 
         CheckLinkedEffectScale.IsOn = ConfigManager.UseLinkedEffectScale;
         SliderScale.Value = ConfigManager.EffectScale;
@@ -2242,6 +2246,11 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void UpdateClickEffectPanelVisibility(bool animate = false) =>
         SetSettingsVisibility(SectionBasic, animate, (PanelClickEffectOptions, CheckMasterSwitch.IsOn));
+
+    private void CheckTouchscreenMode_Changed(object sender, RoutedEventArgs args) => UpdateMultiTouchPanelVisibility(animate: true);
+
+    private void UpdateMultiTouchPanelVisibility(bool animate = false) =>
+        SetSettingsVisibility(SectionBasic, animate, (PanelMultiTouchEffects, CheckTouchscreenMode.IsOn));
 
     private void SetSettingsVisibility(Panel section, bool animate, params (FrameworkElement Element, bool Visible)[] changes)
     {
@@ -2855,9 +2864,9 @@ public sealed partial class ControlPanelWindow : UserControl
         AddPageResetItem(group, TxtClickType.Text, Localization.Get("Basic_LeftClick"), "ClickTriggerType",
             () => RadioClickType.SelectedIndex = 0, () => SaveResetValue("ClickTriggerType", 0));
         foreach (var setting in new[] { (CheckMiddleClickTrigger, "EnableMiddleClickTrigger"),
+                     (CheckTouchscreenMode, "IsTouchscreenMode"), (CheckMultiTouchEffects, "EnableMultiTouchEffects"),
                      (CheckScreenshotCompatibilityMode, "ScreenshotCompatibilityMode"), (CheckAutoStart, "AutoStart"),
-                     (CheckStartSilent, "StartSilent"), (CheckHideTrayIcon, "HideTrayIcon"), (CheckRunAsAdmin, "RunAsAdmin"),
-                     (CheckTouchscreenMode, "IsTouchscreenMode") })
+                     (CheckStartSilent, "StartSilent"), (CheckHideTrayIcon, "HideTrayIcon"), (CheckRunAsAdmin, "RunAsAdmin") })
             AddToggleResetItem(group, setting.Item1, false, setting.Item2);
     }
 
@@ -3095,6 +3104,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         UpdateClickEffectPanelVisibility();
         UpdateEnvironmentFilterInterlock();
+        UpdateMultiTouchPanelVisibility();
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
         UpdateTrailRefreshInterlock();
@@ -3506,6 +3516,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         ConfigManager.Save("RunAsAdmin", runAsAdminEnabled);
         ConfigManager.Save("IsTouchscreenMode", isTouchscreenEnabled);
+        ConfigManager.Save("EnableMultiTouchEffects", CheckMultiTouchEffects.IsOn);
         ConfigManager.Save("IsEffectEnabled", CheckMasterSwitch.IsOn);
         ConfigManager.Save("AutoStart", autoStartEnabled);
         ConfigManager.Save("ParticleColor", ColorPickerColorMath.CombineThemeColor(_particleColor, effectOpacity));

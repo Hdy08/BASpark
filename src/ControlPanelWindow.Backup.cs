@@ -305,6 +305,7 @@ public sealed partial class ControlPanelWindow
                          ("IsEffectEnabled", CheckMasterSwitch), ("AutoStart", CheckAutoStart), ("StartSilent", CheckStartSilent),
                          ("HideTrayIcon", CheckHideTrayIcon), ("EnableAlwaysTrailEffect", CheckAlwaysTrailEffectSwitch),
                          ("RunAsAdmin", CheckRunAsAdmin), ("IsTouchscreenMode", CheckTouchscreenMode),
+                         ("EnableMultiTouchEffects", CheckMultiTouchEffects),
                          ("EnableMiddleClickTrigger", CheckMiddleClickTrigger), ("ScreenshotCompatibilityMode", CheckScreenshotCompatibilityMode),
                          ("EnableEnvironmentFilter", CheckEnvironmentFilter), ("HideInFullscreen", CheckHideInFullscreen),
                          ("ShowEffectOnDesktop", CheckShowEffectOnDesktop), ("UseLinkedEffectScale", CheckLinkedEffectScale),
@@ -353,6 +354,7 @@ public sealed partial class ControlPanelWindow
         }
         UpdateClickEffectPanelVisibility();
         UpdateEnvironmentFilterInterlock();
+        UpdateMultiTouchPanelVisibility();
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
         UpdateTrailRefreshInterlock();

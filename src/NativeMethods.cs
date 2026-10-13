@@ -507,8 +507,7 @@ internal static class NativeMethods
 internal sealed class TouchCursorState
 {
     private readonly Dictionary<IntPtr, bool> _windows = new();
-    private IntPtr _contactWindow;
-    private bool _contactChromium;
+    private readonly Dictionary<long, (IntPtr Window, bool Chromium)> _contacts = new();
 
     internal void Observe(NativeMethods.CURSORINFO cursor, IntPtr window)
     {
@@ -516,28 +515,27 @@ internal sealed class TouchCursorState
         Remember(window, NativeMethods.IsCursorVisible(cursor, false));
     }
 
-    internal void BeginContact(IntPtr window, bool chromium)
+    internal void BeginContact(IntPtr window, bool chromium, long pointerId = 1)
     {
-        _contactWindow = window;
-        _contactChromium = chromium;
+        _contacts[pointerId] = (window, chromium);
     }
 
-    internal void EndContact()
+    internal void EndContact(long pointerId = 1)
     {
-        _contactWindow = IntPtr.Zero;
-        _contactChromium = false;
+        _contacts.Remove(pointerId);
     }
 
-    internal bool IsVisible(NativeMethods.CURSORINFO cursor, IntPtr window, bool chromium)
+    internal bool IsVisible(NativeMethods.CURSORINFO cursor, IntPtr window, bool chromium, long pointerId = 1)
     {
-        if (_contactWindow != IntPtr.Zero && _contactChromium)
+        var contact = _contacts.GetValueOrDefault(pointerId);
+        if (contact.Window != IntPtr.Zero && contact.Chromium)
         {
-            window = _contactWindow;
+            window = contact.Window;
             chromium = true;
         }
         if (chromium && window != IntPtr.Zero
             && ((cursor.flags & NativeMethods.CURSOR_SUPPRESSED) != 0
-                || (window == _contactWindow && _contactChromium && cursor.hCursor == IntPtr.Zero)))
+                || (window == contact.Window && contact.Chromium && cursor.hCursor == IntPtr.Zero)))
         {
             bool allowed = !_windows.TryGetValue(window, out bool previous) || previous;
             if (cursor.hCursor != IntPtr.Zero) allowed &= NativeMethods.IsCursorVisible(cursor, true);
@@ -559,6 +557,6 @@ internal sealed class TouchCursorState
     internal void Reset()
     {
         _windows.Clear();
-        EndContact();
+        _contacts.Clear();
     }
 }

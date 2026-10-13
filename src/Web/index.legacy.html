@@ -76,6 +76,8 @@
                 this.sparks = [];
                 this.trail = [];
                 this.trailStrokeId = 0;
+                this.pointerId = 1;
+                this.touchPointers = new Map();
                 this.isDown = false;
                 this.lastPos = null;
                 this.baseFrameMs = 1000 / 60;
@@ -133,6 +135,7 @@
                                 a: 0.7,
                                 f: 0.95,
                                 fromClick: false,
+                                pointerId: this.pointerId,
                             });
                         }
                     }
@@ -165,6 +168,7 @@
                 this.waves = [];
                 this.sparks = [];
                 this.trail = [];
+                this.touchPointers.clear();
                 this.isDown = false;
                 this.lastPos = null;
                 this.previousDirtyRects = [];
@@ -285,6 +289,46 @@
 
                 for (const rect of rects) {
                     this._clearBuffer(rect);
+                }
+            }
+
+            _withTouchPointer(contact, action) {
+                const trail = this.trail;
+                const strokeId = this.trailStrokeId;
+                const pointerId = this.pointerId;
+                const isDown = this.isDown;
+                const lastPos = this.lastPos;
+                this.trail = contact.trail;
+                this.trailStrokeId = contact.strokeId;
+                this.pointerId = contact.pointerId;
+                this.isDown = contact.isDown;
+                this.lastPos = contact.lastPos;
+                try {
+                    return action();
+                } finally {
+                    contact.trail = this.trail;
+                    contact.strokeId = this.trailStrokeId;
+                    contact.isDown = this.isDown;
+                    contact.lastPos = this.lastPos;
+                    this.trail = trail;
+                    this.trailStrokeId = strokeId;
+                    this.pointerId = pointerId;
+                    this.isDown = isDown;
+                    this.lastPos = lastPos;
+                }
+            }
+
+            _updateTrails(frameScale) {
+                this._updateTrail(frameScale);
+                const alwaysTrail = window.effectiveAlwaysTrail;
+                window.effectiveAlwaysTrail = false;
+                try {
+                    for (const [pointerId, contact] of this.touchPointers) {
+                        this._withTouchPointer(contact, () => this._updateTrail(frameScale));
+                        if (!contact.isDown && contact.trail.length === 0) this.touchPointers.delete(pointerId);
+                    }
+                } finally {
+                    window.effectiveAlwaysTrail = alwaysTrail;
                 }
             }
 
@@ -566,8 +610,7 @@
                 return merged;
             }
 
-            _getEffectRects() {
-                const rects = [];
+            _appendTrailRects(rects) {
                 const trailPad = 18 * this.trailScale + 12;
                 const trailPoints =
                     this.lastPos && this.trail.length > 0
@@ -582,6 +625,13 @@
                         rects.push(this._segmentRect(trailPoints[i], trailPoints[i + 1], trailPad));
                     }
                 }
+            }
+
+            _getEffectRects() {
+                const rects = [];
+                this._appendTrailRects(rects);
+                for (const contact of this.touchPointers.values())
+                    this._withTouchPointer(contact, () => this._appendTrailRects(rects));
 
                 const wavePad = 34 * this.clickScale + RINGS_ANIM_CFG.maxW + 16;
                 for (const wave of this.waves) {
@@ -648,10 +698,18 @@
                     return;
                 }
 
-                const hasWork =
+                let hasWork =
                     this.waves.length > 0 ||
                     this.sparks.length > 0 ||
                     this.trail.length > 0;
+                if (!hasWork) {
+                    for (const contact of this.touchPointers.values()) {
+                        if (contact.trail.length > 0) {
+                            hasWork = true;
+                            break;
+                        }
+                    }
+                }
 
                 // 无粒子时不持续占用rAF 有外部事件时唤醒
                 if (!hasWork) {
@@ -679,7 +737,7 @@
                 bctx.globalCompositeOperation = "lighter";
 
                 this._clearBufferRects(renderRects);
-                this._updateTrail(trailFrameScale);
+                this._updateTrails(trailFrameScale);
                 this._updateWaves(clickFrameScale);
                 this._updateSparks(clickFrameScale, trailFrameScale);
 
@@ -787,6 +845,10 @@
 
             if (nextSuppressed) {
                 window.externalUp();
+                for (const contact of window.spark.touchPointers.values()) {
+                    contact.isDown = false;
+                    contact.lastPos = null;
+                }
                 lastBoomX = -1;
                 lastBoomY = -1;
                 lastMoveX = -1;
@@ -866,6 +928,68 @@
             window.spark.lastPos = { x, y };
             window.scheduleNextAnimationFrame();
         };
+
+        window.externalPointerInput = (input) => {
+            const spark = window.spark;
+            const pointerId = input.pointerId;
+            if (!spark || !Number.isSafeInteger(pointerId) || pointerId <= 1) return false;
+            const release = input.type === 'up' || input.type === 'cancel';
+            let contact = spark.touchPointers.get(pointerId);
+            if (!contact && (release || spark.touchPointers.size >= 128)) return false;
+            if (window.renderingPaused || window.environmentInputSuppressed) return false;
+            contact ||= {
+                pointerId, strokeId: input.strokeId, isDown: false, lastPos: null, trail: [],
+                lastBoomX: -1, lastBoomY: -1, lastBoomTime: 0, lastMoveX: -1, lastMoveY: -1,
+            };
+            const previous = [lastBoomX, lastBoomY, lastBoomTime, lastMoveX, lastMoveY,
+                window.currentTrailStrokeId, window.currentInputMode, window.enableAlwaysTrailEffect];
+            lastBoomX = contact.lastBoomX;
+            lastBoomY = contact.lastBoomY;
+            lastBoomTime = contact.lastBoomTime;
+            lastMoveX = contact.lastMoveX;
+            lastMoveY = contact.lastMoveY;
+            window.currentTrailStrokeId = input.strokeId;
+            window.setInputContext('touch', Boolean(input.alwaysTrail));
+            try {
+                return spark._withTouchPointer(contact, () => {
+                    switch (input.type) {
+                        case 'down': return window.externalBoom(input.x, input.y);
+                        case 'move': return window.externalMove(input.x, input.y);
+                        case 'trailStart': return window.externalTrailStart(input.x, input.y);
+                        case 'trailContinue': return window.externalTrailContinue(input.history, input.x, input.y,
+                            Boolean(input.pressed), Boolean(input.beginStroke), Boolean(input.finishStroke), input.strokeId);
+                        case 'up':
+                            window.externalUp();
+                            spark.lastPos = null;
+                            break;
+                        case 'cancel':
+                            spark.isDown = false;
+                            spark.lastPos = null;
+                            spark.trail = [];
+                            spark.sparks = spark.sparks.filter((shard) => shard.fromClick || shard.pointerId !== pointerId);
+                            break;
+                    }
+                    window.scheduleNextAnimationFrame();
+                    return true;
+                });
+            } finally {
+                contact.lastBoomX = lastBoomX;
+                contact.lastBoomY = lastBoomY;
+                contact.lastBoomTime = lastBoomTime;
+                contact.lastMoveX = lastMoveX;
+                contact.lastMoveY = lastMoveY;
+                if (input.type === 'cancel') spark.touchPointers.delete(pointerId);
+                else spark.touchPointers.set(pointerId, contact);
+                [lastBoomX, lastBoomY, lastBoomTime, lastMoveX, lastMoveY, window.currentTrailStrokeId] = previous;
+                window.setInputContext(previous[6], previous[7]);
+            }
+        };
+
+        window.chrome?.webview?.addEventListener('message', (event) => {
+            const input = event.data;
+            if (input?.source === 'baspark-input' && input.generation === window.__basparkRendererGeneration)
+                window.externalPointerInput(input);
+        });
     </script>
 </body>
 </html>

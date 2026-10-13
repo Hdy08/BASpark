@@ -26,6 +26,7 @@ namespace BASpark
         private IntPtr _mouseHook;
         private NativeMethods.MouseHookProc? _mouseHookDelegate;
         private TouchInputListener? _touchInputListener;
+        private readonly Dictionary<long, TouchTrailState> _touchContacts = new();
         private NativeMethods.POINT? _touchPoint;
         private OverlayWindow? _activePointerOverlay;
         private OverlayWindow? _lastTrailOverlay;
@@ -38,6 +39,8 @@ namespace BASpark
         private static readonly long TrailHistoryRetentionTicks = Stopwatch.Frequency * 2;
         private long _lastMoveTimestamp;
         private long _lastClickTicks;
+        private long _lastPromotedTouchTimestamp;
+        private NativeMethods.POINT _lastPromotedTouchPoint;
         private long _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / 60);
         private int _manualTrailRefreshRate = 60;
         private bool _followDisplayRefreshRate = true;
@@ -47,6 +50,21 @@ namespace BASpark
         private long _suppressionCacheValidUntilTicks;
         private IntPtr _lastForegroundWindow = IntPtr.Zero;
         private bool _disposed;
+
+        internal sealed class TouchTrailState(long pointerId, long strokeId, NativeMethods.POINT point)
+        {
+            internal readonly long PointerId = pointerId;
+            internal readonly long StrokeId = strokeId;
+            internal readonly Queue<TrailSample> History = new(32);
+            internal readonly Dictionary<OverlayWindow, long> Participants = new();
+            internal NativeMethods.POINT Point = point;
+            internal TrailSample? LastSample;
+            internal OverlayWindow? ThrottleOverlay;
+            internal long LastMoveTimestamp;
+            internal IntPtr FilterWindow;
+            internal long FilterValidUntil;
+            internal bool FilterSuppressed;
+        }
 
         private bool _screenshotCompatCaptureWired;
         private bool _screenshotCaptureSessionActive;
@@ -95,6 +113,11 @@ namespace BASpark
             _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / _manualTrailRefreshRate);
             _lastTrailThrottleOverlay = null;
             _lastMoveTimestamp = 0;
+            foreach (TouchTrailState contact in _touchContacts.Values)
+            {
+                contact.LastMoveTimestamp = 0;
+                contact.ThrottleOverlay = null;
+            }
 
             foreach (var pair in _overlays)
             {
@@ -107,6 +130,8 @@ namespace BASpark
         public void UpdateTouchMode(bool enabled)
         {
             ConfigManager.IsTouchscreenMode = enabled;
+            if (!enabled) ReleaseTouchContacts(cancel: true);
+            else if (!ConfigManager.EnableMultiTouchEffects && _touchContacts.Count > 1) ReleaseTouchContacts(cancel: true);
             if (!enabled && _isTouchLikeInput) ReleasePointerStateSilent();
             SyncTouchInputListener();
             ForEachOverlay(w => w.UpdateTouchMode(enabled));
@@ -126,6 +151,12 @@ namespace BASpark
         {
             _suppressionCacheValidUntilTicks = 0;
             _lastForegroundWindow = IntPtr.Zero;
+            foreach (TouchTrailState contact in _touchContacts.Values.ToArray())
+            {
+                contact.FilterValidUntil = 0;
+                if (ShouldSuppressEffects(forceRefresh: true, inputPoint: contact.Point, touchContact: contact))
+                    ReleaseTouchContact(contact, cancel: false);
+            }
             ShouldSuppressEffects(forceRefresh: true);
             SyncForegroundWinEventHook();
         }
@@ -162,25 +193,155 @@ namespace BASpark
             }
         }
 
-        private void OnTouchInput(TouchInputPhase phase, int screenX, int screenY)
+        private void OnTouchInput(long pointerId, TouchInputPhase phase, int screenX, int screenY)
         {
-            switch (phase)
+            if (phase == TouchInputPhase.Up)
             {
-                case TouchInputPhase.Down:
-                    if (_isPrimaryPointerDown && _isTouchLikeInput) OnPointerMove(screenX, screenY, true);
-                    else OnPointerDown(MouseButtons.Left, screenX, screenY, true);
-                    break;
-                case TouchInputPhase.Move:
-                    OnPointerMove(screenX, screenY, true);
-                    break;
-                case TouchInputPhase.Up:
-                    OnPointerUp(true);
-                    break;
+                if (_touchContacts.TryGetValue(pointerId, out TouchTrailState? released))
+                    ReleaseTouchContact(released, cancel: false);
+                return;
             }
+            if (!ConfigManager.IsTouchscreenMode || App.IsEffectsPaused || _overlays.Count == 0) return;
+            var point = new NativeMethods.POINT { x = screenX, y = screenY };
+            TouchTrailState? contact;
+            if (phase == TouchInputPhase.Down)
+            {
+                if (!ConfigManager.IsClickEffectActive || ConfigManager.ClickTriggerType == 1) return;
+                if (!ConfigManager.EnableMultiTouchEffects && _touchContacts.Count > 0 && !_touchContacts.ContainsKey(pointerId)) return;
+                if (_touchContacts.TryGetValue(pointerId, out contact)) ReleaseTouchContact(contact, cancel: true);
+                contact = new TouchTrailState(pointerId, ++_trailStrokeId, point);
+            }
+            else if (!_touchContacts.TryGetValue(pointerId, out contact)) return;
+            contact.Point = point;
+            if (ShouldSuppressEffects(forceRefresh: phase == TouchInputPhase.Down, inputPoint: point, touchContact: contact))
+            {
+                ReleaseTouchContact(contact, cancel: false);
+                return;
+            }
+            bool cursorVisible = _touchInputListener?.IsCursorVisible(point, pointerId)
+                ?? NativeMethods.IsCursorVisible(allowTouchSuppression: true);
+            if (!cursorVisible)
+            {
+                ReleaseTouchContact(contact, cancel: true);
+                return;
+            }
+            OverlayWindow? target = ResolveTargetOverlay(screenX, screenY);
+            if (phase == TouchInputPhase.Down)
+            {
+                if (target == null) return;
+                long timestamp = Stopwatch.GetTimestamp();
+                bool alreadyClicked = TryConsumePromotedTouchClick(screenX, screenY, timestamp);
+                if (alreadyClicked)
+                {
+                    foreach (TrailSample sample in _trailHistory) contact.History.Enqueue(sample);
+                    contact.LastSample = _lastTrailSample;
+                }
+                if (_touchContacts.Count == 0) ReleasePointerStateSilent();
+                _touchContacts[pointerId] = contact;
+                UpdateSuppressionState(DateTime.UtcNow.Ticks, false);
+                target.TrailStrokeId = contact.StrokeId;
+                if (alreadyClicked)
+                    target.EmitTrailContinuation(contact.History, timestamp, screenX, screenY,
+                        true, true, beginStroke: true, finishStroke: false, pointerId: pointerId);
+                else
+                {
+                    ConfigManager.TotalClicks++;
+                    target.EmitDown(screenX, screenY, true, pointerId);
+                }
+                contact.Participants[target] = timestamp;
+                RecordTouchTrailSample(contact, screenX, screenY, timestamp);
+                return;
+            }
+            if (!ConfigManager.IsTrailEffectActive) return;
+            long now = Stopwatch.GetTimestamp();
+            long interval = target?.TrailMoveIntervalTimestamp ?? _idleMoveIntervalTimestamp;
+            if (ReferenceEquals(target, contact.ThrottleOverlay) && now - contact.LastMoveTimestamp < interval) return;
+            contact.LastMoveTimestamp = now;
+            contact.ThrottleOverlay = target;
+            RouteTouchTrailMove(contact, target, screenX, screenY, now);
+        }
+
+        private void RouteTouchTrailMove(TouchTrailState contact, OverlayWindow? target, int screenX, int screenY, long timestamp)
+        {
+            TrimTouchTrailHistory(contact, timestamp);
+            foreach (OverlayWindow overlay in _overlays.Values)
+            {
+                bool participating = contact.Participants.TryGetValue(overlay, out long lastIntersection);
+                bool intersects = ReferenceEquals(overlay, target)
+                    || (contact.LastSample is TrailSample last
+                        && overlay.IntersectsScreenSegment(last.ScreenX, last.ScreenY, screenX, screenY));
+                if (!intersects)
+                {
+                    if (!participating) continue;
+                    if (timestamp - lastIntersection > TrailHistoryRetentionTicks)
+                    {
+                        overlay.EmitUp(true, contact.PointerId);
+                        contact.Participants.Remove(overlay);
+                        continue;
+                    }
+                }
+                overlay.TrailStrokeId = contact.StrokeId;
+                if (ReferenceEquals(overlay, target) && participating)
+                    overlay.EmitMove(screenX, screenY, true, contact.PointerId);
+                else
+                    overlay.EmitTrailContinuation(contact.History, timestamp, screenX, screenY,
+                        true, true, beginStroke: !participating, finishStroke: false, pointerId: contact.PointerId);
+                if (intersects) contact.Participants[overlay] = timestamp;
+            }
+            RecordTouchTrailSample(contact, screenX, screenY, timestamp);
+        }
+
+        private static void TrimTouchTrailHistory(TouchTrailState contact, long timestamp)
+        {
+            while (contact.History.TryPeek(out TrailSample oldest) && timestamp - oldest.Timestamp > TrailHistoryRetentionTicks)
+                contact.History.Dequeue();
+            if (contact.History.Count == 0 && contact.LastSample is TrailSample last)
+            {
+                var renewed = last with { Timestamp = timestamp };
+                contact.History.Enqueue(renewed);
+                contact.LastSample = renewed;
+            }
+        }
+
+        private static void RecordTouchTrailSample(TouchTrailState contact, int screenX, int screenY, long timestamp)
+        {
+            TrimTouchTrailHistory(contact, timestamp);
+            if (contact.History.Count >= 1024) contact.History.Dequeue();
+            var sample = new TrailSample(screenX, screenY, timestamp);
+            contact.History.Enqueue(sample);
+            contact.LastSample = sample;
+        }
+
+        private void ReleaseTouchContact(TouchTrailState contact, bool cancel)
+        {
+            foreach (OverlayWindow overlay in contact.Participants.Keys)
+            {
+                if (cancel) overlay.EmitTouchCancel(contact.PointerId);
+                else overlay.EmitUp(true, contact.PointerId);
+            }
+            contact.Participants.Clear();
+            contact.History.Clear();
+            contact.LastSample = null;
+            _touchContacts.Remove(contact.PointerId);
+        }
+
+        private void ReleaseTouchContacts(bool cancel)
+        {
+            foreach (TouchTrailState contact in _touchContacts.Values.ToArray()) ReleaseTouchContact(contact, cancel);
+        }
+
+        private bool TryConsumePromotedTouchClick(int screenX, int screenY, long timestamp)
+        {
+            if (_lastPromotedTouchTimestamp == 0 || timestamp - _lastPromotedTouchTimestamp > Stopwatch.Frequency / 10
+                || Math.Abs((long)screenX - _lastPromotedTouchPoint.x) > 24
+                || Math.Abs((long)screenY - _lastPromotedTouchPoint.y) > 24) return false;
+            _lastPromotedTouchTimestamp = 0;
+            return true;
         }
 
         private void UninstallMouseHook()
         {
+            ReleaseTouchContacts(cancel: true);
             _touchInputListener?.Dispose();
             _touchInputListener = null;
             if (_mouseHook == IntPtr.Zero) return;
@@ -207,6 +368,7 @@ namespace BASpark
         private void HandleMouseInput(uint message, NativeMethods.MSLLHOOKSTRUCT input)
         {
             bool touchLike = NativeMethods.IsTouchInput(input.dwExtraInfo);
+            if (!touchLike && _touchContacts.Count > 0) return;
             if (!touchLike) _touchInputListener?.ObserveCursor(mouseInput: true);
             if (touchLike && _touchInputListener?.ShouldIgnorePromotedTouch(input.pt.x, input.pt.y) == true) return;
             switch (message)
@@ -648,6 +810,11 @@ namespace BASpark
             _lastClickTicks = currentTicks;
 
             ConfigManager.TotalClicks++;
+            if (touchLike)
+            {
+                _lastPromotedTouchTimestamp = Stopwatch.GetTimestamp();
+                _lastPromotedTouchPoint = new NativeMethods.POINT { x = cursorX, y = cursorY };
+            }
             ClearTrailHistory();
             target.TrailStrokeId = _trailStrokeId;
             target.EmitDown(cursorX, cursorY, touchLike);
@@ -852,6 +1019,8 @@ namespace BASpark
 
         private void ReleasePointerStateSilent()
         {
+            _lastPromotedTouchTimestamp = 0;
+            ReleaseTouchContacts(cancel: true);
             OverlayWindow? activePointerOverlay = _activePointerOverlay;
             activePointerOverlay?.EmitCancel();
             if (_lastTrailOverlay != null &&
@@ -880,6 +1049,7 @@ namespace BASpark
 
         private void ReleasePointerState()
         {
+            ReleaseTouchContacts(cancel: false);
             if (!_isPrimaryPointerDown)
             {
                 ReleasePointerStateSilent();
@@ -1020,6 +1190,7 @@ namespace BASpark
             // Cancel before disposal because a closed WebView can no longer clear retained trail state.
             overlay.EmitCancel();
             _trailParticipants.Remove(overlay);
+            foreach (TouchTrailState contact in _touchContacts.Values) contact.Participants.Remove(overlay);
             if (ReferenceEquals(_activePointerOverlay, overlay))
             {
                 ResetPrimaryPointerState();
@@ -1045,13 +1216,23 @@ namespace BASpark
             _overlays.Remove(deviceName);
         }
 
-        private bool ShouldSuppressEffects(bool forceRefresh = false, NativeMethods.POINT? inputPoint = null)
+        private bool ShouldSuppressEffects(bool forceRefresh = false, NativeMethods.POINT? inputPoint = null,
+            TouchTrailState? touchContact = null)
         {
             long nowTicks = DateTime.UtcNow.Ticks;
+            bool Complete(bool suppressed)
+            {
+                if (touchContact == null) UpdateSuppressionState(nowTicks, suppressed);
+                else
+                {
+                    touchContact.FilterSuppressed = suppressed;
+                    touchContact.FilterValidUntil = nowTicks + SuppressionCacheDurationTicks;
+                }
+                return suppressed;
+            }
             if (!ConfigManager.EnableEnvironmentFilter)
             {
-                UpdateSuppressionState(nowTicks, false);
-                return false;
+                return Complete(false);
             }
 
             NativeMethods.POINT pt;
@@ -1065,14 +1246,16 @@ namespace BASpark
                 targetWindow = NativeMethods.GetForegroundWindow();
             }
 
-            if (targetWindow != _lastForegroundWindow)
+            IntPtr previousWindow = touchContact?.FilterWindow ?? _lastForegroundWindow;
+            if (targetWindow != previousWindow)
             {
                 forceRefresh = true;
-                _lastForegroundWindow = targetWindow;
+                if (touchContact == null) _lastForegroundWindow = targetWindow;
+                else touchContact.FilterWindow = targetWindow;
             }
-            if (!forceRefresh && nowTicks < _suppressionCacheValidUntilTicks)
+            if (!forceRefresh && nowTicks < (touchContact?.FilterValidUntil ?? _suppressionCacheValidUntilTicks))
             {
-                return _isSuppressedByEnvironment;
+                return touchContact?.FilterSuppressed ?? _isSuppressedByEnvironment;
             }
 
             string className = GetWindowClassName(targetWindow);
@@ -1086,35 +1269,30 @@ namespace BASpark
                              string.Equals(className, "SHELLDLL_DefView", StringComparison.OrdinalIgnoreCase);
             if (isDesktop)
             {
-                UpdateSuppressionState(nowTicks, !ConfigManager.ShowEffectOnDesktop);
-                return _isSuppressedByEnvironment;
+                return Complete(!ConfigManager.ShowEffectOnDesktop);
             }
 
             if (IsCurrentProcessWindow(targetWindow))
             {
-                UpdateSuppressionState(nowTicks, false);
-                return false;
+                return Complete(false);
             }
 
             if (!TryGetForegroundProcessName(targetWindow, out string processName))
             {
                 if (!TryGetForegroundProcessName(NativeMethods.GetForegroundWindow(), out processName))
                 {
-                    UpdateSuppressionState(nowTicks, false);
-                    return false;
+                    return Complete(false);
                 }
             }
 
             IntPtr actualForeground = NativeMethods.GetForegroundWindow();
             if (ConfigManager.HideInFullscreen && IsEffectiveFullscreenWindow(actualForeground))
             {
-                UpdateSuppressionState(nowTicks, true);
-                return true;
+                return Complete(true);
             }
 
             bool isSuppressedByProcessFilter = IsSuppressedByProcessFilter(processName);
-            UpdateSuppressionState(nowTicks, isSuppressedByProcessFilter);
-            return _isSuppressedByEnvironment;
+            return Complete(isSuppressedByProcessFilter);
         }
 
         private bool IsOverlayWindow(IntPtr hwnd)
@@ -1158,6 +1336,7 @@ namespace BASpark
 
         private void UpdateSuppressionState(long nowTicks, bool isSuppressed)
         {
+            if (_touchContacts.Count > 0) isSuppressed = false;
             bool changed = _isSuppressedByEnvironment != isSuppressed;
             UpdateSuppressionState(nowTicks, isSuppressed, ref _isSuppressedByEnvironment, ref _suppressionCacheValidUntilTicks);
             if (changed)
@@ -1413,7 +1592,7 @@ namespace BASpark
 
     internal sealed class TouchInputListener : NativeWindow, IDisposable
     {
-        private readonly Action<TouchInputPhase, int, int> _input;
+        private readonly Action<long, TouchInputPhase, int, int> _input;
         private readonly Action<IntPtr, uint, bool, bool, int, int> _contactInput;
         private readonly TouchCursorState _cursorState = new();
         private readonly NativeMethods.WinEventProc _cursorEventProc;
@@ -1421,9 +1600,9 @@ namespace BASpark
         private IntPtr _cursorNameEventHook;
         private readonly Dictionary<IntPtr, TouchDevice?> _devices = new();
         private byte[] _buffer = Array.Empty<byte>();
-        private (IntPtr Device, uint Id)? _primary;
-        private int _lastX;
-        private int _lastY;
+        private readonly Dictionary<(IntPtr Device, uint Id), (long PointerId, int X, int Y)> _contacts = new();
+        private long _nextPointerId = 1;
+        private long? _singlePointerId;
         private int _minX;
         private int _minY;
         private int _maxX;
@@ -1433,7 +1612,7 @@ namespace BASpark
         private bool _touchSuppressesCursor;
         private bool _hasMouseCursor;
 
-        internal TouchInputListener(Action<TouchInputPhase, int, int> input)
+        internal TouchInputListener(Action<long, TouchInputPhase, int, int> input)
         {
             _input = input;
             _contactInput = HandleContact;
@@ -1462,7 +1641,7 @@ namespace BASpark
                 _touchSuppressesCursor = false;
                 _hasMouseCursor = true;
             }
-            if (_primary != null) return;
+            if (_contacts.Count > 0) return;
             var cursor = new NativeMethods.CURSORINFO { cbSize = Marshal.SizeOf<NativeMethods.CURSORINFO>() };
             if (NativeMethods.GetCursorInfo(out cursor))
             {
@@ -1473,7 +1652,7 @@ namespace BASpark
             }
         }
 
-        internal bool IsCursorVisible(NativeMethods.POINT point)
+        internal bool IsCursorVisible(NativeMethods.POINT point, long pointerId = 1)
         {
             var cursor = new NativeMethods.CURSORINFO { cbSize = Marshal.SizeOf<NativeMethods.CURSORINFO>() };
             if (!NativeMethods.GetCursorInfo(out cursor))
@@ -1482,7 +1661,7 @@ namespace BASpark
                 return false;
             }
             var target = ResolveCursorWindow(point);
-            return _cursorState.IsVisible(cursor, target.Window, target.Chromium);
+            return _cursorState.IsVisible(cursor, target.Window, target.Chromium, pointerId);
         }
 
         private static (IntPtr Window, bool Chromium) ResolveCursorWindow(NativeMethods.POINT point)
@@ -1504,9 +1683,9 @@ namespace BASpark
             if (objectId == -9) ObserveCursor();
         }
 
-        internal bool ShouldIgnorePromotedTouch(int screenX, int screenY) => _hasRecentTouch
-            && (_primary != null || Environment.TickCount64 - _lastTouchTime <= 1000)
-            && screenX >= _minX - 24 && screenX <= _maxX + 24 && screenY >= _minY - 24 && screenY <= _maxY + 24;
+        internal bool ShouldIgnorePromotedTouch(int screenX, int screenY) => _contacts.Count > 0
+            || (_hasRecentTouch && Environment.TickCount64 - _lastTouchTime <= 1000
+                && screenX >= _minX - 24 && screenX <= _maxX + 24 && screenY >= _minY - 24 && screenY <= _maxY + 24);
 
         protected override void WndProc(ref Message message)
         {
@@ -1516,12 +1695,7 @@ namespace BASpark
                 else if (message.Msg == 0x00FE)
                 {
                     _devices.Remove(message.LParam);
-                    if (_primary?.Device == message.LParam)
-                    {
-                        _primary = null;
-                        _cursorState.EndContact();
-                        _input(TouchInputPhase.Up, _lastX, _lastY);
-                    }
+                    ReleaseDeviceContacts(message.LParam);
                 }
             }
             catch (Exception exception)
@@ -1557,17 +1731,21 @@ namespace BASpark
         private void HandleContact(IntPtr device, uint id, bool wasDown, bool down, int screenX, int screenY)
         {
             var contact = (device, id);
-            if (!wasDown && down && _primary == null)
+            bool tracked = _contacts.TryGetValue(contact, out var previous);
+            if (!tracked && down)
             {
-                _primary = contact;
+                if (_contacts.Count >= 128) return;
+                previous = (++_nextPointerId, screenX, screenY);
                 var target = ResolveCursorWindow(new NativeMethods.POINT { x = screenX, y = screenY });
-                _cursorState.BeginContact(target.Window, target.Chromium);
-                _minX = _maxX = screenX;
-                _minY = _maxY = screenY;
+                _cursorState.BeginContact(target.Window, target.Chromium, previous.PointerId);
+                _singlePointerId ??= previous.PointerId;
+                if (_contacts.Count == 0)
+                {
+                    _minX = _maxX = screenX;
+                    _minY = _maxY = screenY;
+                }
             }
-            else if (_primary != contact) return;
-            _lastX = screenX;
-            _lastY = screenY;
+            else if (!tracked) return;
             _minX = Math.Min(_minX, screenX);
             _minY = Math.Min(_minY, screenY);
             _maxX = Math.Max(_maxX, screenX);
@@ -1577,10 +1755,28 @@ namespace BASpark
             _touchSuppressesCursor = true;
             if (!down)
             {
-                _primary = null;
-                _cursorState.EndContact();
+                _contacts.Remove(contact);
             }
-            _input(down ? wasDown ? TouchInputPhase.Move : TouchInputPhase.Down : TouchInputPhase.Up, screenX, screenY);
+            else _contacts[contact] = (previous.PointerId, screenX, screenY);
+            try
+            {
+                if (ConfigManager.EnableMultiTouchEffects || _singlePointerId == previous.PointerId)
+                    _input(previous.PointerId, down ? tracked ? TouchInputPhase.Move : TouchInputPhase.Down : TouchInputPhase.Up, screenX, screenY);
+            }
+            finally
+            {
+                if (!down)
+                {
+                    _cursorState.EndContact(previous.PointerId);
+                    if (_singlePointerId == previous.PointerId) _singlePointerId = null;
+                }
+            }
+        }
+
+        private void ReleaseDeviceContacts(IntPtr device)
+        {
+            foreach (var pair in _contacts.Where(pair => pair.Key.Device == device).ToArray())
+                HandleContact(device, pair.Key.Id, true, false, pair.Value.X, pair.Value.Y);
         }
 
         public void Dispose()
@@ -1601,7 +1797,8 @@ namespace BASpark
                 NativeMethods.RegisterRawInputDevices([device], 1, (uint)Marshal.SizeOf<NativeMethods.RAWINPUTDEVICE>());
                 DestroyHandle();
             }
-            _primary = null;
+            _contacts.Clear();
+            _singlePointerId = null;
             _cursorState.Reset();
             _devices.Clear();
             _buffer = Array.Empty<byte>();

@@ -94,7 +94,10 @@
       <value>基础设置</value>
     </data>
     <data name="Basic_Touchscreen" xml:space="preserve">
-      <value>触摸屏模式</value>
+      <value>启用触摸特效</value>
+    </data>
+    <data name="Basic_MultiTouch" xml:space="preserve">
+      <value>启用多点特效</value>
     </data>
     <data name="Basic_TouchscreenHint" xml:space="preserve">
       <value>开启后，实际触摸输入也可触发特效；系统或应用主动隐藏鼠标指针时仍不触发。</value>

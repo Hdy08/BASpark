@@ -477,6 +477,44 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckTouchscreenMode}" Style="{StaticResource BasSettingTitleStyle}" />
+                                        <TextBlock x:Name="TxtTouchscreenHint" Text="" Style="{StaticResource BasCaptionStyle}" />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                        <ToggleSwitch
+                                            x:Name="CheckTouchscreenMode"
+                                            Header=""
+                                            Toggled="CheckTouchscreenMode_Changed"
+                                            Style="{StaticResource BasSettingToggleStyle}"
+                                            AutomationProperties.Name="{Binding Header, ElementName=CheckTouchscreenMode}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <Border x:Name="PanelMultiTouchEffects" Visibility="Collapsed" Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Header, ElementName=CheckMultiTouchEffects}" Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <ToggleSwitch
+                                        x:Name="CheckMultiTouchEffects"
+                                        Grid.Column="1"
+                                        Header=""
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BasSettingToggleStyle}"
+                                        AutomationProperties.Name="{Binding Header, ElementName=CheckMultiTouchEffects}" />
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Header, ElementName=CheckScreenshotCompatibilityMode}" Style="{StaticResource BasSettingTitleStyle}" />
                                         <TextBlock
                                             x:Name="TxtScreenshotHint"
@@ -565,28 +603,6 @@
                                             Toggled="CheckRunAsAdmin_Changed"
                                             Style="{StaticResource BasSettingToggleStyle}"
                                             AutomationProperties.Name="{Binding Header, ElementName=CheckRunAsAdmin}" />
-                                    </Grid>
-                                </Grid>
-                            </Border>
-                            <Border Style="{StaticResource BasSettingCardStyle}">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.15*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Header, ElementName=CheckTouchscreenMode}" Style="{StaticResource BasSettingTitleStyle}" />
-                                        <TextBlock
-                                            x:Name="TxtTouchscreenHint"
-                                            Text=""
-                                            Style="{StaticResource BasCaptionStyle}" />
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                                        <ToggleSwitch
-                                            x:Name="CheckTouchscreenMode"
-                                            Header=""
-                                            Style="{StaticResource BasSettingToggleStyle}"
-                                            AutomationProperties.Name="{Binding Header, ElementName=CheckTouchscreenMode}" />
                                     </Grid>
                                 </Grid>
                             </Border>

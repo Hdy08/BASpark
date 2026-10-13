@@ -2,7 +2,17 @@
 {
     'use strict';
 
-    const POINTER_ID = 1;
+    const DEFAULT_POINTER_ID = 1;
+    const touchPointers = new Map();
+    const defaultPointerContext = { input: {}, renderer: {} };
+    const POINTER_STATE_KEYS = Object.freeze([
+        'activePointerId', 'activePointerSource', 'lastPointerPosition', 'lastPointerTime',
+        'trailDistanceSinceShard', 'currentTrailStroke', 'activeTrailOwnerId',
+    ]);
+    const INPUT_STATE_KEYS = Object.freeze([
+        'pointerId', 'inputMode', 'alwaysTrailEnabled', 'effectiveAlwaysTrail',
+        'activePointerKind', 'strokeId', 'lastBoomX', 'lastBoomY', 'lastBoomTime', 'lastMoveX', 'lastMoveY',
+    ]);
     const DEFAULT_COLOR = '#4ca7ff';
     const HOST_GENERATION =
         typeof window.__basparkRendererGeneration === 'string'
@@ -35,6 +45,7 @@
     const state =
     {
         fx: null,
+        pointerId: DEFAULT_POINTER_ID,
         initialized: false,
         paused: false,
         environmentInputSuppressed: false,
@@ -138,6 +149,57 @@
         state.lastMoveY = -1;
     }
 
+    function capturePointerContext(context)
+    {
+        for (const key of INPUT_STATE_KEYS) context.input[key] = state[key];
+        for (const key of POINTER_STATE_KEYS) context.renderer[key] = state.fx[key];
+    }
+
+    function restorePointerContext(context)
+    {
+        Object.assign(state, context.input);
+        Object.assign(state.fx, context.renderer);
+        if (state.fx.config.trailAlways !== state.effectiveAlwaysTrail) applyInputContext();
+    }
+
+    function withTouchPointer(pointerId, action, release = false)
+    {
+        if (!state.fx) return false;
+        capturePointerContext(defaultPointerContext);
+        const contact = touchPointers.get(pointerId) || {
+            input: {
+                ...defaultPointerContext.input, pointerId, inputMode: 'touch', effectiveAlwaysTrail: false,
+                activePointerKind: null, strokeId: null,
+                lastBoomX: -1, lastBoomY: -1, lastBoomTime: 0, lastMoveX: -1, lastMoveY: -1,
+            },
+            renderer: {
+                activePointerId: null, activePointerSource: null, lastPointerPosition: null, lastPointerTime: 0,
+                trailDistanceSinceShard: 0, currentTrailStroke: null, activeTrailOwnerId: null,
+            },
+        };
+        restorePointerContext(contact);
+        try
+        {
+            return action();
+        }
+        finally
+        {
+            if (release) touchPointers.delete(pointerId);
+            else
+            {
+                capturePointerContext(contact);
+                touchPointers.set(pointerId, contact);
+            }
+            restorePointerContext(defaultPointerContext);
+        }
+    }
+
+    function releaseTouchPointers()
+    {
+        for (const pointerId of touchPointers.keys())
+            withTouchPointer(pointerId, () => state.fx.pointerUp(pointerId), true);
+    }
+
     function canAcceptHostInput()
     {
         return !state.paused && !state.environmentInputSuppressed && state.fx !== null;
@@ -148,6 +210,7 @@
         if (state.fx.currentTrailStroke && state.strokeId !== null)
         {
             state.fx.currentTrailStroke.basparkStrokeId = state.strokeId;
+            state.fx.currentTrailStroke.basparkPointerId = state.pointerId;
         }
     }
 
@@ -176,17 +239,26 @@
             {
                 x: (allowOutside ? normalizedX : clamp(normalizedX, 0, 1)) * state.fx.width,
                 y: (allowOutside ? normalizedY : clamp(normalizedY, 0, 1)) * state.fx.height,
-                pointerId: POINTER_ID,
+                pointerId: state.pointerId,
                 pointerType: pointerType(),
             });
     }
 
     function cancelPointerImmediately()
     {
-        const accepted = state.fx.pointerCancel(POINTER_ID);
+        const fx = state.fx;
+        const owners = new Set(fx.trailStrokes
+            .filter((stroke) => stroke.basparkPointerId === state.pointerId)
+            .map((stroke) => stroke.ownerId));
+        const accepted = fx.pointerCancel(state.pointerId);
 
-        // 宿主取消表示输入所有权切换；清除全部拖尾，避免上一所有者的残留。
-        state.fx.clearTrail();
+        if (state.pointerId === DEFAULT_POINTER_ID) fx.clearTrail();
+        else
+        {
+            fx.trailStrokes = fx.trailStrokes.filter((stroke) => stroke.basparkPointerId !== state.pointerId);
+            fx.shards = fx.shards.filter((shard) => shard.kind !== 'trail' || !owners.has(shard.ownerId));
+            for (const owner of owners) fx.trailShardCounts.delete(owner);
+        }
         state.activePointerKind = null;
         return accepted;
     }
@@ -722,7 +794,7 @@
 
         return invokeFx('externalUp', function ()
         {
-            const accepted = state.fx.pointerUp(POINTER_ID);
+            const accepted = state.fx.pointerUp(state.pointerId);
 
             if (accepted)
             {
@@ -746,6 +818,7 @@
         {
             // End the active stroke without cancelling its already-emitted visuals.
             window.externalUp();
+            releaseTouchPointers();
             resetInputCache();
         }
 
@@ -763,6 +836,7 @@
 
         return invokeFx('externalCancel', function ()
         {
+            if (state.pointerId === DEFAULT_POINTER_ID) releaseTouchPointers();
             const accepted = cancelPointerImmediately();
 
             resetInputCache();
@@ -783,6 +857,7 @@
         {
             if (state.paused)
             {
+                releaseTouchPointers();
                 resetInputCache();
                 state.fx.setPaused(
                     true,
@@ -1101,25 +1176,29 @@
         invokeFx('beforeunload', function ()
         {
             state.fx.destroy();
+            touchPointers.clear();
             state.fx = null;
             resetInputCache();
             return true;
         });
     });
 
-    function handleHostInput(event)
+    window.externalPointerInput = function (input)
     {
-        const input = event.data;
-
-        if (
-            !input ||
-            input.source !== 'baspark-input' ||
-            input.generation !== HOST_GENERATION
-        )
+        const pointerId = input.pointerId ?? DEFAULT_POINTER_ID;
+        if (!Number.isSafeInteger(pointerId) || pointerId < DEFAULT_POINTER_ID) return false;
+        if (pointerId !== DEFAULT_POINTER_ID)
         {
-            return;
+            const release = input.type === 'up' || input.type === 'cancel';
+            if (release && !touchPointers.has(pointerId)) return false;
+            if (!release && (!canAcceptHostInput() || touchPointers.size >= 128 && !touchPointers.has(pointerId))) return false;
+            return withTouchPointer(pointerId, () => dispatchPointerInput(input), release);
         }
+        return dispatchPointerInput(input);
+    };
 
+    function dispatchPointerInput(input)
+    {
         if (Number.isSafeInteger(input.strokeId) && input.strokeId >= 0)
         {
             state.strokeId = input.strokeId;
@@ -1136,25 +1215,26 @@
         switch (input.type)
         {
             case 'down':
-                window.externalBoom(input.x, input.y);
-                break;
+                return window.externalBoom(input.x, input.y);
             case 'trailStart':
-                window.externalTrailStart(input.x, input.y);
-                break;
+                return window.externalTrailStart(input.x, input.y);
             case 'trailContinue':
-                window.externalTrailContinue(input.history, input.x, input.y,
+                return window.externalTrailContinue(input.history, input.x, input.y,
                     Boolean(input.pressed), Boolean(input.beginStroke), Boolean(input.finishStroke));
-                break;
             case 'move':
-                window.externalMove(input.x, input.y);
-                break;
+                return window.externalMove(input.x, input.y);
             case 'up':
-                window.externalUp();
-                break;
+                return window.externalUp();
             case 'cancel':
-                window.externalCancel();
-                break;
+                return window.externalCancel();
         }
+    }
+
+    function handleHostInput(event)
+    {
+        const input = event.data;
+        if (!input || input.source !== 'baspark-input' || input.generation !== HOST_GENERATION) return;
+        window.externalPointerInput(input);
     }
 
     window.chrome?.webview?.addEventListener('message', handleHostInput);

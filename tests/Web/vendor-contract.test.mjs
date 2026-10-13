@@ -234,6 +234,40 @@ test('cross-screen replay retains the reviewed coordinate and time hooks', () =>
   assert.equal(renderer._normalizePointerInput({ x: -100, y: 700 }).y, 600);
 });
 
+test('multi-touch legacy input preserves separate heads, dirty regions, release and cancellation', () =>
+{
+  const { window } = createLegacyHarness();
+  const send = (pointerId, type, horizontal, vertical) => window.externalPointerInput({
+    pointerId, type, x: horizontal, y: vertical, strokeId: pointerId + 40, mode: 'touch', alwaysTrail: false,
+  });
+  send(2, 'down', 0.2, 0.2);
+  send(3, 'down', 0.8, 0.8);
+  assert.equal(window.spark.waves.length, 2);
+  send(2, 'move', 0.3, 0.2);
+  send(3, 'move', 0.7, 0.8);
+  const first = window.spark.touchPointers.get(2);
+  const second = window.spark.touchPointers.get(3);
+  assert.ok(first.trail.every((point) => point.y === 120));
+  assert.ok(second.trail.every((point) => point.y === 480));
+  assert.ok(window.spark._getEffectRects().some((rect) => rect.y < 200));
+  assert.ok(window.spark._getEffectRects().some((rect) => rect.y > 200));
+  send(2, 'up');
+  assert.equal(first.isDown, false);
+  assert.equal(second.isDown, true);
+  send(3, 'move', 0.6, 0.8);
+  assert.equal(second.lastPos.x, 480);
+  send(2, 'cancel');
+  assert.equal(window.spark.touchPointers.has(2), false);
+  assert.equal(window.spark.touchPointers.has(3), true);
+  window.spark._updateTrails(0.1);
+  assert.ok(second.trail.length > 0);
+  send(3, 'up');
+  window.spark._updateTrails(100);
+  window.spark._updateTrails(100);
+  window.spark._updateTrails(100);
+  assert.equal(window.spark.touchPointers.size, 0);
+});
+
 test('cross-screen legacy continuation preserves foreign strokes and avoids return duplicates', () =>
 {
   const { window } = createLegacyHarness();

@@ -15,6 +15,12 @@ namespace BASpark.Tests;
 /// </summary>
 public class WinUi3UiTests
 {
+    private sealed class MultiTouchScope : IDisposable
+    {
+        private readonly bool _previous = ConfigManager.EnableMultiTouchEffects;
+        internal MultiTouchScope(bool enabled) => ConfigManager.EnableMultiTouchEffects = enabled;
+        public void Dispose() => ConfigManager.EnableMultiTouchEffects = _previous;
+    }
     private static readonly XNamespace Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
     private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
@@ -975,7 +981,7 @@ public class WinUi3UiTests
             }]);
         Assert.NotNull(device);
         var phases = new List<TouchInputPhase>();
-        using var listener = new TouchInputListener((phase, screenX, screenY) => phases.Add(phase));
+        using var listener = new TouchInputListener((pointerId, phase, screenX, screenY) => phases.Add(phase));
         const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
         var receive = typeof(TouchInputListener).GetMethod("HandleContact", members)!
             .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
@@ -1011,29 +1017,319 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void TouchscreenInput_KeepsOnePrimaryContactAndDeduplicatesItsPromotedMouseMessages()
+    public void TouchscreenInput_TracksIndependentContactsAndDeduplicatesTheirPromotedMouseMessages()
     {
-        var received = new List<(TouchInputPhase Phase, int ScreenX, int ScreenY)>();
-        using var listener = new TouchInputListener((phase, screenX, screenY) => received.Add((phase, screenX, screenY)));
+        using var mode = new MultiTouchScope(true);
+        var received = new List<(long PointerId, TouchInputPhase Phase, int ScreenX, int ScreenY)>();
+        using var listener = new TouchInputListener((pointerId, phase, screenX, screenY) => received.Add((pointerId, phase, screenX, screenY)));
         Assert.NotEqual(IntPtr.Zero, listener.Handle);
         const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
         var contact = typeof(TouchInputListener).GetMethod("HandleContact", members)!
             .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
         contact(new IntPtr(1), 0, false, true, 200, 300);
+        long first = received[0].PointerId;
         typeof(TouchInputListener).GetField("_lastTouchTime", members)!.SetValue(listener, Environment.TickCount64 - 2000);
         Assert.True(listener.ShouldIgnorePromotedTouch(200, 300));
+        Assert.True(listener.ShouldIgnorePromotedTouch(800, 900));
         contact(new IntPtr(1), 1, false, true, 400, 500);
+        long second = received[1].PointerId;
+        Assert.NotEqual(first, second);
         contact(new IntPtr(1), 0, true, true, 250, 350);
         contact(new IntPtr(1), 1, true, false, 400, 500);
         contact(new IntPtr(1), 0, true, false, 250, 350);
-        Assert.Equal(new[] { (TouchInputPhase.Down, 200, 300), (TouchInputPhase.Move, 250, 350), (TouchInputPhase.Up, 250, 350) }, received);
+        Assert.Equal(new[] {
+            (first, TouchInputPhase.Down, 200, 300), (second, TouchInputPhase.Down, 400, 500),
+            (first, TouchInputPhase.Move, 250, 350), (second, TouchInputPhase.Up, 400, 500),
+            (first, TouchInputPhase.Up, 250, 350) }, received);
         Assert.True(listener.ShouldIgnorePromotedTouch(200, 300));
         Assert.True(listener.ShouldIgnorePromotedTouch(250, 350));
-        Assert.False(listener.ShouldIgnorePromotedTouch(400, 500));
+        Assert.True(listener.ShouldIgnorePromotedTouch(400, 500));
+        Assert.False(listener.ShouldIgnorePromotedTouch(800, 900));
         typeof(TouchInputListener).GetField("_lastTouchTime", members)!.SetValue(listener, Environment.TickCount64 - 1001);
         Assert.False(listener.ShouldIgnorePromotedTouch(200, 300));
         listener.Dispose();
         Assert.Equal(IntPtr.Zero, listener.Handle);
+    }
+
+    [Fact]
+    public void MultiTouch_DeviceRemovalAndRecycledIdsReleaseOnlyTheirOwnContacts()
+    {
+        using var mode = new MultiTouchScope(true);
+        var received = new List<(long PointerId, TouchInputPhase Phase)>();
+        using var listener = new TouchInputListener((pointerId, phase, screenX, screenY) => received.Add((pointerId, phase)));
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contact = typeof(TouchInputListener).GetMethod("HandleContact", members)!
+            .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
+        var remove = typeof(TouchInputListener).GetMethod("ReleaseDeviceContacts", members)!.CreateDelegate<Action<IntPtr>>(listener);
+        contact(new IntPtr(1), 7, false, true, 200, 300);
+        long first = received[^1].PointerId;
+        contact(new IntPtr(2), 7, false, true, 400, 500);
+        long second = received[^1].PointerId;
+        Assert.NotEqual(first, second);
+        remove(new IntPtr(1));
+        Assert.Equal((first, TouchInputPhase.Up), received[^1]);
+        contact(new IntPtr(2), 7, true, true, 450, 550);
+        Assert.Equal((second, TouchInputPhase.Move), received[^1]);
+        contact(new IntPtr(1), 7, false, true, 200, 300);
+        Assert.NotEqual(first, received[^1].PointerId);
+        remove(new IntPtr(2));
+        Assert.Equal((second, TouchInputPhase.Up), received[^1]);
+        remove(new IntPtr(2));
+        Assert.Equal(6, received.Count);
+    }
+
+    [Fact]
+    public void MultiTouch_DisabledRetainsTheFirstContactUntilReleaseWithoutPromotingHeldFingers()
+    {
+        using var mode = new MultiTouchScope(false);
+        var received = new List<(long PointerId, TouchInputPhase Phase)>();
+        using var listener = new TouchInputListener((pointerId, phase, screenX, screenY) => received.Add((pointerId, phase)));
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contact = typeof(TouchInputListener).GetMethod("HandleContact", members)!
+            .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
+        contact(new IntPtr(1), 0, false, true, 200, 300);
+        long first = Assert.Single(received).PointerId;
+        contact(new IntPtr(1), 1, false, true, 400, 500);
+        contact(new IntPtr(1), 1, true, true, 450, 550);
+        Assert.Single(received);
+        contact(new IntPtr(1), 0, true, false, 200, 300);
+        Assert.Equal((first, TouchInputPhase.Up), received[^1]);
+        contact(new IntPtr(1), 1, true, true, 460, 560);
+        Assert.Equal(2, received.Count);
+        contact(new IntPtr(1), 2, false, true, 600, 700);
+        long next = received[^1].PointerId;
+        Assert.NotEqual(first, next);
+        Assert.Equal(TouchInputPhase.Down, received[^1].Phase);
+        contact(new IntPtr(1), 1, true, false, 460, 560);
+        Assert.Equal(3, received.Count);
+        contact(new IntPtr(1), 2, true, false, 600, 700);
+        Assert.Equal((next, TouchInputPhase.Up), received[^1]);
+    }
+
+    [Fact]
+    public void MultiTouch_SettingsCardUsesTheExistingConditionalAnimationAndPrecedesScreenshotMode()
+    {
+        XDocument document = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement section = GetNamedElement(document, "SectionBasic");
+        XElement touch = GetNamedElement(document, "CheckTouchscreenMode");
+        XElement multi = GetNamedElement(document, "PanelMultiTouchEffects");
+        XElement screenshot = GetNamedElement(document, "CheckScreenshotCompatibilityMode");
+        XElement TouchCard(XElement control) => control.Ancestors().Single(element => element.Parent == section);
+        var children = section.Elements().ToList();
+        Assert.True(children.IndexOf(TouchCard(touch)) < children.IndexOf(multi));
+        Assert.True(children.IndexOf(multi) < children.IndexOf(TouchCard(screenshot)));
+        Assert.Equal("Collapsed", (string?)multi.Attribute("Visibility"));
+        Assert.Equal("ToggleSwitch", GetNamedElement(document, "CheckMultiTouchEffects").Name.LocalName);
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("SetSettingsVisibility(SectionBasic, animate, (PanelMultiTouchEffects, CheckTouchscreenMode.IsOn))", source, StringComparison.Ordinal);
+        Assert.Contains("ConfigManager.Save(\"EnableMultiTouchEffects\", CheckMultiTouchEffects.IsOn)", source, StringComparison.Ordinal);
+        foreach (string language in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
+        {
+            XDocument strings = XDocument.Parse(ReadSource("src", language));
+            Assert.Single(strings.Descendants("data"), element => (string?)element.Attribute("name") == "Basic_MultiTouch");
+            if (language == "Strings.resx") Assert.Equal("启用触摸特效", strings.Descendants("data")
+                .Single(element => (string?)element.Attribute("name") == "Basic_Touchscreen").Element("value")!.Value);
+        }
+    }
+
+    [Fact]
+    public void MultiTouch_CursorEligibilityAndReleaseAreIndependentPerContact()
+    {
+        var state = new TouchCursorState();
+        var visible = new IntPtr(123);
+        var hidden = new IntPtr(456);
+        state.Observe(new NativeMethods.CURSORINFO { flags = NativeMethods.CURSOR_SHOWING,
+            hCursor = System.Windows.Forms.Cursors.Arrow.Handle }, visible);
+        state.Observe(new NativeMethods.CURSORINFO(), hidden);
+        state.BeginContact(visible, true, 2);
+        state.BeginContact(hidden, true, 3);
+        var cursor = new NativeMethods.CURSORINFO { flags = NativeMethods.CURSOR_SUPPRESSED };
+        Assert.True(state.IsVisible(cursor, hidden, true, 2));
+        Assert.False(state.IsVisible(cursor, visible, true, 3));
+        state.EndContact(3);
+        Assert.True(state.IsVisible(cursor, hidden, false, 2));
+        state.BeginContact(hidden, false, 3);
+        Assert.False(state.IsVisible(cursor, hidden, false, 3));
+        state.Reset();
+        Assert.False(state.IsVisible(cursor, hidden, false, 2));
+    }
+
+    [Theory]
+    [InlineData(200, 300, 0, true)]
+    [InlineData(224, 324, 0, true)]
+    [InlineData(225, 300, 0, false)]
+    [InlineData(200, 325, 0, false)]
+    [InlineData(200, 300, 200, false)]
+    public void MultiTouch_PromotedClicksAreAdoptedOnceWithoutSuppressingOtherContacts(int horizontal, int vertical, int ageMilliseconds, bool expected)
+    {
+        using var manager = new OverlayManager();
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        long timestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+        typeof(OverlayManager).GetField("_lastPromotedTouchTimestamp", members)!.SetValue(manager,
+            timestamp - System.Diagnostics.Stopwatch.Frequency * ageMilliseconds / 1000);
+        typeof(OverlayManager).GetField("_lastPromotedTouchPoint", members)!.SetValue(manager,
+            new NativeMethods.POINT { x = 200, y = 300 });
+        var consume = typeof(OverlayManager).GetMethod("TryConsumePromotedTouchClick", members)!
+            .CreateDelegate<Func<int, int, long, bool>>(manager);
+        Assert.Equal(expected, consume(horizontal, vertical, timestamp));
+        if (expected) Assert.False(consume(horizontal, vertical, timestamp));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MultiTouch_HidReportsRetainTheOtherContactWhenOneContactDisappears(bool omittedAxes)
+    {
+        var values = new List<NativeMethods.HIDP_VALUE_CAPS>();
+        var buttons = new List<NativeMethods.HIDP_BUTTON_CAPS>();
+        for (ushort collection = 1; collection <= 2; collection++)
+        {
+            ushort start = (ushort)((collection - 1) * 4);
+            values.Add(new NativeMethods.HIDP_VALUE_CAPS
+            {
+                UsagePage = 1, ReportId = 1, LinkCollection = collection, IsRange = 1, IsAbsolute = 1,
+                BitSize = 16, LogicalMin = 0, LogicalMax = 1000, UsageMin = 0x30, UsageMax = 0x31, DataIndexMin = start
+            });
+            values.Add(new NativeMethods.HIDP_VALUE_CAPS
+            {
+                UsagePage = 13, ReportId = 1, LinkCollection = collection, UsageMin = 0x51, DataIndexMin = (ushort)(start + 2)
+            });
+            buttons.Add(new NativeMethods.HIDP_BUTTON_CAPS
+            {
+                UsagePage = 13, ReportId = 1, LinkCollection = collection, UsageMin = 0x42, DataIndexMin = (ushort)(start + 3)
+            });
+        }
+        var device = TouchInputListener.TouchDevice.Create(new IntPtr(123), Array.Empty<byte>(),
+            new NativeMethods.HIDP_CAPS { InputReportByteLength = 20, NumberInputDataIndices = 8 }, values.ToArray(), buttons.ToArray());
+        Assert.NotNull(device);
+        NativeMethods.HIDP_DATA[] data =
+        [
+            new() { DataIndex = 0, Value = 100 }, new() { DataIndex = 1, Value = 200 },
+            new() { DataIndex = 2, Value = 7 }, new() { DataIndex = 3, Value = 1 },
+            new() { DataIndex = 4, Value = 700 }, new() { DataIndex = 5, Value = 800 },
+            new() { DataIndex = 6, Value = 8 }, new() { DataIndex = 7, Value = 1 }
+        ];
+        var received = new List<(uint Id, bool WasDown, bool Down, int Horizontal, int Vertical)>();
+        void Receive(IntPtr source, uint id, bool wasDown, bool down, int horizontal, int vertical) =>
+            received.Add((id, wasDown, down, horizontal, vertical));
+        var display = new NativeMethods.RECT { Right = 1001, Bottom = 1001 };
+        device.ProcessData(1, data, display, 1, Receive);
+        Assert.Equal(new[] { (7U, false, true, 100, 200), (8U, false, true, 700, 800) }, received);
+        received.Clear();
+        data[2].Value = 0;
+        data[3].Value = 0;
+        data[4].Value = 750;
+        device.ProcessData(1, omittedAxes ? data.AsSpan(4) : data, display, 1, Receive);
+        Assert.Equal(new[] { (7U, true, false, 100, 200), (8U, true, true, 750, 800) }, received);
+        received.Clear();
+        data[2].Value = 7;
+        data[3].Value = 1;
+        device.ProcessData(1, data, display, 1, Receive);
+        Assert.Equal(new[] { (7U, false, true, 100, 200), (8U, true, true, 750, 800) }, received);
+    }
+
+    [Fact]
+    public void MultiTouch_IndependentTrailsContinueAcrossScreensAndReleaseSeparately()
+    {
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        using var firstHost = new LayeredWindowHost();
+        using var secondHost = new LayeredWindowHost();
+        using var manager = new OverlayManager();
+        OverlayWindow CreateOverlay(int left, LayeredWindowHost host)
+        {
+            host.SetBounds(left, 0, 400, 600);
+            var overlay = (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow));
+            typeof(OverlayWindow).GetField("_host", members)!.SetValue(overlay, host);
+            typeof(OverlayWindow).GetField("_screenBounds", members)!.SetValue(overlay,
+                new NativeMethods.RECT { Left = left, Top = 0, Right = left + 400, Bottom = 600 });
+            return overlay;
+        }
+        OverlayWindow firstOverlay = CreateOverlay(0, firstHost);
+        OverlayWindow secondOverlay = CreateOverlay(400, secondHost);
+        var overlays = (Dictionary<string, OverlayWindow>)typeof(OverlayManager).GetField("_overlays", members)!.GetValue(manager)!;
+        var contacts = (Dictionary<long, OverlayManager.TouchTrailState>)typeof(OverlayManager).GetField("_touchContacts", members)!.GetValue(manager)!;
+        var move = typeof(OverlayManager).GetMethod("RouteTouchTrailMove", members)!
+            .CreateDelegate<Action<OverlayManager.TouchTrailState, OverlayWindow, int, int, long>>(manager);
+        var release = typeof(OverlayManager).GetMethod("ReleaseTouchContact", members)!
+            .CreateDelegate<Action<OverlayManager.TouchTrailState, bool>>(manager);
+        var first = new OverlayManager.TouchTrailState(2, 42, new NativeMethods.POINT());
+        var second = new OverlayManager.TouchTrailState(3, 43, new NativeMethods.POINT());
+        overlays.Add("first", firstOverlay);
+        overlays.Add("second", secondOverlay);
+        contacts.Add(2, first);
+        contacts.Add(3, second);
+        try
+        {
+            long timestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+            move(first, firstOverlay, 100, 100, timestamp);
+            move(second, secondOverlay, 500, 500, timestamp);
+            move(first, firstOverlay, 390, 100, timestamp + 1);
+            move(first, secondOverlay, 410, 100, timestamp + 2);
+            move(second, secondOverlay, 550, 500, timestamp + 3);
+            Assert.Equal(2, first.Participants.Count);
+            Assert.Single(second.Participants);
+            Assert.All(first.History, sample => Assert.Equal(100, sample.ScreenY));
+            Assert.All(second.History, sample => Assert.Equal(500, sample.ScreenY));
+            release(first, true);
+            Assert.Empty(first.History);
+            Assert.Empty(first.Participants);
+            Assert.Same(second, Assert.Single(contacts).Value);
+            Assert.Equal(2, second.History.Count);
+            move(second, firstOverlay, 350, 500, timestamp + 4);
+            Assert.Equal(2, second.Participants.Count);
+            manager.UpdateTouchMode(false);
+            Assert.Empty(contacts);
+            Assert.Empty(second.History);
+            Assert.Empty(second.Participants);
+        }
+        finally
+        {
+            overlays.Clear();
+        }
+    }
+
+    [Fact]
+    public void MultiTouch_FilteringOneContactDoesNotSuppressOrClearTheOtherContact()
+    {
+        bool previousMode = ConfigManager.IsTouchscreenMode;
+        bool previousFilter = ConfigManager.EnableEnvironmentFilter;
+        using var manager = new OverlayManager();
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contacts = (Dictionary<long, OverlayManager.TouchTrailState>)typeof(OverlayManager).GetField("_touchContacts", members)!.GetValue(manager)!;
+        var overlays = (Dictionary<string, OverlayWindow>)typeof(OverlayManager).GetField("_overlays", members)!.GetValue(manager)!;
+        var input = typeof(OverlayManager).GetMethod("OnTouchInput", members)!.CreateDelegate<Action<long, TouchInputPhase, int, int>>(manager);
+        var update = typeof(OverlayManager).GetMethods(members).Single(method => method.Name == "UpdateSuppressionState" && method.GetParameters().Length == 2)
+            .CreateDelegate<Action<long, bool>>(manager);
+        var blocked = new OverlayManager.TouchTrailState(2, 42, new NativeMethods.POINT { x = -100000, y = -100000 });
+        var allowed = new OverlayManager.TouchTrailState(3, 43, new NativeMethods.POINT { x = -100000, y = -100000 });
+        blocked.FilterWindow = allowed.FilterWindow = NativeMethods.GetForegroundWindow();
+        blocked.FilterValidUntil = allowed.FilterValidUntil = DateTime.UtcNow.AddSeconds(10).Ticks;
+        blocked.FilterSuppressed = true;
+        blocked.History.Enqueue(new TrailSample(10, 20, 0));
+        allowed.History.Enqueue(new TrailSample(30, 40, 0));
+        contacts.Add(2, blocked);
+        contacts.Add(3, allowed);
+        overlays.Add("placeholder", (OverlayWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OverlayWindow)));
+        try
+        {
+            ConfigManager.IsTouchscreenMode = true;
+            ConfigManager.EnableEnvironmentFilter = true;
+            update(DateTime.UtcNow.Ticks, true);
+            Assert.False(manager.IsEffectSuppressedByEnvironment());
+            input(2, TouchInputPhase.Move, -100000, -100000);
+            Assert.Same(allowed, Assert.Single(contacts).Value);
+            Assert.Empty(blocked.History);
+            Assert.Equal(30, Assert.Single(allowed.History).ScreenX);
+            Assert.False(manager.IsEffectSuppressedByEnvironment());
+            input(3, TouchInputPhase.Up, -100000, -100000);
+            Assert.Empty(contacts);
+        }
+        finally
+        {
+            overlays.Clear();
+            ConfigManager.IsTouchscreenMode = previousMode;
+            ConfigManager.EnableEnvironmentFilter = previousFilter;
+        }
     }
 
     [Fact]

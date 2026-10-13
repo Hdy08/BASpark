@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { Buffer } from 'node:buffer';
 
 const adapterSource = readFileSync(
   new URL('../../src/Web/fx-adapter.js', import.meta.url),
@@ -21,6 +22,7 @@ function createHarness(options = {})
     pointerMove: [],
     pointerUp: [],
     pointerTimes: [],
+    booms: [],
     setFxParams: [],
     setCompositingReference: [],
     setPaused: [],
@@ -42,10 +44,18 @@ function createHarness(options = {})
 
       this.width = 800;
       this.height = 600;
-      this.config = config;
+      this.config = { clickEnabled: true, trailEnabled: true, trailAlways: false, ...config };
       this.shards = [];
       this.trailStrokes = [];
       this.currentTrailStroke = null;
+      this.activePointerId = null;
+      this.activePointerSource = null;
+      this.lastPointerPosition = null;
+      this.lastPointerTime = 0;
+      this.trailDistanceSinceShard = 0;
+      this.activeTrailOwnerId = null;
+      this.nextTrailOwnerId = 1;
+      this.fxConfig = this.getFxConfig();
       this.nextOwnerId = 1;
       this.trailShardCounts = new Map();
       this.resolvedEffectBackend = 'pending';
@@ -189,6 +199,21 @@ function createHarness(options = {})
     }
   }
 
+  if (options.vendorPointerInput)
+  {
+    const vendorContext = { atob: (encoded) => Buffer.from(encoded, 'base64').toString('latin1'), structuredClone };
+    vm.runInNewContext(readFileSync(new URL('../../src/Web/vendor/ba-click-fx.iife.js', import.meta.url), 'utf8'), vendorContext);
+    const prototype = vendorContext.BAClickFX.BAClickFX.prototype;
+    for (const method of ['pointerDown', 'pointerMove', 'pointerUp', 'pointerCancel', '_normalizePointerInput',
+      '_pointerMoveAtTime', '_beginTrailOwner', '_startTrailStroke', '_ensureCurrentTrailStroke',
+      '_appendPointerSample', '_releaseActivePointer'])
+      FakeFx.prototype[method] = prototype[method];
+    FakeFx.prototype._getScale = function () { return this.config.scale; };
+    FakeFx.prototype._requestRender = function () {};
+    FakeFx.prototype._spawnTrailShards = function () {};
+    FakeFx.prototype._spawnClick = function (horizontal, vertical) { calls.booms.push([horizontal, vertical]); };
+  }
+
   const windowMock =
   {
     __basparkRendererGeneration: 'test-generation',
@@ -284,6 +309,85 @@ test('initializes the vendored renderer in manual WebView2 mode', () =>
       'baclickfxhostcompositingchange',
     ],
   );
+});
+
+test('multi-touch keeps simultaneous clicks and independent trails in one vendored renderer', () =>
+{
+  const harness = createHarness({ vendorPointerInput: true });
+  const send = (pointerId, type, horizontal, vertical) => harness.window.externalPointerInput({
+    pointerId, type, x: horizontal, y: vertical, strokeId: pointerId + 40, mode: 'touch', alwaysTrail: false,
+  });
+  assert.equal(send(2, 'down', 0.2, 0.2), true);
+  assert.equal(send(3, 'down', 0.8, 0.8), true);
+  assert.deepEqual(harness.calls.booms, [[160, 120], [640, 480]]);
+  assert.equal(harness.fx.trailStrokes.length, 2);
+  send(2, 'move', 0.35, 0.2);
+  send(3, 'move', 0.65, 0.8);
+  const first = harness.fx.trailStrokes.find((stroke) => stroke.basparkPointerId === 2);
+  const second = harness.fx.trailStrokes.find((stroke) => stroke.basparkPointerId === 3);
+  assert.notEqual(first.ownerId, second.ownerId);
+  assert.ok(first.points.length > 1);
+  assert.ok(second.points.length > 1);
+  assert.ok(first.points.every((point) => point.y === 120));
+  assert.ok(second.points.every((point) => point.y === 480));
+  send(2, 'up');
+  assert.equal(first.active, false);
+  assert.equal(second.active, true);
+  const previousCount = second.points.length;
+  assert.equal(send(3, 'move', 0.55, 0.8), true);
+  assert.ok(second.points.length > previousCount);
+  send(3, 'cancel');
+  assert.ok(harness.fx.trailStrokes.includes(first));
+  assert.ok(!harness.fx.trailStrokes.includes(second));
+  assert.equal(send(3, 'up'), false);
+  assert.equal(harness.calls.clearTrail, 0);
+});
+
+test('multi-touch cancellation and cross-screen replay preserve other pointers and aged history', () =>
+{
+  const harness = createHarness({ vendorPointerInput: true });
+  const send = (pointerId, type, detail = {}) => harness.window.externalPointerInput({
+    pointerId, type, x: 0.5, y: 0.5, strokeId: pointerId + 40, mode: 'touch', alwaysTrail: false, ...detail,
+  });
+  send(3, 'down', { y: 0.8 });
+  send(3, 'move', { x: 0.7, y: 0.8 });
+  const other = harness.fx.trailStrokes[0];
+  send(2, 'trailContinue', { history: [[-0.2, 0.2, 120], [-0.05, 0.2, 40]],
+    x: 0.1, y: 0.2, pressed: true, beginStroke: true, finishStroke: false });
+  const first = harness.fx.trailStrokes.find((stroke) => stroke.basparkPointerId === 2);
+  assert.ok(first.points.some((point) => point.x < 0));
+  assert.ok(first.points[0].bornAt < first.points.at(-1).bornAt);
+  send(2, 'cancel');
+  assert.ok(harness.fx.trailStrokes.includes(other));
+  assert.equal(other.active, true);
+  assert.equal(send(3, 'move', { x: 0.8, y: 0.8 }), true);
+  harness.window.setRenderingPaused(true);
+  assert.equal(other.active, false);
+  assert.equal(send(3, 'up'), false);
+  harness.window.setRenderingPaused(false);
+  assert.equal(send(4, 'down'), true);
+});
+
+test('multi-touch input restores a simultaneous mouse context and rejects stale generations', () =>
+{
+  const harness = createHarness({ vendorPointerInput: true });
+  harness.window.setInputContext('mouse', true);
+  harness.window.externalMove(0.1, 0.1);
+  const mouse = harness.fx.currentTrailStroke;
+  const dispatch = harness.hostListeners.get('message');
+  const input = { source: 'baspark-input', generation: 'test-generation', pointerId: 2,
+    strokeId: 42, type: 'down', x: 0.8, y: 0.8, mode: 'touch', alwaysTrail: true };
+  dispatch({ data: { ...input, generation: 'old-generation' } });
+  assert.equal(harness.calls.booms.length, 0);
+  dispatch({ data: input });
+  assert.equal(harness.calls.booms.length, 1);
+  assert.equal(harness.fx.currentTrailStroke, mouse);
+  assert.equal(harness.fx.activePointerId, 1);
+  assert.equal(harness.fx.config.trailAlways, true);
+  assert.equal(harness.window.externalMove(0.2, 0.1), true);
+  assert.ok(mouse.points.length > 1);
+  harness.window.externalCancel();
+  assert.equal(harness.window.externalPointerInput({ ...input, type: 'up' }), false);
 });
 
 test('maps normalized host input and BASpark settings to BAClickFX', () =>

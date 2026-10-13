@@ -1104,42 +1104,42 @@ internal sealed class OverlayWindow : IDisposable
     // 输入事件转发
     // ------------------------------------------------------------------
 
-    public void EmitDown(int x, int y, bool touchLike = false)
+    public void EmitDown(int x, int y, bool touchLike = false, long pointerId = 1)
     {
         if (!TryConvertScreenToOverlayPoint(x, y, out Windows.Foundation.Point clientPoint))
         {
             return;
         }
 
-        if (PostInput("down", clientPoint, touchLike)) return;
+        if (PostInput("down", clientPoint, touchLike, pointerId)) return;
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
         ExecuteWithInputContext(
             inputMode,
             $"if(window.externalBoom) window.externalBoom({FormatCoordinate(clientPoint.X)}, {FormatCoordinate(clientPoint.Y)});");
     }
 
-    public void EmitTrailStart(int x, int y, bool touchLike)
+    public void EmitTrailStart(int x, int y, bool touchLike, long pointerId = 1)
     {
         if (!TryConvertScreenToOverlayPoint(x, y, out Windows.Foundation.Point clientPoint))
         {
             return;
         }
 
-        if (PostInput("trailStart", clientPoint, touchLike)) return;
+        if (PostInput("trailStart", clientPoint, touchLike, pointerId)) return;
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
         ExecuteWithInputContext(
             inputMode,
             $"if(window.externalTrailStart) window.externalTrailStart({FormatCoordinate(clientPoint.X)}, {FormatCoordinate(clientPoint.Y)});");
     }
 
-    public void EmitMove(int x, int y, bool touchLike)
+    public void EmitMove(int x, int y, bool touchLike, long pointerId = 1)
     {
         if (!TryConvertScreenToOverlayPoint(x, y, out Windows.Foundation.Point clientPoint))
         {
             return;
         }
 
-        if (PostInput("move", clientPoint, touchLike)) return;
+        if (PostInput("move", clientPoint, touchLike, pointerId)) return;
         if (Interlocked.Exchange(ref _moveScriptPending, 1) == 1)
         {
             return;
@@ -1152,15 +1152,15 @@ internal sealed class OverlayWindow : IDisposable
             onCompleted: () => Interlocked.Exchange(ref _moveScriptPending, 0));
     }
 
-    public void EmitUp(bool touchLike)
+    public void EmitUp(bool touchLike, long pointerId = 1)
     {
-        if (PostInput("up", default, touchLike)) return;
+        if (PostInput("up", default, touchLike, pointerId)) return;
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
         ExecuteWithInputContext(inputMode, "if(window.externalUp) window.externalUp();");
     }
 
     internal void EmitTrailContinuation(Queue<TrailSample> history, long timestamp, int screenX, int screenY,
-        bool touchLike, bool pressed, bool beginStroke, bool finishStroke)
+        bool touchLike, bool pressed, bool beginStroke, bool finishStroke, long pointerId = 1)
     {
         if (_isClosing || !_rendererReady || _coreWebView == null
             || !_host.TryGetWindowRect(out NativeMethods.RECT bounds)
@@ -1191,7 +1191,7 @@ internal sealed class OverlayWindow : IDisposable
         string beginValue = beginStroke ? "true" : "false";
         string finishValue = finishStroke ? "true" : "false";
         string inputMode = touchLike ? InputModeTouch : InputModeMouse;
-        if (_usingLegacyRenderer)
+        if (_usingLegacyRenderer && pointerId == 1)
         {
             ExecuteWithInputContext(inputMode,
                 string.Create(CultureInfo.InvariantCulture,
@@ -1202,8 +1202,9 @@ internal sealed class OverlayWindow : IDisposable
         try
         {
             string alwaysTrail = ConfigManager.EnableAlwaysTrailEffect ? "true" : "false";
-            _coreWebView.PostWebMessageAsJson(string.Create(CultureInfo.InvariantCulture,
-                $"{{\"source\":\"baspark-input\",\"generation\":\"{_rendererGeneration}\",\"type\":\"trailContinue\",\"strokeId\":{TrailStrokeId},\"history\":{samples},\"x\":{currentX:F6},\"y\":{currentY:F6},\"pressed\":{pressedValue},\"beginStroke\":{beginValue},\"finishStroke\":{finishValue},\"mode\":\"{inputMode}\",\"alwaysTrail\":{alwaysTrail}}}"));
+            string message = string.Create(CultureInfo.InvariantCulture,
+                $"{{\"source\":\"baspark-input\",\"generation\":\"{_rendererGeneration}\",\"type\":\"trailContinue\",\"pointerId\":{pointerId},\"strokeId\":{TrailStrokeId},\"history\":{samples},\"x\":{currentX:F6},\"y\":{currentY:F6},\"pressed\":{pressedValue},\"beginStroke\":{beginValue},\"finishStroke\":{finishValue},\"mode\":\"{inputMode}\",\"alwaysTrail\":{alwaysTrail}}}");
+            _coreWebView.PostWebMessageAsJson(message);
             _lastReportedInputMode = inputMode;
             _lastReportedAlwaysTrail = ConfigManager.EnableAlwaysTrailEffect;
         }
@@ -1221,18 +1222,21 @@ internal sealed class OverlayWindow : IDisposable
             "else if(window.externalUp){window.externalUp();}");
     }
 
-    private bool PostInput(string type, Windows.Foundation.Point point, bool touchLike)
+    internal void EmitTouchCancel(long pointerId) => PostInput("cancel", default, true, pointerId);
+
+    private bool PostInput(string type, Windows.Foundation.Point point, bool touchLike, long pointerId = 1)
     {
-        if (_usingLegacyRenderer) return false;
+        if (_usingLegacyRenderer && pointerId == 1) return false;
         CoreWebView2? coreWebView = _coreWebView;
         if (_isClosing || !_rendererReady || coreWebView == null) return true;
         string mode = touchLike ? InputModeTouch : InputModeMouse;
         string alwaysTrail = ConfigManager.EnableAlwaysTrailEffect ? "true" : "false";
         try
         {
-            coreWebView.PostWebMessageAsJson(string.Create(
+            string message = string.Create(
                 CultureInfo.InvariantCulture,
-                $"{{\"source\":\"baspark-input\",\"generation\":\"{_rendererGeneration}\",\"type\":\"{type}\",\"strokeId\":{TrailStrokeId},\"x\":{point.X:F6},\"y\":{point.Y:F6},\"mode\":\"{mode}\",\"alwaysTrail\":{alwaysTrail}}}"));
+                $"{{\"source\":\"baspark-input\",\"generation\":\"{_rendererGeneration}\",\"type\":\"{type}\",\"pointerId\":{pointerId},\"strokeId\":{TrailStrokeId},\"x\":{point.X:F6},\"y\":{point.Y:F6},\"mode\":\"{mode}\",\"alwaysTrail\":{alwaysTrail}}}");
+            coreWebView.PostWebMessageAsJson(message);
             _lastReportedInputMode = mode;
             _lastReportedAlwaysTrail = ConfigManager.EnableAlwaysTrailEffect;
         }

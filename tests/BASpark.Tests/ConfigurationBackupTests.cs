@@ -189,11 +189,11 @@ public sealed class ConfigurationBackupTests
     [Fact]
     public void SettingCatalog_CoversAllEditableSettingsAndStatisticsWithUniqueKeys()
     {
-        Assert.Equal(30, ConfigurationBackup.Settings.Count);
+        Assert.Equal(31, ConfigurationBackup.Settings.Count);
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
         Assert.Contains(ConfigurationBackup.Settings, item => item.Key == "TotalClicks");
         foreach (string key in new[] { "Profiles", "ParticleColor",
-                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode" })
+                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "EnableMultiTouchEffects" })
             Assert.Contains(ConfigurationBackup.Settings, item => item.Key == key);
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key == "EffectOpacity");
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key is "Profile.Mode" or "Profile.Processes");
@@ -203,6 +203,21 @@ public sealed class ConfigurationBackupTests
             Assert.NotEqual(item.GroupKey, Localization.Get(item.GroupKey));
             Assert.NotEqual(item.TitleKey, Localization.Get(item.TitleKey));
         }
+    }
+
+    [Fact]
+    public void MultiTouch_BackupSelectionRoundTripsTheIndependentToggle()
+    {
+        ConfigurationBackupDocument source = CreateFixture();
+        source.Data["EnableMultiTouchEffects"] = JsonSerializer.SerializeToElement(true);
+        source.Data["IsTouchscreenMode"] = JsonSerializer.SerializeToElement(false);
+        ConfigurationBackupDocument imported = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(
+            ConfigurationBackup.Select(source, ["EnableMultiTouchEffects"])));
+        Assert.True(imported.Data["EnableMultiTouchEffects"].GetBoolean());
+        Assert.DoesNotContain("IsTouchscreenMode", imported.Data.Keys);
+        Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(imported, ["EnableMultiTouchEffects"], CreateFixture());
+        Assert.Equal(true, values["EnableMultiTouchEffects"]);
+        Assert.DoesNotContain("IsTouchscreenMode", values.Keys);
     }
 
     [Theory]
