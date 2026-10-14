@@ -945,7 +945,7 @@ public sealed partial class ControlPanelWindow : UserControl
             }
         }
         _savedSettingsState = new SettingsState(basic.ToJsonString(), visual.ToJsonString(), screens.ToJsonString(), filter.ToJsonString());
-        UpdateApplySettingsState(SettingsSections.All);
+        UpdateApplySettingsState(SettingsSections.All, animateResetButtons: true);
     }
 
     private static string GetScreenResetKey(System.Text.Json.Nodes.JsonNode screen) =>
@@ -968,11 +968,11 @@ public sealed partial class ControlPanelWindow : UserControl
             }
             SettingsSections pending = _pendingSettingsSections;
             _pendingSettingsSections = 0;
-            if (!_isClosed) UpdateApplySettingsState(pending);
+            if (!_isClosed) UpdateApplySettingsState(pending, animateResetButtons: true);
         });
     }
 
-    private void UpdateApplySettingsState(SettingsSections sections)
+    private void UpdateApplySettingsState(SettingsSections sections, bool animateResetButtons = false)
     {
         if (_savedSettingsState == null || _currentSettingsState == null) return;
         if (sections.HasFlag(SettingsSections.Basic)) _currentSettingsState = _currentSettingsState with { Basic = CaptureBasicSettings() };
@@ -981,7 +981,7 @@ public sealed partial class ControlPanelWindow : UserControl
         if (sections.HasFlag(SettingsSections.Screens)) _currentSettingsState = _currentSettingsState with { Screens = CaptureScreenSettings() };
         BtnApplySettings.IsEnabled = BtnUndoSettings.IsEnabled = !_isApplyingSettings &&
             _currentSettingsState.HasChanges(_savedSettingsState, CurrentSettingsPage);
-        RefreshResetButtonVisibility();
+        RefreshResetButtonVisibility(animateResetButtons);
     }
 
     private void BindCollections()
@@ -1568,7 +1568,7 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             SettingsSections pending = _pendingSettingsSections;
             _pendingSettingsSections = 0;
-            UpdateApplySettingsState(pending);
+            UpdateApplySettingsState(pending, animateResetButtons: true);
         }
         if (!_isColorDragging && _pendingSliderFeedback.Count == 0) StopColorPreviewRendering();
     }
@@ -3481,6 +3481,8 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void LoadScreenOptions()
     {
+        foreach (CardResetButton entry in _cardResetButtons.Where(entry => entry.Scope == ResetScope.Screens))
+            if (_resetButtonAnimations.Remove(entry.Button, out ResetButtonAnimation? animation)) animation.Dispose();
         _cardResetButtons.RemoveAll(entry => entry.Scope == ResetScope.Screens);
         ScreenOptions.Clear();
         PanelScreenOptions.Children.Clear();
@@ -4482,6 +4484,8 @@ public sealed partial class ControlPanelWindow : UserControl
         _selectedSettingsItem = null;
         _allRunningProcesses.Clear();
         _runningProcessSnapshot = null;
+        foreach (ResetButtonAnimation animation in _resetButtonAnimations.Values) animation.Dispose();
+        _resetButtonAnimations.Clear();
         _cardResetButtons.Clear();
         _sectionResetButtons.Clear();
         _resetValues.Clear();

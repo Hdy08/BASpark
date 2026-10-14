@@ -3137,7 +3137,9 @@ public class WinUi3UiTests
         Assert.Equal("Right", (string?)check.Attribute("HorizontalAlignment"));
         Assert.Equal("1", (string?)check.Attribute("Grid.Column"));
         foreach (string action in new[] { "Loaded", "Checked", "Unchecked" })
-            Assert.Equal("SelectionCheck_StateChanged", (string?)check.Attribute(action));
+            Assert.Null(check.Attribute(action));
+        Assert.Null(check.Attribute("Style"));
+        Assert.Null(check.Attribute("Template"));
         Assert.Null(check.Attribute("IsChecked"));
         Assert.Contains("check.SetBinding(CheckBox.IsCheckedProperty, new Binding", pages, StringComparison.Ordinal);
         Assert.Contains("Source = item", pages, StringComparison.Ordinal);
@@ -3148,9 +3150,8 @@ public class WinUi3UiTests
         Assert.Contains("if (!ReferenceEquals(row.DataContext, item)) row.DataContext = item", pages, StringComparison.Ordinal);
         Assert.Contains("GetRowElement(context, index)", pages, StringComparison.Ordinal);
         Assert.Contains("GetRowElement(context, anchor)", pages, StringComparison.Ordinal);
-        Assert.Contains("FallbackIconSource: not null", pages, StringComparison.Ordinal);
-        Assert.Contains("glyph.Source = null", pages, StringComparison.Ordinal);
-        Assert.Contains("glyph.Opacity = check.IsChecked == true ? 1 : 0", pages, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectionCheck_StateChanged", pages, StringComparison.Ordinal);
+        Assert.DoesNotContain("glyph.Source = null", pages, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -4184,17 +4185,26 @@ public class WinUi3UiTests
         Assert.Contains(style.Elements(), item => (string?)item.Attribute("Property") == "BorderThickness" && (string?)item.Attribute("Value") == "0");
         Assert.DoesNotContain(style.Elements(), item => (string?)item.Attribute("Property") == "Template");
         string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
-        string sizing = pages[pages.IndexOf("private static void ConfigureResetButton", StringComparison.Ordinal)..
+        string sizing = pages[pages.IndexOf("private void ConfigureResetButton", StringComparison.Ordinal)..
             pages.IndexOf("private static void SetResetButtonLabel", StringComparison.Ordinal)];
         Assert.Contains("button.Height / reference.DesiredSize.Height", sizing, StringComparison.Ordinal);
         Assert.Contains("button.Padding = new Thickness(2 * scale)", sizing, StringComparison.Ordinal);
         Assert.Contains("icon.FontSize = 16 * scale", sizing, StringComparison.Ordinal);
         Assert.Contains("icon.IsTextScaleFactorEnabled = false", sizing, StringComparison.Ordinal);
         Assert.Contains("ConfigureResetButtonAnimations(button)", sizing, StringComparison.Ordinal);
-        Assert.Contains("ElementCompositionPreview.SetImplicitShowAnimation(button, show)", sizing, StringComparison.Ordinal);
-        Assert.Contains("ElementCompositionPreview.SetImplicitHideAnimation(button, hide)", sizing, StringComparison.Ordinal);
-        Assert.Contains("ControlFastAnimationDuration", sizing, StringComparison.Ordinal);
-        Assert.Contains("UISettings().AnimationsEnabled", sizing, StringComparison.Ordinal);
+        Assert.Contains("new FadeInThemeAnimation", pages, StringComparison.Ordinal);
+        Assert.Contains("new FadeOutThemeAnimation", pages, StringComparison.Ordinal);
+        Assert.Contains("ControlFastAnimationDuration", pages, StringComparison.Ordinal);
+        Assert.Contains("UISettings().AnimationsEnabled", pages, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetImplicitShowAnimation", pages, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetImplicitHideAnimation", pages, StringComparison.Ordinal);
+        Assert.Contains("if (!_visible) button.Visibility = Visibility.Collapsed", pages, StringComparison.Ordinal);
+        Assert.Contains("!entry.IsDefault(_currentSettingsState)", pages, StringComparison.Ordinal);
+        Assert.Contains("private void RefreshPageHeaders(bool animateResetButtons = false)", pages, StringComparison.Ordinal);
+        Assert.Contains("internal void Update(bool refresh = false, bool animateResetButtons = false)", pages, StringComparison.Ordinal);
+        Assert.Contains("_show(active, animateResetButtons)", pages, StringComparison.Ordinal);
+        Assert.Contains("UpdateApplySettingsState(SettingsSections.All, animateResetButtons: true)", pages, StringComparison.Ordinal);
+        Assert.Contains("RefreshResetButtonVisibility(animateResetButtons)", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
     }
 
     [Fact]

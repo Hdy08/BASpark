@@ -4,8 +4,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using Windows.Foundation;
 
 namespace BASpark;
@@ -192,18 +193,62 @@ public sealed partial class ControlPanelWindow
     private sealed record CardResetButton(Button Button, TextBlock Label, ResetScope Scope, string Key, Action Restore, Func<SettingsState, bool> IsDefault);
     private sealed record StickyHeading(FrameworkElement Anchor, TextBlock Label, object? Action, Func<bool> Visible);
 
+    private sealed class ResetButtonAnimation(Button button) : IDisposable
+    {
+        private Storyboard? _storyboard;
+        private bool _visible = button.Visibility == Visibility.Visible;
+
+        internal void SetVisible(bool visible, bool animate)
+        {
+            if (_visible == visible && (animate || _storyboard == null)) return;
+            _visible = visible;
+            _storyboard?.Stop();
+            _storyboard = null;
+            button.IsHitTestVisible = visible;
+            animate &= button.IsLoaded && new Windows.UI.ViewManagement.UISettings().AnimationsEnabled;
+            for (DependencyObject? parent = VisualTreeHelper.GetParent(button); animate && parent != null; parent = VisualTreeHelper.GetParent(parent))
+                if (parent is UIElement { Visibility: Visibility.Collapsed }) animate = false;
+            if (!animate)
+            {
+                button.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                return;
+            }
+            button.Visibility = Visibility.Visible;
+            var storyboard = new Storyboard();
+            var duration = new Duration(TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], System.Globalization.CultureInfo.InvariantCulture));
+            Timeline fade = visible ? new FadeInThemeAnimation { Duration = duration } : new FadeOutThemeAnimation { Duration = duration };
+            Storyboard.SetTarget(fade, button);
+            storyboard.Children.Add(fade);
+            _storyboard = storyboard;
+            storyboard.Completed += (_, _) =>
+            {
+                if (!ReferenceEquals(_storyboard, storyboard)) return;
+                _storyboard = null;
+                if (!_visible) button.Visibility = Visibility.Collapsed;
+                storyboard.Stop();
+            };
+            storyboard.Begin();
+        }
+
+        public void Dispose()
+        {
+            _storyboard?.Stop();
+            _storyboard = null;
+        }
+    }
+
     private sealed class StickySectionTracker : IDisposable
     {
         private readonly ScrollViewer _scroll;
         private readonly FrameworkElement _content;
-        private readonly Action<StickyHeading?> _show;
+        private readonly Action<StickyHeading?, bool> _show;
         private readonly List<StickyHeading> _headings = [];
         private StickyHeading? _active;
         private bool _updatePending;
         private bool _refreshPending;
         private bool _disposed;
 
-        internal StickySectionTracker(ScrollViewer scroll, FrameworkElement content, Action<StickyHeading?> show)
+        internal StickySectionTracker(ScrollViewer scroll, FrameworkElement content, Action<StickyHeading?, bool> show)
         {
             _scroll = scroll;
             _content = content;
@@ -236,10 +281,10 @@ public sealed partial class ControlPanelWindow
             }
             _headings.Clear();
             _active = null;
-            _show(null);
+            _show(null, false);
         }
 
-        internal void Update(bool refresh = false)
+        internal void Update(bool refresh = false, bool animateResetButtons = false)
         {
             if (!_scroll.IsLoaded) return;
             StickyHeading? active = null;
@@ -264,7 +309,7 @@ public sealed partial class ControlPanelWindow
             if (!ReferenceEquals(active, _active) || refresh)
             {
                 _active = active;
-                _show(active);
+                _show(active, animateResetButtons);
             }
         }
 
@@ -305,6 +350,7 @@ public sealed partial class ControlPanelWindow
     private StickySectionTracker? _settingsHeaders;
     private StickySectionTracker? _aboutHeaders;
     private readonly List<CardResetButton> _cardResetButtons = [];
+    private readonly Dictionary<Button, ResetButtonAnimation> _resetButtonAnimations = [];
     private readonly List<(Button Button, TextBlock Label, SectionResetRequest Request)> _sectionResetButtons = [];
     private SettingsState? _resetValueState;
     private readonly Dictionary<string, JsonElement> _resetValues = new(StringComparer.Ordinal);
@@ -316,12 +362,11 @@ public sealed partial class ControlPanelWindow
 
     private void SetupPageHeaders()
     {
-        _settingsHeaders = new(SettingsContentScrollViewer, SettingsContent, heading =>
+        _settingsHeaders = new(SettingsContentScrollViewer, SettingsContent, (heading, animateResetButtons) =>
         {
             TxtActiveSettingsSection.Text = heading?.Label.Text ?? string.Empty;
             BtnResetSection.Tag = heading?.Action;
-            BtnResetSection.Visibility = heading?.Action is SectionResetRequest request && HasNonDefaultSettings(request)
-                ? Visibility.Visible : Visibility.Collapsed;
+            SetResetButtonVisibility(BtnResetSection, heading?.Action is SectionResetRequest request && HasNonDefaultSettings(request), animateResetButtons);
         });
         _stickyTrackers.Add(_settingsHeaders);
         foreach (var section in new[]
@@ -349,7 +394,7 @@ public sealed partial class ControlPanelWindow
                 (section.Item1 != TxtFilterAdvancedTitle || EnvironmentFilterList.IsExpanded)));
         }
         _aboutHeaders = new(AboutScrollViewer, AboutContent,
-            heading => TxtActiveAboutSection.Text = heading?.Label.Text ?? string.Empty);
+            (heading, _) => TxtActiveAboutSection.Text = heading?.Label.Text ?? string.Empty);
         _stickyTrackers.Add(_aboutHeaders);
         foreach (TextBlock label in new[] { TxtBuildInfoTitle, TxtRepositoryLinks, TxtAuthorsTitle })
             _aboutHeaders.Add(new(WrapPageHeading(label, AboutContent, null, label == TxtBuildInfoTitle), label, null,
@@ -385,13 +430,13 @@ public sealed partial class ControlPanelWindow
         return anchor;
     }
 
-    private void RefreshPageHeaders()
+    private void RefreshPageHeaders(bool animateResetButtons = false)
     {
         if (_settingsHeaders == null) return;
         SettingsSections page = CurrentSettingsPage;
-        BtnBasicReset.Visibility = page == SettingsSections.Basic && HasNonDefaultSettings(new(ResetScope.Basic, null)) ? Visibility.Visible : Visibility.Collapsed;
-        BtnVisualReset.Visibility = page == SettingsSections.Visual && HasNonDefaultSettings(new(ResetScope.Visual, null)) ? Visibility.Visible : Visibility.Collapsed;
-        BtnFilterReset.Visibility = page == SettingsSections.Filter && HasNonDefaultSettings(new(ResetScope.Filter, null)) ? Visibility.Visible : Visibility.Collapsed;
+        SetResetButtonVisibility(BtnBasicReset, page == SettingsSections.Basic && HasNonDefaultSettings(new(ResetScope.Basic, null)), animateResetButtons);
+        SetResetButtonVisibility(BtnVisualReset, page == SettingsSections.Visual && HasNonDefaultSettings(new(ResetScope.Visual, null)), animateResetButtons);
+        SetResetButtonVisibility(BtnFilterReset, page == SettingsSections.Filter && HasNonDefaultSettings(new(ResetScope.Filter, null)), animateResetButtons);
         BtnRefreshScreens.Visibility = page == SettingsSections.Screens ? Visibility.Visible : Visibility.Collapsed;
         foreach (Button button in new[] { BtnResetSection }.Concat(_sectionResetButtons.Select(entry => entry.Button)))
         {
@@ -403,11 +448,11 @@ public sealed partial class ControlPanelWindow
             string label = Localization.Get("Settings_ResetPage");
             SetResetButtonLabel(button, label);
         }
-        _settingsHeaders.Update(true);
+        _settingsHeaders.Update(true, animateResetButtons);
         _aboutHeaders?.Update(true);
     }
 
-    private static void ConfigureResetButton(Button button, TextBlock label)
+    private void ConfigureResetButton(Button button, TextBlock label)
     {
         button.Style = (Style)Application.Current.Resources["BasInlineResetButtonStyle"];
         var reference = new TextBlock { Text = "Ag", Style = (Style)Application.Current.Resources["BasSectionTitleStyle"],
@@ -434,23 +479,15 @@ public sealed partial class ControlPanelWindow
         ConfigureResetButtonAnimations(button);
     }
 
-    private static void ConfigureResetButtonAnimations(Button button)
+    private void ConfigureResetButtonAnimations(Button button)
     {
-        if (!new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) return;
-        var compositor = ElementCompositionPreview.GetElementVisual(button).Compositor;
-        var duration = TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], System.Globalization.CultureInfo.InvariantCulture);
-        var show = compositor.CreateScalarKeyFrameAnimation();
-        show.Target = "Opacity";
-        show.InsertKeyFrame(0, 0);
-        show.InsertKeyFrame(1, 1);
-        show.Duration = duration;
-        var hide = compositor.CreateScalarKeyFrameAnimation();
-        hide.Target = "Opacity";
-        hide.InsertKeyFrame(0, 1);
-        hide.InsertKeyFrame(1, 0);
-        hide.Duration = duration;
-        ElementCompositionPreview.SetImplicitShowAnimation(button, show);
-        ElementCompositionPreview.SetImplicitHideAnimation(button, hide);
+        _resetButtonAnimations.TryAdd(button, new(button));
+    }
+
+    private void SetResetButtonVisibility(Button button, bool visible, bool animate = false)
+    {
+        if (_resetButtonAnimations.TryGetValue(button, out ResetButtonAnimation? animation)) animation.SetVisible(visible, animate);
+        else button.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static void SetResetButtonLabel(Button button, string label, string? name = null)
@@ -655,22 +692,22 @@ public sealed partial class ControlPanelWindow
         _ => "MultiScreen_Displays"
     };
 
-    private bool HasNonDefaultSettings(SectionResetRequest request) => _cardResetButtons.Any(entry => entry.Scope == request.Scope &&
-        (request.GroupKey == null || GetResetSectionKey(entry) == request.GroupKey) && entry.Button.Visibility == Visibility.Visible);
+    private bool HasNonDefaultSettings(SectionResetRequest request) => _currentSettingsState != null && _cardResetButtons.Any(entry => entry.Scope == request.Scope &&
+        (request.GroupKey == null || GetResetSectionKey(entry) == request.GroupKey) && !entry.IsDefault(_currentSettingsState));
 
-    private void RefreshResetButtonVisibility()
+    private void RefreshResetButtonVisibility(bool animate = false)
     {
         if (_currentSettingsState == null) return;
         foreach (CardResetButton entry in _cardResetButtons)
         {
-            entry.Button.Visibility = entry.IsDefault(_currentSettingsState) ? Visibility.Collapsed : Visibility.Visible;
+            SetResetButtonVisibility(entry.Button, !entry.IsDefault(_currentSettingsState), animate);
             entry.Button.IsEnabled = !_isApplyingSettings;
             string label = Localization.Get("Settings_ResetItem");
             SetResetButtonLabel(entry.Button, label, $"{label}: {entry.Label.Text}");
         }
         foreach (var entry in _sectionResetButtons)
-            entry.Button.Visibility = HasNonDefaultSettings(entry.Request) ? Visibility.Visible : Visibility.Collapsed;
-        RefreshPageHeaders();
+            SetResetButtonVisibility(entry.Button, HasNonDefaultSettings(entry.Request), animate);
+        RefreshPageHeaders(animate);
     }
 
     private void ResetSection_Click(object sender, RoutedEventArgs args)
@@ -701,8 +738,7 @@ public sealed partial class ControlPanelWindow
         UpdateDependentSettingsVisibility(animate: true);
         UpdateAdvancedSettingsVisibility();
         UpdateAdvancedHdrControls();
-        UpdateApplySettingsState(SettingsSections.All);
-        RefreshPageHeaders();
+        UpdateApplySettingsState(SettingsSections.All, animateResetButtons: true);
     }
 
     private void DiscardSettings_Click(object sender, RoutedEventArgs args)
@@ -712,8 +748,7 @@ public sealed partial class ControlPanelWindow
         ApplyBackupValuesToPanel(_savedSettingsState.GetValues(CurrentSettingsPage), animate: true);
         UpdateAdvancedSettingsVisibility();
         UpdateAdvancedHdrControls();
-        UpdateApplySettingsState(SettingsSections.All);
-        RefreshPageHeaders();
+        UpdateApplySettingsState(SettingsSections.All, animateResetButtons: true);
     }
 
     private void ApplyPageRuntimeSettings(SettingsSections page, bool screensChanged)
@@ -796,15 +831,6 @@ public sealed partial class ControlPanelWindow
     }
 
     private void SelectionCard_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args) => UpdateSelectionCardBinding(sender);
-
-    private void SelectionCheck_StateChanged(object sender, RoutedEventArgs args)
-    {
-        if (sender is CheckBox check && FindVisualDescendant<AnimatedIcon>(check, "CheckGlyph") is { FallbackIconSource: not null } glyph)
-        {
-            glyph.Source = null;
-            glyph.Opacity = check.IsChecked == true ? 1 : 0;
-        }
-    }
 
     private static void UpdateSelectionCardBinding(FrameworkElement card)
     {

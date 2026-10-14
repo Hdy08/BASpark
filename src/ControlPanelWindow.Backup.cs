@@ -422,6 +422,6 @@ public sealed partial class ControlPanelWindow
             if (savedScreen != null && currentScreen != null) savedScreen["IsEnabled"] = currentScreen["IsEnabled"]!.DeepClone();
         }
         _savedSettingsState = new SettingsState(basic.ToJsonString(), visual.ToJsonString(), screens.ToJsonString(), filter.ToJsonString());
-        UpdateApplySettingsState(SettingsSections.All);
+        UpdateApplySettingsState(SettingsSections.All, animateResetButtons: true);
     }
 }

@@ -54,7 +54,6 @@
                         <TextBlock Text="{x:Bind Subtitle}" Visibility="{x:Bind SubtitleVisibility}" Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
                     <CheckBox x:Name="SelectionCardCheck" Grid.Column="1"
-                              Loaded="SelectionCheck_StateChanged" Checked="SelectionCheck_StateChanged" Unchecked="SelectionCheck_StateChanged"
                               MinWidth="0" Padding="0" HorizontalAlignment="Right" VerticalAlignment="Center"
                               AutomationProperties.Name="{x:Bind Title}" />
                 </Grid>
