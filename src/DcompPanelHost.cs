@@ -544,10 +544,9 @@ internal sealed class DcompPanelHost : IDisposable
         }
     }
 
-    /// <summary>通知调用方关闭；普通面板先隐藏，固定窗口保留内容供关闭动画使用。</summary>
+    /// <summary>通知调用方关闭，保留内容供原生关闭动画使用。</summary>
     public void RequestClose()
     {
-        if (!_fixedSize) Hide();
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 

@@ -592,9 +592,34 @@ public sealed partial class ControlPanelWindow : UserControl
 
     public event EventHandler? Closed;
 
-    public void Activate() => _host.Show();
+    private bool _showRequested;
+    private bool _pageTemplatesPrepared;
+    private Task? _closeTask;
 
-    public void Close() => ControlPanelWindow_Closed(this, EventArgs.Empty);
+    public void Activate()
+    {
+        if (_isClosed) return;
+        if (_host.AppWindow?.IsVisible == true) _host.Show();
+        else if (!_showRequested)
+        {
+            _showRequested = true;
+            StartupDialogHost.ShowWhenReady(_host, RootGrid, fitToContent: false);
+        }
+    }
+
+    public void Close() => _ = CloseAsync();
+
+    public Task CloseAsync() => _closeTask ??= ClosePanelAsync();
+
+    private async Task ClosePanelAsync()
+    {
+        if (_isClosed) return;
+        _isClosed = true;
+        Size windowSize = _host.GetLogicalSize();
+        if (RootGrid.XamlRoot is { } root) root.Changed -= PanelXamlRoot_Changed;
+        try { await StartupDialogHost.CloseAsync(_host, dispose: false); }
+        finally { DisposeControlPanel(windowSize); }
+    }
 
     /// <summary>UI 已加载且窗口未关闭时，控件事件才会产生副作用（等价于旧版的 IsLoaded 判断）。</summary>
     private bool IsUiReady => !_isClosed && RootGrid is { IsLoaded: true };
@@ -682,6 +707,35 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateCaptionButtonBounds();
         UpdateCaptionButtonState();
         ApplyTitleBarTheme();
+        PreparePageTemplates();
+    }
+
+    private void PreparePageTemplates()
+    {
+        if (_pageTemplatesPrepared) return;
+        _pageTemplatesPrepared = true;
+        FrameworkElement[] pages = [PageWelcome, PageSettings, PageLog, PageAbout,
+            SectionBasic, SectionVisual, SectionFilter, SectionMultiScreen, SectionBackup];
+        Visibility[] visibility = pages.Select(page => page.Visibility).ToArray();
+        bool loading = _isLoading;
+        _isLoading = true;
+        try
+        {
+            foreach (FrameworkElement page in pages) page.Visibility = Visibility.Visible;
+            RootGrid.UpdateLayout();
+            foreach (ContentDialog dialog in new[] { RunningProcessOverlay, VisualResetOverlay, BackupOverlay, RenameProfileOverlay })
+            {
+                ConfigureContentDialog(dialog);
+                dialog.ApplyTemplate();
+            }
+        }
+        finally
+        {
+            for (int index = 0; index < pages.Length; index++) pages[index].Visibility = visibility[index];
+            _isLoading = loading;
+            RootGrid.UpdateLayout();
+            RefreshPageHeaders();
+        }
     }
 
     private static double MeasureSingleLineWidth(TextBlock text)
@@ -2037,6 +2091,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdatePageVisibility()
     {
         StopSettingsAnimations();
+        foreach (ResetButtonAnimation animation in _resetButtonAnimations.Values) animation.Complete();
         var selected = SidebarNavigation.SelectedItem as NavigationViewItem ?? TabWelcome;
         bool welcome = selected == TabWelcome;
         bool settings = IsSettingsNavigation(selected);
@@ -4055,6 +4110,11 @@ public sealed partial class ControlPanelWindow : UserControl
                 DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
                 {
                     if (_isClosed || version != animationVersion) return;
+                    dialog.UpdateLayout();
+                    layout ??= FindVisualDescendant<Grid>(dialog, "LayoutRoot");
+                    if (layout != null) layout.Opacity = 0;
+                    await ElementCompositionPreview.GetElementVisual(layout ?? (UIElement)dialog).Compositor.RequestCommitAsync();
+                    if (_isClosed || version != animationVersion) return;
                     _ = VisualStateManager.GoToState(dialog, "DialogHidden", false);
                     _ = VisualStateManager.GoToState(dialog, "DialogShowing", true);
                     if (layout != null)
@@ -4363,18 +4423,10 @@ public sealed partial class ControlPanelWindow : UserControl
         });
     }
 
-    private void ControlPanelWindow_Closed(object? sender, EventArgs args)
+    private void ControlPanelWindow_Closed(object? sender, EventArgs args) => Close();
+
+    private void DisposeControlPanel(Size windowSize)
     {
-        _ = sender;
-        _ = args;
-
-        if (_isClosed)
-        {
-            return;
-        }
-
-        _isClosed = true;
-        Size windowSize = _host.GetLogicalSize();
         if (_windowSizeRestored && windowSize.Width > 0 && windowSize.Height > 0)
         {
             ConfigManager.Save("ControlPanelWidth", windowSize.Width);

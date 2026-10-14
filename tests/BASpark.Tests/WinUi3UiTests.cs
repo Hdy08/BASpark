@@ -163,7 +163,10 @@ public class WinUi3UiTests
         XElement header = Assert.Single(template.Elements());
         XElement title = Assert.Single(header.Elements(), item => item.Name.LocalName == "TextBlock");
         Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)title.Attribute("Style"));
-        Assert.Equal("0,8,0,8", (string?)header.Attribute("Margin"));
+        Assert.Equal("0,8,16,12", (string?)header.Attribute("Margin"));
+        string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        Assert.Contains("Margin = new Thickness(0, 8, 16, 12)", source, StringComparison.Ordinal);
+        Assert.Contains("header.Margin = group.IsFirst ? new Thickness() : new Thickness(0, 8, 16, 12)", source, StringComparison.Ordinal);
         Assert.Equal(2, header.Elements().Count(item => item.Name.LocalName == "Button"));
     }
 
@@ -3916,7 +3919,8 @@ public class WinUi3UiTests
         Assert.Contains("0xF000 or 0xF030 or 0xF020", source, StringComparison.Ordinal);
         Assert.Contains("if (_fixedSize) style &= ~(WsThickFrame | WsMinimizeBox | WsMaximizeBox)", source, StringComparison.Ordinal);
         Assert.Contains("bool fixedSize = false, int minimumWidth = MinWidthDesign, int minimumHeight = MinHeightDesign", source, StringComparison.Ordinal);
-        Assert.Contains("if (!_fixedSize) Hide()", source, StringComparison.Ordinal);
+        string close = source[source.IndexOf("public void RequestClose()", StringComparison.Ordinal)..source.IndexOf("public void Dispose()", StringComparison.Ordinal)];
+        Assert.DoesNotContain("Hide()", close, StringComparison.Ordinal);
         Assert.Contains("root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity))", ReadSource("src", "StartupDialogHost.cs"), StringComparison.Ordinal);
         foreach (string file in new[] { "LanguageSelectWindow.xaml.cs", "PrivacyWindow.xaml.cs" })
             Assert.Contains("new DcompPanelHost(fixedSize: true, minimumWidth: 1, minimumHeight: 1)", ReadSource("src", file), StringComparison.Ordinal);
@@ -4192,13 +4196,15 @@ public class WinUi3UiTests
         Assert.Contains("icon.FontSize = 16 * scale", sizing, StringComparison.Ordinal);
         Assert.Contains("icon.IsTextScaleFactorEnabled = false", sizing, StringComparison.Ordinal);
         Assert.Contains("ConfigureResetButtonAnimations(button)", sizing, StringComparison.Ordinal);
-        Assert.Contains("new FadeInThemeAnimation", pages, StringComparison.Ordinal);
-        Assert.Contains("new FadeOutThemeAnimation", pages, StringComparison.Ordinal);
+        Assert.Contains("new DoubleAnimationUsingKeyFrames", pages, StringComparison.Ordinal);
+        Assert.Contains("Value = visible ? 1 : 0", pages, StringComparison.Ordinal);
+        Assert.Contains("Storyboard.SetTargetProperty(fade, \"Opacity\")", pages, StringComparison.Ordinal);
+        Assert.Contains("VisualStateManager.GoToState(button, \"Normal\", false)", pages, StringComparison.Ordinal);
         Assert.Contains("ControlFastAnimationDuration", pages, StringComparison.Ordinal);
         Assert.Contains("UISettings().AnimationsEnabled", pages, StringComparison.Ordinal);
         Assert.DoesNotContain("SetImplicitShowAnimation", pages, StringComparison.Ordinal);
         Assert.DoesNotContain("SetImplicitHideAnimation", pages, StringComparison.Ordinal);
-        Assert.Contains("if (!_visible) button.Visibility = Visibility.Collapsed", pages, StringComparison.Ordinal);
+        Assert.Contains("button.Visibility = _visible ? Visibility.Visible : Visibility.Collapsed", pages, StringComparison.Ordinal);
         Assert.Contains("!entry.IsDefault(_currentSettingsState)", pages, StringComparison.Ordinal);
         Assert.Contains("private void RefreshPageHeaders(bool animateResetButtons = false)", pages, StringComparison.Ordinal);
         Assert.Contains("internal void Update(bool refresh = false, bool animateResetButtons = false)", pages, StringComparison.Ordinal);

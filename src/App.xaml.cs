@@ -19,6 +19,7 @@ public partial class App : Application
 
     private static Mutex? _mutex;
     private int _isExiting;
+    private bool _isRestarting;
 
     /// <summary>UI 线程调度器；叠加层与设置层都通过它回到 UI 线程。</summary>
     public static DispatcherQueue DispatcherQueue { get; private set; } = null!;
@@ -171,6 +172,7 @@ public partial class App : Application
     {
         DispatcherQueue.TryEnqueue(() =>
         {
+            if (Volatile.Read(ref _isExiting) != 0 || _isRestarting) return;
             Interlocked.Increment(ref _backgroundMemoryGeneration);
             if (_controlPanel == null)
             {
@@ -293,8 +295,10 @@ public partial class App : Application
         }
     }
 
-    private void RestartApplication()
+    private async void RestartApplication()
     {
+        if (_isRestarting || Volatile.Read(ref _isExiting) != 0) return;
+        _isRestarting = true;
         try
         {
             string exePath = Environment.ProcessPath
@@ -306,8 +310,10 @@ public partial class App : Application
                 startInfo.Verb = "runas";
             }
 
+            if (_controlPanel != null) await _controlPanel.CloseAsync();
+            if (Volatile.Read(ref _isExiting) != 0) return;
             Process.Start(startInfo);
-            ExitApplication();
+            await ExitApplicationAsync();
         }
         catch (Exception ex)
         {
@@ -315,6 +321,7 @@ public partial class App : Application
                 Localization.Format("Tray_RestartFailed", ex.Message),
                 Localization.Get("Msg_Error"));
         }
+        finally { _isRestarting = false; }
     }
 
     // ------------------------------------------------------------------
@@ -336,6 +343,12 @@ public partial class App : Application
 
     public void ExitApplication()
     {
+        if (DispatcherQueue.HasThreadAccess) _ = ExitApplicationAsync();
+        else DispatcherQueue.TryEnqueue(() => _ = ExitApplicationAsync());
+    }
+
+    private async Task ExitApplicationAsync()
+    {
         if (Interlocked.Exchange(ref _isExiting, 1) == 1)
         {
             return;
@@ -344,19 +357,19 @@ public partial class App : Application
         SystemEvents.SessionEnding -= OnSessionEnding;
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
 
-        ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
-
-        Tray?.Dispose();
-        Tray = null;
-
         try
         {
-            _controlPanel?.Close();
+            if (_controlPanel != null) await _controlPanel.CloseAsync();
         }
         catch
         {
             // 关闭阶段尽力清理即可。
         }
+
+        ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
+
+        Tray?.Dispose();
+        Tray = null;
 
         try
         {

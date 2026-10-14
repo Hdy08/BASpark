@@ -200,41 +200,51 @@ public sealed partial class ControlPanelWindow
 
         internal void SetVisible(bool visible, bool animate)
         {
-            if (_visible == visible && (animate || _storyboard == null)) return;
+            if (_visible == visible) return;
+            double opacity = button.Visibility == Visibility.Collapsed ? 0 : button.Opacity;
             _visible = visible;
             _storyboard?.Stop();
             _storyboard = null;
+            button.ReleasePointerCaptures();
             button.IsHitTestVisible = visible;
+            VisualStateManager.GoToState(button, "Normal", false);
+            VisualStateManager.GoToState(button, "Unfocused", false);
             animate &= button.IsLoaded && new Windows.UI.ViewManagement.UISettings().AnimationsEnabled;
             for (DependencyObject? parent = VisualTreeHelper.GetParent(button); animate && parent != null; parent = VisualTreeHelper.GetParent(parent))
                 if (parent is UIElement { Visibility: Visibility.Collapsed }) animate = false;
             if (!animate)
             {
-                button.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                Complete();
                 return;
             }
             button.Visibility = Visibility.Visible;
+            button.Opacity = 1;
             var storyboard = new Storyboard();
-            var duration = new Duration(TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], System.Globalization.CultureInfo.InvariantCulture));
-            Timeline fade = visible ? new FadeInThemeAnimation { Duration = duration } : new FadeOutThemeAnimation { Duration = duration };
+            var duration = TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], System.Globalization.CultureInfo.InvariantCulture);
+            var fade = new DoubleAnimationUsingKeyFrames();
+            fade.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = opacity });
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(duration), Value = visible ? 1 : 0 });
             Storyboard.SetTarget(fade, button);
+            Storyboard.SetTargetProperty(fade, "Opacity");
             storyboard.Children.Add(fade);
             _storyboard = storyboard;
             storyboard.Completed += (_, _) =>
             {
                 if (!ReferenceEquals(_storyboard, storyboard)) return;
-                _storyboard = null;
-                if (!_visible) button.Visibility = Visibility.Collapsed;
-                storyboard.Stop();
+                Complete();
             };
             storyboard.Begin();
         }
 
-        public void Dispose()
+        internal void Complete()
         {
             _storyboard?.Stop();
             _storyboard = null;
+            button.Visibility = _visible ? Visibility.Visible : Visibility.Collapsed;
+            button.Opacity = 1;
         }
+
+        public void Dispose() => Complete();
     }
 
     private sealed class StickySectionTracker : IDisposable
@@ -365,6 +375,7 @@ public sealed partial class ControlPanelWindow
         _settingsHeaders = new(SettingsContentScrollViewer, SettingsContent, (heading, animateResetButtons) =>
         {
             TxtActiveSettingsSection.Text = heading?.Label.Text ?? string.Empty;
+            if (!Equals(BtnResetSection.Tag, heading?.Action) && _resetButtonAnimations.TryGetValue(BtnResetSection, out var animation)) animation.Complete();
             BtnResetSection.Tag = heading?.Action;
             SetResetButtonVisibility(BtnResetSection, heading?.Action is SectionResetRequest request && HasNonDefaultSettings(request), animateResetButtons);
         });
@@ -819,7 +830,9 @@ public sealed partial class ControlPanelWindow
         element.DataContext = sender.ItemsSourceView.GetAt(args.Index);
         UpdateSelectionCardBinding(element);
         bool first = element.DataContext is SelectionGroup { IsFirst: true };
-        element.Margin = new Thickness(0, 0, 16, first ? 0 : 4);
+        element.Margin = element.DataContext is SelectionGroup
+            ? first ? new Thickness() : new Thickness(0, 8, 16, 12)
+            : new Thickness(0, 0, 16, 4);
         element.Height = first ? 0 : double.NaN;
         element.Opacity = first ? 0 : 1;
         element.IsHitTestVisible = !first;
@@ -856,7 +869,7 @@ public sealed partial class ControlPanelWindow
     {
         if (sender is not Grid { DataContext: SelectionGroup group } header) return;
         header.Height = group.IsFirst ? 0 : double.NaN;
-        header.Margin = group.IsFirst ? new Thickness() : new Thickness(0, 8, 0, 8);
+        header.Margin = group.IsFirst ? new Thickness() : new Thickness(0, 8, 16, 12);
         if (_groupSelectionToolbars.TryGetValue(header, out var existing) && ReferenceEquals(existing.Group, group)) return;
         Button[] buttons = header.Children.OfType<Button>().ToArray();
         SelectionToolbar global = _selectionToolbars[group.List];

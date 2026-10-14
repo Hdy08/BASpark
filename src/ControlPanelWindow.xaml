@@ -60,7 +60,7 @@
             </Border>
         </DataTemplate>
         <DataTemplate x:Key="SelectionHeadingTemplate" x:DataType="local:SelectionGroup">
-            <Grid x:Name="SelectionHeading" ColumnSpacing="8" Margin="0,8,0,8" Loaded="SelectionHeading_Loaded"
+            <Grid x:Name="SelectionHeading" ColumnSpacing="8" Margin="0,8,16,12" Loaded="SelectionHeading_Loaded"
                   Unloaded="SelectionHeading_Unloaded" DataContextChanged="SelectionHeading_DataContextChanged">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

@@ -68,7 +68,7 @@ internal static class StartupDialogHost
         }
     }
 
-    public static void ShowWhenReady(DcompPanelHost host, FrameworkElement root)
+    public static void ShowWhenReady(DcompPanelHost host, FrameworkElement root, bool fitToContent = true)
     {
         IntPtr handle = host.Handle;
         bool prepared = false;
@@ -80,7 +80,7 @@ internal static class StartupDialogHost
             try
             {
                 root.UpdateLayout();
-                FitToContent(host, root);
+                if (fitToContent) FitToContent(host, root);
                 root.UpdateLayout();
                 await ElementCompositionPreview.GetElementVisual(root).Compositor.RequestCommitAsync();
                 if (host.Handle == IntPtr.Zero || ClosingWindows.ContainsKey(handle)) return;
@@ -109,7 +109,7 @@ internal static class StartupDialogHost
         host.Show();
     }
 
-    public static Task CloseAsync(DcompPanelHost host)
+    public static Task CloseAsync(DcompPanelHost host, bool dispose = true)
     {
         IntPtr handle = host.Handle;
         if (ClosingWindows.TryGetValue(handle, out Task? closing)) return closing;
@@ -123,7 +123,7 @@ internal static class StartupDialogHost
                 host.Hide();
                 if (visible && new Windows.UI.ViewManagement.UISettings().AnimationsEnabled)
                     await Task.Delay(CloseAnimationRetention);
-                host.Dispose();
+                if (dispose) host.Dispose();
                 completion.TrySetResult(true);
             }
             catch (Exception exception) { completion.TrySetException(exception); }
