@@ -4175,37 +4175,20 @@ public sealed partial class ControlPanelWindow : UserControl
             };
             CompositionTarget.Rendering += readyHandler;
         };
-        dialog.Closing += async (_, args) =>
+        dialog.Closing += (_, args) =>
         {
+            if (_isClosed || args.Cancel ||
+                dialog == BackupOverlay && _backupBusy && (!_modalDialogs.TryGetValue(dialog, out ModalDialogState? state) || !state.CloseRequested)) return;
             animationVersion++;
             if (readyHandler != null) CompositionTarget.Rendering -= readyHandler;
             readyHandler = null;
-            if (_isClosed || args.Cancel || !new Windows.UI.ViewManagement.UISettings().AnimationsEnabled ||
-                dialog == BackupOverlay && _backupBusy && (!_modalDialogs.TryGetValue(dialog, out ModalDialogState? state) || !state.CloseRequested)) return;
-            var deferral = args.GetDeferral();
             _dialogPresentationsPending.Remove(dialog);
-            try
-            {
-                var ready = new TaskCompletionSource();
-                if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () => ready.TrySetResult())) return;
-                await ready.Task;
-                if (_isClosed || args.Cancel) return;
-                dialog.UpdateLayout();
-                Task scrimClosed = AnimateScrim(false);
-                VisualStateManager.GoToState(dialog, "DialogShowing", false);
-                if (VisualStateManager.GoToState(dialog, "DialogHidden", true))
-                    await Task.WhenAll(
-                        Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], CultureInfo.InvariantCulture)),
-                        Task.WhenAny(scrimClosed, Task.Delay(TimeSpan.Parse((string)Application.Current.Resources["ControlNormalAnimationDuration"], CultureInfo.InvariantCulture))));
-            }
-            catch (Exception)
-            {
-            }
-            finally
-            {
-                try { deferral.Complete(); }
-                catch (Exception) { }
-            }
+            scrimAnimation?.Stop();
+            scrimAnimation = null;
+            scrim?.ClearValue(OpacityProperty);
+            VisualStateManager.GoToState(dialog, "DialogShowingWithoutSmokeLayer", false);
+            FindVisualDescendant<Grid>(dialog, "LayoutRoot")?.ClearValue(OpacityProperty);
+            if (_dialogPresentationGuards.TryGetValue(dialog, out Border? background)) background.ClearValue(OpacityProperty);
         };
         dialog.Closed += (_, _) =>
         {
