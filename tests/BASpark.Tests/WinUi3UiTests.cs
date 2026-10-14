@@ -550,7 +550,7 @@ public class WinUi3UiTests
         // 空文案的具名元素必须在代码里被赋值，否则界面上会出现空白按钮。
         string[] mustBeFilledWithContent =
         [
-            "BtnApplySettings", "BtnVisualReset", "BtnClearLog",
+            "BtnApplySettings", "BtnClearLog",
             "BtnResetSettings", "BtnRefreshScreens", "BtnAddProfile", "BtnRenameProfile", "BtnDeleteProfile",
             "BtnRepoDoomVoss", "BtnRepoCialloKing", "BtnRepoWinUI",
         ];
@@ -561,6 +561,18 @@ public class WinUi3UiTests
             GetNamedElement(panel, name);
             Assert.Contains(name + ".Content", source, StringComparison.Ordinal);
         }
+
+        foreach (string name in new[] { "BtnBasicReset", "BtnVisualReset", "BtnFilterReset" })
+        {
+            XElement button = GetNamedElement(panel, name);
+            Assert.Null(button.Attribute("Content"));
+            Assert.Equal("\uE777", (string?)Assert.Single(button.Elements(Presentation + "FontIcon")).Attribute("Glyph"));
+        }
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        Assert.Contains("string label = Localization.Get(\"Settings_ResetPage\")", pages, StringComparison.Ordinal);
+        Assert.Contains("SetResetButtonLabel(button, label)", pages, StringComparison.Ordinal);
+        Assert.Contains("ToolTipService.SetToolTip(button, label)", pages, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetName(button, name)", pages, StringComparison.Ordinal);
 
         // 侧边栏导航项带原生图标，文案写在内部 TextBlock 上（不再是 RadioButton.Content），
         // 因此断言的是对应的 Label 元素被赋值。
@@ -3740,8 +3752,18 @@ public class WinUi3UiTests
         Assert.Contains("dialog.Style = (Style)Application.Current.Resources[\"BasContentDialogStyle\"]", source, StringComparison.Ordinal);
         string dialogs = source[source.IndexOf("private void ConfigureContentDialog", StringComparison.Ordinal)..source.IndexOf("private async Task<XamlRoot?> EnsureXamlRootAsync", StringComparison.Ordinal)];
         Assert.DoesNotContain("Title = title", dialogs, StringComparison.Ordinal);
-        foreach (string name in new[] { "TxtOverlayRunning", "TxtOverlayVisualReset", "TxtOverlayRename" })
-            Assert.Contains(name + ".Text = Localization.Get", source, StringComparison.Ordinal);
+        foreach ((string list, string heading, string resource) in new[]
+        {
+            ("ListRunningProcesses", "TxtOverlayRunning", "Overlay_RunningProcess"),
+            ("ListVisualResetItems", "TxtOverlayVisualReset", "Overlay_VisualReset")
+        })
+        {
+            Assert.Contains($"SetSelectionTitle({list}, Localization.Get(\"{resource}\"))", source, StringComparison.Ordinal);
+            Assert.Contains("Heading = " + heading, source, StringComparison.Ordinal);
+        }
+        Assert.Contains("toolbar.HeadingText = title", source, StringComparison.Ordinal);
+        Assert.Contains("toolbar.Heading.Text = SelectionGroup.FormatTitle(title, toolbar.Items)", source, StringComparison.Ordinal);
+        Assert.Contains("TxtOverlayRename.Text = Localization.Get(\"Overlay_RenameProfile\")", source, StringComparison.Ordinal);
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement sectionTitle = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasSectionTitleStyle");
         Assert.Equal("{StaticResource SubtitleTextBlockStyle}", (string?)sectionTitle.Attribute("BasedOn"));
