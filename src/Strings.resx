@@ -995,4 +995,115 @@
     <data name="Advanced_labelBloomTrailEmissionDescription" xml:space="preserve"><value>调节拖尾提供给 Bloom 的发光能量。</value></data>
     <data name="Advanced_labelBloomTrailCoverageDescription" xml:space="preserve"><value>调节拖尾辉光源的覆盖宽度倍率。</value></data>
     <data name="Settings_ResetItem" xml:space="preserve"><value>重置此项设置</value></data>
+    <data name="Installer_Title" xml:space="preserve">
+      <value>BASpark - 安装程序</value>
+    </data>
+    <data name="Installer_UninstallerTitle" xml:space="preserve">
+      <value>BASpark - 卸载程序</value>
+    </data>
+    <data name="Installer_LanguageTitle" xml:space="preserve">
+      <value>选择语言</value>
+    </data>
+    <data name="Installer_Agreement" xml:space="preserve">
+      <value>我已阅读并同意</value>
+    </data>
+    <data name="Installer_ConfirmTitle" xml:space="preserve">
+      <value>确认安装</value>
+    </data>
+    <data name="Installer_ConfirmDescription" xml:space="preserve">
+      <value>确认以下选项后，点击“安装”开始。</value>
+    </data>
+    <data name="Installer_UpdateDescription" xml:space="preserve">
+      <value>将更新现有的 BASpark，安装位置保持不变。</value>
+    </data>
+    <data name="Installer_Directory" xml:space="preserve">
+      <value>安装位置</value>
+    </data>
+    <data name="Installer_Browse" xml:space="preserve">
+      <value>浏览</value>
+    </data>
+    <data name="Installer_StartMenu" xml:space="preserve">
+      <value>开始菜单文件夹</value>
+    </data>
+    <data name="Installer_DesktopShortcut" xml:space="preserve">
+      <value>创建桌面快捷方式</value>
+    </data>
+    <data name="Installer_CertificateConsent" xml:space="preserve">
+      <value>信任仅用于 BASpark 的证书，以允许特效叠加层以 UIAccess 层级显示</value>
+    </data>
+    <data name="Installer_Launch" xml:space="preserve">
+      <value>启动 BASpark</value>
+    </data>
+    <data name="Installer_KeepData" xml:space="preserve">
+      <value>保留用户数据</value>
+    </data>
+    <data name="Installer_UninstallTitle" xml:space="preserve">
+      <value>卸载 BASpark</value>
+    </data>
+    <data name="Installer_UninstallDescription" xml:space="preserve">
+      <value>将移除 BASpark 及其快捷方式。保留的数据可在重新安装后继续使用。</value>
+    </data>
+    <data name="Installer_Cancel" xml:space="preserve">
+      <value>取消</value>
+    </data>
+    <data name="Installer_Back" xml:space="preserve">
+      <value>返回</value>
+    </data>
+    <data name="Installer_Finish" xml:space="preserve">
+      <value>完成</value>
+    </data>
+    <data name="Installer_Retry" xml:space="preserve">
+      <value>重试</value>
+    </data>
+    <data name="Installer_Install" xml:space="preserve">
+      <value>安装</value>
+    </data>
+    <data name="Installer_Uninstall" xml:space="preserve">
+      <value>卸载</value>
+    </data>
+    <data name="Installer_Installing" xml:space="preserve">
+      <value>正在安装 BASpark</value>
+    </data>
+    <data name="Installer_Uninstalling" xml:space="preserve">
+      <value>正在卸载 BASpark</value>
+    </data>
+    <data name="Installer_ProgressDescription" xml:space="preserve">
+      <value>请稍候，详细进度将在下方显示。</value>
+    </data>
+    <data name="Installer_InstallComplete" xml:space="preserve">
+      <value>安装完成</value>
+    </data>
+    <data name="Installer_UninstallComplete" xml:space="preserve">
+      <value>卸载完成</value>
+    </data>
+    <data name="Installer_InstallSuccess" xml:space="preserve">
+      <value>BASpark 已成功安装到你的电脑。</value>
+    </data>
+    <data name="Installer_UninstallSuccess" xml:space="preserve">
+      <value>BASpark 已从你的电脑移除。</value>
+    </data>
+    <data name="Installer_InvalidDirectory" xml:space="preserve">
+      <value>请输入有效的完整安装路径。</value>
+    </data>
+    <data name="Installer_CertificateRequired" xml:space="preserve">
+      <value>请先勾选证书授权，以安装 UIAccess 版本。</value>
+    </data>
+    <data name="Installer_SecureDirectoryRequired" xml:space="preserve">
+      <value>UIAccess 版本必须安装在 Program Files 目录内，请选择该目录下的位置。</value>
+    </data>
+    <data name="Installer_InvalidStartMenu" xml:space="preserve">
+      <value>请输入有效的开始菜单文件夹名称。</value>
+    </data>
+    <data name="Installer_BackendMissing" xml:space="preserve">
+      <value>找不到安装文件，请重新下载安装程序。</value>
+    </data>
+    <data name="Installer_BackendFailed" xml:space="preserve">
+      <value>操作未完成（退出代码：{0}）。请查看上方输出后重试。</value>
+    </data>
+    <data name="Installer_OperationFailed" xml:space="preserve">
+      <value>操作未完成</value>
+    </data>
+    <data name="Installer_RetryDescription" xml:space="preserve">
+      <value>请查看下方输出，更正问题后重试。</value>
+    </data>
 </root>

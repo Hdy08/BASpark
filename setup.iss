@@ -8,13 +8,21 @@
   #define NormalizedAppVersion AppVersion
 #endif
 
-#ifdef UiAccessCertificateThumbprint
-  #define PublishedSource "src\publish_uiaccess"
-#else
-  #define PublishedSource "src\publish_full"
+#ifndef PublishedSource
+  #ifdef UiAccessCertificateThumbprint
+    #define PublishedSource "src\publish_uiaccess"
+  #else
+    #define PublishedSource "src\publish_full"
+  #endif
 #endif
 
-#define PublishedExecutable SourcePath + "\" + PublishedSource + "\BASpark.exe"
+#if Pos(":", PublishedSource) > 0
+  #define PublishedSourceRoot PublishedSource
+#else
+  #define PublishedSourceRoot SourcePath + "\" + PublishedSource
+#endif
+
+#define PublishedExecutable AddBackslash(PublishedSourceRoot) + "BASpark.exe"
 #if FileExists(PublishedExecutable)
   #define PublishedAppVersion GetStringFileInfo(PublishedExecutable, "ProductVersion")
   #if PublishedAppVersion != NormalizedAppVersion
@@ -23,7 +31,7 @@
 #endif
 
 #ifdef UiAccessCertificateThumbprint
-  #define UiAccessCertificateFile SourcePath + "\" + PublishedSource + "\BASpark.UIAccess.cer"
+  #define UiAccessCertificateFile AddBackslash(PublishedSourceRoot) + "BASpark.UIAccess.cer"
   #if !FileExists(UiAccessCertificateFile)
     #pragma error "UIAccess certificate file is missing: " + UiAccessCertificateFile
   #endif
@@ -40,7 +48,7 @@ AllowNoIcons=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 AppMutex={code:GetBASparkAppMutex}
-CloseApplications=yes
+CloseApplications=no
 SetupIconFile=src\app.ico
 UninstallDisplayIcon={app}\BASpark.exe
 Compression=lzma2/ultra64
@@ -48,9 +56,9 @@ SolidCompression=yes
 WizardStyle=modern
 OutputDir=dist
 OutputBaseFilename=BASpark_Installer_{#AppVersion}_x64
-ShowLanguageDialog=yes
+ShowLanguageDialog=no
+DisableStartupPrompt=yes
 #ifdef UiAccessCertificateThumbprint
-DisableDirPage=yes
 UsePreviousAppDir=no
 #endif
 
@@ -76,23 +84,24 @@ UiAccessCertificateConsent=Trust the certificate used only for BASpark to allow 
 UiAccessCertificateRequired=Certificate trust is required for the UIAccess build. Setup made no changes.
 UiAccessCertificateSilentRequired=Silent installation requires /ACCEPTUIACCESSCERT=1.
 UiAccessCertificateInstallFailed=Failed to trust the BASpark UIAccess signing certificate. Setup made no application changes.
-UiAccessSecureLocationRequired=The UIAccess build must be installed in Program Files\BASpark.
+UiAccessSecureLocationRequired=The UIAccess build must be installed inside Program Files.
 UiAccessPreviousLocationRequired=An existing BASpark installation was found outside Program Files\BASpark. Uninstall it before installing the UIAccess build.
 chinesesimplified.UiAccessCertificateConsent=信任仅用于 BASpark 的证书，以允许特效叠加层以 UIAccess 层级显示
 chinesesimplified.UiAccessCertificateRequired=UIAccess 版本必须信任代码签名证书，安装程序尚未修改应用文件。
 chinesesimplified.UiAccessCertificateSilentRequired=静默安装必须添加 /ACCEPTUIACCESSCERT=1。
 chinesesimplified.UiAccessCertificateInstallFailed=无法信任 BASpark UIAccess 签名证书，安装程序尚未修改应用文件。
-chinesesimplified.UiAccessSecureLocationRequired=UIAccess 版本必须安装在 Program Files\BASpark 目录中。
+chinesesimplified.UiAccessSecureLocationRequired=UIAccess 版本必须安装在 Program Files 目录内。
 chinesesimplified.UiAccessPreviousLocationRequired=检测到 BASpark 旧版本安装在 Program Files\BASpark 之外。请先卸载旧版本，再安装 UIAccess 版本。
 japanese.UiAccessCertificateConsent=BASpark 専用の証明書を信頼し、エフェクトのオーバーレイを UIAccess レベルで表示できるようにする
 japanese.UiAccessCertificateRequired=UIAccess 版ではコード署名証明書の信頼が必要です。アプリケーションファイルは変更されていません。
 japanese.UiAccessCertificateSilentRequired=サイレントインストールには /ACCEPTUIACCESSCERT=1 が必要です。
 japanese.UiAccessCertificateInstallFailed=BASpark UIAccess 署名証明書を信頼できませんでした。アプリケーションファイルは変更されていません。
-japanese.UiAccessSecureLocationRequired=UIAccess 版は Program Files\BASpark にインストールする必要があります。
+japanese.UiAccessSecureLocationRequired=UIAccess 版は Program Files 内にインストールする必要があります。
 japanese.UiAccessPreviousLocationRequired=Program Files\BASpark 以外に既存の BASpark が見つかりました。UIAccess 版をインストールする前に、既存版をアンインストールしてください。
 #endif
 
 [Files]
+Source: "{#PublishedSource}\*"; DestDir: "{tmp}\BASpark.Setup"; Flags: dontcopy recursesubdirs createallsubdirs; Excludes: "BASpark.UIAccess.cer"
 #ifdef UiAccessCertificateThumbprint
 Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "BASpark.UIAccess.cer"
 Source: "{#PublishedSource}\BASpark.UIAccess.cer"; Flags: dontcopy
@@ -107,10 +116,8 @@ Name: "{group}\BASpark"; Filename: "{app}\BASpark.exe"
 Name: "{autodesktop}\BASpark"; Filename: "{app}\BASpark.exe"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\BASpark"; Flags: uninsdeletekey
-
-[UninstallRun]
-Filename: "taskkill"; Parameters: "/F /IM BASpark.exe /T"; Flags: runhidden
+Root: HKCU; Subkey: "Software\BASpark"; ValueType: string; ValueName: "UiLanguage"; ValueData: "{code:GetInstallerCulture}"; Check: IsNativeInstallerWorker
+Root: HKCU; Subkey: "Software\BASpark"; ValueType: dword; ValueName: "AgreedToPrivacy"; ValueData: "1"; Check: IsNativeInstallerWorker
 
 [Run]
 #ifdef UiAccessCertificateThumbprint
@@ -123,12 +130,42 @@ Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags:
 const
   BASparkAppMutex = 'Global\BASpark_SingleInstance_Mutex';
 
+var
+  PreservedUserDataFile: String;
+
 function GetBASparkAppMutex(Param: String): String;
 begin
-  if IsUninstaller then
-    Result := BASparkAppMutex
+  Result := '';
+end;
+
+function IsNativeInstallerWorker: Boolean;
+begin
+  Result := ExpandConstant('{param:BASPARKWORKER|0}') = '1';
+end;
+
+function GetInstallerCulture(Param: String): String;
+begin
+  if ActiveLanguage = 'chinesesimplified' then
+    Result := 'zh-CN'
+  else if ActiveLanguage = 'japanese' then
+    Result := 'ja'
   else
-    Result := '';
+    Result := 'en';
+end;
+
+procedure WriteNativeProgress(Value: Integer);
+var
+  StatusFile: String;
+begin
+  StatusFile := ExpandConstant('{param:BASPARKSTATUS|}');
+  if StatusFile <> '' then
+    SaveStringToFile(StatusFile, IntToStr(Value), False);
+end;
+
+procedure CurInstallProgressChanged(CurProgress, MaxProgress: Integer);
+begin
+  if MaxProgress > 0 then
+    WriteNativeProgress(Round(CurProgress * 100.0 / MaxProgress));
 end;
 
 function CloseRunningBASpark: Boolean;
@@ -141,10 +178,6 @@ begin
     Exit;
 
   Result := False;
-  if SuppressibleMsgBox(FmtMessage(SetupMessage(msgSetupAppRunningError), ['BASpark']),
-       mbError, MB_OKCANCEL, IDCANCEL) <> IDOK then
-    Exit;
-
   ResultCode := -1;
   if not Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM BASpark.exe /T',
        '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
@@ -162,13 +195,87 @@ begin
     Sleep(50);
   end;
 
-  SuppressibleMsgBox(ExpandConstant('{cm:CloseRunningBASparkFailed}'),
-    mbError, MB_OK, IDOK);
+  Log(ExpandConstant('{cm:CloseRunningBASparkFailed}'));
 end;
 
 function InitializeSetup: Boolean;
+var
+  Parameters: String;
+  ResultCode: Integer;
 begin
-  Result := CloseRunningBASpark;
+  if WizardSilent then
+  begin
+    Result := True;
+    Exit;
+  end;
+  Result := False;
+  ExtractTemporaryFiles('{tmp}\BASpark.Setup\*');
+  Parameters := '--installer --backend="' + ExpandConstant('{srcexe}') + '"';
+#ifdef UiAccessCertificateThumbprint
+  Parameters := Parameters + ' --uiaccess=1';
+#endif
+  if not Exec(ExpandConstant('{tmp}\BASpark.Setup\BASpark.Setup.exe'),
+       Parameters, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) then
+    Log('Could not start the WinUI installer: ' + IntToStr(ResultCode));
+end;
+
+function CopyInstallerFrontend(SourceDirectory, TargetDirectory: String): Boolean;
+var
+  Entry: TFindRec;
+  SourceFile: String;
+  TargetFile: String;
+begin
+  Result := ForceDirectories(TargetDirectory);
+  if not Result then Exit;
+  if FindFirst(AddBackslash(SourceDirectory) + '*', Entry) then
+  begin
+    try
+      repeat
+        if (Entry.Name = '.') or (Entry.Name = '..') or
+           (Pos('unins', Lowercase(Entry.Name)) = 1) or
+           ((Entry.Attributes and $400) <> 0) then Continue;
+        SourceFile := AddBackslash(SourceDirectory) + Entry.Name;
+        TargetFile := AddBackslash(TargetDirectory) + Entry.Name;
+        if (Entry.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+          Result := CopyInstallerFrontend(SourceFile, TargetFile)
+        else
+          Result := FileCopy(SourceFile, TargetFile, False);
+        if not Result then Exit;
+      until not FindNext(Entry);
+    finally
+      FindClose(Entry);
+    end;
+  end;
+end;
+
+function InitializeUninstall: Boolean;
+var
+  FrontendDirectory: String;
+  ResultCode: Integer;
+begin
+  Result := False;
+  if not UninstallSilent then
+  begin
+    FrontendDirectory := AddBackslash(GetEnv('TEMP')) + 'BASpark.Setup\' +
+      GetDateTimeString('yyyymmddhhnnsszzz', '', '') + '-' + IntToStr(Random(1000000));
+    if not CopyInstallerFrontend(ExpandConstant('{app}'), FrontendDirectory) then Exit;
+    if not Exec(AddBackslash(FrontendDirectory) + 'BASpark.Setup.exe',
+         '--uninstaller --backend="' + ExpandConstant('{uninstallexe}') +
+         '" --install-dir="' + ExpandConstant('{app}') + '"', '', SW_SHOWNORMAL,
+         ewNoWait, ResultCode) then
+      Log('Could not start the WinUI uninstaller: ' + IntToStr(ResultCode));
+    Exit;
+  end;
+  if not CloseRunningBASpark then Exit;
+  if (ExpandConstant('{param:BASPARKKEEPDATA|1}') = '1') and
+     RegKeyExists(HKEY_CURRENT_USER, 'Software\BASpark') then
+  begin
+    PreservedUserDataFile := ExpandConstant('{tmp}\BASpark-UserData.reg');
+    if not Exec(ExpandConstant('{sys}\reg.exe'),
+         'export "HKCU\Software\BASpark" "' + PreservedUserDataFile + '" /y',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then Exit;
+  end;
+  Result := True;
 end;
 
 #ifdef UiAccessCertificateThumbprint
@@ -178,29 +285,12 @@ const
   PreviousInstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B0A2C1D4-E3F5-4A6B-9C8D-7E1F2A3B4C5D}}_is1';
 
 var
-  UiAccessCertificateConsentCheckBox: TNewCheckBox;
   UiAccessCertificateInstalled: Boolean;
   UiAccessPeopleOwnershipAdded: Boolean;
   UiAccessPeopleWasPresent: Boolean;
   UiAccessPublisherOwnershipAdded: Boolean;
   UiAccessPublisherWasPresent: Boolean;
   SetupInstallationCompleted: Boolean;
-
-procedure InitializeWizard;
-begin
-  UiAccessCertificateConsentCheckBox := TNewCheckBox.Create(WizardForm);
-  UiAccessCertificateConsentCheckBox.Parent := WizardForm.ReadyPage;
-  UiAccessCertificateConsentCheckBox.Caption :=
-    ExpandConstant('{cm:UiAccessCertificateConsent}');
-  UiAccessCertificateConsentCheckBox.Checked := True;
-  UiAccessCertificateConsentCheckBox.Left := WizardForm.ReadyMemo.Left;
-  UiAccessCertificateConsentCheckBox.Width := WizardForm.ReadyMemo.Width;
-  UiAccessCertificateConsentCheckBox.Height := ScaleY(17);
-  WizardForm.ReadyMemo.Height := WizardForm.ReadyMemo.Height -
-    UiAccessCertificateConsentCheckBox.Height - ScaleY(8);
-  UiAccessCertificateConsentCheckBox.Top := WizardForm.ReadyMemo.Top +
-    WizardForm.ReadyMemo.Height + ScaleY(8);
-end;
 
 function CertificateStoreKey(StoreName, Thumbprint: String): String;
 begin
@@ -482,33 +572,24 @@ begin
   if not TryNormalizePath(ExpandConstant('{autopf}\BASpark'),
        TargetDirectoryNormalized) or
      not TryNormalizePath(WizardDirValue, AppDirectoryNormalized) or
-     (CompareText(AppDirectoryNormalized, TargetDirectoryNormalized) <> 0) then
+     (Pos(Lowercase(AddBackslash(ExpandConstant('{autopf}'))),
+       Lowercase(AddBackslash(AppDirectoryNormalized))) <> 1) then
   begin
     Result := ExpandConstant('{cm:UiAccessSecureLocationRequired}');
     Exit;
   end;
 
   if RegistryViewHasConflictingInstall(True,
-       TargetDirectoryNormalized) or
+       AppDirectoryNormalized) or
      RegistryViewHasConflictingInstall(False,
-       TargetDirectoryNormalized) then
+       AppDirectoryNormalized) then
   begin
     Result := ExpandConstant('{cm:UiAccessPreviousLocationRequired}');
     Exit;
   end;
 
-  if WizardSilent then
-  begin
-    ConsentGranted := CompareText(
-      ExpandConstant('{param:ACCEPTUIACCESSCERT|0}'), '1') = 0;
-    if not ConsentGranted then
-    begin
-      Result := ExpandConstant('{cm:UiAccessCertificateSilentRequired}');
-      Exit;
-    end;
-  end
-  else
-    ConsentGranted := UiAccessCertificateConsentCheckBox.Checked;
+  ConsentGranted := CompareText(
+    ExpandConstant('{param:ACCEPTUIACCESSCERT|0}'), '1') = 0;
 
   if not ConsentGranted then
   begin
@@ -550,7 +631,29 @@ begin
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
 begin
+  if CurUninstallStep = usUninstall then WriteNativeProgress(10);
+  if CurUninstallStep = usPostUninstall then
+  begin
+    WriteNativeProgress(90);
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'BASpark');
+    Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /TN "BASparkAutoStart" /F',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+  if CurUninstallStep = usDone then
+  begin
+    if PreservedUserDataFile <> '' then
+      Exec(ExpandConstant('{sys}\reg.exe'), 'import "' + PreservedUserDataFile + '"',
+        '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+    else if ExpandConstant('{param:BASPARKKEEPDATA|1}') = '0' then
+    begin
+      RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, 'Software\BASpark');
+      DelTree(ExpandConstant('{localappdata}\BASpark'), True, True, True);
+    end;
+    WriteNativeProgress(100);
+  end;
 #ifdef UiAccessCertificateThumbprint
   if CurUninstallStep = usDone then
     CleanupOwnedUiAccessCertificates('');

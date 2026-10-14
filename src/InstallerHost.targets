@@ -1,0 +1,55 @@
+<Project>
+  <UsingTask TaskName="ApplyInstallerManifest" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Executable ParameterType="System.String" Required="true" />
+      <Manifest ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Runtime.InteropServices" />
+      <Code Type="Class" Language="cs"><![CDATA[
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public sealed class ApplyInstallerManifest : Microsoft.Build.Utilities.Task
+{
+    [Microsoft.Build.Framework.Required] public string Executable { get; set; }
+    [Microsoft.Build.Framework.Required] public string Manifest { get; set; }
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr BeginUpdateResource(string file, bool deleteExisting);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool UpdateResource(IntPtr update, IntPtr type, IntPtr name, ushort language, byte[] data, uint length);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool EndUpdateResource(IntPtr update, bool discard);
+    public override bool Execute()
+    {
+        string manifestText = File.ReadAllText(Manifest);
+        byte[] manifest = Encoding.UTF8.GetBytes(manifestText.Replace("uiAccess=\"true\"", "uiAccess=\"false\""));
+        IntPtr update = BeginUpdateResource(Executable, false);
+        if (update == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        if (!UpdateResource(update, (IntPtr)24, (IntPtr)1, 0, manifest, (uint)manifest.Length))
+        {
+            int error = Marshal.GetLastWin32Error();
+            EndUpdateResource(update, true);
+            throw new System.ComponentModel.Win32Exception(error);
+        }
+        if (!EndUpdateResource(update, false)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        return true;
+    }
+}
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="CreateInstallerHost" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
+    <CreateAppHost AppHostSourcePath="$(AppHostSourcePath)"
+                   AppHostDestinationPath="$(PublishDir)BASpark.Setup.exe"
+                   AppBinaryName="$(AssemblyName).dll" IntermediateAssembly="$(TargetPath)"
+                   WindowsGraphicalUserInterface="true" />
+    <ApplyInstallerManifest Executable="$(PublishDir)BASpark.Setup.exe" Manifest="$(ApplicationManifest)" />
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).pri" DestinationFiles="$(PublishDir)BASpark.Setup.pri" />
+  </Target>
+</Project>

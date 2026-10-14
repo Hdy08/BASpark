@@ -104,4 +104,6 @@
              Condition="'@(WinUiCompiledResource)' != ''" />
   </Target>
 
+  <Import Project="InstallerHost.targets" />
+
 </Project>

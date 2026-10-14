@@ -995,4 +995,115 @@
     <data name="Advanced_labelBloomTrailEmissionDescription" xml:space="preserve"><value>Adjust trail emission energy entering Bloom.</value></data>
     <data name="Advanced_labelBloomTrailCoverageDescription" xml:space="preserve"><value>Adjust the width multiplier of the trail glow source.</value></data>
     <data name="Settings_ResetItem" xml:space="preserve"><value>Reset this setting</value></data>
+    <data name="Installer_Title" xml:space="preserve">
+      <value>BASpark - Setup</value>
+    </data>
+    <data name="Installer_UninstallerTitle" xml:space="preserve">
+      <value>BASpark - Uninstall</value>
+    </data>
+    <data name="Installer_LanguageTitle" xml:space="preserve">
+      <value>Select a language</value>
+    </data>
+    <data name="Installer_Agreement" xml:space="preserve">
+      <value>I have read and agree</value>
+    </data>
+    <data name="Installer_ConfirmTitle" xml:space="preserve">
+      <value>Ready to install</value>
+    </data>
+    <data name="Installer_ConfirmDescription" xml:space="preserve">
+      <value>Review your options, then select Install to continue.</value>
+    </data>
+    <data name="Installer_UpdateDescription" xml:space="preserve">
+      <value>Your existing BASpark installation will be updated in its current location.</value>
+    </data>
+    <data name="Installer_Directory" xml:space="preserve">
+      <value>Installation location</value>
+    </data>
+    <data name="Installer_Browse" xml:space="preserve">
+      <value>Browse</value>
+    </data>
+    <data name="Installer_StartMenu" xml:space="preserve">
+      <value>Start menu folder</value>
+    </data>
+    <data name="Installer_DesktopShortcut" xml:space="preserve">
+      <value>Create a desktop shortcut</value>
+    </data>
+    <data name="Installer_CertificateConsent" xml:space="preserve">
+      <value>Trust the certificate used only for BASpark to allow the effect overlay to display at the UIAccess level</value>
+    </data>
+    <data name="Installer_Launch" xml:space="preserve">
+      <value>Launch BASpark</value>
+    </data>
+    <data name="Installer_KeepData" xml:space="preserve">
+      <value>Keep user data</value>
+    </data>
+    <data name="Installer_UninstallTitle" xml:space="preserve">
+      <value>Uninstall BASpark</value>
+    </data>
+    <data name="Installer_UninstallDescription" xml:space="preserve">
+      <value>BASpark and its shortcuts will be removed. Retained user data can be used after reinstalling.</value>
+    </data>
+    <data name="Installer_Cancel" xml:space="preserve">
+      <value>Cancel</value>
+    </data>
+    <data name="Installer_Back" xml:space="preserve">
+      <value>Back</value>
+    </data>
+    <data name="Installer_Finish" xml:space="preserve">
+      <value>Finish</value>
+    </data>
+    <data name="Installer_Retry" xml:space="preserve">
+      <value>Retry</value>
+    </data>
+    <data name="Installer_Install" xml:space="preserve">
+      <value>Install</value>
+    </data>
+    <data name="Installer_Uninstall" xml:space="preserve">
+      <value>Uninstall</value>
+    </data>
+    <data name="Installer_Installing" xml:space="preserve">
+      <value>Installing BASpark</value>
+    </data>
+    <data name="Installer_Uninstalling" xml:space="preserve">
+      <value>Uninstalling BASpark</value>
+    </data>
+    <data name="Installer_ProgressDescription" xml:space="preserve">
+      <value>Please wait. Detailed progress appears below.</value>
+    </data>
+    <data name="Installer_InstallComplete" xml:space="preserve">
+      <value>Installation complete</value>
+    </data>
+    <data name="Installer_UninstallComplete" xml:space="preserve">
+      <value>Uninstallation complete</value>
+    </data>
+    <data name="Installer_InstallSuccess" xml:space="preserve">
+      <value>BASpark has been installed on your computer.</value>
+    </data>
+    <data name="Installer_UninstallSuccess" xml:space="preserve">
+      <value>BASpark has been removed from your computer.</value>
+    </data>
+    <data name="Installer_InvalidDirectory" xml:space="preserve">
+      <value>Enter a valid, absolute installation path.</value>
+    </data>
+    <data name="Installer_CertificateRequired" xml:space="preserve">
+      <value>Accept certificate trust to install the UIAccess build.</value>
+    </data>
+    <data name="Installer_SecureDirectoryRequired" xml:space="preserve">
+      <value>The UIAccess build must be installed inside Program Files. Choose a location in that directory.</value>
+    </data>
+    <data name="Installer_InvalidStartMenu" xml:space="preserve">
+      <value>Enter a valid start menu folder name.</value>
+    </data>
+    <data name="Installer_BackendMissing" xml:space="preserve">
+      <value>Installation files could not be found. Download the installer again.</value>
+    </data>
+    <data name="Installer_BackendFailed" xml:space="preserve">
+      <value>The operation did not complete (exit code: {0}). Review the output above and try again.</value>
+    </data>
+    <data name="Installer_OperationFailed" xml:space="preserve">
+      <value>Operation incomplete</value>
+    </data>
+    <data name="Installer_RetryDescription" xml:space="preserve">
+      <value>Review the output below, resolve the issue, and try again.</value>
+    </data>
 </root>

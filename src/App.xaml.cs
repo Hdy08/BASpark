@@ -39,6 +39,7 @@ public partial class App : Application
     }
 
     private ControlPanelWindow? _controlPanel;
+    private InstallerWindow? _installerWindow;
     private int _backgroundMemoryGeneration;
     private readonly KeeperWindow _keeper = new();
 
@@ -50,6 +51,15 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         DispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
+        if (InstallerSession.TryCreate(Environment.GetCommandLineArgs()[1..], out InstallerSession? installer))
+        {
+            _keeper.EnsureCreated();
+            _installerWindow = new InstallerWindow(installer!);
+            _installerWindow.Closed += (_, _) => Exit();
+            _installerWindow.Show();
+            return;
+        }
 
         if (TrayIconController.TryShowExistingControlPanel())
         {
