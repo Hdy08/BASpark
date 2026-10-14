@@ -35,8 +35,11 @@ internal static class WindowChrome
             _combo.ApplyTemplate();
             if (Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(_combo) == 0 ||
                 Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(_combo, 0) is not Grid layout) return;
-            string text = _combo.SelectedItem is ComboBoxItem item ? item.Content?.ToString() ?? string.Empty
-                : _combo.SelectedItem?.ToString() ?? _combo.PlaceholderText ?? string.Empty;
+            object? selected = _combo.SelectedItem;
+            if (selected != null && !string.IsNullOrEmpty(_combo.DisplayMemberPath))
+                selected = selected.GetType().GetProperty(_combo.DisplayMemberPath)?.GetValue(selected);
+            string text = selected is ComboBoxItem item ? item.Content?.ToString() ?? string.Empty
+                : selected?.ToString() ?? _combo.PlaceholderText ?? string.Empty;
             var label = new TextBlock
             {
                 Text = text, FontFamily = _combo.FontFamily, FontSize = _combo.FontSize,

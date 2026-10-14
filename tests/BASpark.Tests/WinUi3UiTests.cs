@@ -562,7 +562,7 @@ public class WinUi3UiTests
         foreach (string name in mustBeFilledWithContent)
         {
             GetNamedElement(panel, name);
-            Assert.Contains(name + ".Content", source, StringComparison.Ordinal);
+            Assert.Contains("SetActionIcon(" + name + ",", source, StringComparison.Ordinal);
         }
 
         foreach (string name in new[] { "BtnBasicReset", "BtnVisualReset", "BtnFilterReset" })
@@ -3041,7 +3041,7 @@ public class WinUi3UiTests
             Assert.Equal(url, (string?)link.Attribute("NavigateUri"));
             Assert.Equal("{Binding Tag, ElementName=" + name + "}", (string?)link.Attribute("Content"));
             Assert.Equal("{StaticResource BasRepositoryLinkStyle}", (string?)link.Attribute("Style"));
-            Assert.Contains(name + ".Content = Localization.Get(\"About_OpenRepository\")", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+            Assert.Contains("SetActionIcon(" + name + ", \"\\uE774\", \"About_OpenRepository\")", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
         }
         foreach (string file in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
         {

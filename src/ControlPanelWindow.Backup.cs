@@ -34,15 +34,15 @@ public sealed partial class ControlPanelWindow
         TxtExportConfigurationHint.Text = Localization.Get("Backup_ExportHint");
         TxtImportConfiguration.Text = Localization.Get("Backup_ImportTitle");
         TxtImportConfigurationHint.Text = Localization.Get("Backup_ImportHint");
-        BtnExportConfiguration.Content = Localization.Get("Backup_Export");
-        BtnImportConfiguration.Content = Localization.Get("Backup_Import");
+        SetActionIcon(BtnExportConfiguration, "\uEDE1", "Backup_Export");
+        SetActionIcon(BtnImportConfiguration, "\uE8B5", "Backup_Import");
         BtnBackupCancel.Content = Localization.Get("Overlay_Cancel");
         BtnBackupConfirm.Content = Localization.Get(_backupImport ? "Backup_ConfirmImport" : "Backup_ConfirmExport");
         SetSelectionTitle(ListBackupItems, Localization.Get(_backupImport ? "Backup_SelectImport" : "Backup_SelectExport"));
         SearchBackupItems.PlaceholderText = Localization.Get("Overlay_SearchSettings");
-        BtnExitApplication.Content = Localization.Get("Welcome_Exit");
-        BtnRestartApplication.Content = Localization.Get("Welcome_Restart");
-        BtnCopyLog.Content = Localization.Get("Log_Copy");
+        SetActionIcon(BtnExitApplication, "\uE7E8", "Welcome_Exit");
+        SetActionIcon(BtnRestartApplication, "\uE777", "Welcome_Restart");
+        SetActionIcon(BtnCopyLog, "\uE8C8", "Log_Copy");
     }
 
     private void ExitApplication_Click(object sender, RoutedEventArgs args)

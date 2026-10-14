@@ -684,7 +684,7 @@
       <value>このページの設定をリセット</value>
     </data>
     <data name="Settings_Reset" xml:space="preserve">
-      <value>設定をリセット</value>
+      <value>すべての設定をリセット</value>
     </data>
     <data name="Overlay_AllReset" xml:space="preserve">
       <value>既定値に戻す設定を選択</value>

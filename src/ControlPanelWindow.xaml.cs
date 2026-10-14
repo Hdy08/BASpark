@@ -491,7 +491,7 @@ public sealed partial class ControlPanelWindow : UserControl
         _selectionToolbars[ListVisualResetItems] = new(BtnResetInvert, BtnResetSelectAll, BtnOverlayVisualConfirm, TxtResetNoResults, []) { Heading = TxtOverlayVisualReset };
         _selectionToolbars[ListBackupItems] = new(BtnBackupInvert, BtnBackupSelectAll, BtnBackupConfirm, TxtBackupNoResults, []) { Heading = TxtBackupSelectionTitle };
         foreach (var entry in _selectionToolbars) entry.Value.Invert.Tag = entry.Value.SelectAll.Tag = entry.Key;
-        foreach (ComboBox combo in new[] { ComboLanguage, ComboProcessFilterMode }) _comboWidthTrackers.Add(new(combo));
+        foreach (ComboBox combo in new[] { ComboLanguage, ComboProfiles, ComboProcessFilterMode }) _comboWidthTrackers.Add(new(combo));
 
         try
         {
@@ -687,6 +687,28 @@ public sealed partial class ControlPanelWindow : UserControl
         ToolTipService.SetToolTip(button, label);
     }
 
+    private static void SetActionIcon(ButtonBase button, string glyph, string key) =>
+        SetActionIcon(button, new FontIcon { Glyph = glyph, FontSize = 16, IsTextScaleFactorEnabled = false }, Localization.Get(key));
+
+    private static void SetActionIcon(ButtonBase button, FrameworkElement icon, string label)
+    {
+        button.Content = icon;
+        button.Width = button.Height = 32;
+        button.MinWidth = 0;
+        button.Padding = new Thickness(0);
+        button.HorizontalContentAlignment = HorizontalAlignment.Center;
+        button.VerticalContentAlignment = VerticalAlignment.Center;
+        AutomationProperties.SetName(button, label);
+        ToolTipService.SetToolTip(button, label);
+    }
+
+    private Viewbox CreateActionPathIcon(string resourceKey, double width, double height) => new()
+    {
+        Width = 16, Height = 16, Stretch = Stretch.Uniform,
+        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        Child = new PathIcon { Width = width, Height = height, Data = GetSelectionIconData(resourceKey) }
+    };
+
     private void CaptionMinimize_Click(object sender, RoutedEventArgs args) => _host.Minimize();
 
     private void CaptionMaximize_Click(object sender, RoutedEventArgs args) => _host.ToggleMaximize();
@@ -778,6 +800,11 @@ public sealed partial class ControlPanelWindow : UserControl
                     width += grid.ColumnSpacing + (child is StackPanel stack ? stack.Spacing * (buttons.Length - 1) : 0);
                     foreach (ButtonBase action in buttons)
                     {
+                        if (!double.IsNaN(action.Width))
+                        {
+                            width += Math.Max(action.MinWidth, action.Width);
+                            continue;
+                        }
                         double labelWidth = MeasureSingleLineWidth(new TextBlock
                         {
                             Text = action.Content?.ToString() ?? string.Empty,
@@ -1357,8 +1384,8 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateEffectsPauseButton();
         TxtStatusLabel.Text = Localization.Get("Welcome_StatusLabel");
         TxtClicksLabel.Text = Localization.Get("Welcome_ClicksLabel");
-        BtnApplySettings.Content = Localization.Get("Settings_Apply");
-        BtnUndoSettings.Content = Localization.Get("Settings_Undo");
+        SetActionIcon(BtnApplySettings, "\uE74E", "Settings_Apply");
+        SetActionIcon(BtnUndoSettings, "\uE7A7", "Settings_Undo");
         TxtScreensTitle.Text = Localization.Get("MultiScreen_Displays");
         TxtBasicTitle.Text = Localization.Get("Basic_Interface");
         TxtBasicTriggerTitle.Text = Localization.Get("Basic_Trigger");
@@ -1412,17 +1439,17 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckHideInFullscreen.Header = Localization.Get("Filter_Fullscreen");
         CheckShowEffectOnDesktop.Header = Localization.Get("Filter_Desktop");
         TxtFilterProfiles.Text = Localization.Get("Filter_Profiles");
-        BtnAddProfile.Content = Localization.Get("Filter_New");
-        BtnRenameProfile.Content = Localization.Get("Filter_Rename");
-        BtnDeleteProfile.Content = Localization.Get("Filter_Delete");
+        SetActionIcon(BtnAddProfile, "\uE710", "Filter_New");
+        SetActionIcon(BtnRenameProfile, "\uE8AC", "Filter_Rename");
+        SetActionIcon(BtnDeleteProfile, "\uE74D", "Filter_Delete");
         TxtFilterMode.Text = Localization.Get("Filter_Mode");
         TxtProcessList.Text = Localization.Get("Filter_ProcessList");
         TxtAddProcess.Text = Localization.Get("Filter_AddProcess");
-        BtnBrowseProcess.Content = Localization.Get("Filter_Browse");
-        BtnSelectRunningProcess.Content = Localization.Get("Filter_SelectRunning");
-        BtnRefreshScreens.Content = Localization.Get("MultiScreen_Refresh");
+        SetActionIcon(BtnBrowseProcess, "\uEC50", "Filter_Browse");
+        SetActionIcon(BtnSelectRunningProcess, "\uEA40", "Filter_SelectRunning");
+        SetActionIcon(BtnRefreshScreens, "\uE895", "MultiScreen_Refresh");
         TxtLogTitle.Text = Localization.Get("Nav_Log");
-        BtnClearLog.Content = Localization.Get("Log_Clear");
+        SetActionIcon(BtnClearLog, "\uE74D", "Log_Clear");
         TxtLogHint.Text = Localization.Get("Log_Hint");
         TxtAboutTitle.Text = Localization.Get("About_Title");
         TxtAboutDescription.Text = Localization.Get("About_Description");
@@ -1430,24 +1457,27 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtVersionInfo.Text = Localization.Get("About_VersionInfo");
         TxtCommitDetails.Text = Localization.Get("About_CommitDetails");
         TxtBuildTime.Text = Localization.Get("About_BuildTime");
-        BtnCopyVersion.Content = BtnCopyBuildTime.Content = Localization.Get("About_Copy");
-        BtnViewCommit.Content = Localization.Get("About_View");
+        SetActionIcon(BtnCopyVersion, "\uE8C8", "About_Copy");
+        SetActionIcon(BtnCopyBuildTime, "\uE8C8", "About_Copy");
+        SetActionIcon(BtnViewCommit, "\uE774", "About_OpenRepository");
         TxtAuthorsTitle.Text = Localization.Get("About_Authors");
         TxtAuthorDoomDescription.Text = Localization.Get("About_DoomRole");
         TxtAuthorCialloDescription.Text = Localization.Get("About_CialloRole");
         TxtAuthorHdyDescription.Text = Localization.Get("About_HdyRole");
-        BtnAuthorDoomWebsite.Content = Localization.Get("About_OfficialSite");
+        SetActionIcon(BtnAuthorDoomWebsite, "\uE774", "About_OfficialSite");
         BtnAuthorDoomWebsite.Tag = Localization.IsChineseLocale ? "https://basp.catbotstudio.cn" : "https://basp.catbotstudio.top";
-        BtnAuthorDoomQq.Content = Localization.Get("About_QqGroup");
-        BtnAuthorDoomSponsor.Content = Localization.Get("About_Sponsor");
-        foreach (Button button in new[] { BtnAuthorDoomGithub, BtnAuthorCialloGithub, BtnAuthorHdyGithub }) button.Content = "GitHub";
-        foreach (Button button in new[] { BtnAuthorDoomBilibili, BtnAuthorCialloBilibili, BtnAuthorHdyBilibili }) button.Content = "Bilibili";
+        SetActionIcon(BtnAuthorDoomQq, CreateActionPathIcon("QqIconData", 13.4452, 15.9878), Localization.Get("About_QqGroup"));
+        SetActionIcon(BtnAuthorDoomSponsor, "\uEB52", "About_Sponsor");
+        foreach (Button button in new[] { BtnAuthorDoomGithub, BtnAuthorCialloGithub, BtnAuthorHdyGithub })
+            SetActionIcon(button, CreateActionPathIcon("GithubIconData", 640, 640), "GitHub");
+        foreach (Button button in new[] { BtnAuthorDoomBilibili, BtnAuthorCialloBilibili, BtnAuthorHdyBilibili })
+            SetActionIcon(button, CreateActionPathIcon("BilibiliIconData", 24, 24), "Bilibili");
         LoadVersion();
         TxtRepositoryLinks.Text = Localization.Get("About_Repositories");
-        BtnRepoDoomVoss.Content = Localization.Get("About_OpenRepository");
-        BtnRepoCialloKing.Content = Localization.Get("About_OpenRepository");
-        BtnRepoWinUI.Content = Localization.Get("About_OpenRepository");
-        BtnResetSettings.Content = Localization.Get("Settings_Reset");
+        SetActionIcon(BtnRepoDoomVoss, "\uE774", "About_OpenRepository");
+        SetActionIcon(BtnRepoCialloKing, "\uE774", "About_OpenRepository");
+        SetActionIcon(BtnRepoWinUI, "\uE774", "About_OpenRepository");
+        SetActionIcon(BtnResetSettings, "\uEBC4", "Settings_Reset");
         SetSelectionTitle(ListRunningProcesses, Localization.Get("Overlay_RunningProcess"));
         SearchRunningProcess.PlaceholderText = Localization.Get("Overlay_SearchProcesses");
         BtnOverlayCancel.Content = Localization.Get("Overlay_Cancel");
@@ -2256,7 +2286,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateEffectsPauseButton()
     {
         BtnToggleEffectsPause.IsChecked = App.IsEffectsPaused;
-        BtnToggleEffectsPause.Content = Localization.Get(App.IsEffectsPaused ? "Effects_Enable" : "Effects_Pause");
+        SetActionIcon(BtnToggleEffectsPause, App.IsEffectsPaused ? "\uE768" : "\uE769", App.IsEffectsPaused ? "Effects_Enable" : "Effects_Pause");
     }
 
     // ==================================================================
@@ -2621,11 +2651,6 @@ public sealed partial class ControlPanelWindow : UserControl
             SelectProcessFilterMode(selected.Mode);
             UpdateEnvironmentFilterInterlock();
         }
-    }
-
-    private void ProfileActions_SizeChanged(object sender, SizeChangedEventArgs args)
-    {
-        if (!_isClosed && ComboProfiles.Width != args.NewSize.Width) ComboProfiles.Width = args.NewSize.Width;
     }
 
     private void RefreshCurrentProfileProcesses(FilterProfile? profile)

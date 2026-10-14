@@ -684,7 +684,7 @@
       <value>重置本页设置</value>
     </data>
     <data name="Settings_Reset" xml:space="preserve">
-      <value>重置设置</value>
+      <value>重置所有设置</value>
     </data>
     <data name="Overlay_AllReset" xml:space="preserve">
       <value>选择要恢复默认的设置项</value>
