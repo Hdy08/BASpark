@@ -2572,7 +2572,12 @@ public class WinUi3UiTests
             Assert.Null(page.Attribute("Margin"));
             Assert.Null(page.Attribute("Background"));
             Assert.Equal("{StaticResource BasSettingsPageTitleStyle}", (string?)GetNamedElement(document, titleName).Attribute("Style"));
-            if (pageName != "PageSettings")
+            if (pageName == "PageAbout")
+            {
+                Assert.Null(page.Attribute("Padding"));
+                Assert.Equal("28,20,28,0", (string?)GetNamedElement(document, titleName).Parent!.Attribute("Margin"));
+            }
+            else if (pageName != "PageSettings")
             {
                 Assert.Equal("28,20,28,28", (string?)page.Attribute("Padding"));
             }
@@ -3204,12 +3209,47 @@ public class WinUi3UiTests
         Assert.Equal("0", (string?)card.Attribute("MinHeight"));
         Assert.Equal("0", (string?)card.Attribute("Margin"));
         Assert.Null(card.Attribute("Height"));
+        XElement[] labels = card.Descendants(Presentation + "TextBlock").ToArray();
+        Assert.Equal("{Binding Title}", (string?)labels[0].Attribute("Text"));
+        Assert.Equal("{Binding Subtitle}", (string?)labels[1].Attribute("Text"));
+        Assert.Equal("{Binding SubtitleVisibility}", (string?)labels[1].Attribute("Visibility"));
+        XElement heading = GetNamedElement(panel, "SelectionHeading");
+        Assert.Equal("{Binding TitleWithCount}", (string?)heading.Element(Presentation + "TextBlock")!.Attribute("Text"));
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        string itemsChanged = pages[pages.IndexOf("protected override void OnItemsChangedCore", StringComparison.Ordinal)..
+            pages.IndexOf("internal SelectionGroup? GetActiveGroup", StringComparison.Ordinal)];
+        Assert.Contains("context.RecycleElement(entry.Element)", itemsChanged, StringComparison.Ordinal);
+        Assert.Contains("state.Realized.Clear()", itemsChanged, StringComparison.Ordinal);
+        Assert.Contains("InvalidateMeasure()", itemsChanged, StringComparison.Ordinal);
+        Assert.Contains("check.ApplyTemplate()", pages, StringComparison.Ordinal);
+        Assert.Contains("Application.Current.Resources[\"DefaultCheckBoxStyle\"]", pages, StringComparison.Ordinal);
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("if (source is CheckBox) return false", source, StringComparison.Ordinal);
         Assert.Contains("item.IsSelected = !item.IsSelected", source, StringComparison.Ordinal);
         Assert.Contains("args.Handled = true", source, StringComparison.Ordinal);
         Assert.DoesNotContain("new Border { Child = layout", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ListRunningProcesses.SelectedItems", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PageScrollbars_KeepNativeTracksWithinTheViewportAndOutsideAboutCards()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement about = GetNamedElement(panel, "PageAbout");
+        Assert.Null(about.Attribute("Padding"));
+        Assert.Same(about, GetNamedElement(panel, "AboutScrollViewer").Parent);
+        foreach ((string scrollName, string contentName) in new[]
+                 { ("SettingsContentScrollViewer", "SettingsContent"), ("AboutScrollViewer", "AboutContent") })
+        {
+            XElement scroll = GetNamedElement(panel, scrollName);
+            Assert.Equal("28,0,28,0", (string?)scroll.Attribute("Padding"));
+            Assert.Equal("Auto", (string?)scroll.Attribute("VerticalScrollBarVisibility"));
+            Assert.Null(scroll.Attribute("Style"));
+            Assert.Null(scroll.Attribute("Template"));
+            XElement content = GetNamedElement(panel, contentName);
+            Assert.Same(scroll, content.Parent);
+            Assert.Equal("0,0,0,28", (string?)content.Attribute("Padding"));
+        }
     }
 
     [Fact]

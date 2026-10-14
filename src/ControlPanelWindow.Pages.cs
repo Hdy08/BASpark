@@ -57,7 +57,10 @@ public sealed class SelectionCardLayout : VirtualizingLayout
 
     protected override void OnItemsChangedCore(VirtualizingLayoutContext context, object source, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
-        ((LayoutState)context.LayoutState).Dirty = true;
+        var state = (LayoutState)context.LayoutState;
+        foreach (var entry in state.Realized) context.RecycleElement(entry.Element);
+        state.Realized.Clear();
+        state.Dirty = true;
         InvalidateMeasure();
     }
 
@@ -87,7 +90,12 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         content.Children.Add(text);
-        var check = new CheckBox { MinWidth = 0, Padding = new Thickness(), VerticalAlignment = VerticalAlignment.Center };
+        var check = new CheckBox
+        {
+            Style = (Style)Application.Current.Resources["DefaultCheckBoxStyle"],
+            MinWidth = 0, Padding = new Thickness(), VerticalAlignment = VerticalAlignment.Center
+        };
+        check.ApplyTemplate();
         Grid.SetColumn(check, 1);
         content.Children.Add(check);
         _measurementCard = new Border

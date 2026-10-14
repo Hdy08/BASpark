@@ -50,12 +50,12 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="{x:Bind Title}" Style="{StaticResource BasSettingTitleStyle}" />
-                        <TextBlock Text="{x:Bind Subtitle}" Visibility="{x:Bind SubtitleVisibility}" Style="{StaticResource BasCaptionStyle}" />
+                        <TextBlock Text="{Binding Title}" Style="{StaticResource BasSettingTitleStyle}" />
+                        <TextBlock Text="{Binding Subtitle}" Visibility="{Binding SubtitleVisibility}" Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
                     <CheckBox x:Name="SelectionCardCheck" Grid.Column="1"
                               MinWidth="0" Padding="0" HorizontalAlignment="Right" VerticalAlignment="Center"
-                              AutomationProperties.Name="{x:Bind Title}" />
+                              AutomationProperties.Name="{Binding Title}" />
                 </Grid>
             </Border>
         </DataTemplate>
@@ -67,7 +67,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{x:Bind TitleWithCount, Mode=OneWay}" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding TitleWithCount}" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
                 <Button Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Click="InvertSelection_Click"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
                 <Button Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Click="SelectAll_Click"
@@ -354,9 +354,9 @@
 
                 <ScrollViewer x:Name="SettingsContentScrollViewer"
                               Grid.Row="2"
-                              Padding="28,0,28,28"
+                              Padding="28,0,28,0"
                               VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="SettingsContent">
+                    <StackPanel x:Name="SettingsContent" Padding="0,0,0,28">
 
                         <!-- ===== 基础设置 ===== -->
                         <StackPanel x:Name="SectionBasic">
@@ -1562,19 +1562,20 @@
             </Grid>
 
             <!-- ===== 关于 ===== -->
-            <Grid x:Name="PageAbout" Visibility="Collapsed" Padding="28,20,28,28">
+            <Grid x:Name="PageAbout" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0">
+                <StackPanel Grid.Row="0" Margin="28,20,28,0">
                     <TextBlock x:Name="TxtAboutTitle" Text="" Style="{StaticResource BasSettingsPageTitleStyle}" />
                     <TextBlock x:Name="TxtAboutDescription" Text="" Margin="0,8,0,0" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <TextBlock x:Name="TxtActiveAboutSection" Grid.Row="1" Style="{StaticResource BasSettingsSectionTitleStyle}" />
-                <ScrollViewer x:Name="AboutScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="AboutContent">
+                <TextBlock x:Name="TxtActiveAboutSection" Grid.Row="1" Margin="28,20,28,8" Style="{StaticResource BasSettingsSectionTitleStyle}" />
+                <ScrollViewer x:Name="AboutScrollViewer" Grid.Row="2" Padding="28,0,28,0"
+                              HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="AboutContent" Padding="0,0,0,28">
                     <TextBlock x:Name="TxtBuildInfoTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                     <Border Style="{StaticResource BasSettingCardStyle}">
                         <Grid ColumnSpacing="16">
