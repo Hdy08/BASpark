@@ -994,4 +994,5 @@
     <data name="Advanced_labelBloomTrailAlphaDescription" xml:space="preserve"><value>调节原生拖尾辉光的不透明度。</value></data>
     <data name="Advanced_labelBloomTrailEmissionDescription" xml:space="preserve"><value>调节拖尾提供给 Bloom 的发光能量。</value></data>
     <data name="Advanced_labelBloomTrailCoverageDescription" xml:space="preserve"><value>调节拖尾辉光源的覆盖宽度倍率。</value></data>
+    <data name="Settings_ResetItem" xml:space="preserve"><value>重置此项设置</value></data>
 </root>

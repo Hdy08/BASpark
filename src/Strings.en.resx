@@ -994,4 +994,5 @@
     <data name="Advanced_labelBloomTrailAlphaDescription" xml:space="preserve"><value>Adjust opacity of native trail glow.</value></data>
     <data name="Advanced_labelBloomTrailEmissionDescription" xml:space="preserve"><value>Adjust trail emission energy entering Bloom.</value></data>
     <data name="Advanced_labelBloomTrailCoverageDescription" xml:space="preserve"><value>Adjust the width multiplier of the trail glow source.</value></data>
+    <data name="Settings_ResetItem" xml:space="preserve"><value>Reset this setting</value></data>
 </root>

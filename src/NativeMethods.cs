@@ -248,6 +248,36 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     internal static extern bool UnhookWindowsHookEx(IntPtr hook);
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MSG
+    {
+        internal IntPtr Hwnd;
+        internal uint Message;
+        internal UIntPtr WParam;
+        internal IntPtr LParam;
+        internal uint Time;
+        internal POINT Point;
+        internal uint Private;
+    }
+
+    [DllImport("user32.dll", EntryPoint = "GetMessageW")]
+    internal static extern int GetMessage(out MSG message, IntPtr window, uint minimum, uint maximum);
+
+    [DllImport("user32.dll", EntryPoint = "PeekMessageW")]
+    internal static extern bool PeekMessage(out MSG message, IntPtr window, uint minimum, uint maximum, uint remove);
+
+    [DllImport("user32.dll")]
+    internal static extern bool TranslateMessage(ref MSG message);
+
+    [DllImport("user32.dll", EntryPoint = "DispatchMessageW")]
+    internal static extern IntPtr DispatchMessage(ref MSG message);
+
+    [DllImport("user32.dll", EntryPoint = "PostThreadMessageW", SetLastError = true)]
+    internal static extern bool PostThreadMessage(uint threadId, uint message, UIntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll")]
+    internal static extern uint GetCurrentThreadId();
+
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool RegisterRawInputDevices(RAWINPUTDEVICE[] devices, uint count, uint size);
 

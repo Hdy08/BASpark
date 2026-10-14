@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -7,12 +8,17 @@ using Windows.Foundation;
 
 namespace BASpark;
 
-public sealed class SelectionGroup(string title, ItemsControl list, List<SelectionCardItem> items, bool first)
+public sealed class SelectionGroup(string title, ItemsControl list, List<SelectionCardItem> items, bool first) : INotifyPropertyChanged
 {
     public string Title { get; } = title;
     public ItemsControl List { get; } = list;
     public List<SelectionCardItem> Items { get; } = items;
     public bool IsFirst { get; } = first;
+    public string TitleWithCount => FormatTitle(Title, Items);
+    public event PropertyChangedEventHandler? PropertyChanged;
+    internal void RefreshSelectionCount() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TitleWithCount)));
+    internal static string FormatTitle(string title, IReadOnlyCollection<SelectionCardItem> items) =>
+        $"{title} ({items.Count(item => item.IsSelected)}/{items.Count})";
 }
 
 public sealed class SelectionCardLayout : VirtualizingLayout
@@ -110,7 +116,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
                 if (context.GetItemAt(index) is SelectionGroup group)
                 {
                     state.Groups.Add((state.Offsets[index], group));
-                    _headingTitle.Text = group.Title;
+                    _headingTitle.Text = $"{group.Title} ({group.Items.Count}/{group.Items.Count})";
                     _measurementHeading!.Measure(new Size(width, double.PositiveInfinity));
                     height = group.IsFirst ? 0 : _measurementHeading.DesiredSize.Height;
                 }
@@ -170,6 +176,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
 public sealed partial class ControlPanelWindow
 {
     private sealed record SectionResetRequest(ResetScope Scope, string? GroupKey);
+    private sealed record CardResetButton(Button Button, TextBlock Label, ResetScope Scope, string Key, Action Restore, Func<SettingsState, bool> IsDefault);
     private sealed record StickyHeading(FrameworkElement Anchor, TextBlock Label, object? Action, Func<bool> Visible);
 
     private sealed class StickySectionTracker : IDisposable
@@ -276,6 +283,10 @@ public sealed partial class ControlPanelWindow
     private readonly Dictionary<ItemsControl, SelectionToolbar> _pinnedSelectionToolbars = new();
     private StickySectionTracker? _settingsHeaders;
     private StickySectionTracker? _aboutHeaders;
+    private readonly List<CardResetButton> _cardResetButtons = [];
+    private readonly List<(Button Button, TextBlock Label, SectionResetRequest Request)> _sectionResetButtons = [];
+    private SettingsState? _resetValueState;
+    private readonly Dictionary<string, JsonElement> _resetValues = new(StringComparer.Ordinal);
 
     private SettingsSections CurrentSettingsPage => _selectedSettingsItem == SubTabVisual ? SettingsSections.Visual
         : _selectedSettingsItem == SubTabFilter ? SettingsSections.Filter
@@ -288,7 +299,8 @@ public sealed partial class ControlPanelWindow
         {
             TxtActiveSettingsSection.Text = heading?.Label.Text ?? string.Empty;
             BtnResetSection.Tag = heading?.Action;
-            BtnResetSection.Visibility = heading?.Action is SectionResetRequest ? Visibility.Visible : Visibility.Collapsed;
+            BtnResetSection.Visibility = heading?.Action is SectionResetRequest request && HasNonDefaultSettings(request)
+                ? Visibility.Visible : Visibility.Collapsed;
         });
         _stickyTrackers.Add(_settingsHeaders);
         foreach (var section in new[]
@@ -337,10 +349,12 @@ public sealed partial class ControlPanelWindow
         content.Children.Add(label);
         if (request != null)
         {
-            var button = new Button { Width = 32, Height = 32, MinWidth = 0, Padding = new Thickness(), Tag = request,
+            var button = new Button { Tag = request,
                 Content = new FontIcon { Glyph = "\uE777", FontSize = 16 } };
+            ConfigureResetButton(button, label);
             button.Click += ResetSection_Click;
             content.Children.Add(button);
+            _sectionResetButtons.Add((button, label, request));
         }
         var anchor = new Grid { Margin = first ? new Thickness() : margin, HorizontalAlignment = HorizontalAlignment.Left,
             Opacity = first ? 0 : 1, IsHitTestVisible = !first };
@@ -354,20 +368,257 @@ public sealed partial class ControlPanelWindow
     {
         if (_settingsHeaders == null) return;
         SettingsSections page = CurrentSettingsPage;
-        BtnBasicReset.Visibility = page == SettingsSections.Basic ? Visibility.Visible : Visibility.Collapsed;
-        BtnVisualReset.Visibility = page == SettingsSections.Visual ? Visibility.Visible : Visibility.Collapsed;
-        BtnFilterReset.Visibility = page == SettingsSections.Filter ? Visibility.Visible : Visibility.Collapsed;
+        BtnBasicReset.Visibility = page == SettingsSections.Basic && HasNonDefaultSettings(new(ResetScope.Basic, null)) ? Visibility.Visible : Visibility.Collapsed;
+        BtnVisualReset.Visibility = page == SettingsSections.Visual && HasNonDefaultSettings(new(ResetScope.Visual, null)) ? Visibility.Visible : Visibility.Collapsed;
+        BtnFilterReset.Visibility = page == SettingsSections.Filter && HasNonDefaultSettings(new(ResetScope.Filter, null)) ? Visibility.Visible : Visibility.Collapsed;
         BtnRefreshScreens.Visibility = page == SettingsSections.Screens ? Visibility.Visible : Visibility.Collapsed;
-        foreach (Button button in new[] { BtnResetSection }.Concat(SettingsContent.Children.OfType<StackPanel>().Append(PanelEnvironmentFilter)
-                     .SelectMany(section => section.Children.OfType<Grid>()).SelectMany(header => header.Children.OfType<StackPanel>())
-                     .SelectMany(header => header.Children.OfType<Button>())))
+        foreach (Button button in new[] { BtnResetSection }.Concat(_sectionResetButtons.Select(entry => entry.Button)))
         {
             string label = Localization.Get("Settings_ResetSection");
-            ToolTipService.SetToolTip(button, label);
-            AutomationProperties.SetName(button, label);
+            SetResetButtonLabel(button, label);
+        }
+        foreach (Button button in new[] { BtnBasicReset, BtnVisualReset, BtnFilterReset })
+        {
+            string label = Localization.Get("Settings_ResetPage");
+            SetResetButtonLabel(button, label);
         }
         _settingsHeaders.Update(true);
         _aboutHeaders?.Update(true);
+    }
+
+    private static void ConfigureResetButton(Button button, TextBlock label)
+    {
+        button.Style = (Style)Application.Current.Resources["BasInlineResetButtonStyle"];
+        void UpdateSize()
+        {
+            var line = new TextBlock { Text = label.Text, FontFamily = label.FontFamily, FontSize = label.FontSize,
+                FontWeight = label.FontWeight, LineHeight = label.LineHeight, TextWrapping = TextWrapping.NoWrap };
+            line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            button.Height = button.Width = line.DesiredSize.Height;
+        }
+        UpdateSize();
+        label.SizeChanged += (_, _) => UpdateSize();
+        button.VerticalAlignment = VerticalAlignment.Center;
+    }
+
+    private static void SetResetButtonLabel(Button button, string label, string? name = null)
+    {
+        if (ToolTipService.GetToolTip(button) as string != label) ToolTipService.SetToolTip(button, label);
+        name ??= label;
+        if (AutomationProperties.GetName(button) != name) AutomationProperties.SetName(button, name);
+    }
+
+    private List<VisualResetItem> CreateCardResetItems(ResetScope scope)
+    {
+        var items = new List<VisualResetItem>();
+        ResetScope previousScope = _resetScope;
+        ICollection<VisualResetItem>? previousTarget = _resetItemTarget;
+        _resetScope = scope;
+        _resetItemTarget = items;
+        try
+        {
+            if (scope == ResetScope.Basic) RebuildBasicResetItems();
+            if (scope == ResetScope.Visual) RebuildVisualResetItems();
+            if (scope == ResetScope.Filter) RebuildFilterResetItems();
+            return items;
+        }
+        finally
+        {
+            _resetScope = previousScope;
+            _resetItemTarget = previousTarget;
+        }
+    }
+
+    private void SetupCardResetButtons()
+    {
+        foreach (ResetScope scope in new[] { ResetScope.Basic, ResetScope.Visual, ResetScope.Filter })
+        {
+            Dictionary<string, VisualResetItem> items = CreateCardResetItems(scope).ToDictionary(item => item.SettingKey!);
+            foreach (var entry in new (FrameworkElement Control, string Key)[]
+            {
+                (ComboLanguage, "UiLanguage"), (RadioDarkMode, "DarkMode"), (CheckAlwaysTrailEffectSwitch, "EnableAlwaysTrailEffect"),
+                (CheckMasterSwitch, "IsEffectEnabled"), (RadioClickType, "ClickTriggerType"), (CheckMiddleClickTrigger, "EnableMiddleClickTrigger"),
+                (CheckTouchscreenMode, "IsTouchscreenMode"), (SliderMaxTouchEffects, "MaxTouchEffects"),
+                (CheckScreenshotCompatibilityMode, "ScreenshotCompatibilityMode"), (CheckAutoStart, "AutoStart"),
+                (CheckStartSilent, "StartSilent"), (CheckHideTrayIcon, "HideTrayIcon"), (CheckRunAsAdmin, "RunAsAdmin"),
+                (CheckLinkedEffectScale, "UseLinkedEffectScale"), (SliderScale, "EffectScale"), (SliderTrailScale, "TrailEffectScale"),
+                (SliderClickScale, "ClickEffectScale"), (CheckLinkedAnimationSpeed, "UseLinkedAnimationSpeed"),
+                (SliderSpeed, "EffectSpeed"), (SliderTrailAnimSpeed, "TrailAnimationSpeed"), (SliderClickAnimSpeed, "ClickAnimationSpeed"),
+                (CheckApplyCurveDraw, "ApplyCurveDraw"), (SliderTrailSamplingRate, "InputSamplingRate"), (SliderGlow, "GlowIntensity"),
+                (CheckBaClickAdvancedSettings, "EnableBaClickAdvancedSettings"), (CheckEnvironmentFilter, "EnableEnvironmentFilter"),
+                (CheckHideInFullscreen, "HideInFullscreen"), (CheckShowEffectOnDesktop, "ShowEffectOnDesktop"), (ComboProfiles, "Profiles")
+            })
+            {
+                if (!items.TryGetValue(entry.Key, out VisualResetItem? item)) continue;
+                var heading = FindSettingCardHeading(entry.Control);
+                if (heading != null) AddCardResetButton(heading.Value.Label, heading.Value.Parent, scope, entry.Key, item.Restore!,
+                    state => entry.Key == "Profiles" ? AreProfilesDefault(state) :
+                        item.DefaultValue is JsonElement defaultValue && IsDefaultSettingValue(state, entry.Key, defaultValue));
+            }
+            if (scope == ResetScope.Visual)
+            {
+                VisualResetItem color = items["ParticleColor"];
+                AddCardResetButton(TxtEffectColor, (Panel)EffectColorExpander.Header, scope, "ParticleColor", color.Restore!,
+                    state => IsDefaultSettingValue(state, "ParticleColor", color.DefaultValue!.Value));
+            }
+        }
+        if (FindSettingCardHeading(ComboProcessFilterMode) is { } modeHeading)
+            AddCardResetButton(modeHeading.Label, modeHeading.Parent, ResetScope.Filter, "Profile.Mode", () => SelectProcessFilterMode(ProcessFilterModeOption.Blacklist),
+                state => GetPendingProfile(state)?.GetProperty("Mode").GetInt32() == (int)ProcessFilterModeOption.Blacklist);
+        var processHeading = FindSettingCardHeading(ListConfiguredProcesses)!.Value;
+        AddCardResetButton(TxtProcessList, processHeading.Parent, ResetScope.Filter, "Profile.Processes", () =>
+        {
+            if (ComboProfiles.SelectedItem is not FilterProfile profile) return;
+            profile.Processes.Clear();
+            RefreshCurrentProfileProcesses(profile);
+        }, state => GetPendingProfile(state)?.GetProperty("Processes").GetArrayLength() == 0);
+        foreach (Button button in new[] { BtnBasicReset, BtnVisualReset, BtnFilterReset }) ConfigureResetButton(button, TxtSettingsTitle);
+        ConfigureResetButton(BtnResetSection, TxtActiveSettingsSection);
+        RefreshResetButtonVisibility();
+    }
+
+    private (TextBlock Label, Panel Parent)? FindSettingCardHeading(FrameworkElement control)
+    {
+        foreach (Border card in SettingElements(SettingsContent).OfType<Border>())
+            if (card.Style == (Style)Application.Current.Resources["BasSettingCardStyle"] && SettingElements(card).Contains(control))
+                return FindCardHeading(card.Child);
+        return null;
+    }
+
+    private static IEnumerable<UIElement> SettingElements(UIElement content)
+    {
+        yield return content;
+        IEnumerable<UIElement> children = content switch
+        {
+            Panel panel => panel.Children,
+            Border { Child: not null } border => [border.Child],
+            Expander expander => new[] { expander.Header, expander.Content }.OfType<UIElement>(),
+            ContentControl { Content: UIElement child } => [child],
+            _ => []
+        };
+        foreach (UIElement child in children)
+            foreach (UIElement element in SettingElements(child)) yield return element;
+    }
+
+    private static (TextBlock Label, Panel Parent)? FindCardHeading(UIElement content)
+    {
+        if (content is Border border) return FindCardHeading(border.Child);
+        if (content is Panel panel)
+            foreach (UIElement child in panel.Children)
+            {
+                if (child is TextBlock title) return (title, panel);
+                if (FindCardHeading(child) is { } heading) return heading;
+            }
+        return null;
+    }
+
+    private void AddCardResetButton(TextBlock label, Panel panel, ResetScope scope, string key, Action restore, Func<SettingsState, bool> isDefault)
+    {
+        int index = panel.Children.IndexOf(label);
+        int column = Grid.GetColumn(label);
+        int row = Grid.GetRow(label);
+        Thickness margin = label.Margin;
+        panel.Children.RemoveAt(index);
+        label.Margin = new Thickness();
+        var heading = new Grid { ColumnSpacing = 4, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = margin };
+        heading.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        heading.Children.Add(label);
+        var button = new Button { Visibility = Visibility.Collapsed, Content = new FontIcon { Glyph = "\uE777", FontSize = 16 } };
+        ConfigureResetButton(button, label);
+        var request = new CardResetButton(button, label, scope, key, restore, isDefault);
+        button.Tag = request;
+        button.Click += CardReset_Click;
+        Grid.SetColumn(button, 1);
+        heading.Children.Add(button);
+        Grid.SetColumn(heading, column);
+        Grid.SetRow(heading, row);
+        panel.Children.Insert(index, heading);
+        _cardResetButtons.Add(request);
+    }
+
+    private void CardReset_Click(object sender, RoutedEventArgs args)
+    {
+        if (sender is not Button { Tag: CardResetButton request } || _isApplyingSettings) return;
+        Focus(FocusState.Programmatic);
+        RestorePendingSettings(new[] { request.Restore });
+    }
+
+    private Dictionary<string, JsonElement> GetResetValues(SettingsState state)
+    {
+        if (ReferenceEquals(_resetValueState, state)) return _resetValues;
+        _resetValues.Clear();
+        foreach (string content in new[] { state.Basic, state.Visual, state.Filter })
+        {
+            using JsonDocument document = JsonDocument.Parse(content);
+            foreach (JsonProperty property in document.RootElement.EnumerateObject()) _resetValues[property.Name] = property.Value.Clone();
+        }
+        _resetValueState = state;
+        return _resetValues;
+    }
+
+    private bool IsDefaultSettingValue(SettingsState state, string key, JsonElement defaultValue)
+    {
+        Dictionary<string, JsonElement> values = GetResetValues(state);
+        if (!values.TryGetValue(key, out JsonElement value)) return false;
+        if (key == "ParticleColor")
+            return string.Equals(ColorPickerColorMath.CombineThemeColor(value.GetString()!, values["EffectOpacity"].GetDouble()),
+                defaultValue.GetString(), StringComparison.OrdinalIgnoreCase);
+        return SettingValuesEqual(value, defaultValue);
+    }
+
+    internal static bool SettingValuesEqual(JsonElement value, JsonElement defaultValue) =>
+        value.ValueKind == defaultValue.ValueKind && (value.ValueKind == JsonValueKind.Number
+            ? Math.Abs(value.GetDouble() - defaultValue.GetDouble()) < 0.000000001
+            : value.ValueKind == JsonValueKind.String ? value.GetString() == defaultValue.GetString() : value.GetRawText() == defaultValue.GetRawText());
+
+    private JsonElement? GetPendingProfile(SettingsState state)
+    {
+        Dictionary<string, JsonElement> values = GetResetValues(state);
+        if (!values.TryGetValue("Profiles", out JsonElement profiles)) return null;
+        string? activeId = values["ActiveProfileId"].GetString();
+        foreach (JsonElement profile in profiles.EnumerateArray())
+            if (profile.GetProperty("Id").GetString() == activeId) return profile;
+        return null;
+    }
+
+    private bool AreProfilesDefault(SettingsState state)
+    {
+        Dictionary<string, JsonElement> values = GetResetValues(state);
+        if (!values.TryGetValue("Profiles", out JsonElement profiles) || profiles.GetArrayLength() != 1) return false;
+        JsonElement profile = profiles[0];
+        return profile.GetProperty("Name").GetString() == Localization.Get("Profile_Default") &&
+            profile.GetProperty("Mode").GetInt32() == (int)ProcessFilterModeOption.Blacklist && profile.GetProperty("Processes").GetArrayLength() == 0;
+    }
+
+    private static string GetResetSectionKey(CardResetButton entry) => entry.Scope switch
+    {
+        ResetScope.Basic => entry.Key is "UiLanguage" or "DarkMode" ? "Basic_Interface"
+            : entry.Key is "AutoStart" or "StartSilent" or "HideTrayIcon" or "RunAsAdmin" ? "Basic_Runtime" : "Basic_Trigger",
+        ResetScope.Filter => entry.Key is "EnableEnvironmentFilter" or "HideInFullscreen" or "ShowEffectOnDesktop" ? "Filter_BasicSection" : "Filter_AdvancedSection",
+        ResetScope.Visual => entry.Key.StartsWith("BaClickFx/", StringComparison.Ordinal) || entry.Key is "EnableBaClickAdvancedSettings" or "HdrPreset" ? "Visual_AdvancedSection"
+            : entry.Key.Contains("Scale", StringComparison.Ordinal) ? "Visual_ScaleSection"
+            : entry.Key.Contains("Speed", StringComparison.Ordinal) ? "Visual_SpeedSection"
+            : entry.Key is "ApplyCurveDraw" or "InputSamplingRate" ? "Visual_SamplingSection" : "Visual_OtherSection",
+        _ => "MultiScreen_Displays"
+    };
+
+    private bool HasNonDefaultSettings(SectionResetRequest request) => _cardResetButtons.Any(entry => entry.Scope == request.Scope &&
+        (request.GroupKey == null || GetResetSectionKey(entry) == request.GroupKey) && entry.Button.Visibility == Visibility.Visible);
+
+    private void RefreshResetButtonVisibility()
+    {
+        if (_currentSettingsState == null) return;
+        foreach (CardResetButton entry in _cardResetButtons)
+        {
+            entry.Button.Visibility = entry.IsDefault(_currentSettingsState) ? Visibility.Collapsed : Visibility.Visible;
+            entry.Button.IsEnabled = !_isApplyingSettings;
+            string label = Localization.Get("Settings_ResetItem");
+            SetResetButtonLabel(entry.Button, label, $"{label}: {entry.Label.Text}");
+        }
+        foreach (var entry in _sectionResetButtons)
+            entry.Button.Visibility = HasNonDefaultSettings(entry.Request) ? Visibility.Visible : Visibility.Collapsed;
+        RefreshPageHeaders();
     }
 
     private void ResetSection_Click(object sender, RoutedEventArgs args)
@@ -384,12 +635,14 @@ public sealed partial class ControlPanelWindow
         RestorePendingSettings(VisualResetItems.Where(item => group == null || item.Group == group));
     }
 
-    private void RestorePendingSettings(IEnumerable<VisualResetItem> items)
+    private void RestorePendingSettings(IEnumerable<VisualResetItem> items) => RestorePendingSettings(items.Select(item => item.Restore).OfType<Action>());
+
+    private void RestorePendingSettings(IEnumerable<Action> restores)
     {
         _isLoading = _suppressValueSync = true;
         try
         {
-            foreach (VisualResetItem item in items) item.Restore?.Invoke();
+            foreach (Action restore in restores) restore();
             SyncSliderAndBoxValues();
         }
         finally { _isLoading = _suppressValueSync = false; }
@@ -496,6 +749,7 @@ public sealed partial class ControlPanelWindow
         Button[] buttons = header.Children.OfType<Button>().ToArray();
         SelectionToolbar global = _selectionToolbars[group.List];
         var toolbar = new SelectionToolbar(buttons[0], buttons[1], global.Confirm, global.EmptyMessage, group.Items);
+        toolbar.Invert.Tag = toolbar.SelectAll.Tag = group;
         InitializeSelectionToolbar(toolbar);
         _groupSelectionToolbars[header] = (group, toolbar);
         UpdateSelectionButtons(toolbar, group.List != ListBackupItems || !_backupBusy);
@@ -531,9 +785,9 @@ public sealed partial class ControlPanelWindow
         Grid header = list == ListVisualResetItems ? ResetGroupHeader : BackupGroupHeader;
         TextBlock title = list == ListVisualResetItems ? TxtResetGroup : TxtBackupGroup;
         SelectionToolbar toolbar = _pinnedSelectionToolbars[list];
-        if (ReferenceEquals(toolbar.Invert.Tag, group) && title.Text == (group?.Title ?? string.Empty)) return;
+        title.Text = group?.TitleWithCount ?? string.Empty;
+        if (ReferenceEquals(toolbar.Invert.Tag, group)) return;
         header.Visibility = group == null ? Visibility.Collapsed : Visibility.Visible;
-        title.Text = group?.Title ?? string.Empty;
         toolbar.Items.Clear();
         if (group != null) toolbar.Items.AddRange(group.Items);
         toolbar.Invert.Tag = toolbar.SelectAll.Tag = group;
@@ -544,8 +798,14 @@ public sealed partial class ControlPanelWindow
     private void UpdateSectionSelectionToolbars(ItemsControl list)
     {
         bool available = list != ListBackupItems || !_backupBusy;
+        foreach (SelectionGroup group in list.Items.OfType<SelectionGroup>()) group.RefreshSelectionCount();
         foreach (var entry in _groupSelectionToolbars.Values)
             if (entry.Group.List == list) UpdateSelectionButtons(entry.Toolbar, available);
-        if (_pinnedSelectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) UpdateSelectionButtons(toolbar, available);
+        if (_pinnedSelectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar))
+        {
+            UpdateSelectionButtons(toolbar, available);
+            TextBlock title = list == ListVisualResetItems ? TxtResetGroup : TxtBackupGroup;
+            title.Text = (toolbar.Invert.Tag as SelectionGroup)?.TitleWithCount ?? string.Empty;
+        }
     }
 }

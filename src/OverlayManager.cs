@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
@@ -24,7 +25,7 @@ namespace BASpark
         private readonly Dictionary<string, OverlayWindow> _overlays = new(StringComparer.OrdinalIgnoreCase);
         private IKeyboardMouseEvents? _globalHook;
         private IntPtr _mouseHook;
-        private NativeMethods.MouseHookProc? _mouseHookDelegate;
+        private MouseInputHook? _mouseInputHook;
         private TouchInputListener? _touchInputListener;
         private readonly Dictionary<long, TouchTrailState> _touchContacts = new();
         private NativeMethods.POINT? _touchPoint;
@@ -174,11 +175,8 @@ namespace BASpark
             UninstallMouseHook();
             _globalHook?.Dispose();
             _globalHook = Hook.GlobalEvents();
-            _mouseHookDelegate ??= MouseHookCallback;
-            _mouseHook = NativeMethods.SetWindowsHookEx(
-                NativeMethods.WH_MOUSE_LL, _mouseHookDelegate, NativeMethods.GetModuleHandle(null), 0);
-            if (_mouseHook == IntPtr.Zero)
-                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            _mouseInputHook = new MouseInputHook(action => App.DispatcherQueue?.TryEnqueue(() => action()) == true, HandleMouseInput);
+            _mouseHook = _mouseInputHook.Handle;
             SyncTouchInputListener();
             SyncScreenshotCompatCaptureSurfaces(ConfigManager.ScreenshotCompatibilityMode);
         }
@@ -349,24 +347,9 @@ namespace BASpark
             _touchInputListener?.Dispose();
             _touchInputListener = null;
             if (_mouseHook == IntPtr.Zero) return;
-            NativeMethods.UnhookWindowsHookEx(_mouseHook);
+            _mouseInputHook?.Dispose();
+            _mouseInputHook = null;
             _mouseHook = IntPtr.Zero;
-        }
-
-        private IntPtr MouseHookCallback(int code, IntPtr message, IntPtr data)
-        {
-            if (code >= 0 && !_disposed)
-            {
-                try
-                {
-                    HandleMouseInput(unchecked((uint)message.ToInt64()), Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(data));
-                }
-                catch (Exception exception)
-                {
-                    Debug.WriteLine("Mouse input routing failed: " + exception.Message);
-                }
-            }
-            return NativeMethods.CallNextHookEx(_mouseHook, code, message, data);
         }
 
         private void HandleMouseInput(uint message, NativeMethods.MSLLHOOKSTRUCT input)
@@ -1589,6 +1572,105 @@ namespace BASpark
             UninstallForegroundWinEventHook();
 
             CloseWindows();
+        }
+    }
+
+    internal sealed class MouseInputHook : IDisposable
+    {
+        private readonly Func<Action, bool> _dispatch;
+        private readonly Action<uint, NativeMethods.MSLLHOOKSTRUCT> _input;
+        private readonly ConcurrentQueue<(uint Message, NativeMethods.MSLLHOOKSTRUCT Input)> _pending = new();
+        private readonly NativeMethods.MouseHookProc _callback;
+        private readonly Thread _thread;
+        private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private IntPtr _handle;
+        private uint _threadId;
+        private int _dispatchPending;
+        private int _disposed;
+
+        internal IntPtr Handle => _handle;
+
+        internal MouseInputHook(Func<Action, bool> dispatch, Action<uint, NativeMethods.MSLLHOOKSTRUCT> input)
+        {
+            _dispatch = dispatch;
+            _input = input;
+            _callback = MouseHookCallback;
+            _thread = new Thread(Run) { IsBackground = true, Name = "BASpark.MouseInput" };
+            _thread.Start();
+            try { _ready.Task.GetAwaiter().GetResult(); }
+            catch { Dispose(); throw; }
+        }
+
+        private void Run()
+        {
+            try
+            {
+                _threadId = NativeMethods.GetCurrentThreadId();
+                NativeMethods.PeekMessage(out _, IntPtr.Zero, 0, 0, 0);
+                _handle = NativeMethods.SetWindowsHookEx(NativeMethods.WH_MOUSE_LL, _callback, NativeMethods.GetModuleHandle(null), 0);
+                if (_handle == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+                _ready.TrySetResult();
+                while (NativeMethods.GetMessage(out NativeMethods.MSG message, IntPtr.Zero, 0, 0) > 0)
+                {
+                    NativeMethods.TranslateMessage(ref message);
+                    NativeMethods.DispatchMessage(ref message);
+                }
+            }
+            catch (Exception exception) { _ready.TrySetException(exception); }
+            finally
+            {
+                if (_handle != IntPtr.Zero) NativeMethods.UnhookWindowsHookEx(_handle);
+                _handle = IntPtr.Zero;
+            }
+        }
+
+        private IntPtr MouseHookCallback(int code, IntPtr message, IntPtr data)
+        {
+            if (code >= 0 && Volatile.Read(ref _disposed) == 0)
+            {
+                try
+                {
+                    _pending.Enqueue((unchecked((uint)message.ToInt64()), Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(data)));
+                    QueueDrain();
+                }
+                catch (Exception exception) { Debug.WriteLine("Mouse input routing failed: " + exception.Message); }
+            }
+            return NativeMethods.CallNextHookEx(_handle, code, message, data);
+        }
+
+        private void QueueDrain()
+        {
+            if (Interlocked.Exchange(ref _dispatchPending, 1) != 0) return;
+            if (_dispatch(Drain)) return;
+            Interlocked.Exchange(ref _dispatchPending, 0);
+            _pending.Clear();
+        }
+
+        private void Drain()
+        {
+            long start = Stopwatch.GetTimestamp();
+            try
+            {
+                while (Volatile.Read(ref _disposed) == 0 && _pending.TryDequeue(out var entry))
+                {
+                    try { _input(entry.Message, entry.Input); }
+                    catch (Exception exception) { Debug.WriteLine("Mouse input routing failed: " + exception.Message); }
+                    if (Stopwatch.GetElapsedTime(start) >= TimeSpan.FromMilliseconds(4)) break;
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _dispatchPending, 0);
+                if (Volatile.Read(ref _disposed) == 0 && !_pending.IsEmpty) QueueDrain();
+            }
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            if (_threadId != 0) NativeMethods.PostThreadMessage(_threadId, 0x0012, UIntPtr.Zero, IntPtr.Zero);
+            if (Thread.CurrentThread != _thread) _thread.Join();
+            _pending.Clear();
         }
     }
 

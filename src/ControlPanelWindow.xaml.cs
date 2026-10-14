@@ -203,6 +203,7 @@ public class VisualResetItem : SelectionCardItem
     public Action? Save { get; set; }
     public string? SettingKey { get; set; }
     public string? SelectionId { get; set; }
+    public JsonElement? DefaultValue { get; set; }
     public string Group { get; set; } = string.Empty;
 
     public VisualResetItem(string title, string subtitle, Action restore)
@@ -411,6 +412,8 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly HashSet<ContentDialog> _dialogPresentationsPending = new();
     private sealed record SelectionToolbar(Button Invert, Button SelectAll, Button Confirm, TextBlock EmptyMessage, List<SelectionCardItem> Items)
     {
+        public TextBlock? Heading { get; init; }
+        public string HeadingText { get; set; } = string.Empty;
         public Viewbox? InvertIcon { get; set; }
         public Viewbox? SelectAllIcon { get; set; }
         public Geometry? ClearIconData { get; set; }
@@ -423,6 +426,8 @@ public sealed partial class ControlPanelWindow : UserControl
     private readonly List<ProcessItem> _allRunningProcesses = new();
     private int _runningProcessLoadGeneration;
     private bool _loadingRunningProcesses;
+    private Task<List<ProcessItem>>? _runningProcessSnapshot;
+    private long _runningProcessSnapshotTimestamp;
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
     private CompositionRoundedRectangleGeometry? _colorCardGeometry;
@@ -482,9 +487,10 @@ public sealed partial class ControlPanelWindow : UserControl
         InitializeComponent();
         WindowChrome.ApplyTitleBarIcon(AppTitleBar);
         _host = new DcompPanelHost(minimumWidth: LanguageMinimumWidth);
-        _selectionToolbars[ListRunningProcesses] = new(BtnRunningInvert, BtnRunningSelectAll, BtnOverlayConfirmAdd, TxtRunningNoResults, []);
-        _selectionToolbars[ListVisualResetItems] = new(BtnResetInvert, BtnResetSelectAll, BtnOverlayVisualConfirm, TxtResetNoResults, []);
-        _selectionToolbars[ListBackupItems] = new(BtnBackupInvert, BtnBackupSelectAll, BtnBackupConfirm, TxtBackupNoResults, []);
+        _selectionToolbars[ListRunningProcesses] = new(BtnRunningInvert, BtnRunningSelectAll, BtnOverlayConfirmAdd, TxtRunningNoResults, []) { Heading = TxtOverlayRunning };
+        _selectionToolbars[ListVisualResetItems] = new(BtnResetInvert, BtnResetSelectAll, BtnOverlayVisualConfirm, TxtResetNoResults, []) { Heading = TxtOverlayVisualReset };
+        _selectionToolbars[ListBackupItems] = new(BtnBackupInvert, BtnBackupSelectAll, BtnBackupConfirm, TxtBackupNoResults, []) { Heading = TxtBackupSelectionTitle };
+        foreach (var entry in _selectionToolbars) entry.Value.Invert.Tag = entry.Value.SelectAll.Tag = entry.Key;
         foreach (ComboBox combo in new[] { ComboLanguage, ComboProcessFilterMode }) _comboWidthTrackers.Add(new(combo));
 
         try
@@ -549,6 +555,7 @@ public sealed partial class ControlPanelWindow : UserControl
             InitLogView();
             InitializeSettingsTracking();
             SetupPageHeaders();
+            SetupCardResetButtons();
 
             _host.CloseRequested += ControlPanelWindow_Closed;
             _host.SizeChanged += (_, _) => UpdateCaptionButtonState();
@@ -572,6 +579,7 @@ public sealed partial class ControlPanelWindow : UserControl
             App.EffectsPauseChanged += EffectsPauseChanged;
             SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
             _refreshTimer.Start();
+            _ = GetRunningProcessesAsync();
         }
         catch
         {
@@ -973,6 +981,7 @@ public sealed partial class ControlPanelWindow : UserControl
         if (sections.HasFlag(SettingsSections.Screens)) _currentSettingsState = _currentSettingsState with { Screens = CaptureScreenSettings() };
         BtnApplySettings.IsEnabled = BtnUndoSettings.IsEnabled = !_isApplyingSettings &&
             _currentSettingsState.HasChanges(_savedSettingsState, CurrentSettingsPage);
+        RefreshResetButtonVisibility();
     }
 
     private void BindCollections()
@@ -1315,8 +1324,6 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckStartSilent.Header = Localization.Get("Basic_StartSilent");
         CheckHideTrayIcon.Header = Localization.Get("Basic_HideTrayIcon");
         TxtHideTrayHint.Text = Localization.Get("Basic_HideTrayHint");
-        BtnBasicReset.Content = Localization.Get("Settings_ResetPage");
-        BtnFilterReset.Content = Localization.Get("Settings_ResetPage");
         CheckRunAsAdmin.Header = Localization.Get("Basic_RunAsAdmin");
         TxtRunAsAdminHint.Text = Localization.Get("Basic_RunAsAdminHint");
         CheckTouchscreenMode.Header = Localization.Get("Basic_Touchscreen");
@@ -1327,7 +1334,6 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtVisualSpeedTitle.Text = Localization.Get("Visual_SpeedSection");
         TxtVisualSamplingTitle.Text = Localization.Get("Visual_SamplingSection");
         TxtVisualOtherTitle.Text = Localization.Get("Visual_OtherSection");
-        BtnVisualReset.Content = Localization.Get("Settings_ResetPage");
         CheckLinkedEffectScale.Header = Localization.Get("Visual_LinkedScale");
         TxtLinkedScaleHint.Text = Localization.Get("Visual_LinkedScaleHint");
         TxtVisualScale.Text = Localization.Get("Visual_Scale");
@@ -1387,11 +1393,11 @@ public sealed partial class ControlPanelWindow : UserControl
         BtnRepoCialloKing.Content = Localization.Get("About_OpenRepository");
         BtnRepoWinUI.Content = Localization.Get("About_OpenRepository");
         BtnResetSettings.Content = Localization.Get("Settings_Reset");
-        TxtOverlayRunning.Text = Localization.Get("Overlay_RunningProcess");
+        SetSelectionTitle(ListRunningProcesses, Localization.Get("Overlay_RunningProcess"));
         SearchRunningProcess.PlaceholderText = Localization.Get("Overlay_SearchProcesses");
         BtnOverlayCancel.Content = Localization.Get("Overlay_Cancel");
         BtnOverlayConfirmAdd.Content = Localization.Get("Overlay_ConfirmAdd");
-        TxtOverlayVisualReset.Text = Localization.Get("Overlay_VisualReset");
+        SetSelectionTitle(ListVisualResetItems, Localization.Get("Overlay_VisualReset"));
         BtnOverlayVisualCancel.Content = Localization.Get("Overlay_Cancel");
         BtnOverlayVisualConfirm.Content = Localization.Get("Overlay_ConfirmReset");
         SearchVisualReset.PlaceholderText = Localization.Get("Overlay_SearchSettings");
@@ -2143,6 +2149,7 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateMinimumWindowWidth();
         UpdateApplySettingsState(SettingsSections.All);
         RefreshPageHeaders();
+        if (ReferenceEquals(incoming, SectionFilter)) _ = GetRunningProcessesAsync();
     }
 
     // ==================================================================
@@ -2342,10 +2349,12 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void RestoreLanguageDefault()
     {
-        string culture = Localization.NormalizeCulture(CultureInfo.GetCultureInfo(GetUserDefaultUILanguage()).Name);
+        string culture = GetDefaultLanguage();
         ComboLanguage.SelectedItem = ComboLanguage.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), culture, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static string GetDefaultLanguage() => Localization.NormalizeCulture(CultureInfo.GetCultureInfo(GetUserDefaultUILanguage()).Name);
 
     [DllImport("kernel32.dll")]
     private static extern ushort GetUserDefaultUILanguage();
@@ -2511,7 +2520,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         ListConfiguredProcesses.IsEnabled = processFilterEnabled && CurrentProfileProcesses.Count > 0;
         BtnBrowseProcess.IsEnabled = processFilterEnabled;
-        BtnSelectRunningProcess.IsEnabled = processFilterEnabled;
+        BtnSelectRunningProcess.IsEnabled = processFilterEnabled && !_loadingRunningProcesses;
         _settingsHeaders?.Update();
     }
 
@@ -2802,19 +2811,41 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private async void SelectRunningProcess_Click(object sender, RoutedEventArgs e)
     {
-        if (_isClosed || _modalDialogs.ContainsKey(RunningProcessOverlay)) return;
+        if (_isClosed || _loadingRunningProcesses || _modalDialogs.ContainsKey(RunningProcessOverlay)) return;
         int generation = ++_runningProcessLoadGeneration;
         _loadingRunningProcesses = true;
+        BtnSelectRunningProcess.IsEnabled = false;
+        List<ProcessItem> processes;
+        try
+        {
+            processes = await GetRunningProcessesAsync();
+        }
+        finally
+        {
+            _loadingRunningProcesses = false;
+            if (!_isClosed) UpdateEnvironmentFilterInterlock();
+        }
+        if (_isClosed || generation != _runningProcessLoadGeneration) return;
         _allRunningProcesses.Clear();
+        _allRunningProcesses.AddRange(processes.Select(item => new ProcessItem
+        {
+            DisplayName = item.DisplayName, ProcessName = item.ProcessName
+        }));
         SearchRunningProcess.Text = string.Empty;
         ApplyRunningProcessFilter(null);
         _ = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: true);
-        List<ProcessItem> processes = await Task.Run(GetRunningProcesses);
-        if (_isClosed || generation != _runningProcessLoadGeneration) return;
-        _loadingRunningProcesses = false;
-        if (!_modalDialogs.TryGetValue(RunningProcessOverlay, out ModalDialogState? state) || state.CloseRequested) return;
-        _allRunningProcesses.AddRange(processes);
-        ApplyRunningProcessFilter(SearchRunningProcess.Text);
+    }
+
+    private Task<List<ProcessItem>> GetRunningProcessesAsync()
+    {
+        long timestamp = Stopwatch.GetTimestamp();
+        if (_runningProcessSnapshot == null || _runningProcessSnapshot.IsCompleted &&
+            Stopwatch.GetElapsedTime(_runningProcessSnapshotTimestamp, timestamp) >= TimeSpan.FromSeconds(2))
+        {
+            _runningProcessSnapshotTimestamp = timestamp;
+            _runningProcessSnapshot = Task.Run(GetRunningProcesses);
+        }
+        return _runningProcessSnapshot;
     }
 
     private void CloseRunningProcessOverlay_Click(object sender, RoutedEventArgs e)
@@ -2969,27 +3000,31 @@ public sealed partial class ControlPanelWindow : UserControl
         if (scope is ResetScope.Visual or ResetScope.All) RebuildVisualResetItems();
         if (scope is ResetScope.Filter or ResetScope.All) RebuildFilterResetItems();
         if (scope is ResetScope.Screens or ResetScope.All) RebuildScreenResetItems();
-        TxtOverlayVisualReset.Text = Localization.Get(scope switch
+        SetSelectionTitle(ListVisualResetItems, Localization.Get(scope switch
         {
             ResetScope.Basic => "Overlay_BasicReset",
             ResetScope.Filter => "Overlay_FilterReset",
             ResetScope.Screens => "Overlay_ScreenReset",
             ResetScope.All => "Overlay_AllReset",
             _ => "Overlay_VisualReset"
-        });
+        }));
         foreach (VisualResetItem item in VisualResetItems) item.IsSelected = true;
         SearchVisualReset.Text = string.Empty;
         RefreshVisualResetRows(null);
         _ = SetModalOverlayVisibleAsync(VisualResetOverlay, visible: true);
     }
 
-    private void AddPageResetItem(string group, string title, string value, string key, Action restore, Action save, string? selectionId = null) =>
-        VisualResetItems.Add(new VisualResetItem(title, Localization.Format("Reset_DefaultValue", value), restore)
-        { Group = group, SettingKey = key, SelectionId = selectionId, Save = save });
+    private ICollection<VisualResetItem>? _resetItemTarget;
+    private ICollection<VisualResetItem> ResetItemTarget => _resetItemTarget ?? VisualResetItems;
+
+    private void AddPageResetItem(string group, string title, string value, string key, Action restore, Action save, string? selectionId = null, object? defaultValue = null) =>
+        ResetItemTarget.Add(new VisualResetItem(title, Localization.Format("Reset_DefaultValue", value), restore)
+        { Group = group, SettingKey = key, SelectionId = selectionId, Save = save,
+            DefaultValue = defaultValue == null ? null : JsonSerializer.SerializeToElement(defaultValue) });
 
     private void AddToggleResetItem(string group, ToggleSwitch toggle, bool value, string key) =>
         AddPageResetItem(group, toggle.Header?.ToString() ?? string.Empty,
-            Localization.Get(value ? "Basic_DarkModeOn" : "Basic_DarkModeOff"), key, () => toggle.IsOn = value, () => SaveResetValue(key, value));
+            Localization.Get(value ? "Basic_DarkModeOn" : "Basic_DarkModeOff"), key, () => toggle.IsOn = value, () => SaveResetValue(key, value), defaultValue: value);
 
     private static void SaveResetValue(string key, object value)
     {
@@ -3003,14 +3038,14 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         string group = GetResetGroup("Nav_Basic", "Basic_Interface");
         AddPageResetItem(group, TxtBasicLanguage.Text, Localization.Get("Basic_DarkModeSystem"), "UiLanguage", RestoreLanguageDefault,
-            () => SaveResetValue("UiLanguage", GetSelectedLanguage() ?? Localization.CurrentCultureName));
+            () => SaveResetValue("UiLanguage", GetSelectedLanguage() ?? Localization.CurrentCultureName), defaultValue: GetDefaultLanguage());
         AddPageResetItem(group, TxtDarkMode.Text, Localization.Get("Basic_DarkModeSystem"), "DarkMode",
-            () => SelectDarkMode(DarkModeOption.System), () => SaveResetValue("DarkMode", DarkModeOption.System));
+            () => SelectDarkMode(DarkModeOption.System), () => SaveResetValue("DarkMode", DarkModeOption.System), defaultValue: DarkModeOption.System);
         group = GetResetGroup("Nav_Basic", "Basic_Trigger");
         AddToggleResetItem(group, CheckAlwaysTrailEffectSwitch, false, "EnableAlwaysTrailEffect");
         AddToggleResetItem(group, CheckMasterSwitch, true, "IsEffectEnabled");
         AddPageResetItem(group, TxtClickType.Text, Localization.Get("Basic_LeftClick"), "ClickTriggerType",
-            () => RadioClickType.SelectedIndex = 0, () => SaveResetValue("ClickTriggerType", 0));
+            () => RadioClickType.SelectedIndex = 0, () => SaveResetValue("ClickTriggerType", 0), defaultValue: 0);
         foreach (var setting in new[] { (CheckMiddleClickTrigger, "EnableMiddleClickTrigger"),
                      (CheckTouchscreenMode, "IsTouchscreenMode"),
                      (CheckScreenshotCompatibilityMode, "ScreenshotCompatibilityMode") })
@@ -3018,7 +3053,7 @@ public sealed partial class ControlPanelWindow : UserControl
             AddToggleResetItem(group, setting.Item1, false, setting.Item2);
             if (setting.Item1 == CheckTouchscreenMode)
                 AddPageResetItem(group, TxtMaxTouchEffects.Text, "1", "MaxTouchEffects",
-                    () => SliderMaxTouchEffects.Value = 1, () => SaveResetValue("MaxTouchEffects", 1));
+                    () => SliderMaxTouchEffects.Value = 1, () => SaveResetValue("MaxTouchEffects", 1), defaultValue: 1);
         }
         group = GetResetGroup("Nav_Basic", "Basic_Runtime");
         foreach (var setting in new[] { (CheckAutoStart, "AutoStart"), (CheckStartSilent, "StartSilent"),
@@ -3095,9 +3130,10 @@ public sealed partial class ControlPanelWindow : UserControl
             Group = group,
             Restore = restore,
             Save = () => SaveResetValue(key, value),
-            SettingKey = key
+            SettingKey = key,
+            DefaultValue = JsonSerializer.SerializeToElement(value)
         };
-        VisualResetItems.Add(item);
+        ResetItemTarget.Add(item);
     }
 
     private void RebuildVisualResetItems()
@@ -3147,6 +3183,13 @@ public sealed partial class ControlPanelWindow : UserControl
         toolbar.Items.AddRange(list.Items.OfType<SelectionCardItem>());
         foreach (SelectionCardItem item in toolbar.Items) item.PropertyChanged += SelectionItem_PropertyChanged;
         UpdateSelectionToolbar(list);
+    }
+
+    private void SetSelectionTitle(ItemsControl list, string title)
+    {
+        if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
+        toolbar.HeadingText = title;
+        if (toolbar.Heading != null) toolbar.Heading.Text = SelectionGroup.FormatTitle(title, toolbar.Items);
     }
 
     private void SelectionItem_PropertyChanged(object? sender, PropertyChangedEventArgs args)
@@ -3217,6 +3260,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateSelectionToolbar(ItemsControl list)
     {
         if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
+        if (toolbar.Heading != null) toolbar.Heading.Text = SelectionGroup.FormatTitle(toolbar.HeadingText, toolbar.Items);
         bool available = list != ListBackupItems || !_backupBusy;
         UpdateSelectionButtons(toolbar, available);
         toolbar.Confirm.IsEnabled = available && toolbar.Items.Any(item => item.IsSelected);
@@ -3436,6 +3480,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void LoadScreenOptions()
     {
+        _cardResetButtons.RemoveAll(entry => entry.Scope == ResetScope.Screens);
         ScreenOptions.Clear();
         PanelScreenOptions.Children.Clear();
         _screenToggles.Clear();
@@ -3538,11 +3583,12 @@ public sealed partial class ControlPanelWindow : UserControl
     private FrameworkElement CreateScreenRow(ScreenOptionItem item)
     {
         var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new TextBlock
+        var title = new TextBlock
         {
             Text = item.Title,
             Style = TryGetAppResource<Style>("BasSettingTitleStyle")
-        });
+        };
+        text.Children.Add(title);
         text.Children.Add(new TextBlock
         {
             Text = item.ResolutionText,
@@ -3567,6 +3613,11 @@ public sealed partial class ControlPanelWindow : UserControl
             item.IsEnabled = toggle.IsOn;
             QueueSettingsChangeCheck(SettingsSections.Screens);
         };
+        AddCardResetButton(title, text, ResetScope.Screens, "Screen", () =>
+        {
+            item.IsEnabled = true;
+            SyncScreenToggles();
+        }, _ => item.IsEnabled);
 
         var row = new Grid { ColumnSpacing = 16 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -4429,6 +4480,11 @@ public sealed partial class ControlPanelWindow : UserControl
         _pressedToggleSwitch = null;
         _selectedSettingsItem = null;
         _allRunningProcesses.Clear();
+        _runningProcessSnapshot = null;
+        _cardResetButtons.Clear();
+        _sectionResetButtons.Clear();
+        _resetValues.Clear();
+        _resetValueState = null;
         RunningProcessList.Clear();
         VisualResetItems.Clear();
         CurrentProfileProcesses.Clear();

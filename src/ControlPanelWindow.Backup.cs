@@ -38,7 +38,7 @@ public sealed partial class ControlPanelWindow
         BtnImportConfiguration.Content = Localization.Get("Backup_Import");
         BtnBackupCancel.Content = Localization.Get("Overlay_Cancel");
         BtnBackupConfirm.Content = Localization.Get(_backupImport ? "Backup_ConfirmImport" : "Backup_ConfirmExport");
-        TxtBackupSelectionTitle.Text = Localization.Get(_backupImport ? "Backup_SelectImport" : "Backup_SelectExport");
+        SetSelectionTitle(ListBackupItems, Localization.Get(_backupImport ? "Backup_SelectImport" : "Backup_SelectExport"));
         SearchBackupItems.PlaceholderText = Localization.Get("Overlay_SearchSettings");
         BtnExitApplication.Content = Localization.Get("Welcome_Exit");
         BtnRestartApplication.Content = Localization.Get("Welcome_Restart");

@@ -994,4 +994,5 @@
     <data name="Advanced_labelBloomTrailAlphaDescription" xml:space="preserve"><value>ネイティブの軌跡グローの不透明度です。</value></data>
     <data name="Advanced_labelBloomTrailEmissionDescription" xml:space="preserve"><value>軌跡から Bloom に入力する発光エネルギーです。</value></data>
     <data name="Advanced_labelBloomTrailCoverageDescription" xml:space="preserve"><value>軌跡のグロー源の幅の倍率です。</value></data>
+    <data name="Settings_ResetItem" xml:space="preserve"><value>この設定をリセット</value></data>
 </root>

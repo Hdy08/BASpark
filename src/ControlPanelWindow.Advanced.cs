@@ -124,6 +124,9 @@ public sealed partial class ControlPanelWindow
         }
         control.Tag = setting;
         _advancedControls[setting.Path] = control;
+        AddCardResetButton(label, text, ResetScope.Visual, setting.Key,
+            () => SetAdvancedControlValue(setting.Path, setting.DefaultValue),
+            state => IsDefaultSettingValue(state, setting.Key, setting.DefaultValue));
         Grid.SetColumn(content, 1);
         grid.Children.Add(content);
         return new Border { Style = (Style)Application.Current.Resources["BasSettingCardStyle"], Child = grid };
@@ -133,7 +136,8 @@ public sealed partial class ControlPanelWindow
     {
         Grid grid = CreateAdvancedCardGrid();
         var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(CreateAdvancedLabel("Advanced_HdrPreset", "BasSettingTitleStyle"));
+        TextBlock title = CreateAdvancedLabel("Advanced_HdrPreset", "BasSettingTitleStyle");
+        text.Children.Add(title);
         text.Children.Add(CreateAdvancedLabel("Advanced_HdrHint", "BasCaptionStyle"));
         grid.Children.Add(text);
         _hdrPreset = new ComboBox { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
@@ -154,6 +158,12 @@ public sealed partial class ControlPanelWindow
         _comboWidthTrackers.Add(new(_hdrPreset));
         Grid.SetColumn(_hdrPreset, 1);
         grid.Children.Add(_hdrPreset);
+        AddCardResetButton(title, text, ResetScope.Visual, "HdrPreset", () =>
+        {
+            foreach (string path in HdrPaths)
+                SetAdvancedControlValue(path, AdvancedFxSettings.Definitions.Single(item => item.Path == path).DefaultValue);
+        }, state => HdrPaths.Select(path => AdvancedFxSettings.Definitions.Single(item => item.Path == path))
+            .All(setting => IsDefaultSettingValue(state, setting.Key, setting.DefaultValue)));
         return new Border { Style = (Style)Application.Current.Resources["BasSettingCardStyle"], Child = grid };
     }
 
@@ -311,6 +321,6 @@ public sealed partial class ControlPanelWindow
                     Dictionary<string, JsonElement> values = AdvancedFxSettings.Parse(ConfigManager.BaClickAdvancedSettings);
                     values.Remove(definition.Path);
                     SaveResetValue("BaClickAdvancedSettings", AdvancedFxSettings.Serialize(values));
-                });
+                }, defaultValue: definition.DefaultValue);
     }
 }

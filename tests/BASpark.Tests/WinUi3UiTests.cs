@@ -2776,7 +2776,7 @@ public class WinUi3UiTests
             .Select(style => (string?)style.Attribute(Xaml + "Key"))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
-        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle", "DefaultComboBoxItemStyle", "DefaultFlyoutPresenterStyle", "DefaultExpanderStyle",
+        styleKeys.UnionWith(new[] { "DefaultContentDialogStyle", "DefaultToggleButtonStyle", "DefaultInfoBarStyle", "DefaultToggleSwitchStyle", "DefaultHyperlinkButtonStyle", "DefaultComboBoxItemStyle", "DefaultFlyoutPresenterStyle", "DefaultExpanderStyle", "SubtleButtonStyle",
             "TitleTextBlockStyle", "SubtitleTextBlockStyle", "BodyTextBlockStyle", "BodyStrongTextBlockStyle", "BodyLargeTextBlockStyle", "CaptionTextBlockStyle" });
 
         foreach (XElement style in styles.Where(style => style.Attribute("BasedOn") is not null))
@@ -3122,7 +3122,7 @@ public class WinUi3UiTests
         XElement check = GetNamedElement(panel, "SelectionCardCheck");
         Assert.Equal("Right", (string?)check.Attribute("HorizontalAlignment"));
         Assert.Equal("1", (string?)check.Attribute("Grid.Column"));
-        Assert.Equal("{x:Bind IsSelected, Mode=TwoWay}", (string?)check.Attribute("IsChecked"));
+        Assert.Equal("{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}", (string?)check.Attribute("IsChecked"));
     }
 
     [Fact]
@@ -3353,7 +3353,11 @@ public class WinUi3UiTests
         Assert.DoesNotContain("ResetConfig_Click", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         foreach (string name in new[] { "BtnBasicReset", "BtnVisualReset", "BtnFilterReset" })
-            Assert.Contains(name + ".Content = Localization.Get(\"Settings_ResetPage\")", source, StringComparison.Ordinal);
+        {
+            Assert.Equal("{StaticResource BasInlineResetButtonStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
+            Assert.Single(GetNamedElement(panel, name).Elements(), item => item.Name.LocalName == "FontIcon");
+        }
+        Assert.Contains("Localization.Get(\"Settings_ResetPage\")", ReadSource("src", "ControlPanelWindow.Pages.cs"), StringComparison.Ordinal);
         Assert.DoesNotContain(panel.Descendants(), item => (string?)item.Attribute(Xaml + "Name") == "BtnScreensReset");
         foreach (string file in new[] { "Strings.resx", "Strings.en.resx", "Strings.ja.resx" })
         {
@@ -4017,7 +4021,7 @@ public class WinUi3UiTests
     {
         string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
         string reset = source[source.IndexOf("private void ResetSection_Click", StringComparison.Ordinal)..source.IndexOf("private void ApplyPageRuntimeSettings", StringComparison.Ordinal)];
-        Assert.Contains("item.Restore?.Invoke()", reset, StringComparison.Ordinal);
+        Assert.Contains("foreach (Action restore in restores) restore()", reset, StringComparison.Ordinal);
         Assert.Contains("ApplyBackupValuesToPanel(_savedSettingsState.GetValues(CurrentSettingsPage), animate: true)", reset, StringComparison.Ordinal);
         Assert.DoesNotContain("ConfigManager.Save", reset, StringComparison.Ordinal);
         Assert.DoesNotContain("App.Overlay", reset, StringComparison.Ordinal);
@@ -4088,6 +4092,100 @@ public class WinUi3UiTests
         Assert.True(second.IsSelected);
         Assert.True(otherGroup.IsSelected);
         Assert.False(hidden.IsSelected);
+    }
+
+    [Fact]
+    public void SelectionCounts_ReflectOnlyTheRowsTargetedByEachToolbar()
+    {
+        SelectionCardItem[] items = [new ProcessItem { IsSelected = true }, new ProcessItem(), new ProcessItem { IsSelected = true }];
+        Assert.Equal("Settings (2/3)", SelectionGroup.FormatTitle("Settings", items));
+        Assert.Equal("Settings (1/2)", SelectionGroup.FormatTitle("Settings", items.Take(2).ToArray()));
+        var group = new SelectionGroup("Visual", null!, items.ToList(), false);
+        string? property = null;
+        group.PropertyChanged += (_, args) => property = args.PropertyName;
+        SelectionBatch.Change(items, invert: true);
+        group.RefreshSelectionCount();
+        Assert.Equal("Visual (1/3)", group.TitleWithCount);
+        Assert.Equal(nameof(SelectionGroup.TitleWithCount), property);
+        SelectionBatch.Change(items, invert: false);
+        Assert.Equal("Settings (3/3)", SelectionGroup.FormatTitle("Settings", items));
+        Assert.Equal("Empty (0/0)", SelectionGroup.FormatTitle("Empty", []));
+    }
+
+    [Theory]
+    [InlineData("1", "1.00", true)]
+    [InlineData("0.30000000000000004", "0.3", true)]
+    [InlineData("0.31", "0.3", false)]
+    [InlineData("true", "false", false)]
+    [InlineData("true", "true", true)]
+    [InlineData("\"1\"", "1", false)]
+    public void InlineReset_DefaultChecksRespectValueTypesAndNumericPrecision(string current, string expected, bool equal)
+    {
+        using var value = System.Text.Json.JsonDocument.Parse(current);
+        using var defaultValue = System.Text.Json.JsonDocument.Parse(expected);
+        Assert.Equal(equal, ControlPanelWindow.SettingValuesEqual(value.RootElement, defaultValue.RootElement));
+    }
+
+    [Fact]
+    public void InlineReset_PageIconsFollowTheirTitlesAndUseTheNativeSubtleButtonTemplate()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        XElement title = GetNamedElement(panel, "TxtSettingsTitle");
+        foreach (string name in new[] { "BtnBasicReset", "BtnVisualReset", "BtnFilterReset" })
+        {
+            XElement button = GetNamedElement(panel, name);
+            Assert.Same(title.Parent, button.Parent);
+            Assert.Null(button.Attribute("Content"));
+            Assert.Equal("{StaticResource BasInlineResetButtonStyle}", (string?)button.Attribute("Style"));
+            Assert.Single(button.Elements(), item => item.Name.LocalName == "FontIcon");
+        }
+        XElement style = Assert.Single(LoadXaml("src", "DesignSystem.xaml").Descendants(Presentation + "Style"),
+            item => (string?)item.Attribute(Xaml + "Key") == "BasInlineResetButtonStyle");
+        Assert.Equal("{StaticResource SubtleButtonStyle}", (string?)style.Attribute("BasedOn"));
+        Assert.Contains(style.Elements(), item => (string?)item.Attribute("Property") == "Background" && (string?)item.Attribute("Value") == "Transparent");
+        Assert.Contains(style.Elements(), item => (string?)item.Attribute("Property") == "BorderThickness" && (string?)item.Attribute("Value") == "0");
+        Assert.DoesNotContain(style.Elements(), item => (string?)item.Attribute("Property") == "Template");
+    }
+
+    [Fact]
+    public void RunningProcessPicker_PreparesTheFirstSnapshotBeforeShowingTheList()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string open = source[source.IndexOf("private async void SelectRunningProcess_Click", StringComparison.Ordinal)..
+            source.IndexOf("private void CloseRunningProcessOverlay_Click", StringComparison.Ordinal)];
+        Assert.True(open.IndexOf("await GetRunningProcessesAsync()", StringComparison.Ordinal) < open.IndexOf("ApplyRunningProcessFilter(null)", StringComparison.Ordinal));
+        Assert.True(open.IndexOf("ApplyRunningProcessFilter(null)", StringComparison.Ordinal) < open.IndexOf("SetModalOverlayVisibleAsync", StringComparison.Ordinal));
+        Assert.Contains("Task.Run(GetRunningProcesses)", open, StringComparison.Ordinal);
+        Assert.Contains("generation != _runningProcessLoadGeneration", open, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MouseInputHook_CopiesNativeInputAndLetsTheUiDrainItWithoutBlockingTheHook()
+    {
+        var work = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+        var inputs = new List<NativeMethods.MSLLHOOKSTRUCT>();
+        using var hook = new MouseInputHook(action => { work.Enqueue(action); return true; }, (_, input) => inputs.Add(input));
+        Assert.NotEqual(IntPtr.Zero, hook.Handle);
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var thread = Assert.IsType<Thread>(typeof(MouseInputHook).GetField("_thread", members)!.GetValue(hook));
+        Assert.NotEqual(Environment.CurrentManagedThreadId, thread.ManagedThreadId);
+        var callback = Assert.IsType<NativeMethods.MouseHookProc>(typeof(MouseInputHook).GetField("_callback", members)!.GetValue(hook));
+        var input = new NativeMethods.MSLLHOOKSTRUCT { pt = new NativeMethods.POINT { x = -120, y = 480 }, dwExtraInfo = new UIntPtr(0xBA5A7755) };
+        IntPtr buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MSLLHOOKSTRUCT>());
+        try
+        {
+            System.Runtime.InteropServices.Marshal.StructureToPtr(input, buffer, false);
+            callback(0, new IntPtr(NativeMethods.WM_MOUSEMOVE), buffer);
+        }
+        finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer); }
+        Assert.Empty(inputs);
+        while (work.TryDequeue(out Action? drain)) drain();
+        var copied = Assert.Single(inputs, item => item.dwExtraInfo == input.dwExtraInfo);
+        Assert.Equal(input.pt.x, copied.pt.x);
+        Assert.Equal(input.pt.y, copied.pt.y);
+        hook.Dispose();
+        Assert.False(thread.IsAlive);
+        Assert.Equal(IntPtr.Zero, hook.Handle);
     }
 
     private static XElement GetSettingCard(XElement control) =>
