@@ -198,7 +198,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
 public sealed partial class ControlPanelWindow
 {
     private sealed record SectionResetRequest(ResetScope Scope, string? GroupKey);
-    private sealed record CardResetButton(Button Button, TextBlock Label, ResetScope Scope, string Key, Action Restore, Func<SettingsState, bool> IsDefault);
+    private sealed record CardResetButton(Button Button, TextBlock Label, ResetScope Scope, string Key, Action Restore, Func<SettingsState, bool> IsDefault, bool IsGroup);
     private sealed record StickyHeading(FrameworkElement Anchor, TextBlock Label, object? Action, Func<bool> Visible);
 
     private sealed class ResetButtonAnimation(Button button) : IDisposable
@@ -369,6 +369,9 @@ public sealed partial class ControlPanelWindow
     private StickySectionTracker? _aboutHeaders;
     private readonly List<CardResetButton> _cardResetButtons = [];
     private readonly Dictionary<Button, ResetButtonAnimation> _resetButtonAnimations = [];
+    private readonly Dictionary<TextBlock, TranslateTransform> _rowTextTransforms = [];
+    private readonly Dictionary<(string Family, double Size, ushort Weight, string Language, double Scale, bool Cjk), double> _rowTextOffsets = [];
+    private readonly Windows.UI.ViewManagement.UISettings _rowTextUiSettings = new();
     private readonly List<(Button Button, TextBlock Label, SectionResetRequest Request)> _sectionResetButtons = [];
     private SettingsState? _resetValueState;
     private readonly Dictionary<string, JsonElement> _resetValues = new(StringComparer.Ordinal);
@@ -471,21 +474,17 @@ public sealed partial class ControlPanelWindow
         _aboutHeaders?.Update(true);
     }
 
-    private void ConfigureResetButton(Button button, TextBlock label)
+    private void ConfigureResetButton(Button button, TextBlock label, bool standardSize = false)
     {
+        AlignRowText(label);
         button.Style = (Style)Application.Current.Resources["BasInlineResetButtonStyle"];
-        var reference = new TextBlock { Text = "Ag", Style = (Style)Application.Current.Resources["BasSectionTitleStyle"],
+        var reference = new TextBlock { Style = (Style)Application.Current.Resources["BasSettingsPageTitleStyle"],
             IsTextScaleFactorEnabled = false };
-        reference.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         void UpdateSize()
         {
-            var line = new TextBlock { Text = label.Text, FontFamily = label.FontFamily, FontSize = label.FontSize,
-                FontWeight = label.FontWeight, LineHeight = label.LineHeight, TextWrapping = TextWrapping.NoWrap,
-                IsTextScaleFactorEnabled = label.IsTextScaleFactorEnabled };
-            line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            button.Height = button.Width = line.DesiredSize.Height;
-            double scale = button.Height / reference.DesiredSize.Height;
-            button.Padding = new Thickness(2 * scale);
+            double scale = standardSize ? 1 : label.FontSize / reference.FontSize;
+            button.Height = button.Width = 32 * scale;
+            button.Padding = new Thickness(4 * scale);
             if (button.Content is FontIcon icon)
             {
                 icon.IsTextScaleFactorEnabled = false;
@@ -496,6 +495,48 @@ public sealed partial class ControlPanelWindow
         label.SizeChanged += (_, _) => UpdateSize();
         button.VerticalAlignment = VerticalAlignment.Center;
         ConfigureResetButtonAnimations(button);
+    }
+
+    private void SetupRowTextAlignment()
+    {
+        foreach (TextBlock label in SettingElements((UIElement)Content).OfType<TextBlock>())
+            if (label.Style != null && new[] { "BasSettingsPageTitleStyle", "BasSectionTitleStyle", "BasSettingsSectionTitleStyle",
+                    "BasSettingTitleStyle", "BasCaptionStyle", "BasAdvancedGroupTitleStyle", "BasAdvancedSectionTitleStyle", "BasPageSubtitleStyle" }
+                .Any(key => label.Style == (Style)Application.Current.Resources[key])) AlignRowText(label);
+    }
+
+    private void AlignRowText(TextBlock label)
+    {
+        if (!_rowTextTransforms.TryGetValue(label, out TranslateTransform? transform))
+        {
+            transform = new TranslateTransform();
+            label.RenderTransform = transform;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            _rowTextTransforms.Add(label, transform);
+            label.SizeChanged += RowText_SizeChanged;
+        }
+        bool cjk = label.Text.Any(character => character is >= '\u2E80' and <= '\u9FFF');
+        double scale = label.IsTextScaleFactorEnabled ? _rowTextUiSettings.TextScaleFactor : 1;
+        var key = (label.FontFamily.Source, label.FontSize, label.FontWeight.Weight, label.Language, scale, cjk);
+        if (!_rowTextOffsets.TryGetValue(key, out double offset))
+        {
+            var measurement = new TextBlock { Text = cjk ? "设" : "Ag", FontFamily = label.FontFamily, FontSize = label.FontSize,
+                FontWeight = label.FontWeight, FontStyle = label.FontStyle, FontStretch = label.FontStretch,
+                Language = label.Language, IsTextScaleFactorEnabled = label.IsTextScaleFactorEnabled,
+                TextLineBounds = TextLineBounds.TrimToCapHeight };
+            measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double capHeight = measurement.DesiredSize.Height;
+            measurement.TextLineBounds = TextLineBounds.TrimToBaseline;
+            measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            offset = (capHeight - measurement.DesiredSize.Height) / 2;
+            _rowTextOffsets[key] = offset;
+        }
+        transform.Y = offset;
+    }
+
+    private void RowText_SizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (!_isClosed && sender is TextBlock label) AlignRowText(label);
     }
 
     private void ConfigureResetButtonAnimations(Button button)
@@ -580,7 +621,7 @@ public sealed partial class ControlPanelWindow
             profile.Processes.Clear();
             RefreshCurrentProfileProcesses(profile);
         }, state => GetPendingProfile(state)?.GetProperty("Processes").GetArrayLength() == 0);
-        foreach (Button button in new[] { BtnBasicReset, BtnVisualReset, BtnFilterReset }) ConfigureResetButton(button, TxtSettingsTitle);
+        foreach (Button button in new[] { BtnBasicReset, BtnVisualReset, BtnFilterReset }) ConfigureResetButton(button, TxtSettingsTitle, standardSize: true);
         ConfigureResetButton(BtnResetSection, TxtActiveSettingsSection);
         RefreshResetButtonVisibility();
     }
@@ -620,7 +661,7 @@ public sealed partial class ControlPanelWindow
         return null;
     }
 
-    private void AddCardResetButton(TextBlock label, Panel panel, ResetScope scope, string key, Action restore, Func<SettingsState, bool> isDefault)
+    private void AddCardResetButton(TextBlock label, Panel panel, ResetScope scope, string key, Action restore, Func<SettingsState, bool> isDefault, bool isGroup = false)
     {
         int index = panel.Children.IndexOf(label);
         int column = Grid.GetColumn(label);
@@ -634,7 +675,7 @@ public sealed partial class ControlPanelWindow
         heading.Children.Add(label);
         var button = new Button { Visibility = Visibility.Collapsed, Content = new FontIcon { Glyph = "\uE777", FontSize = 16 } };
         ConfigureResetButton(button, label);
-        var request = new CardResetButton(button, label, scope, key, restore, isDefault);
+        var request = new CardResetButton(button, label, scope, key, restore, isDefault, isGroup);
         button.Tag = request;
         button.Click += CardReset_Click;
         Grid.SetColumn(button, 1);
@@ -721,7 +762,7 @@ public sealed partial class ControlPanelWindow
         {
             SetResetButtonVisibility(entry.Button, !entry.IsDefault(_currentSettingsState), animate);
             entry.Button.IsEnabled = !_isApplyingSettings;
-            string label = Localization.Get("Settings_ResetItem");
+            string label = Localization.Get(entry.IsGroup ? "Settings_ResetSection" : "Settings_ResetItem");
             SetResetButtonLabel(entry.Button, label, $"{label}: {entry.Label.Text}");
         }
         foreach (var entry in _sectionResetButtons)
@@ -848,7 +889,11 @@ public sealed partial class ControlPanelWindow
 
     private void SelectionCard_Loaded(object sender, RoutedEventArgs args)
     {
-        if (sender is FrameworkElement card) UpdateSelectionCardBinding(card);
+        if (sender is FrameworkElement card)
+        {
+            UpdateSelectionCardBinding(card);
+            foreach (TextBlock label in SettingElements(card).OfType<TextBlock>()) AlignRowText(label);
+        }
     }
 
     private void SelectionCard_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args) => UpdateSelectionCardBinding(sender);
@@ -870,7 +915,12 @@ public sealed partial class ControlPanelWindow
         else check.ClearValue(CheckBox.IsCheckedProperty);
     }
 
-    private void SelectionHeading_Loaded(object sender, RoutedEventArgs args) => InitializeSelectionHeading(sender);
+    private void SelectionHeading_Loaded(object sender, RoutedEventArgs args)
+    {
+        InitializeSelectionHeading(sender);
+        if (sender is Grid header)
+            foreach (TextBlock label in header.Children.OfType<TextBlock>()) AlignRowText(label);
+    }
     private void SelectionHeading_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args) => InitializeSelectionHeading(sender);
 
     private void InitializeSelectionHeading(object sender)

@@ -36,7 +36,7 @@ public sealed partial class ControlPanelWindow
     {
         foreach (var group in AdvancedFxSettings.Definitions.GroupBy(item => item.GroupKey))
         {
-            PanelBaClickAdvanced.Children.Add(CreateAdvancedLabel(group.Key, "BasAdvancedGroupTitleStyle"));
+            PanelBaClickAdvanced.Children.Add(CreateAdvancedHeading(group.Key, "BasAdvancedGroupTitleStyle", group));
             foreach (var section in group.GroupBy(item => item.SectionKey))
             {
                 var content = new StackPanel();
@@ -48,7 +48,7 @@ public sealed partial class ControlPanelWindow
                 PanelBaClickAdvanced.Children.Add(new Expander
                 {
                     Style = (Style)Application.Current.Resources["BasAdvancedExpanderStyle"],
-                    Header = CreateAdvancedLabel(section.Key, "BasAdvancedSectionTitleStyle"),
+                    Header = CreateAdvancedHeading(section.Key, "BasAdvancedSectionTitleStyle", section),
                     Content = content, IsExpanded = false,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -56,6 +56,21 @@ public sealed partial class ControlPanelWindow
                 });
             }
         }
+    }
+
+    private StackPanel CreateAdvancedHeading(string key, string styleKey, IEnumerable<AdvancedFxSetting> settings)
+    {
+        var heading = new StackPanel();
+        TextBlock label = CreateAdvancedLabel(key, styleKey);
+        heading.Children.Add(label);
+        AdvancedFxSetting[] definitions = settings.ToArray();
+        AddCardResetButton(label, heading, ResetScope.Visual, AdvancedFxSettings.KeyPrefix + key,
+            () =>
+            {
+                foreach (AdvancedFxSetting setting in definitions)
+                    SetAdvancedControlValue(setting.Path, setting.DefaultValue);
+            }, state => definitions.All(setting => IsDefaultSettingValue(state, setting.Key, setting.DefaultValue)), isGroup: true);
+        return heading;
     }
 
     private TextBlock CreateAdvancedLabel(string key, string styleKey)

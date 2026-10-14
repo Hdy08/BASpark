@@ -4210,7 +4210,7 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void InlineReset_PageIconsFollowTheirTitlesAndUseTheNativeSubtleButtonTemplate()
+    public void InlineReset_PageIconsUseStandardSizingAndOtherIconsFollowTypography()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         XElement title = GetNamedElement(panel, "TxtSettingsTitle");
@@ -4231,8 +4231,11 @@ public class WinUi3UiTests
         string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
         string sizing = pages[pages.IndexOf("private void ConfigureResetButton", StringComparison.Ordinal)..
             pages.IndexOf("private static void SetResetButtonLabel", StringComparison.Ordinal)];
-        Assert.Contains("button.Height / reference.DesiredSize.Height", sizing, StringComparison.Ordinal);
-        Assert.Contains("button.Padding = new Thickness(2 * scale)", sizing, StringComparison.Ordinal);
+        Assert.Contains("label.FontSize / reference.FontSize", sizing, StringComparison.Ordinal);
+        Assert.Contains("Application.Current.Resources[\"BasSettingsPageTitleStyle\"]", sizing, StringComparison.Ordinal);
+        Assert.Contains("button.Height = button.Width = 32 * scale", sizing, StringComparison.Ordinal);
+        Assert.Contains("button.Padding = new Thickness(4 * scale)", sizing, StringComparison.Ordinal);
+        Assert.Contains("ConfigureResetButton(button, TxtSettingsTitle, standardSize: true)", pages, StringComparison.Ordinal);
         Assert.Contains("icon.FontSize = 16 * scale", sizing, StringComparison.Ordinal);
         Assert.Contains("icon.IsTextScaleFactorEnabled = false", sizing, StringComparison.Ordinal);
         Assert.Contains("ConfigureResetButtonAnimations(button)", sizing, StringComparison.Ordinal);
@@ -4251,6 +4254,42 @@ public class WinUi3UiTests
         Assert.Contains("_show(active, animateResetButtons)", pages, StringComparison.Ordinal);
         Assert.Contains("UpdateApplySettingsState(SettingsSections.All, animateResetButtons: true)", pages, StringComparison.Ordinal);
         Assert.Contains("RefreshResetButtonVisibility(animateResetButtons)", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdvancedFx_GroupAndSectionHeadingsResetOnlyTheirOwnPendingSettings()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.Advanced.cs");
+        Assert.Contains("CreateAdvancedHeading(group.Key, \"BasAdvancedGroupTitleStyle\", group)", source, StringComparison.Ordinal);
+        Assert.Contains("CreateAdvancedHeading(section.Key, \"BasAdvancedSectionTitleStyle\", section)", source, StringComparison.Ordinal);
+        string heading = source[source.IndexOf("private StackPanel CreateAdvancedHeading", StringComparison.Ordinal)..
+            source.IndexOf("private TextBlock CreateAdvancedLabel", StringComparison.Ordinal)];
+        Assert.Contains("AddCardResetButton(label, heading, ResetScope.Visual", heading, StringComparison.Ordinal);
+        Assert.Contains("settings.ToArray()", heading, StringComparison.Ordinal);
+        Assert.Contains("foreach (AdvancedFxSetting setting in definitions)", heading, StringComparison.Ordinal);
+        Assert.Contains("SetAdvancedControlValue(setting.Path, setting.DefaultValue)", heading, StringComparison.Ordinal);
+        Assert.Contains("definitions.All(setting => IsDefaultSettingValue(state, setting.Key, setting.DefaultValue))", heading, StringComparison.Ordinal);
+        Assert.Contains("isGroup: true", heading, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConfigManager.Save", heading, StringComparison.Ordinal);
+        Assert.DoesNotContain("App.Overlay", heading, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PanelRows_CenterTextUsingCachedFontMetricsWithoutTrimmingDisplayedGlyphs()
+    {
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        string alignment = pages[pages.IndexOf("private void SetupRowTextAlignment", StringComparison.Ordinal)..
+            pages.IndexOf("private void ConfigureResetButtonAnimations", StringComparison.Ordinal)];
+        Assert.Contains("label.VerticalAlignment = VerticalAlignment.Center", alignment, StringComparison.Ordinal);
+        Assert.Contains("_rowTextOffsets.TryGetValue", alignment, StringComparison.Ordinal);
+        Assert.Contains("TextLineBounds = TextLineBounds.TrimToCapHeight", alignment, StringComparison.Ordinal);
+        Assert.Contains("measurement.TextLineBounds = TextLineBounds.TrimToBaseline", alignment, StringComparison.Ordinal);
+        Assert.Contains("transform.Y = offset", alignment, StringComparison.Ordinal);
+        Assert.DoesNotContain("label.TextLineBounds =", alignment, StringComparison.Ordinal);
+        string panel = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        Assert.Contains("SetupRowTextAlignment()", panel, StringComparison.Ordinal);
+        Assert.Contains("label.SizeChanged -= RowText_SizeChanged", panel, StringComparison.Ordinal);
+        Assert.Contains("_rowTextOffsets.Clear()", panel, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -556,6 +556,7 @@ public sealed partial class ControlPanelWindow : UserControl
             InitializeSettingsTracking();
             SetupPageHeaders();
             SetupCardResetButtons();
+            SetupRowTextAlignment();
 
             _host.CloseRequested += ControlPanelWindow_Closed;
             _host.SizeChanged += (_, _) => UpdateCaptionButtonState();
@@ -4538,6 +4539,9 @@ public sealed partial class ControlPanelWindow : UserControl
         _runningProcessSnapshot = null;
         foreach (ResetButtonAnimation animation in _resetButtonAnimations.Values) animation.Dispose();
         _resetButtonAnimations.Clear();
+        foreach (TextBlock label in _rowTextTransforms.Keys) label.SizeChanged -= RowText_SizeChanged;
+        _rowTextTransforms.Clear();
+        _rowTextOffsets.Clear();
         _cardResetButtons.Clear();
         _sectionResetButtons.Clear();
         _resetValues.Clear();
