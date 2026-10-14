@@ -91,7 +91,8 @@ public sealed partial class InstallerWindow : UserControl
         ConfirmTitle.Text = Text("Installer_ConfirmTitle");
         ConfirmDescription.Text = Text(_session.IsUpdate ? "Installer_UpdateDescription" : "Installer_ConfirmDescription");
         DirectoryLabel.Text = CompleteDirectoryLabel.Text = Text("Installer_Directory");
-        BtnBrowse.Content = Text("Installer_Browse");
+        ToolTipService.SetToolTip(BtnBrowse, Text("Installer_Browse"));
+        AutomationProperties.SetName(BtnBrowse, Text("Installer_Browse"));
         StartMenuLabel.Text = Text("Installer_StartMenu");
         CheckDesktop.Content = Text("Installer_DesktopShortcut");
         CertificateConsent.Text = Text("Installer_CertificateConsent");
@@ -255,7 +256,7 @@ public sealed partial class InstallerWindow : UserControl
             if (update.Message is string message)
             {
                 foreach (string line in message.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                    _output.Enqueue($"[{DateTime.Now:HH:mm:ss.fff}] [INFO] {line.TrimEnd('\r')}");
+                    _output.Enqueue(InstallerSession.FormatOutputLine(line, DateTime.Now));
                 while (_output.Count > 800) _output.Dequeue();
                 OutputText.Text = string.Join(Environment.NewLine, _output);
                 OutputScroller.ChangeView(null, OutputScroller.ScrollableHeight, null, disableAnimation: true);

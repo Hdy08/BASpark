@@ -139,7 +139,9 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBox x:Name="DirectoryInput" VerticalAlignment="Center" VerticalContentAlignment="Center"
                                          Loaded="Input_Loaded" TextChanged="Directory_Changed" />
-                                <Button x:Name="BtnBrowse" Grid.Column="1" Click="Browse_Click" />
+                                <Button x:Name="BtnBrowse" Grid.Column="1" Width="32" Height="32" Padding="0" Click="Browse_Click">
+                                    <FontIcon Glyph="&#xEC50;" FontSize="16" />
+                                </Button>
                             </Grid>
                         </Grid>
                     </Border>

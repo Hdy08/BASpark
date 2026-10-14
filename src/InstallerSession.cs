@@ -102,6 +102,18 @@ internal sealed class InstallerSession : IInstallerBackend
         return arguments.ToArray();
     }
 
+    internal static string FormatOutputLine(string line, DateTime timestamp)
+    {
+        if (line.Length > 23 && char.IsWhiteSpace(line[23]) &&
+            DateTime.TryParseExact(line[..23], "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out DateTime originalTimestamp))
+        {
+            timestamp = originalTimestamp;
+            line = line[23..].TrimStart();
+        }
+        return $"[{timestamp:HH:mm:ss.fff}] [INFO] {line.TrimEnd('\r')}";
+    }
+
     public async Task RunAsync(InstallerChoices choices, string culture, IProgress<InstallerProgress> progress)
     {
         string? invalid = Validate(choices);

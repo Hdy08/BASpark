@@ -98,4 +98,14 @@ public sealed class InstallerSessionTests
         Assert.DoesNotContain(arguments, argument => argument.StartsWith("/DIR=", StringComparison.Ordinal));
         Assert.DoesNotContain(arguments, argument => argument.StartsWith("/TASKS=", StringComparison.Ordinal));
     }
+
+    [Theory]
+    [InlineData("2026-10-15 09:28:03.452   Setup started", "[09:28:03.452] [INFO] Setup started")]
+    [InlineData("2026-10-15 09:28:03.452   Uninstall started\r", "[09:28:03.452] [INFO] Uninstall started")]
+    [InlineData("Operation complete", "[12:34:56.789] [INFO] Operation complete")]
+    [InlineData("2026-10-15 is not a log timestamp", "[12:34:56.789] [INFO] 2026-10-15 is not a log timestamp")]
+    public void Output_PreservesBackendTimeWithoutRepeatingTheTimestamp(string line, string expected)
+    {
+        Assert.Equal(expected, InstallerSession.FormatOutputLine(line, new DateTime(2026, 10, 15, 12, 34, 56, 789)));
+    }
 }

@@ -101,12 +101,20 @@ japanese.UiAccessPreviousLocationRequired=Program Files\BASpark 以外に既存�
 #endif
 
 [Files]
-Source: "{#PublishedSource}\*"; DestDir: "{tmp}\BASpark.Setup"; Flags: dontcopy recursesubdirs createallsubdirs; Excludes: "BASpark.UIAccess.cer"
+Source: "{#PublishedSource}\BASpark.Setup.files"; DestDir: "{tmp}\BASpark.Setup"; Flags: dontcopy solidbreak
+#define FrontendFileHandle FileOpen(AddBackslash(PublishedSourceRoot) + "BASpark.Setup.files")
+#define FrontendFile ""
+#sub AddInstallerFrontendFile
+Source: "{#PublishedSource}\{#FrontendFile}"; DestDir: "{tmp}\BASpark.Setup\{#ExtractFileDir(FrontendFile)}"; Flags: dontcopy
+#endsub
+#for {FrontendFile = FileRead(FrontendFileHandle); FrontendFile != ""; FrontendFile = FileRead(FrontendFileHandle)} AddInstallerFrontendFile
+#expr FileClose(FrontendFileHandle)
+Source: "{#PublishedSource}\BASpark.exe"; DestDir: "{app}"; Flags: ignoreversion solidbreak
 #ifdef UiAccessCertificateThumbprint
-Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "BASpark.UIAccess.cer"
+Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "BASpark.exe,BASpark.UIAccess.cer"
 Source: "{#PublishedSource}\BASpark.UIAccess.cer"; Flags: dontcopy
 #else
-Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "BASpark.exe"
 #endif
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
@@ -221,30 +229,28 @@ end;
 
 function CopyInstallerFrontend(SourceDirectory, TargetDirectory: String): Boolean;
 var
-  Entry: TFindRec;
+  Files: TArrayOfString;
+  Index: Integer;
   SourceFile: String;
   TargetFile: String;
 begin
-  Result := ForceDirectories(TargetDirectory);
+  Result := LoadStringsFromFile(AddBackslash(SourceDirectory) +
+    'BASpark.Setup.files', Files);
   if not Result then Exit;
-  if FindFirst(AddBackslash(SourceDirectory) + '*', Entry) then
+  for Index := 0 to GetArrayLength(Files) - 1 do
   begin
-    try
-      repeat
-        if (Entry.Name = '.') or (Entry.Name = '..') or
-           (Pos('unins', Lowercase(Entry.Name)) = 1) or
-           ((Entry.Attributes and $400) <> 0) then Continue;
-        SourceFile := AddBackslash(SourceDirectory) + Entry.Name;
-        TargetFile := AddBackslash(TargetDirectory) + Entry.Name;
-        if (Entry.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
-          Result := CopyInstallerFrontend(SourceFile, TargetFile)
-        else
-          Result := FileCopy(SourceFile, TargetFile, False);
-        if not Result then Exit;
-      until not FindNext(Entry);
-    finally
-      FindClose(Entry);
+    if (Files[Index] = '') or (Pos('..', Files[Index]) > 0) or
+       (Pos(':', Files[Index]) > 0) or (Pos('\', Files[Index]) = 1) or
+       (Pos('/', Files[Index]) = 1) then
+    begin
+      Result := False;
+      Exit;
     end;
+    SourceFile := AddBackslash(SourceDirectory) + Files[Index];
+    TargetFile := AddBackslash(TargetDirectory) + Files[Index];
+    Result := ForceDirectories(ExtractFileDir(TargetFile)) and
+      FileCopy(SourceFile, TargetFile, False);
+    if not Result then Exit;
   end;
 end;
 
@@ -257,7 +263,7 @@ begin
   if not UninstallSilent then
   begin
     FrontendDirectory := AddBackslash(GetEnv('TEMP')) + 'BASpark.Setup\' +
-      GetDateTimeString('yyyymmddhhnnsszzz', '', '') + '-' + IntToStr(Random(1000000));
+      GetDateTimeString('yyyymmddhhnnsszzz', #0, #0) + '-' + IntToStr(Random(1000000));
     if not CopyInstallerFrontend(ExpandConstant('{app}'), FrontendDirectory) then Exit;
     if not Exec(AddBackslash(FrontendDirectory) + 'BASpark.Setup.exe',
          '--uninstaller --backend="' + ExpandConstant('{uninstallexe}') +

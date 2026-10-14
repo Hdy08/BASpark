@@ -51,5 +51,22 @@ public sealed class ApplyInstallerManifest : Microsoft.Build.Utilities.Task
                    WindowsGraphicalUserInterface="true" />
     <ApplyInstallerManifest Executable="$(PublishDir)BASpark.Setup.exe" Manifest="$(ApplicationManifest)" />
     <Copy SourceFiles="$(TargetDir)$(AssemblyName).pri" DestinationFiles="$(PublishDir)BASpark.Setup.pri" />
+    <PropertyGroup>
+      <InstallerFrontendRoot>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::GetFullPath('$(PublishDir)'))))</InstallerFrontendRoot>
+    </PropertyGroup>
+    <ItemGroup>
+      <InstallerFrontendFile Include="$(PublishDir)BASpark.Setup.exe;$(PublishDir)BASpark.dll;$(PublishDir)BASpark.deps.json;$(PublishDir)BASpark.runtimeconfig.json;$(PublishDir)BASpark*.pri;$(PublishDir)*.xbf;
+                                      $(PublishDir)System.*.dll;$(PublishDir)Microsoft.Win32.*.dll;$(PublishDir)Microsoft.CSharp.dll;$(PublishDir)mscorlib.dll;$(PublishDir)netstandard.dll;
+                                      $(PublishDir)coreclr.dll;$(PublishDir)clrgc.dll;$(PublishDir)clrjit.dll;$(PublishDir)hostfxr.dll;$(PublishDir)hostpolicy.dll;
+                                      $(PublishDir)CoreMessagingXP.dll;$(PublishDir)dcompi.dll;$(PublishDir)dwmcorei.dll;$(PublishDir)DwmSceneI.dll;$(PublishDir)DWriteCore.dll;$(PublishDir)marshal.dll;$(PublishDir)MRM.dll;$(PublishDir)wuceffectsi.dll;$(PublishDir)WinUIEdit.dll;
+                                      $(PublishDir)WinRT.Runtime.dll;$(PublishDir)Microsoft.DirectManipulation.dll;$(PublishDir)Microsoft.InputStateManager.dll;$(PublishDir)Microsoft.Internal.FrameworkUdk.dll;$(PublishDir)Microsoft.InteractiveExperiences.Projection.dll;
+                                      $(PublishDir)Microsoft.WinUI.dll;$(PublishDir)Microsoft.UI*.dll;$(PublishDir)Microsoft.UI*.pri;$(PublishDir)Microsoft.UI.Xaml\Assets\**\*;
+                                      $(PublishDir)en-us\*.mui;$(PublishDir)zh-CN\*.mui;$(PublishDir)ja-JP\*.mui;$(PublishDir)en\BASpark.resources.dll;$(PublishDir)ja\BASpark.resources.dll;
+                                      $(PublishDir)Microsoft.Windows.SDK.NET.dll;$(PublishDir)Microsoft.Windows.ApplicationModel.Resources*.dll;$(PublishDir)Microsoft.Windows.Storage*.dll;$(PublishDir)Microsoft.Windows.Foundation.Projection.dll;$(PublishDir)Microsoft.WindowsAppRuntime*.dll;$(PublishDir)Microsoft.WindowsAppRuntime.pri"
+                             Exclude="$(PublishDir)System.Windows*.dll;$(PublishDir)System.Xaml.dll;$(PublishDir)System.Printing.dll;$(PublishDir)System.IO.Packaging.dll" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(PublishDir)BASpark.Setup.files"
+                      Lines="@(InstallerFrontendFile->Metadata('FullPath')->Replace('$(InstallerFrontendRoot)', '')->Distinct())"
+                      Encoding="ASCII" Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>
 </Project>
