@@ -72,19 +72,19 @@ CloseRunningBASparkFailed=Setup could not close BASpark. Close it completely fro
 chinesesimplified.CloseRunningBASparkFailed=安装程序无法关闭 BASpark。请从系统托盘彻底退出程序，然后重新运行安装程序。
 japanese.CloseRunningBASparkFailed=BASpark を終了できませんでした。システムトレイから完全に終了し、インストーラーを再実行してください。
 #ifdef UiAccessCertificateThumbprint
-UiAccessCertificateConsent=Trust the signing certificate used only for BASpark to allow effects over selected system interfaces
+UiAccessCertificateConsent=Trust the certificate used only for BASpark to allow the effect overlay to display at the UIAccess level
 UiAccessCertificateRequired=Certificate trust is required for the UIAccess build. Setup made no changes.
 UiAccessCertificateSilentRequired=Silent installation requires /ACCEPTUIACCESSCERT=1.
 UiAccessCertificateInstallFailed=Failed to trust the BASpark UIAccess signing certificate. Setup made no application changes.
 UiAccessSecureLocationRequired=The UIAccess build must be installed in Program Files\BASpark.
 UiAccessPreviousLocationRequired=An existing BASpark installation was found outside Program Files\BASpark. Uninstall it before installing the UIAccess build.
-chinesesimplified.UiAccessCertificateConsent=信任仅用于 BASpark 的签名证书，以允许特效覆盖部分系统界面
+chinesesimplified.UiAccessCertificateConsent=信任仅用于 BASpark 的证书，以允许特效叠加层以 UIAccess 层级显示
 chinesesimplified.UiAccessCertificateRequired=UIAccess 版本必须信任代码签名证书，安装程序尚未修改应用文件。
 chinesesimplified.UiAccessCertificateSilentRequired=静默安装必须添加 /ACCEPTUIACCESSCERT=1。
 chinesesimplified.UiAccessCertificateInstallFailed=无法信任 BASpark UIAccess 签名证书，安装程序尚未修改应用文件。
 chinesesimplified.UiAccessSecureLocationRequired=UIAccess 版本必须安装在 Program Files\BASpark 目录中。
 chinesesimplified.UiAccessPreviousLocationRequired=检测到 BASpark 旧版本安装在 Program Files\BASpark 之外。请先卸载旧版本，再安装 UIAccess 版本。
-japanese.UiAccessCertificateConsent=BASpark 専用の署名証明書を信頼し、特定のシステム画面上にエフェクトを表示する
+japanese.UiAccessCertificateConsent=BASpark 専用の証明書を信頼し、エフェクトのオーバーレイを UIAccess レベルで表示できるようにする
 japanese.UiAccessCertificateRequired=UIAccess 版ではコード署名証明書の信頼が必要です。アプリケーションファイルは変更されていません。
 japanese.UiAccessCertificateSilentRequired=サイレントインストールには /ACCEPTUIACCESSCERT=1 が必要です。
 japanese.UiAccessCertificateInstallFailed=BASpark UIAccess 署名証明書を信頼できませんでした。アプリケーションファイルは変更されていません。

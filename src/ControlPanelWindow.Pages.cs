@@ -433,7 +433,7 @@ public sealed partial class ControlPanelWindow
         parent.Children.RemoveAt(index);
         label.Margin = new Thickness();
         label.VerticalAlignment = VerticalAlignment.Center;
-        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
         content.Children.Add(label);
         if (request != null)
         {
