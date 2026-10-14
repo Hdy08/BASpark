@@ -100,12 +100,51 @@ public sealed class InstallerSessionTests
     }
 
     [Theory]
-    [InlineData("2026-10-15 09:28:03.452   Setup started", "[09:28:03.452] [INFO] Setup started")]
-    [InlineData("2026-10-15 09:28:03.452   Uninstall started\r", "[09:28:03.452] [INFO] Uninstall started")]
-    [InlineData("Operation complete", "[12:34:56.789] [INFO] Operation complete")]
-    [InlineData("2026-10-15 is not a log timestamp", "[12:34:56.789] [INFO] 2026-10-15 is not a log timestamp")]
-    public void Output_PreservesBackendTimeWithoutRepeatingTheTimestamp(string line, string expected)
+    [InlineData("正在提取文件...", "C:\\BASpark\\app.dll")]
+    [InlineData("Extracting files...", "C:\\BASpark\\app.dll")]
+    [InlineData("ファイルを展開しています...", "C:\\BASpark\\app.dll")]
+    public void Output_UsesTheNativeInstallerStatusAndFilename(string status, string file)
     {
-        Assert.Equal(expected, InstallerSession.FormatOutputLine(line, new DateTime(2026, 10, 15, 12, 34, 56, 789)));
+        InstallerProgress update = Assert.IsType<InstallerProgress>(new InstallerProgressReader().Read($"25\r\n{status}\r\n{file}\r\n"));
+        Assert.Equal(25, update.Percentage);
+        Assert.Equal(status + Environment.NewLine + file, update.Message);
+    }
+
+    [Fact]
+    public void Output_ReportsOnlyChangedProgressAndMessages()
+    {
+        var reader = new InstallerProgressReader();
+        Assert.NotNull(reader.Read("10\nExtracting files...\nfirst.dll\n"));
+        Assert.Null(reader.Read("10\nExtracting files...\nfirst.dll\n"));
+        InstallerProgress percentage = Assert.IsType<InstallerProgress>(reader.Read("11\nExtracting files...\nfirst.dll\n"));
+        Assert.Equal(11, percentage.Percentage);
+        Assert.Null(percentage.Message);
+        InstallerProgress file = Assert.IsType<InstallerProgress>(reader.Read("11\nExtracting files...\nsecond.dll\n"));
+        Assert.Null(file.Percentage);
+        Assert.Equal("second.dll", file.Message);
+        InstallerProgress phase = Assert.IsType<InstallerProgress>(reader.Read("90\nCreating shortcuts...\n\n"));
+        Assert.Equal("Creating shortcuts...", phase.Message);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("25\r\nExtracting files...\r\nfirst.dll")]
+    [InlineData("invalid\r\nExtracting files...\r\nfirst.dll\r\n")]
+    public void Output_DoesNotConsumePartiallyWrittenSnapshots(string incomplete)
+    {
+        var reader = new InstallerProgressReader();
+        Assert.Null(reader.Read(incomplete));
+        Assert.NotNull(reader.Read("25\r\nExtracting files...\r\nfirst.dll\r\n"));
+    }
+
+    [Fact]
+    public void UninstallOutput_ShowsTheNativeStatusOnce()
+    {
+        var reader = new InstallerProgressReader();
+        InstallerProgress initial = Assert.IsType<InstallerProgress>(reader.Read("10\nRemoving BASpark...\n\n"));
+        Assert.Equal("Removing BASpark...", initial.Message);
+        InstallerProgress next = Assert.IsType<InstallerProgress>(reader.Read("90\nRemoving BASpark...\n\n"));
+        Assert.Equal(90, next.Percentage);
+        Assert.Null(next.Message);
     }
 }

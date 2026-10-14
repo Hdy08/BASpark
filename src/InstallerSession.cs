@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Principal;
-using System.Text;
 using Microsoft.Win32;
 
 namespace BASpark;
@@ -14,6 +13,33 @@ internal sealed record InstallerProgress(double? Percentage, string? Message);
 internal interface IInstallerBackend
 {
     Task RunAsync(InstallerChoices choices, string culture, IProgress<InstallerProgress> progress);
+}
+
+internal sealed class InstallerProgressReader
+{
+    private int? _percentage;
+    private string _status = "";
+    private string _file = "";
+
+    internal InstallerProgress? Read(string snapshot)
+    {
+        string[] lines = snapshot.Split('\n');
+        if (lines.Length != 4 || lines[3].Length != 0 ||
+            !int.TryParse(lines[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int percentage)) return null;
+        percentage = Math.Clamp(percentage, 0, 100);
+        string status = lines[1].TrimEnd('\r');
+        string file = lines[2].TrimEnd('\r');
+        var messages = new List<string>();
+        if (status.Length > 0 && status != _status) messages.Add(status);
+        if (file.Length > 0 && file != _file) messages.Add(file);
+        double? changedPercentage = percentage != _percentage ? percentage : null;
+        _percentage = percentage;
+        _status = status;
+        _file = file;
+        return changedPercentage != null || messages.Count > 0
+            ? new InstallerProgress(changedPercentage, messages.Count > 0 ? string.Join(Environment.NewLine, messages) : null)
+            : null;
+    }
 }
 
 internal sealed class InstallerSession : IInstallerBackend
@@ -102,18 +128,6 @@ internal sealed class InstallerSession : IInstallerBackend
         return arguments.ToArray();
     }
 
-    internal static string FormatOutputLine(string line, DateTime timestamp)
-    {
-        if (line.Length > 23 && char.IsWhiteSpace(line[23]) &&
-            DateTime.TryParseExact(line[..23], "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out DateTime originalTimestamp))
-        {
-            timestamp = originalTimestamp;
-            line = line[23..].TrimStart();
-        }
-        return $"[{timestamp:HH:mm:ss.fff}] [INFO] {line.TrimEnd('\r')}";
-    }
-
     public async Task RunAsync(InstallerChoices choices, string culture, IProgress<InstallerProgress> progress)
     {
         string? invalid = Validate(choices);
@@ -128,27 +142,13 @@ internal sealed class InstallerSession : IInstallerBackend
         if (!new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator)) start.Verb = "runas";
         foreach (string argument in BuildArguments(choices, culture, statusPath, logPath)) start.ArgumentList.Add(argument);
         using Process worker = Process.Start(start) ?? throw new InvalidOperationException(Localization.Get("Installer_BackendMissing", culture));
-        long logPosition = 0;
-        string pending = "";
+        var progressReader = new InstallerProgressReader();
         async Task ReadOutputAsync()
         {
             try
             {
-                if (File.Exists(statusPath) && double.TryParse(await File.ReadAllTextAsync(statusPath),
-                    NumberStyles.Number, CultureInfo.InvariantCulture, out double percentage))
-                    progress.Report(new(Math.Clamp(percentage, 0, 100), null));
-                if (!File.Exists(logPath)) return;
-                await using var stream = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                stream.Seek(logPosition, SeekOrigin.Begin);
-                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: logPosition == 0);
-                string text = pending + await reader.ReadToEndAsync();
-                logPosition = stream.Position;
-                int lastNewline = text.LastIndexOf('\n');
-                if (lastNewline < 0) { pending = text; return; }
-                string[] lines = text[..lastNewline].Split('\n').Select(line => line.TrimEnd('\r'))
-                    .Where(line => !string.IsNullOrWhiteSpace(line)).ToArray();
-                if (lines.Length > 0) progress.Report(new(null, string.Join(Environment.NewLine, lines)));
-                pending = text[(lastNewline + 1)..];
+                if (File.Exists(statusPath) && progressReader.Read(await File.ReadAllTextAsync(statusPath)) is { } update)
+                    progress.Report(update);
             }
             catch (IOException) { }
         }
@@ -159,7 +159,6 @@ internal sealed class InstallerSession : IInstallerBackend
         }
         await worker.WaitForExitAsync();
         await ReadOutputAsync();
-        if (pending.Length > 0) progress.Report(new(null, pending));
         if (worker.ExitCode is not (0 or 3010))
             throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture,
                 Localization.Get("Installer_BackendFailed", culture), worker.ExitCode));

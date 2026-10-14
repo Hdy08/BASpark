@@ -256,7 +256,7 @@ public sealed partial class InstallerWindow : UserControl
             if (update.Message is string message)
             {
                 foreach (string line in message.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                    _output.Enqueue(InstallerSession.FormatOutputLine(line, DateTime.Now));
+                    _output.Enqueue(line.TrimEnd('\r'));
                 while (_output.Count > 800) _output.Dequeue();
                 OutputText.Text = string.Join(Environment.NewLine, _output);
                 OutputScroller.ChangeView(null, OutputScroller.ScrollableHeight, null, disableAnimation: true);

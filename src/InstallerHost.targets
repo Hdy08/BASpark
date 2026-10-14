@@ -65,8 +65,13 @@ public sealed class ApplyInstallerManifest : Microsoft.Build.Utilities.Task
                                       $(PublishDir)Microsoft.Windows.SDK.NET.dll;$(PublishDir)Microsoft.Windows.ApplicationModel.Resources*.dll;$(PublishDir)Microsoft.Windows.Storage*.dll;$(PublishDir)Microsoft.Windows.Foundation.Projection.dll;$(PublishDir)Microsoft.WindowsAppRuntime*.dll;$(PublishDir)Microsoft.WindowsAppRuntime.pri"
                              Exclude="$(PublishDir)System.Windows*.dll;$(PublishDir)System.Xaml.dll;$(PublishDir)System.Printing.dll;$(PublishDir)System.IO.Packaging.dll" />
     </ItemGroup>
+    <GetFileHash Files="@(InstallerFrontendFile->Metadata('FullPath')->Distinct())" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="InstallerFrontendHash" />
+    </GetFileHash>
     <WriteLinesToFile File="$(PublishDir)BASpark.Setup.files"
-                      Lines="@(InstallerFrontendFile->Metadata('FullPath')->Replace('$(InstallerFrontendRoot)', '')->Distinct())"
+                      Lines="@(InstallerFrontendHash->Metadata('FullPath')->Replace('$(InstallerFrontendRoot)', ''))"
+                      Encoding="ASCII" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(PublishDir)BASpark.Setup.hashes" Lines="@(InstallerFrontendHash->'%(FileHash)')"
                       Encoding="ASCII" Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>
 </Project>

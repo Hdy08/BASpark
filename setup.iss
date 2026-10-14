@@ -102,19 +102,25 @@ japanese.UiAccessPreviousLocationRequired=Program Files\BASpark 以外に既存�
 
 [Files]
 Source: "{#PublishedSource}\BASpark.Setup.files"; DestDir: "{tmp}\BASpark.Setup"; Flags: dontcopy solidbreak
+Source: "{#PublishedSource}\BASpark.Setup.files"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PublishedSource}\BASpark.Setup.hashes"; DestDir: "{tmp}\BASpark.Setup"; Flags: dontcopy
+Source: "{#PublishedSource}\BASpark.Setup.hashes"; DestDir: "{app}"; Flags: ignoreversion
 #define FrontendFileHandle FileOpen(AddBackslash(PublishedSourceRoot) + "BASpark.Setup.files")
 #define FrontendFile ""
+#define InstalledFrontendExcludes "\BASpark.exe,\BASpark.Setup.files,\BASpark.Setup.hashes"
 #sub AddInstallerFrontendFile
 Source: "{#PublishedSource}\{#FrontendFile}"; DestDir: "{tmp}\BASpark.Setup\{#ExtractFileDir(FrontendFile)}"; Flags: dontcopy
+Source: "{#PublishedSource}\{#FrontendFile}"; DestDir: "{app}\{#ExtractFileDir(FrontendFile)}"; Flags: ignoreversion
+#expr InstalledFrontendExcludes = InstalledFrontendExcludes + ",\" + FrontendFile
 #endsub
 #for {FrontendFile = FileRead(FrontendFileHandle); FrontendFile != ""; FrontendFile = FileRead(FrontendFileHandle)} AddInstallerFrontendFile
 #expr FileClose(FrontendFileHandle)
 Source: "{#PublishedSource}\BASpark.exe"; DestDir: "{app}"; Flags: ignoreversion solidbreak
 #ifdef UiAccessCertificateThumbprint
-Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "BASpark.exe,BASpark.UIAccess.cer"
+Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "{#InstalledFrontendExcludes},\BASpark.UIAccess.cer"
 Source: "{#PublishedSource}\BASpark.UIAccess.cer"; Flags: dontcopy
 #else
-Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "BASpark.exe"
+Source: "{#PublishedSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "{#InstalledFrontendExcludes}"
 #endif
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
@@ -137,9 +143,11 @@ Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags:
 [Code]
 const
   BASparkAppMutex = 'Global\BASpark_SingleInstance_Mutex';
+  PreviousInstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B0A2C1D4-E3F5-4A6B-9C8D-7E1F2A3B4C5D}}_is1';
 
 var
   PreservedUserDataFile: String;
+  LastNativeProgress: String;
 
 function GetBASparkAppMutex(Param: String): String;
 begin
@@ -164,10 +172,24 @@ end;
 procedure WriteNativeProgress(Value: Integer);
 var
   StatusFile: String;
+  State: TArrayOfString;
+  Snapshot: String;
 begin
   StatusFile := ExpandConstant('{param:BASPARKSTATUS|}');
-  if StatusFile <> '' then
-    SaveStringToFile(StatusFile, IntToStr(Value), False);
+  if StatusFile = '' then Exit;
+  SetArrayLength(State, 3);
+  State[0] := IntToStr(Value);
+  if IsUninstaller then
+    State[1] := UninstallProgressForm.StatusLabel.Caption
+  else
+  begin
+    State[1] := WizardForm.StatusLabel.Caption;
+    State[2] := WizardForm.FilenameLabel.Caption;
+  end;
+  Snapshot := State[0] + #13#10 + State[1] + #13#10 + State[2];
+  if Snapshot = LastNativeProgress then Exit;
+  if SaveStringsToUTF8File(StatusFile, State, False) then
+    LastNativeProgress := Snapshot;
 end;
 
 procedure CurInstallProgressChanged(CurProgress, MaxProgress: Integer);
@@ -206,6 +228,53 @@ begin
   Log(ExpandConstant('{cm:CloseRunningBASparkFailed}'));
 end;
 
+procedure PrepareInstallerFrontend;
+var
+  Files: TArrayOfString;
+  Hashes: TArrayOfString;
+  Index: Integer;
+  PreviousDirectory: String;
+  SourceFile: String;
+  TargetFile: String;
+  ReusedFile: String;
+  Reused: Boolean;
+begin
+  ExtractTemporaryFiles('{tmp}\BASpark.Setup\BASpark.Setup.files');
+  ExtractTemporaryFiles('{tmp}\BASpark.Setup\BASpark.Setup.hashes');
+  if not LoadStringsFromFile(ExpandConstant('{tmp}\BASpark.Setup\BASpark.Setup.files'), Files) or
+     not LoadStringsFromFile(ExpandConstant('{tmp}\BASpark.Setup\BASpark.Setup.hashes'), Hashes) or
+     (GetArrayLength(Files) <> GetArrayLength(Hashes)) then
+    RaiseException('Invalid installer frontend manifest.');
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE_64, PreviousInstallKey,
+       'InstallLocation', PreviousDirectory) then
+    RegQueryStringValue(HKEY_LOCAL_MACHINE_32, PreviousInstallKey,
+      'InstallLocation', PreviousDirectory);
+  if PreviousDirectory = '' then
+    PreviousDirectory := ExpandConstant('{autopf}\BASpark');
+  for Index := 0 to GetArrayLength(Files) - 1 do
+  begin
+    Reused := False;
+    if PreviousDirectory <> '' then
+    begin
+      SourceFile := AddBackslash(PreviousDirectory) + Files[Index];
+      TargetFile := ExpandConstant('{tmp}\BASpark.Setup\') + Files[Index];
+      ReusedFile := TargetFile + '.reuse';
+      try
+        if FileExists(SourceFile) and
+           (CompareText(GetSHA256OfFile(SourceFile), Hashes[Index]) = 0) and
+           ForceDirectories(ExtractFileDir(TargetFile)) and
+           FileCopy(SourceFile, ReusedFile, False) and
+           (CompareText(GetSHA256OfFile(ReusedFile), Hashes[Index]) = 0) then
+          Reused := RenameFile(ReusedFile, TargetFile);
+      except
+        Reused := False;
+      end;
+    end;
+    if not Reused then
+      ExtractTemporaryFiles('{tmp}\BASpark.Setup\' + Files[Index]);
+  end;
+end;
+
 function InitializeSetup: Boolean;
 var
   Parameters: String;
@@ -217,7 +286,7 @@ begin
     Exit;
   end;
   Result := False;
-  ExtractTemporaryFiles('{tmp}\BASpark.Setup\*');
+  PrepareInstallerFrontend;
   Parameters := '--installer --backend="' + ExpandConstant('{srcexe}') + '"';
 #ifdef UiAccessCertificateThumbprint
   Parameters := Parameters + ' --uiaccess=1';
@@ -288,7 +357,6 @@ end;
 const
   UiAccessCertificateThumbprint = '{#UiAccessCertificateThumbprint}';
   UiAccessOwnershipRoot = 'SOFTWARE\BASpark\Installer\UIAccessCertificates';
-  PreviousInstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{B0A2C1D4-E3F5-4A6B-9C8D-7E1F2A3B4C5D}}_is1';
 
 var
   UiAccessCertificateInstalled: Boolean;
