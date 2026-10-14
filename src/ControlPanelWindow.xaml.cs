@@ -4105,6 +4105,7 @@ public sealed partial class ControlPanelWindow : UserControl
                     button.HorizontalAlignment = HorizontalAlignment.Right;
                 }
             }
+            if (_dialogPresentationsPending.Contains(dialog)) readyHandler?.Invoke(dialog, EventArgs.Empty);
         };
     }
 

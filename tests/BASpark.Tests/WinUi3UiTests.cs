@@ -213,7 +213,6 @@ public class WinUi3UiTests
             "DynamicResource",
             "StaticResource}",
             "x:Static",
-            "ControlTemplate",
             "DataTrigger",
             "WindowStartupLocation",
             "AllowsTransparency",
@@ -238,6 +237,7 @@ public class WinUi3UiTests
             "Expander",
             "ColorPicker",
             "ItemsControl",
+            "ItemsRepeater",
             "ScrollViewer",
         ];
 
@@ -3122,7 +3122,7 @@ public class WinUi3UiTests
         XElement check = GetNamedElement(panel, "SelectionCardCheck");
         Assert.Equal("Right", (string?)check.Attribute("HorizontalAlignment"));
         Assert.Equal("1", (string?)check.Attribute("Grid.Column"));
-        Assert.Equal("{Binding IsSelected, Mode=TwoWay}", (string?)check.Attribute("IsChecked"));
+        Assert.Equal("{x:Bind IsSelected, Mode=TwoWay}", (string?)check.Attribute("IsChecked"));
     }
 
     [Fact]
@@ -3154,15 +3154,17 @@ public class WinUi3UiTests
             XElement list = GetNamedElement(panel, name);
             Assert.Equal("ItemsControl", list.Name.LocalName);
             Assert.Equal("{StaticResource SelectionCardTemplates}", (string?)list.Attribute("ItemTemplateSelector"));
-            Assert.Equal("{StaticResource SelectionCardContainerStyle}", (string?)list.Attribute("ItemContainerStyle"));
+            Assert.Equal("{StaticResource SelectionListStyle}", (string?)list.Attribute("Style"));
             Assert.Equal("ScrollViewer", list.Parent!.Name.LocalName);
             Assert.Equal("0,0,-16,0", (string?)list.Parent.Attribute("Margin"));
             Assert.Equal("Auto", (string?)list.Parent.Attribute("VerticalScrollBarVisibility"));
-            Assert.Single(list.Descendants(), element => element.Name.LocalName == "StackPanel");
-            Assert.Single(list.Descendants(), element => element.Name.LocalName == "TransitionCollection");
+            Assert.Empty(list.Elements());
         }
-        XElement container = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionCardContainerStyle");
-        Assert.Contains(container.Elements(), element => (string?)element.Attribute("Property") == "Margin" && (string?)element.Attribute("Value") == "0,0,16,4");
+        XElement style = Assert.Single(panel.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "SelectionListStyle");
+        XElement repeater = Assert.Single(style.Descendants(), element => element.Name.LocalName == "ItemsRepeater");
+        Assert.Equal("{TemplateBinding ItemsSource}", (string?)repeater.Attribute("ItemsSource"));
+        Assert.Equal("{TemplateBinding ItemTemplateSelector}", (string?)repeater.Attribute("ItemTemplate"));
+        Assert.Single(repeater.Descendants(), element => element.Name.LocalName == "SelectionCardLayout");
         XElement card = GetNamedElement(panel, "SelectionCard");
         Assert.Equal("SelectionCard_PointerPressed", (string?)card.Attribute("PointerPressed"));
         Assert.Equal("SelectionCard_PointerReleased", (string?)card.Attribute("PointerReleased"));
@@ -3831,7 +3833,7 @@ public class WinUi3UiTests
         Assert.Null(overlay.Attribute("Background"));
         XElement list = GetNamedElement(panel, "ListBackupItems");
         Assert.Equal("{StaticResource SelectionCardTemplates}", (string?)list.Attribute("ItemTemplateSelector"));
-        Assert.Equal("{StaticResource SelectionCardContainerStyle}", (string?)list.Attribute("ItemContainerStyle"));
+        Assert.Equal("{StaticResource SelectionListStyle}", (string?)list.Attribute("Style"));
         Assert.Equal("ItemsControl", list.Name.LocalName);
         foreach (string name in new[] { "BtnExportConfiguration", "BtnImportConfiguration" })
         {

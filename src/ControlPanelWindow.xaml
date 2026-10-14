@@ -40,7 +40,7 @@
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
-        <DataTemplate x:Key="SelectionCardTemplate">
+        <DataTemplate x:Key="SelectionCardTemplate" x:DataType="local:SelectionCardItem">
             <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" MinHeight="0" Margin="0"
                     PointerPressed="SelectionCard_PointerPressed" PointerReleased="SelectionCard_PointerReleased">
                 <Grid ColumnSpacing="16">
@@ -49,35 +49,43 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Title}" Style="{StaticResource BasSettingTitleStyle}" />
-                        <TextBlock Text="{Binding Subtitle}" Visibility="{Binding SubtitleVisibility}" Style="{StaticResource BasCaptionStyle}" />
+                        <TextBlock Text="{x:Bind Title}" Style="{StaticResource BasSettingTitleStyle}" />
+                        <TextBlock Text="{x:Bind Subtitle}" Visibility="{x:Bind SubtitleVisibility}" Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
-                    <CheckBox x:Name="SelectionCardCheck" Grid.Column="1" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                    <CheckBox x:Name="SelectionCardCheck" Grid.Column="1" IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
                               MinWidth="0" Padding="0" HorizontalAlignment="Right" VerticalAlignment="Center"
-                              AutomationProperties.Name="{Binding Title}" />
+                              AutomationProperties.Name="{x:Bind Title}" />
                 </Grid>
             </Border>
         </DataTemplate>
-        <DataTemplate x:Key="SelectionHeadingTemplate">
-            <Grid ColumnSpacing="8" Margin="0,8,0,8" Loaded="SelectionHeading_Loaded" Unloaded="SelectionHeading_Unloaded">
+        <DataTemplate x:Key="SelectionHeadingTemplate" x:DataType="local:SelectionGroup">
+            <Grid x:Name="SelectionHeading" ColumnSpacing="8" Margin="0,8,0,8" Loaded="SelectionHeading_Loaded"
+                  Unloaded="SelectionHeading_Unloaded" DataContextChanged="SelectionHeading_DataContextChanged">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{Binding Title}" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Tag="{Binding}" Click="InvertSelection_Click"
+                <TextBlock Text="{x:Bind Title}" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Tag="{x:Bind}" Click="InvertSelection_Click"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
-                <Button Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Tag="{Binding}" Click="SelectAll_Click"
+                <Button Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Tag="{x:Bind}" Click="SelectAll_Click"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
             </Grid>
         </DataTemplate>
         <local:SelectionCardTemplateSelector x:Key="SelectionCardTemplates"
             CardTemplate="{StaticResource SelectionCardTemplate}" HeadingTemplate="{StaticResource SelectionHeadingTemplate}" />
-        <Style x:Key="SelectionCardContainerStyle" TargetType="ContentPresenter">
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,16,4" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Style x:Key="SelectionListStyle" TargetType="ItemsControl">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ItemsRepeater ItemsSource="{TemplateBinding ItemsSource}" ItemTemplate="{TemplateBinding ItemTemplateSelector}"
+                                       VerticalCacheLength="1" ElementPrepared="SelectionElement_Prepared" ElementClearing="SelectionElement_Clearing">
+                            <ItemsRepeater.Layout><local:SelectionCardLayout /></ItemsRepeater.Layout>
+                        </ItemsRepeater>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
 
@@ -1743,15 +1751,9 @@
                     </Grid>
                     <ScrollViewer Grid.Row="2" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="ListRunningProcesses"
+                        <ItemsControl x:Name="ListRunningProcesses" Style="{StaticResource SelectionListStyle}"
                                       MinHeight="0" HorizontalContentAlignment="Stretch"
-                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
-                                      ItemContainerStyle="{StaticResource SelectionCardContainerStyle}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemContainerTransitions><TransitionCollection /></ItemsControl.ItemContainerTransitions>
-                        </ItemsControl>
+                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}" />
                     </ScrollViewer>
                     <TextBlock x:Name="TxtRunningNoResults" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,16"
                                HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource BasCaptionStyle}" />
@@ -1825,15 +1827,9 @@
                         </Grid>
                     <ScrollViewer x:Name="ResetItemsScrollViewer" Grid.Row="1" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="ListVisualResetItems"
+                        <ItemsControl x:Name="ListVisualResetItems" Style="{StaticResource SelectionListStyle}"
                                       MinHeight="0" HorizontalContentAlignment="Stretch"
-                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
-                                      ItemContainerStyle="{StaticResource SelectionCardContainerStyle}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemContainerTransitions><TransitionCollection /></ItemsControl.ItemContainerTransitions>
-                        </ItemsControl>
+                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}" />
                     </ScrollViewer>
                     </Grid>
                     <TextBlock x:Name="TxtResetNoResults" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,16"
@@ -1903,15 +1899,9 @@
                         </Grid>
                     <ScrollViewer x:Name="BackupItemsScrollViewer" Grid.Row="1" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="ListBackupItems" MinHeight="0"
+                        <ItemsControl x:Name="ListBackupItems" MinHeight="0" Style="{StaticResource SelectionListStyle}"
                                       HorizontalContentAlignment="Stretch"
-                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}"
-                                      ItemContainerStyle="{StaticResource SelectionCardContainerStyle}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemContainerTransitions><TransitionCollection /></ItemsControl.ItemContainerTransitions>
-                        </ItemsControl>
+                                      ItemTemplateSelector="{StaticResource SelectionCardTemplates}" />
                     </ScrollViewer>
                     </Grid>
                     <TextBlock x:Name="TxtBackupNoResults" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,16"
