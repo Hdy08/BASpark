@@ -42,6 +42,7 @@
         </ResourceDictionary>
         <DataTemplate x:Key="SelectionCardTemplate" x:DataType="local:SelectionCardItem">
             <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" MinHeight="0" Margin="0"
+                    Loaded="SelectionCard_Loaded" DataContextChanged="SelectionCard_DataContextChanged"
                     PointerPressed="SelectionCard_PointerPressed" PointerReleased="SelectionCard_PointerReleased">
                 <Grid ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
@@ -52,7 +53,8 @@
                         <TextBlock Text="{x:Bind Title}" Style="{StaticResource BasSettingTitleStyle}" />
                         <TextBlock Text="{x:Bind Subtitle}" Visibility="{x:Bind SubtitleVisibility}" Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
-                    <CheckBox x:Name="SelectionCardCheck" Grid.Column="1" IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    <CheckBox x:Name="SelectionCardCheck" Grid.Column="1"
+                              Loaded="SelectionCheck_StateChanged" Checked="SelectionCheck_StateChanged" Unchecked="SelectionCheck_StateChanged"
                               MinWidth="0" Padding="0" HorizontalAlignment="Right" VerticalAlignment="Center"
                               AutomationProperties.Name="{x:Bind Title}" />
                 </Grid>
@@ -238,12 +240,12 @@
                     </Grid>
                     <TextBlock x:Name="TxtWelcomeSubtitle"
                                Text=""
-                               Margin="0,4,0,24"
+                               Margin="0,4,0,0"
                                Style="{StaticResource BasPageSubtitleStyle}" />
                 </StackPanel>
 
                     <!-- 实时统计 -->
-                    <Grid x:Name="StatsHeader" Grid.Row="1" Margin="0,8,0,8" ColumnSpacing="16">
+                    <Grid x:Name="StatsHeader" Grid.Row="1" Margin="0,20,0,8" ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />

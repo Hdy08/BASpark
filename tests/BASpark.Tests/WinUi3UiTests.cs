@@ -3129,12 +3129,28 @@ public class WinUi3UiTests
         Assert.Contains("list.ItemsSource = rows", pages, StringComparison.Ordinal);
         XElement card = GetNamedElement(panel, "SelectionCard");
         Assert.Equal("{StaticResource BasSettingCardStyle}", (string?)card.Attribute("Style"));
+        Assert.Equal("SelectionCard_Loaded", (string?)card.Attribute("Loaded"));
+        Assert.Equal("SelectionCard_DataContextChanged", (string?)card.Attribute("DataContextChanged"));
         Assert.Contains(card.Descendants(), element => (string?)element.Attribute("Style") == "{StaticResource BasSettingTitleStyle}");
         Assert.Contains(card.Descendants(), element => (string?)element.Attribute("Style") == "{StaticResource BasCaptionStyle}");
         XElement check = GetNamedElement(panel, "SelectionCardCheck");
         Assert.Equal("Right", (string?)check.Attribute("HorizontalAlignment"));
         Assert.Equal("1", (string?)check.Attribute("Grid.Column"));
-        Assert.Equal("{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}", (string?)check.Attribute("IsChecked"));
+        foreach (string action in new[] { "Loaded", "Checked", "Unchecked" })
+            Assert.Equal("SelectionCheck_StateChanged", (string?)check.Attribute(action));
+        Assert.Null(check.Attribute("IsChecked"));
+        Assert.Contains("check.SetBinding(CheckBox.IsCheckedProperty, new Binding", pages, StringComparison.Ordinal);
+        Assert.Contains("Source = item", pages, StringComparison.Ordinal);
+        Assert.Contains("Path = new PropertyPath(nameof(SelectionCardItem.IsSelected))", pages, StringComparison.Ordinal);
+        Assert.Contains("Mode = BindingMode.TwoWay", pages, StringComparison.Ordinal);
+        Assert.Contains("check.ClearValue(CheckBox.IsCheckedProperty)", pages, StringComparison.Ordinal);
+        Assert.Contains("UpdateSelectionCardBinding(sender)", pages, StringComparison.Ordinal);
+        Assert.Contains("if (!ReferenceEquals(row.DataContext, item)) row.DataContext = item", pages, StringComparison.Ordinal);
+        Assert.Contains("GetRowElement(context, index)", pages, StringComparison.Ordinal);
+        Assert.Contains("GetRowElement(context, anchor)", pages, StringComparison.Ordinal);
+        Assert.Contains("FallbackIconSource: not null", pages, StringComparison.Ordinal);
+        Assert.Contains("glyph.Source = null", pages, StringComparison.Ordinal);
+        Assert.Contains("glyph.Opacity = check.IsChecked == true ? 1 : 0", pages, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -4167,6 +4183,45 @@ public class WinUi3UiTests
         Assert.Contains(style.Elements(), item => (string?)item.Attribute("Property") == "Background" && (string?)item.Attribute("Value") == "Transparent");
         Assert.Contains(style.Elements(), item => (string?)item.Attribute("Property") == "BorderThickness" && (string?)item.Attribute("Value") == "0");
         Assert.DoesNotContain(style.Elements(), item => (string?)item.Attribute("Property") == "Template");
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        string sizing = pages[pages.IndexOf("private static void ConfigureResetButton", StringComparison.Ordinal)..
+            pages.IndexOf("private static void SetResetButtonLabel", StringComparison.Ordinal)];
+        Assert.Contains("button.Height / reference.DesiredSize.Height", sizing, StringComparison.Ordinal);
+        Assert.Contains("button.Padding = new Thickness(2 * scale)", sizing, StringComparison.Ordinal);
+        Assert.Contains("icon.FontSize = 16 * scale", sizing, StringComparison.Ordinal);
+        Assert.Contains("icon.IsTextScaleFactorEnabled = false", sizing, StringComparison.Ordinal);
+        Assert.Contains("ConfigureResetButtonAnimations(button)", sizing, StringComparison.Ordinal);
+        Assert.Contains("ElementCompositionPreview.SetImplicitShowAnimation(button, show)", sizing, StringComparison.Ordinal);
+        Assert.Contains("ElementCompositionPreview.SetImplicitHideAnimation(button, hide)", sizing, StringComparison.Ordinal);
+        Assert.Contains("ControlFastAnimationDuration", sizing, StringComparison.Ordinal);
+        Assert.Contains("UISettings().AnimationsEnabled", sizing, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PageHeadings_RefreshAfterNavigationAndAfterTheirAnchorsLoad()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string navigation = source[source.IndexOf("private void UpdatePageVisibility()", StringComparison.Ordinal)..
+            source.IndexOf("private void SetPageVisible", StringComparison.Ordinal)];
+        Assert.True(navigation.LastIndexOf("RefreshPageHeaders()", StringComparison.Ordinal) >
+            navigation.IndexOf("SetPageVisible(PageAbout", StringComparison.Ordinal));
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        Assert.Contains("heading.Anchor.Loaded += Heading_Loaded", pages, StringComparison.Ordinal);
+        Assert.Contains("heading.Anchor.Loaded -= Heading_Loaded", pages, StringComparison.Ordinal);
+        Assert.Contains("private void Heading_Loaded(object sender, RoutedEventArgs args) => RequestUpdate(true)", pages, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WelcomeSection_UsesTheSameHeadingGapAsOtherPages()
+    {
+        XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
+        Assert.Equal("0,4,0,0", (string?)GetNamedElement(panel, "TxtWelcomeSubtitle").Attribute("Margin"));
+        XDocument styles = LoadXaml("src", "DesignSystem.xaml");
+        XElement style = Assert.Single(styles.Descendants(Presentation + "Style"),
+            item => (string?)item.Attribute(Xaml + "Key") == "BasSettingsSectionTitleStyle");
+        string? spacing = (string?)Assert.Single(style.Elements(Presentation + "Setter"),
+            setter => (string?)setter.Attribute("Property") == "Margin").Attribute("Value");
+        Assert.Equal(spacing, (string?)GetNamedElement(panel, "StatsHeader").Attribute("Margin"));
     }
 
     [Fact]

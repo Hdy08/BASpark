@@ -2067,6 +2067,7 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             ScrollLogToEnd();
         }
+        RefreshPageHeaders();
     }
 
     /// <summary>显示/隐藏页面，并对「新进入」的页面播放过渡动画。</summary>

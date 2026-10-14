@@ -3,6 +3,8 @@ using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Windows.Foundation;
 
@@ -60,6 +62,17 @@ public sealed class SelectionCardLayout : VirtualizingLayout
 
     internal SelectionGroup? GetActiveGroup(double offset) =>
         _state?.Groups.LastOrDefault(entry => entry.Offset <= offset + 1).Group;
+
+    private static UIElement GetRowElement(VirtualizingLayoutContext context, int index)
+    {
+        UIElement element = context.GetOrCreateElementAt(index);
+        if (element is FrameworkElement row)
+        {
+            object item = context.GetItemAt(index);
+            if (!ReferenceEquals(row.DataContext, item)) row.DataContext = item;
+        }
+        return element;
+    }
 
     private void InitializeMeasurementElements()
     {
@@ -149,14 +162,14 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         {
             if (state.Offsets[index + 1] < top) continue;
             if (state.Offsets[index] > bottom) break;
-            UIElement element = context.GetOrCreateElementAt(index);
+            UIElement element = GetRowElement(context, index);
             element.Measure(new Size(width, state.Offsets[index + 1] - state.Offsets[index]));
             state.Realized.Add((index, element));
         }
         int anchor = context.RecommendedAnchorIndex;
         if (anchor >= 0 && anchor < context.ItemCount && !state.Realized.Any(entry => entry.Index == anchor))
         {
-            UIElement element = context.GetOrCreateElementAt(anchor);
+            UIElement element = GetRowElement(context, anchor);
             element.Measure(new Size(width, state.Offsets[anchor + 1] - state.Offsets[anchor]));
             state.Realized.Add((anchor, element));
         }
@@ -203,18 +216,24 @@ public sealed partial class ControlPanelWindow
         internal void Add(StickyHeading heading)
         {
             _headings.Add(heading);
+            heading.Anchor.Loaded += Heading_Loaded;
             RequestUpdate();
         }
 
         internal void Remove(FrameworkElement anchor)
         {
+            anchor.Loaded -= Heading_Loaded;
             _headings.RemoveAll(heading => ReferenceEquals(heading.Anchor, anchor));
             RequestUpdate();
         }
 
         internal void Clear()
         {
-            foreach (StickyHeading heading in _headings) heading.Anchor.Opacity = 1;
+            foreach (StickyHeading heading in _headings)
+            {
+                heading.Anchor.Loaded -= Heading_Loaded;
+                heading.Anchor.Opacity = 1;
+            }
             _headings.Clear();
             _active = null;
             _show(null);
@@ -265,6 +284,7 @@ public sealed partial class ControlPanelWindow
         }
 
         private void Loaded(object sender, RoutedEventArgs args) => RequestUpdate(true);
+        private void Heading_Loaded(object sender, RoutedEventArgs args) => RequestUpdate(true);
         private void SizeChanged(object sender, SizeChangedEventArgs args) => RequestUpdate();
 
         public void Dispose()
@@ -273,6 +293,7 @@ public sealed partial class ControlPanelWindow
             _scroll.ViewChanged -= ViewChanged;
             _scroll.Loaded -= Loaded;
             _content.SizeChanged -= SizeChanged;
+            foreach (StickyHeading heading in _headings) heading.Anchor.Loaded -= Heading_Loaded;
             _headings.Clear();
         }
     }
@@ -389,16 +410,47 @@ public sealed partial class ControlPanelWindow
     private static void ConfigureResetButton(Button button, TextBlock label)
     {
         button.Style = (Style)Application.Current.Resources["BasInlineResetButtonStyle"];
+        var reference = new TextBlock { Text = "Ag", Style = (Style)Application.Current.Resources["BasSectionTitleStyle"],
+            IsTextScaleFactorEnabled = false };
+        reference.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         void UpdateSize()
         {
             var line = new TextBlock { Text = label.Text, FontFamily = label.FontFamily, FontSize = label.FontSize,
-                FontWeight = label.FontWeight, LineHeight = label.LineHeight, TextWrapping = TextWrapping.NoWrap };
+                FontWeight = label.FontWeight, LineHeight = label.LineHeight, TextWrapping = TextWrapping.NoWrap,
+                IsTextScaleFactorEnabled = label.IsTextScaleFactorEnabled };
             line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             button.Height = button.Width = line.DesiredSize.Height;
+            double scale = button.Height / reference.DesiredSize.Height;
+            button.Padding = new Thickness(2 * scale);
+            if (button.Content is FontIcon icon)
+            {
+                icon.IsTextScaleFactorEnabled = false;
+                icon.FontSize = 16 * scale;
+            }
         }
         UpdateSize();
         label.SizeChanged += (_, _) => UpdateSize();
         button.VerticalAlignment = VerticalAlignment.Center;
+        ConfigureResetButtonAnimations(button);
+    }
+
+    private static void ConfigureResetButtonAnimations(Button button)
+    {
+        if (!new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) return;
+        var compositor = ElementCompositionPreview.GetElementVisual(button).Compositor;
+        var duration = TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], System.Globalization.CultureInfo.InvariantCulture);
+        var show = compositor.CreateScalarKeyFrameAnimation();
+        show.Target = "Opacity";
+        show.InsertKeyFrame(0, 0);
+        show.InsertKeyFrame(1, 1);
+        show.Duration = duration;
+        var hide = compositor.CreateScalarKeyFrameAnimation();
+        hide.Target = "Opacity";
+        hide.InsertKeyFrame(0, 1);
+        hide.InsertKeyFrame(1, 0);
+        hide.Duration = duration;
+        ElementCompositionPreview.SetImplicitShowAnimation(button, show);
+        ElementCompositionPreview.SetImplicitHideAnimation(button, hide);
     }
 
     private static void SetResetButtonLabel(Button button, string label, string? name = null)
@@ -730,11 +782,45 @@ public sealed partial class ControlPanelWindow
     {
         if (args.Element is not FrameworkElement element) return;
         element.DataContext = sender.ItemsSourceView.GetAt(args.Index);
+        UpdateSelectionCardBinding(element);
         bool first = element.DataContext is SelectionGroup { IsFirst: true };
         element.Margin = new Thickness(0, 0, 16, first ? 0 : 4);
         element.Height = first ? 0 : double.NaN;
         element.Opacity = first ? 0 : 1;
         element.IsHitTestVisible = !first;
+    }
+
+    private void SelectionCard_Loaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is FrameworkElement card) UpdateSelectionCardBinding(card);
+    }
+
+    private void SelectionCard_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args) => UpdateSelectionCardBinding(sender);
+
+    private void SelectionCheck_StateChanged(object sender, RoutedEventArgs args)
+    {
+        if (sender is CheckBox check && FindVisualDescendant<AnimatedIcon>(check, "CheckGlyph") is { FallbackIconSource: not null } glyph)
+        {
+            glyph.Source = null;
+            glyph.Opacity = check.IsChecked == true ? 1 : 0;
+        }
+    }
+
+    private static void UpdateSelectionCardBinding(FrameworkElement card)
+    {
+        if (card.FindName("SelectionCardCheck") is not CheckBox check) return;
+        if (card.DataContext is SelectionCardItem item)
+        {
+            if (ReferenceEquals(check.GetBindingExpression(CheckBox.IsCheckedProperty)?.ParentBinding.Source, item)) return;
+            check.SetBinding(CheckBox.IsCheckedProperty, new Binding
+            {
+                Source = item,
+                Path = new PropertyPath(nameof(SelectionCardItem.IsSelected)),
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+            });
+        }
+        else check.ClearValue(CheckBox.IsCheckedProperty);
     }
 
     private void SelectionHeading_Loaded(object sender, RoutedEventArgs args) => InitializeSelectionHeading(sender);
@@ -760,7 +846,11 @@ public sealed partial class ControlPanelWindow
     {
         Grid? header = args.Element as Grid ?? FindVisualDescendant<Grid>(args.Element, "SelectionHeading");
         if (header != null) _groupSelectionToolbars.Remove(header);
-        if (args.Element is FrameworkElement element) element.DataContext = null;
+        if (args.Element is FrameworkElement element)
+        {
+            if (element.FindName("SelectionCardCheck") is CheckBox check) check.ClearValue(CheckBox.IsCheckedProperty);
+            element.DataContext = null;
+        }
     }
 
     private void SelectionHeading_Unloaded(object sender, RoutedEventArgs args)
