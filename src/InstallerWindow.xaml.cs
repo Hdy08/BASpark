@@ -32,6 +32,13 @@ public sealed partial class InstallerWindow : UserControl
         _session = session;
         _backend = backend ?? session;
         InitializeComponent();
+        StartupDialogHost.AlignContentSpacing(LanguageCard, LanguageCard, LanguagePrompt);
+        StartupDialogHost.AlignContentSpacing(WelcomeScroller, WelcomeIntro, WelcomeTagline);
+        StartupDialogHost.AlignContentSpacing(WelcomeCards, WelcomeCards, WelcomeIntro, 4);
+        StartupDialogHost.AlignContentSpacing(ConfirmScroller, ConfirmCards, ConfirmDescription);
+        StartupDialogHost.AlignContentSpacing(ProgressGap, ProgressGap, ProgressDescription, 0);
+        StartupDialogHost.AlignContentSpacing(CompleteMessages, CompleteMessages, CompleteTitle);
+        StartupDialogHost.AlignContentSpacing(UninstallProductCard, UninstallProductCard, UninstallDescription);
         _pages = [LanguagePage, WelcomePage, ConfirmPage, ProgressPage, CompletePage, UninstallPage];
         PagePool.Children.Clear();
         _host = new DcompPanelHost(fixedSize: true, minimumWidth: 1, minimumHeight: 1);

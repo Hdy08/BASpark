@@ -35,6 +35,7 @@ public partial class LanguageSelectWindow : UserControl
     {
         _displayCulture = Localization.DetectCultureFromSystem();
         InitializeComponent();
+        StartupDialogHost.AlignContentSpacing(StartupScrollViewer, LanguageCard, TxtSubtitle);
         _languageWidth = new(ComboLanguage);
         _host = new DcompPanelHost(fixedSize: true, minimumWidth: 1, minimumHeight: 1);
         WindowChrome.ApplyTitleBarIcon(AppTitleBar);

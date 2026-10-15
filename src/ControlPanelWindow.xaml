@@ -1757,7 +1757,7 @@
                                Text=""
                                TextWrapping="Wrap"
                                Style="{StaticResource BasSectionTitleStyle}" />
-                    <Grid x:Name="RunningSearchToolbar" Grid.Row="1" ColumnSpacing="8" Margin="0,24,0,8">
+                    <Grid Grid.Row="1" ColumnSpacing="8" Margin="0,12,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -1817,7 +1817,7 @@
                                Text=""
                                TextWrapping="Wrap"
                                Style="{StaticResource BasSectionTitleStyle}" />
-                    <Grid x:Name="ResetSearchToolbar" Grid.Row="1" ColumnSpacing="8" Margin="0,24,0,0">
+                    <Grid Grid.Row="1" ColumnSpacing="8" Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -1889,7 +1889,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock x:Name="TxtBackupSelectionTitle" Grid.Row="0" Text="" TextWrapping="Wrap"
                                Style="{StaticResource BasSectionTitleStyle}" />
-                    <Grid x:Name="BackupSearchToolbar" Grid.Row="1" ColumnSpacing="8" Margin="0,24,0,0">
+                    <Grid Grid.Row="1" ColumnSpacing="8" Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />

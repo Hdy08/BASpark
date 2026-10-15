@@ -3816,7 +3816,7 @@ public class WinUi3UiTests
             XElement search = GetNamedElement(panel, name);
             XElement toolbar = search.Parent!;
             Assert.Equal("1", (string?)toolbar.Attribute("Grid.Row"));
-            Assert.Equal(name == "SearchRunningProcess" ? "0,24,0,8" : "0,24,0,0", (string?)toolbar.Attribute("Margin"));
+            Assert.Equal(name == "SearchRunningProcess" ? "0,12,0,8" : "0,12,0,0", (string?)toolbar.Attribute("Margin"));
             Assert.Equal(2, toolbar.Elements(Presentation + "Button").Count());
             Assert.Equal(4, toolbar.Parent!.Elements(Presentation + "Grid.RowDefinitions").Single().Elements().Count());
         }
@@ -4368,9 +4368,9 @@ public class WinUi3UiTests
         foreach (string name in new[] { "StatsHeader", "SettingsSectionHeader", "AboutSectionHeader", "ResetGroupHeader", "BackupGroupHeader" })
             Assert.Equal("{StaticResource BasSectionHeaderStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
         string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
-        Assert.Contains("SetupContentSpacing(StatsHeader, TxtStatsTitle, TxtWelcomeSubtitle)", pages, StringComparison.Ordinal);
-        Assert.Contains("SetupContentSpacing(SettingsSectionHeader, TxtActiveSettingsSection, TxtSettingsTitle)", pages, StringComparison.Ordinal);
-        Assert.Contains("SetupContentSpacing(AboutSectionHeader, TxtActiveAboutSection, TxtAboutDescription)", pages, StringComparison.Ordinal);
+        Assert.Contains("StartupDialogHost.AlignContentSpacing(StatsHeader, TxtStatsTitle, TxtWelcomeSubtitle)", pages, StringComparison.Ordinal);
+        Assert.Contains("StartupDialogHost.AlignContentSpacing(SettingsSectionHeader, TxtActiveSettingsSection, TxtSettingsTitle)", pages, StringComparison.Ordinal);
+        Assert.Contains("StartupDialogHost.AlignContentSpacing(AboutSectionHeader, TxtActiveAboutSection, TxtAboutDescription)", pages, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -384,14 +384,11 @@ public sealed partial class ControlPanelWindow
 
     private void SetupPageHeaders()
     {
-        SetupContentSpacing(StatsHeader, TxtStatsTitle, TxtWelcomeSubtitle);
-        SetupContentSpacing(SettingsSectionHeader, TxtActiveSettingsSection, TxtSettingsTitle);
-        SetupContentSpacing(AboutSectionHeader, TxtActiveAboutSection, TxtAboutDescription);
-        SetupContentSpacing(LogCard, LogCard, TxtLogHint);
-        SetupContentSpacing(RunningSearchToolbar, SearchRunningProcess, TxtOverlayRunning);
-        SetupContentSpacing(ResetSearchToolbar, SearchVisualReset, TxtOverlayVisualReset);
-        SetupContentSpacing(BackupSearchToolbar, SearchBackupItems, TxtBackupSelectionTitle);
-        SetupContentSpacing(NewProfileNameInput, NewProfileNameInput, TxtOverlayRename);
+        StartupDialogHost.AlignContentSpacing(StatsHeader, TxtStatsTitle, TxtWelcomeSubtitle);
+        StartupDialogHost.AlignContentSpacing(SettingsSectionHeader, TxtActiveSettingsSection, TxtSettingsTitle);
+        StartupDialogHost.AlignContentSpacing(AboutSectionHeader, TxtActiveAboutSection, TxtAboutDescription);
+        StartupDialogHost.AlignContentSpacing(LogCard, LogCard, TxtLogHint);
+        StartupDialogHost.AlignContentSpacing(NewProfileNameInput, NewProfileNameInput, TxtOverlayRename);
         _settingsHeaders = new(SettingsContentScrollViewer, SettingsContent, (heading, animateResetButtons) =>
         {
             TxtActiveSettingsSection.Text = heading?.Label.Text ?? string.Empty;
@@ -459,24 +456,6 @@ public sealed partial class ControlPanelWindow
         if (first) anchor.Height = 0;
         parent.Children.Insert(index, anchor);
         return anchor;
-    }
-
-    private static void SetupContentSpacing(FrameworkElement container, FrameworkElement content, FrameworkElement previous)
-    {
-        void UpdateSpacing()
-        {
-            if (!container.IsLoaded || content.ActualHeight <= 0 || previous.ActualHeight <= 0 || container.Parent is not UIElement parent) return;
-            double top = content.TransformToVisual(parent).TransformPoint(new Point()).Y;
-            double bottom = previous.TransformToVisual(parent).TransformPoint(new Point(0, previous.ActualHeight)).Y;
-            double adjustment = 24 - (top - bottom);
-            if (Math.Abs(adjustment) < 0.1) return;
-            Thickness margin = container.Margin;
-            container.Margin = new Thickness(margin.Left, margin.Top + adjustment, margin.Right, margin.Bottom);
-        }
-        container.Loaded += (_, _) => UpdateSpacing();
-        container.SizeChanged += (_, _) => UpdateSpacing();
-        if (!ReferenceEquals(container, content)) content.SizeChanged += (_, _) => UpdateSpacing();
-        previous.SizeChanged += (_, _) => UpdateSpacing();
     }
 
     private void RefreshPageHeaders(bool animateResetButtons = false)

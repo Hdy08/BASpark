@@ -17,6 +17,8 @@ namespace BASpark;
 internal static class StartupDialogHost
 {
     private static readonly Dictionary<IntPtr, Task> ClosingWindows = [];
+    private static readonly Dictionary<(string Family, double Size, ushort Weight, string Language, double Scale), double> TextLeading = [];
+    private static readonly Windows.UI.ViewManagement.UISettings TextUiSettings = new();
     private static readonly TimeSpan CloseAnimationRetention = TimeSpan.FromMilliseconds(300);
     private const int DwmwaTransitionsForcedDisabled = 3;
 
@@ -236,6 +238,39 @@ internal static class StartupDialogHost
             yield return child;
             foreach (DependencyObject descendant in ContentElements(child)) yield return descendant;
         }
+    }
+
+    internal static double GetTextLeading(FrameworkElement element)
+    {
+        if (element is not TextBlock label) return 0;
+        double scale = label.IsTextScaleFactorEnabled ? TextUiSettings.TextScaleFactor : 1;
+        var key = (label.FontFamily.Source, label.FontSize, label.FontWeight.Weight, label.Language, scale);
+        if (TextLeading.TryGetValue(key, out double leading)) return leading;
+        var measurement = new TextBlock { Text = "Ag", FontFamily = label.FontFamily, FontSize = label.FontSize,
+            FontWeight = label.FontWeight, FontStyle = label.FontStyle, FontStretch = label.FontStretch,
+            Language = label.Language, IsTextScaleFactorEnabled = label.IsTextScaleFactorEnabled, UseLayoutRounding = false };
+        measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        leading = Math.Max(0, (measurement.DesiredSize.Height - label.FontSize * scale) / 2);
+        TextLeading[key] = leading;
+        return leading;
+    }
+
+    internal static void AlignContentSpacing(FrameworkElement container, FrameworkElement content, FrameworkElement previous, double spacing = 24)
+    {
+        void UpdateSpacing()
+        {
+            if (!container.IsLoaded || content.ActualHeight <= 0 || previous.ActualHeight <= 0 || container.Parent is not UIElement parent) return;
+            double top = content.TransformToVisual(parent).TransformPoint(new Point()).Y + GetTextLeading(content);
+            double bottom = previous.TransformToVisual(parent).TransformPoint(new Point(0, previous.ActualHeight)).Y - GetTextLeading(previous);
+            double adjustment = spacing - (top - bottom);
+            if (Math.Abs(adjustment) < 1 / (container.XamlRoot?.RasterizationScale ?? 1)) return;
+            Thickness margin = container.Margin;
+            container.Margin = new Thickness(margin.Left, margin.Top + adjustment, margin.Right, margin.Bottom);
+        }
+        container.Loaded += (_, _) => UpdateSpacing();
+        container.SizeChanged += (_, _) => UpdateSpacing();
+        if (!ReferenceEquals(container, content)) content.SizeChanged += (_, _) => UpdateSpacing();
+        previous.SizeChanged += (_, _) => UpdateSpacing();
     }
 
     private static void ConfigureTextCenter(TextBlock label)
