@@ -191,6 +191,44 @@ public sealed class EnvironmentFilterBehaviorTests
         }
     }
 
+    [Theory]
+    [InlineData(-1, false)]
+    [InlineData(-1, true)]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    public void InstallerAndUninstaller_AreFilteredIndependentlyOfTheAppSettingAndProfile(int mode, bool showOnApp)
+    {
+        FieldInfo profilesField = typeof(ConfigManager).GetField("_profiles", BindingFlags.Static | BindingFlags.NonPublic)!;
+        object? previousProfiles = profilesField.GetValue(null);
+        string previousActive = ConfigManager.ActiveProfileId;
+        bool previousShowOnApp = ConfigManager.ShowEffectOnApp;
+        try
+        {
+            profilesField.SetValue(null, mode < 0 ? new List<FilterProfile>() : new List<FilterProfile>
+            {
+                new() { Id = "installer-filter-test", Mode = (ProcessFilterModeOption)mode, Processes = ["listed.exe"] }
+            });
+            ConfigManager.ActiveProfileId = "installer-filter-test";
+            ConfigManager.ShowEffectOnApp = showOnApp;
+            var suppress = typeof(OverlayManager).GetMethod("IsSuppressedByProcessFilter", BindingFlags.Static | BindingFlags.NonPublic)!
+                .CreateDelegate<Func<string, bool>>();
+            Assert.True(suppress("BASpark.Setup.exe"));
+            Assert.True(suppress("baspark.setup.exe"));
+            Assert.Equal(mode == (int)ProcessFilterModeOption.Whitelist, suppress("BASpark.exe"));
+            Assert.Equal(mode == (int)ProcessFilterModeOption.Blacklist, suppress("listed.exe"));
+        }
+        finally
+        {
+            profilesField.SetValue(null, previousProfiles);
+            ConfigManager.ActiveProfileId = previousActive;
+            ConfigManager.ShowEffectOnApp = previousShowOnApp;
+        }
+    }
+
     private static string ReadSource(params string[] pathParts) =>
         File.ReadAllText(Path.Combine([FindWorkspaceRoot(), .. pathParts]), Encoding.UTF8);
 

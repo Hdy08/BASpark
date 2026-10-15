@@ -1300,6 +1300,11 @@ namespace BASpark
 
         private static bool IsSuppressedByProcessFilter(string processName)
         {
+            if (string.Equals(processName, "BASpark.Setup.exe", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             var profile = ConfigManager.GetActiveProfile();
             if (profile == null || profile.Mode == ProcessFilterModeOption.Disabled)
             {

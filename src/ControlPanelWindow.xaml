@@ -237,6 +237,17 @@
                             <Button x:Name="BtnExitApplication" Content="" Style="{StaticResource BasDangerButtonStyle}"
                                     MinWidth="0" Click="ExitApplication_Click" />
                             <Button x:Name="BtnRestartApplication" Content="" MinWidth="0" Click="RestartApplication_Click" />
+                            <ToggleButton x:Name="BtnToggleEffectsPause" Content="" Click="ToggleEffectsPause_Click"
+                                          MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <ToggleButton.Resources>
+                                    <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="AccentFillColorDefaultBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="AccentFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="AccentFillColorTertiaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
+                                    <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
+                                </ToggleButton.Resources>
+                            </ToggleButton>
                         </StackPanel>
                     </Grid>
                     <TextBlock x:Name="TxtWelcomeSubtitle"
@@ -246,23 +257,8 @@
                 </StackPanel>
 
                     <!-- 实时统计 -->
-                    <Grid x:Name="StatsHeader" Grid.Row="1" Margin="0,20,0,8" ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <Grid x:Name="StatsHeader" Grid.Row="1" Margin="0,20,0,8">
                         <TextBlock x:Name="TxtStatsTitle" Text="" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
-                        <ToggleButton x:Name="BtnToggleEffectsPause" Grid.Column="1" Content="" Click="ToggleEffectsPause_Click"
-                                      MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <ToggleButton.Resources>
-                                <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="AccentFillColorDefaultBrush" />
-                                <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="AccentFillColorSecondaryBrush" />
-                                <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="AccentFillColorTertiaryBrush" />
-                                <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
-                                <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
-                                <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
-                            </ToggleButton.Resources>
-                        </ToggleButton>
                     </Grid>
                 <ScrollViewer x:Name="WelcomeScrollViewer" Grid.Row="2" Margin="-28,0,-28,-28" Padding="28,0,28,28"
                               VerticalScrollBarVisibility="Auto">

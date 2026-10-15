@@ -71,7 +71,12 @@ public class WinUi3UiTests
         XElement action = GetNamedElement(panel, "BtnToggleEffectsPause");
         Assert.Equal("ToggleButton", action.Name.LocalName);
         Assert.Equal("Right", (string?)action.Attribute("HorizontalAlignment"));
-        Assert.Equal("1", (string?)action.Attribute("Grid.Column"));
+        XElement actions = action.Parent!;
+        Assert.Same(GetNamedElement(panel, "BtnRestartApplication").Parent, actions);
+        Assert.Same(action, actions.Elements().Last());
+        Assert.Equal("1", (string?)actions.Attribute("Grid.Column"));
+        Assert.Same(GetNamedElement(panel, "TxtWelcomeTitle").Parent, actions.Parent);
+        Assert.DoesNotContain(action, GetNamedElement(panel, "StatsHeader").Descendants());
         string application = ReadSource("src", "App.xaml.cs");
         string toggle = application[application.IndexOf("public static void ToggleEffectsPaused()", StringComparison.Ordinal)..application.IndexOf("private ControlPanelWindow?", StringComparison.Ordinal)];
         Assert.Contains("Overlay?.RefreshPauseState()", toggle, StringComparison.Ordinal);
