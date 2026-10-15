@@ -353,8 +353,6 @@
     <Style x:Key="BasAdvancedExpanderStyle" TargetType="Expander">
         <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Padding" Value="0,4,0,0" />
         <Setter Property="Margin" Value="{StaticResource BasCardMargin}" />
         <Setter Property="MinWidth" Value="0" />
     </Style>
