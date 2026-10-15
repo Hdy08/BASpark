@@ -23,6 +23,7 @@
             <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         </Style>
         <Style x:Key="InstallerChoiceStyle" TargetType="CheckBox" BasedOn="{StaticResource DefaultCheckBoxStyle}">
+            <Setter Property="MinHeight" Value="20" />
             <Setter Property="Padding" Value="8,0,0,0" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
@@ -59,7 +60,7 @@
                 </TransitionCollection>
             </ContentControl.ContentTransitions>
         </ContentControl>
-        <StackPanel x:Name="PageFooter" Grid.Row="2" Padding="24,12,24,24" Spacing="0">
+        <StackPanel x:Name="PageFooter" Grid.Row="2" Padding="24,12,24,24" Spacing="8">
             <CheckBox x:Name="CheckAgreement" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded"
                       IsChecked="False" Checked="Choice_Changed" Unchecked="Choice_Changed" />
             <StackPanel x:Name="InstallChoices" Spacing="8">
@@ -96,7 +97,7 @@
                         </Grid>
                     </Border>
             </StackPanel>
-            <Grid x:Name="WelcomePage" RowSpacing="12">
+            <Grid x:Name="WelcomePage" RowSpacing="20">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="WelcomeTitle" Style="{StaticResource BasPageTitleStyle}" />
@@ -129,7 +130,7 @@
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
-            <Grid x:Name="ConfirmPage" RowSpacing="8">
+            <Grid x:Name="ConfirmPage" RowSpacing="20">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="ConfirmTitle" Style="{StaticResource BasPageTitleStyle}" />

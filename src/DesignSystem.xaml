@@ -185,6 +185,7 @@
 
     <!-- 页面主标题：Title 层级 -->
     <Style x:Key="BasPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
+        <Setter Property="Margin" Value="0,-6,0,0" />
         <Setter Property="TextWrapping" Value="NoWrap" />
         <Setter Property="Foreground" Value="{ThemeResource BasTextPrimaryBrush}" />
     </Style>

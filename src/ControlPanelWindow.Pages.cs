@@ -531,6 +531,7 @@ public sealed partial class ControlPanelWindow
             offset = (capHeight - measurement.DesiredSize.Height) / 2;
             _rowTextOffsets[key] = offset;
         }
+        if (label.Margin.Top < 0) offset -= label.Margin.Top / 2;
         transform.Y = offset;
     }
 
