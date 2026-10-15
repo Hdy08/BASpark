@@ -124,8 +124,10 @@ public class WinUi3UiTests
         XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasStartupInfoBarStyle");
         Assert.Contains(style.Elements(), setter => (string?)setter.Attribute("Property") == "IsIconVisible" && (string?)setter.Attribute("Value") == "True");
         string source = ReadSource("src", "PrivacyWindow.xaml.cs");
-        Assert.Contains("Grid.SetRow(content, 0)", source, StringComparison.Ordinal);
-        Assert.Contains("panel.Visibility = Visibility.Collapsed", source, StringComparison.Ordinal);
+        Assert.Contains("StartupDialogHost.AlignInfoBarContent((InfoBar)sender)", source, StringComparison.Ordinal);
+        string alignment = ReadSource("src", "StartupDialogHost.cs");
+        Assert.Contains("Grid.SetRow(content, 0)", alignment, StringComparison.Ordinal);
+        Assert.Contains("panel.Visibility = Visibility.Collapsed", alignment, StringComparison.Ordinal);
     }
 
     [Fact]

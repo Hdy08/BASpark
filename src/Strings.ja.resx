@@ -396,7 +396,7 @@
       <value>ご利用前に以下の内容をお読みください：</value>
     </data>
     <data name="Privacy_OpenSource_Body" xml:space="preserve">
-      <value>本ソフトは無料のオープンソースです。転売は禁止です。有料で入手した場合はプラットフォームに通報し返金を請求してください。</value>
+      <value>無料のオープンソースです。転売禁止。有料で入手した場合は、購入先に通報し返金を請求してください。</value>
     </data>
     <data name="Privacy_OpenSource_Title" xml:space="preserve">
       <value>オープンソース</value>

@@ -16,6 +16,7 @@ public sealed partial class InstallerWindow : UserControl
     private readonly DcompPanelHost _host;
     private readonly UIElement[] _pages;
     private readonly Queue<string> _output = new();
+    private Panel? _errorMessages;
     private bool _initializing = true;
     private bool _closed;
     private bool _busy;
@@ -108,6 +109,8 @@ public sealed partial class InstallerWindow : UserControl
         AutomationProperties.SetName(StartMenuInput, StartMenuLabel.Text);
         AutomationProperties.SetName(ToggleStartMenu, StartMenuLabel.Text);
         AutomationProperties.SetName(ComboLanguage, LanguageLabel.Text);
+        foreach (CheckBox choice in new[] { CheckAgreement, CheckDesktop, CheckCertificate, CheckLaunch, CheckKeepData })
+            if (choice.IsLoaded) StartupDialogHost.AlignChoiceContent(choice);
         UpdateActions();
     }
 
@@ -116,6 +119,15 @@ public sealed partial class InstallerWindow : UserControl
         _step = step;
         ErrorInfo.IsOpen = false;
         ErrorInfo.Visibility = Visibility.Collapsed;
+        Panel messages = step == 2 ? ConfirmCards : step == 4 ? CompleteMessages : ProgressOutput;
+        if (!ReferenceEquals(_errorMessages, messages))
+        {
+            _errorMessages?.Children.Remove(ErrorInfo);
+            Grid.SetRow(ErrorInfo, messages == ProgressOutput ? 1 : 0);
+            ErrorInfo.Margin = messages == ProgressOutput ? new Thickness(0, 4, 0, 0) : new Thickness(0);
+            messages.Children.Add(ErrorInfo);
+            _errorMessages = messages;
+        }
         PageContent.Content = _pages[step];
         DirectoryCard.Visibility = _session.IsUpdate ? Visibility.Collapsed : Visibility.Visible;
         CheckCertificate.Visibility = _session.RequiresCertificate ? Visibility.Visible : Visibility.Collapsed;
@@ -302,35 +314,9 @@ public sealed partial class InstallerWindow : UserControl
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void WelcomeInfo_Loaded(object sender, RoutedEventArgs args)
-    {
-        static void Align(DependencyObject parent, bool hasContent)
-        {
-            for (int index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
-            {
-                DependencyObject child = VisualTreeHelper.GetChild(parent, index);
-                if (child is Border { Name: "ContentRoot" } root)
-                {
-                    root.VerticalAlignment = VerticalAlignment.Stretch;
-                    if (root.Child is Grid layout && layout.RowDefinitions.Count > 0)
-                        layout.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
-                }
-                else if (hasContent && child is ContentPresenter { Name: "ContentArea" } content) Grid.SetRow(content, 0);
-                else if (child is InfoBarPanel panel)
-                {
-                    if (hasContent) panel.Visibility = Visibility.Collapsed;
-                    else panel.VerticalAlignment = VerticalAlignment.Center;
-                }
-                else if (child is FrameworkElement icon && icon.Name is "IconBackground" or "StandardIcon" or "UserIconBox")
-                {
-                    icon.VerticalAlignment = VerticalAlignment.Center;
-                    icon.Margin = new Thickness(icon.Margin.Left, 0, icon.Margin.Right, 0);
-                }
-                Align(child, hasContent);
-            }
-        }
-        var info = (InfoBar)sender;
-        info.ApplyTemplate();
-        Align(info, info.Content != null);
-    }
+    private void WelcomeInfo_Loaded(object sender, RoutedEventArgs args) =>
+        StartupDialogHost.AlignInfoBarContent((InfoBar)sender);
+
+    private void Choice_Loaded(object sender, RoutedEventArgs args) =>
+        StartupDialogHost.AlignChoiceContent((CheckBox)sender);
 }

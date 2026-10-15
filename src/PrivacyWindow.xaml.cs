@@ -105,20 +105,8 @@ public partial class PrivacyWindow : UserControl
         }
     }
 
-    private void WelcomeInfoBar_Loaded(object sender, RoutedEventArgs args)
-    {
-        void AlignContent(DependencyObject parent)
-        {
-            for (int index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
-            {
-                DependencyObject child = VisualTreeHelper.GetChild(parent, index);
-                if (child is ContentPresenter { Name: "ContentArea" } content) Grid.SetRow(content, 0);
-                else if (child is InfoBarPanel panel) panel.Visibility = Visibility.Collapsed;
-                AlignContent(child);
-            }
-        }
-        AlignContent((InfoBar)sender);
-    }
+    private void WelcomeInfoBar_Loaded(object sender, RoutedEventArgs args) =>
+        StartupDialogHost.AlignInfoBarContent((InfoBar)sender);
 
     // ------------------------------------------------------------------
     // 按钮

@@ -1,7 +1,9 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices;
 using Windows.Foundation;
 using Windows.Graphics;
@@ -168,5 +170,79 @@ internal static class StartupDialogHost
         appWindow.Move(new PointInt32(
             area.WorkArea.X + Math.Max(0, (area.WorkArea.Width - width) / 2),
             area.WorkArea.Y + Math.Max(0, (area.WorkArea.Height - height) / 2)));
+    }
+
+    public static void AlignInfoBarContent(InfoBar info)
+    {
+        info.ApplyTemplate();
+        foreach (DependencyObject child in ContentElements(info))
+        {
+            if (child is Border { Name: "ContentRoot" } root)
+            {
+                root.VerticalAlignment = VerticalAlignment.Stretch;
+                root.BackgroundSizing = BackgroundSizing.OuterBorderEdge;
+                if (root.Child is Grid layout && layout.RowDefinitions.Count > 0)
+                    layout.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+            }
+            else if (child is ContentPresenter { Name: "ContentArea" } content && info.Content != null)
+                Grid.SetRow(content, 0);
+            else if (child is InfoBarPanel panel)
+            {
+                if (info.Content != null) panel.Visibility = Visibility.Collapsed;
+                else panel.VerticalAlignment = VerticalAlignment.Center;
+            }
+            else if (child is FrameworkElement icon && icon.Name is "IconBackground" or "StandardIcon" or "UserIconBox")
+            {
+                icon.VerticalAlignment = VerticalAlignment.Center;
+                icon.Margin = new Thickness(icon.Margin.Left, 0, icon.Margin.Right, 0);
+            }
+            if (child is TextBlock label && label.Name is not ("IconBackground" or "StandardIcon"))
+                ConfigureTextCenter(label);
+        }
+    }
+
+    public static void AlignChoiceContent(CheckBox choice)
+    {
+        choice.ApplyTemplate();
+        foreach (ContentPresenter content in ContentElements(choice).OfType<ContentPresenter>())
+        {
+            content.VerticalAlignment = VerticalAlignment.Center;
+            content.VerticalContentAlignment = VerticalAlignment.Center;
+            foreach (TextBlock label in ContentElements(content).OfType<TextBlock>()) ConfigureTextCenter(label);
+        }
+    }
+
+    private static IEnumerable<DependencyObject> ContentElements(DependencyObject parent)
+    {
+        for (int index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(parent, index);
+            yield return child;
+            foreach (DependencyObject descendant in ContentElements(child)) yield return descendant;
+        }
+    }
+
+    private static void ConfigureTextCenter(TextBlock label)
+    {
+        label.VerticalAlignment = VerticalAlignment.Center;
+        label.SizeChanged -= StartupText_SizeChanged;
+        label.SizeChanged += StartupText_SizeChanged;
+        UpdateTextCenter(label);
+    }
+
+    private static void StartupText_SizeChanged(object sender, SizeChangedEventArgs args) => UpdateTextCenter((TextBlock)sender);
+
+    private static void UpdateTextCenter(TextBlock label)
+    {
+        bool cjk = label.Text.Any(character => character is >= '\u2E80' and <= '\u9FFF');
+        var measurement = new TextBlock { Text = cjk ? "设" : "Ag", FontFamily = label.FontFamily, FontSize = label.FontSize,
+            FontWeight = label.FontWeight, FontStyle = label.FontStyle, FontStretch = label.FontStretch,
+            Language = label.Language, IsTextScaleFactorEnabled = label.IsTextScaleFactorEnabled,
+            TextLineBounds = TextLineBounds.TrimToCapHeight };
+        measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double capHeight = measurement.DesiredSize.Height;
+        measurement.TextLineBounds = TextLineBounds.TrimToBaseline;
+        measurement.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        label.RenderTransform = new TranslateTransform { Y = (capHeight - measurement.DesiredSize.Height) / 2 };
     }
 }

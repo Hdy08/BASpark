@@ -23,6 +23,10 @@
             <Setter Property="MinHeight" Value="60" />
             <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         </Style>
+        <Style x:Key="InstallerChoiceStyle" TargetType="CheckBox" BasedOn="{StaticResource DefaultCheckBoxStyle}">
+            <Setter Property="Padding" Value="8,0,0,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
     </UserControl.Resources>
     <Grid x:Name="RootGrid" Background="{ThemeResource BasSidebarBackgroundBrush}">
         <Grid.RowDefinitions>
@@ -57,17 +61,17 @@
             </ContentControl.ContentTransitions>
         </ContentControl>
         <StackPanel Grid.Row="2" Padding="28,12,28,16" Spacing="8">
-            <InfoBar x:Name="ErrorInfo" Style="{StaticResource InstallerInfoBarStyle}" IsOpen="False"
-                     Visibility="Collapsed" Severity="Error" Loaded="WelcomeInfo_Loaded" />
-            <CheckBox x:Name="CheckAgreement" IsChecked="False" Checked="Choice_Changed" Unchecked="Choice_Changed" />
+            <CheckBox x:Name="CheckAgreement" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded"
+                      IsChecked="False" Checked="Choice_Changed" Unchecked="Choice_Changed" />
             <StackPanel x:Name="InstallChoices" Spacing="4">
-                <CheckBox x:Name="CheckDesktop" IsChecked="False" />
-                <CheckBox x:Name="CheckCertificate" IsChecked="False" Checked="Choice_Changed" Unchecked="Choice_Changed">
+                <CheckBox x:Name="CheckDesktop" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded" IsChecked="False" />
+                <CheckBox x:Name="CheckCertificate" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded"
+                          IsChecked="False" Checked="Choice_Changed" Unchecked="Choice_Changed">
                     <CheckBox.Content><TextBlock x:Name="CertificateConsent" TextWrapping="Wrap" /></CheckBox.Content>
                 </CheckBox>
             </StackPanel>
-            <CheckBox x:Name="CheckLaunch" IsChecked="True" />
-            <CheckBox x:Name="CheckKeepData" IsChecked="True" />
+            <CheckBox x:Name="CheckLaunch" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded" IsChecked="True" />
+            <CheckBox x:Name="CheckKeepData" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded" IsChecked="True" />
             <StackPanel x:Name="ActionButtons" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                 <Button x:Name="BtnCancel" Click="Cancel_Click" />
                 <Button x:Name="BtnBack" Click="Back_Click" />
@@ -130,7 +134,7 @@
                     <TextBlock x:Name="ConfirmTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="ConfirmDescription" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <StackPanel Spacing="4">
+                <StackPanel x:Name="ConfirmCards" Spacing="4">
                     <Border x:Name="DirectoryCard" Style="{StaticResource BasSettingCardStyle}" Margin="0">
                         <Grid ColumnSpacing="16">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="360" /></Grid.ColumnDefinitions>
@@ -168,16 +172,19 @@
                     <TextBlock x:Name="ProgressDescription" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
                 <ProgressBar x:Name="InstallProgress" Grid.Row="1" Minimum="0" Maximum="100" Value="0" />
-                <Border Grid.Row="2" Style="{StaticResource BasLogCardStyle}" Margin="0">
-                    <ScrollViewer x:Name="OutputScroller" VerticalScrollBarVisibility="Auto">
-                        <TextBlock x:Name="OutputText" Margin="16" FontFamily="Consolas" FontSize="{StaticResource BasFontSizeCaption}"
-                                   TextWrapping="Wrap" IsTextSelectionEnabled="True" />
-                    </ScrollViewer>
-                </Border>
+                <Grid x:Name="ProgressOutput" Grid.Row="2">
+                    <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <Border Style="{StaticResource BasLogCardStyle}" Margin="0">
+                        <ScrollViewer x:Name="OutputScroller" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="OutputText" Margin="16" FontFamily="Consolas" FontSize="{StaticResource BasFontSizeCaption}"
+                                       TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
             </Grid>
             <StackPanel x:Name="CompletePage" Spacing="20">
                 <TextBlock x:Name="CompleteTitle" Style="{StaticResource BasPageTitleStyle}" />
-                <StackPanel Spacing="4">
+                <StackPanel x:Name="CompleteMessages" Spacing="4">
                 <InfoBar x:Name="CompleteInfo" Style="{StaticResource InstallerInfoBarStyle}"
                          Severity="Success" Loaded="WelcomeInfo_Loaded" />
                 <InfoBar x:Name="CompleteDirectoryCard" Style="{StaticResource InstallerInfoBarStyle}"
@@ -202,6 +209,8 @@
                     </StackPanel>
                 </InfoBar>
             </StackPanel>
+            <InfoBar x:Name="ErrorInfo" Style="{StaticResource InstallerInfoBarStyle}" IsOpen="False"
+                     Visibility="Collapsed" Severity="Error" Loaded="WelcomeInfo_Loaded" />
         </Grid>
     </Grid>
 </UserControl>

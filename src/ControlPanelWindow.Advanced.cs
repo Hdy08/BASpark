@@ -315,6 +315,8 @@ public sealed partial class ControlPanelWindow
         expander.ApplyTemplate();
         if (FindVisualDescendant<ToggleButton>(expander, "ExpanderHeader") is ToggleButton header)
             header.Visibility = Visibility.Collapsed;
+        if (FindVisualDescendant<Border>(expander, "ExpanderContent") is Border content)
+            content.BorderThickness = new Thickness(0);
     }
 
     private void BaClickAdvancedSettings_Changed(object sender, RoutedEventArgs args) => UpdateAdvancedSettingsVisibility();
