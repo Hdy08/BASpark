@@ -150,6 +150,9 @@
     <data name="Filter_Desktop" xml:space="preserve">
       <value>Show effects on desktop</value>
     </data>
+    <data name="Filter_App" xml:space="preserve">
+      <value>Show effects on this app</value>
+    </data>
     <data name="Filter_Enable" xml:space="preserve">
       <value>Enable smart environment detection</value>
     </data>

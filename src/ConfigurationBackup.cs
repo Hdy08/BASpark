@@ -63,6 +63,7 @@ public static class ConfigurationBackup
         new("EnableEnvironmentFilter", "Nav_Filter", "Filter_Enable"),
         new("HideInFullscreen", "Nav_Filter", "Filter_Fullscreen"),
         new("ShowEffectOnDesktop", "Nav_Filter", "Filter_Desktop"),
+        new("ShowEffectOnApp", "Nav_Filter", "Filter_App"),
         new("Profiles", "Nav_Filter", "Filter_ProfileGroup")
     ];
 

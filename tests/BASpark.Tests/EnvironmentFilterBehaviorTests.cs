@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace BASpark.Tests;
 
+[Collection(nameof(EnvironmentFilterBehaviorTests))]
 public sealed class EnvironmentFilterBehaviorTests
 {
     [DllImport("user32.dll")]
@@ -146,6 +147,50 @@ public sealed class EnvironmentFilterBehaviorTests
         Assert.Contains("ShouldSuppressEffects();", mouseMoveMethod, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void OwnVisibleWindow_UsesTheAppSettingForMouseAndEachTouchContact(bool filterEnabled, bool showOnApp, bool expectedSuppressed)
+    {
+        bool previousFilter = ConfigManager.EnableEnvironmentFilter;
+        bool previousShowOnApp = ConfigManager.ShowEffectOnApp;
+        using var manager = new OverlayManager();
+        IntPtr window = NativeMethods.CreateWindowEx(NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE | 0x8,
+            "Button", "BASpark filter test", NativeMethods.WS_POPUP | 0x10000000,
+            48, 48, 40, 40, IntPtr.Zero, IntPtr.Zero, NativeMethods.GetModuleHandle(null), IntPtr.Zero);
+        Assert.NotEqual(IntPtr.Zero, window);
+        try
+        {
+            ConfigManager.EnableEnvironmentFilter = filterEnabled;
+            ConfigManager.ShowEffectOnApp = showOnApp;
+            Assert.True(NativeMethods.IsWindowVisible(window));
+            Assert.True(NativeMethods.GetWindowRect(window, out NativeMethods.RECT bounds));
+            var point = new NativeMethods.POINT { x = (bounds.Left + bounds.Right) / 2, y = (bounds.Top + bounds.Bottom) / 2 };
+            Assert.Equal(window, NativeMethods.GetAncestor(NativeMethods.WindowFromPoint(point), NativeMethods.GA_ROOT));
+            var suppress = typeof(OverlayManager).GetMethod("ShouldSuppressEffects", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .CreateDelegate<Func<bool, NativeMethods.POINT?, OverlayManager.TouchTrailState?, bool>>(manager);
+            Assert.Equal(expectedSuppressed, suppress(true, point, null));
+            foreach (long pointerId in new long[] { 1, 2 })
+            {
+                var contact = new OverlayManager.TouchTrailState(pointerId, pointerId, point);
+                Assert.Equal(expectedSuppressed, suppress(true, point, contact));
+                Assert.Equal(expectedSuppressed, contact.FilterSuppressed);
+                Assert.Equal(expectedSuppressed, suppress(false, point, contact));
+                ConfigManager.ShowEffectOnApp = !showOnApp;
+                Assert.Equal(filterEnabled && showOnApp, suppress(true, point, contact));
+                ConfigManager.ShowEffectOnApp = showOnApp;
+            }
+        }
+        finally
+        {
+            ConfigManager.EnableEnvironmentFilter = previousFilter;
+            ConfigManager.ShowEffectOnApp = previousShowOnApp;
+            Assert.True(NativeMethods.DestroyWindow(window));
+        }
+    }
+
     private static string ReadSource(params string[] pathParts) =>
         File.ReadAllText(Path.Combine([FindWorkspaceRoot(), .. pathParts]), Encoding.UTF8);
 
@@ -161,4 +206,9 @@ public sealed class EnvironmentFilterBehaviorTests
 
         throw new DirectoryNotFoundException("Could not locate the BASpark workspace root.");
     }
+}
+
+[CollectionDefinition(nameof(EnvironmentFilterBehaviorTests), DisableParallelization = true)]
+public sealed class EnvironmentFilterCollection
+{
 }

@@ -4082,7 +4082,7 @@ public class WinUi3UiTests
             "{\"UiLanguage\":\"zh-CN\",\"DarkMode\":2,\"MaxTouchEffects\":1}",
             "{\"EffectScale\":1.2,\"ParticleColor\":\"76,167,255\",\"EffectOpacity\":0.75,\"EnableBaClickAdvancedSettings\":true,\"BaClickFx/overlayAlphaLimit\":0.85}",
             "[{\"IdentityKey\":\"screen\",\"DeviceName\":\"DISPLAY1\",\"IsEnabled\":true}]",
-            "{\"EnableEnvironmentFilter\":true,\"Profiles\":[{\"Id\":\"profile\",\"Name\":\"Saved\",\"Mode\":1,\"Processes\":[\"saved.exe\"]}],\"ActiveProfileId\":\"profile\"}");
+            "{\"EnableEnvironmentFilter\":true,\"ShowEffectOnApp\":false,\"Profiles\":[{\"Id\":\"profile\",\"Name\":\"Saved\",\"Mode\":1,\"Processes\":[\"saved.exe\"]}],\"ActiveProfileId\":\"profile\"}");
         Dictionary<string, object> basic = saved.GetValues(SettingsSections.Basic);
         Assert.Equal(new[] { "DarkMode", "MaxTouchEffects", "UiLanguage" }, basic.Keys.Order().ToArray());
         Assert.IsType<DarkModeOption>(basic["DarkMode"]);
@@ -4092,7 +4092,8 @@ public class WinUi3UiTests
         Assert.DoesNotContain("MaxTouchEffects", visual.Keys);
         Assert.DoesNotContain("FilterProfiles", visual.Keys);
         Dictionary<string, object> filter = saved.GetValues(SettingsSections.Filter);
-        Assert.Equal(new[] { "ActiveProfileId", "EnableEnvironmentFilter", "FilterProfiles" }, filter.Keys.Order().ToArray());
+        Assert.Equal(new[] { "ActiveProfileId", "EnableEnvironmentFilter", "FilterProfiles", "ShowEffectOnApp" }, filter.Keys.Order().ToArray());
+        Assert.False((bool)filter["ShowEffectOnApp"]);
         FilterProfile profile = System.Text.Json.JsonSerializer.Deserialize<List<FilterProfile>>((string)filter["FilterProfiles"])!.Single();
         Assert.Equal(new[] { "saved.exe" }, profile.Processes);
         Assert.Equal(saved.Screens, saved.GetValues(SettingsSections.Screens)["ScreenSelections"]);

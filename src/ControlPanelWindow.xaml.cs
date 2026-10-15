@@ -873,7 +873,7 @@ public sealed partial class ControlPanelWindow : UserControl
                      CheckAlwaysTrailEffectSwitch, CheckRunAsAdmin, CheckTouchscreenMode, CheckMiddleClickTrigger,
                      CheckScreenshotCompatibilityMode })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Basic);
-        foreach (ToggleSwitch toggle in new[] { CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop })
+        foreach (ToggleSwitch toggle in new[] { CheckEnvironmentFilter, CheckHideInFullscreen, CheckShowEffectOnDesktop, CheckShowEffectOnApp })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Filter);
         foreach (ToggleSwitch toggle in new[] { CheckLinkedEffectScale, CheckLinkedAnimationSpeed, CheckApplyCurveDraw, CheckBaClickAdvancedSettings })
             TrackSettingsProperty(toggle, ToggleSwitch.IsOnProperty, SettingsSections.Visual);
@@ -926,7 +926,8 @@ public sealed partial class ControlPanelWindow : UserControl
     private string CaptureFilterSettings() => JsonSerializer.Serialize(new
     {
         EnableEnvironmentFilter = CheckEnvironmentFilter.IsOn, HideInFullscreen = CheckHideInFullscreen.IsOn,
-        ShowEffectOnDesktop = CheckShowEffectOnDesktop.IsOn, ActiveProfileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
+        ShowEffectOnDesktop = CheckShowEffectOnDesktop.IsOn, ShowEffectOnApp = CheckShowEffectOnApp.IsOn,
+        ActiveProfileId = (ComboProfiles.SelectedItem as FilterProfile)?.Id,
         Profiles = Profiles.Select(profile => new
         {
             profile.Id, profile.Name, profile.Mode,
@@ -1438,6 +1439,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckEnvironmentFilter.Header = Localization.Get("Filter_Enable");
         CheckHideInFullscreen.Header = Localization.Get("Filter_Fullscreen");
         CheckShowEffectOnDesktop.Header = Localization.Get("Filter_Desktop");
+        CheckShowEffectOnApp.Header = Localization.Get("Filter_App");
         TxtFilterProfiles.Text = Localization.Get("Filter_Profiles");
         SetActionIcon(BtnAddProfile, "\uE710", "Filter_New");
         SetActionIcon(BtnRenameProfile, "\uE8AC", "Filter_Rename");
@@ -2317,6 +2319,7 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckEnvironmentFilter.IsOn = ConfigManager.EnableEnvironmentFilter;
         CheckHideInFullscreen.IsOn = ConfigManager.HideInFullscreen;
         CheckShowEffectOnDesktop.IsOn = ConfigManager.ShowEffectOnDesktop;
+        CheckShowEffectOnApp.IsOn = ConfigManager.ShowEffectOnApp;
         CheckRunAsAdmin.IsOn = ConfigManager.RunAsAdmin;
         CheckTouchscreenMode.IsOn = ConfigManager.IsTouchscreenMode;
         SliderMaxTouchEffects.Value = _touchEffectLimitFormatter.ToSliderValue(ConfigManager.MaxTouchEffects);
@@ -2599,6 +2602,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         CheckHideInFullscreen.IsEnabled = environmentFilterEnabled;
         CheckShowEffectOnDesktop.IsEnabled = environmentFilterEnabled;
+        CheckShowEffectOnApp.IsEnabled = environmentFilterEnabled;
         ComboProfiles.IsEnabled = environmentFilterEnabled;
         ComboProcessFilterMode.IsEnabled = environmentFilterEnabled;
         BtnAddProfile.IsEnabled = environmentFilterEnabled;
@@ -3149,6 +3153,7 @@ public sealed partial class ControlPanelWindow : UserControl
         AddToggleResetItem(group, CheckEnvironmentFilter, false, "EnableEnvironmentFilter");
         AddToggleResetItem(group, CheckHideInFullscreen, true, "HideInFullscreen");
         AddToggleResetItem(group, CheckShowEffectOnDesktop, true, "ShowEffectOnDesktop");
+        AddToggleResetItem(group, CheckShowEffectOnApp, true, "ShowEffectOnApp");
         group = GetResetGroup("Nav_Filter", "Filter_AdvancedSection");
         AddPageResetItem(group, Localization.Get("Filter_ProfileGroup"), Localization.Get("Reset_DefaultProfile"), "Profiles", () =>
         {

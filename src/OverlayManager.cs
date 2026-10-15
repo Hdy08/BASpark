@@ -1261,7 +1261,7 @@ namespace BASpark
 
             if (IsCurrentProcessWindow(targetWindow))
             {
-                return Complete(false);
+                return Complete(!ConfigManager.ShowEffectOnApp);
             }
 
             if (!TryGetForegroundProcessName(targetWindow, out string processName))

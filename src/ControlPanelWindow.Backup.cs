@@ -307,6 +307,7 @@ public sealed partial class ControlPanelWindow
                          ("EnableMiddleClickTrigger", CheckMiddleClickTrigger), ("ScreenshotCompatibilityMode", CheckScreenshotCompatibilityMode),
                          ("EnableEnvironmentFilter", CheckEnvironmentFilter), ("HideInFullscreen", CheckHideInFullscreen),
                          ("ShowEffectOnDesktop", CheckShowEffectOnDesktop), ("UseLinkedEffectScale", CheckLinkedEffectScale),
+                         ("ShowEffectOnApp", CheckShowEffectOnApp),
                          ("UseLinkedAnimationSpeed", CheckLinkedAnimationSpeed), ("ApplyCurveDraw", CheckApplyCurveDraw)
                      })
                 if (values.TryGetValue(item.Item1, out object? value)) item.Item2.IsOn = (bool)value;

@@ -93,6 +93,7 @@ namespace BASpark
         public static bool EnableEnvironmentFilter { get; set; } = false;
         public static bool HideInFullscreen { get; set; } = true;
         public static bool ShowEffectOnDesktop { get; set; } = true;
+        public static bool ShowEffectOnApp { get; set; } = true;
         public static string FilterProfiles { get; set; } = "";
         public static string ActiveProfileId { get; set; } = "";
         public static bool IsTouchscreenMode { get; set; } = false;
@@ -168,6 +169,7 @@ namespace BASpark
                         EnableEnvironmentFilter = Convert.ToBoolean(key.GetValue("EnableEnvironmentFilter", false));
                         HideInFullscreen = Convert.ToBoolean(key.GetValue("HideInFullscreen", true));
                         ShowEffectOnDesktop = Convert.ToBoolean(key.GetValue("ShowEffectOnDesktop", true));
+                        ShowEffectOnApp = Convert.ToBoolean(key.GetValue("ShowEffectOnApp", true));
                         IsTouchscreenMode = Convert.ToBoolean(key.GetValue("IsTouchscreenMode", false));
                         MaxTouchEffects = ParseMaxTouchEffects(key.GetValue("MaxTouchEffects"), key.GetValue("EnableMultiTouchEffects"));
                         ClickTriggerType = Convert.ToInt32(key.GetValue("ClickTriggerType", 0), CultureInfo.InvariantCulture);
@@ -748,6 +750,7 @@ namespace BASpark
                     EnableEnvironmentFilter = false;
                     HideInFullscreen = true;
                     ShowEffectOnDesktop = true;
+                    ShowEffectOnApp = true;
                     FilterProfiles = "";
                     ActiveProfileId = "";
                     _profiles.Clear();

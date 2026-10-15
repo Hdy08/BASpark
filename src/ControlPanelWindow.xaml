@@ -1300,6 +1300,24 @@
                                             </Grid>
                                         </Grid>
                                     </Border>
+                                    <Border Style="{StaticResource BasSettingCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.15*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Header, ElementName=CheckShowEffectOnApp}" Style="{StaticResource BasSettingTitleStyle}" />
+                                            </StackPanel>
+                                            <Grid Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                                <ToggleSwitch
+                                                    x:Name="CheckShowEffectOnApp"
+                                                    Header=""
+                                                    Style="{StaticResource BasSettingToggleStyle}"
+                                                    AutomationProperties.Name="{Binding Header, ElementName=CheckShowEffectOnApp}" />
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
                                     <TextBlock x:Name="TxtFilterAdvancedTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                                     <Border Style="{StaticResource BasSettingCardStyle}">
                                         <Grid ColumnSpacing="16">

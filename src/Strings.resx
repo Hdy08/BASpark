@@ -150,6 +150,9 @@
     <data name="Filter_Desktop" xml:space="preserve">
       <value>在桌面上显示特效</value>
     </data>
+    <data name="Filter_App" xml:space="preserve">
+      <value>在本应用上显示特效</value>
+    </data>
     <data name="Filter_Enable" xml:space="preserve">
       <value>启用智能环境探测</value>
     </data>

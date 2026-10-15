@@ -150,6 +150,9 @@
     <data name="Filter_Desktop" xml:space="preserve">
       <value>デスクトップでエフェクトを表示</value>
     </data>
+    <data name="Filter_App" xml:space="preserve">
+      <value>このアプリ上でエフェクトを表示</value>
+    </data>
     <data name="Filter_Enable" xml:space="preserve">
       <value>スマート環境検出を有効にする</value>
     </data>

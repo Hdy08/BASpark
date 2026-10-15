@@ -4,6 +4,31 @@ namespace BASpark.Tests;
 
 public sealed class ConfigurationBackupTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ShowEffectOnApp_BackupAndImportPreserveTheChoiceWithoutChangingOtherSettings(bool enabled)
+    {
+        bool previousValue = ConfigManager.ShowEffectOnApp;
+        try
+        {
+            ConfigManager.ShowEffectOnApp = enabled;
+            ConfigurationBackupDocument captured = ConfigurationBackup.Capture([]);
+            ConfigurationBackupDocument selected = ConfigurationBackup.Select(captured, ["ShowEffectOnApp"]);
+            ConfigurationBackupDocument parsed = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(selected));
+            Assert.Equal("ShowEffectOnApp", Assert.Single(parsed.Data).Key);
+            Assert.Equal(enabled, parsed.Data["ShowEffectOnApp"].GetBoolean());
+            Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(parsed, ["ShowEffectOnApp"], CreateFixture());
+            Assert.Equal(enabled, Assert.Single(values).Value);
+            Assert.Equal(enabled, ConfigManager.ShowEffectOnApp);
+            Assert.Equal("Nav_Filter", ConfigurationBackup.Settings.Single(setting => setting.Key == "ShowEffectOnApp").GroupKey);
+        }
+        finally
+        {
+            ConfigManager.ShowEffectOnApp = previousValue;
+        }
+    }
+
     [Fact]
     public void AdvancedFx_DisplayDefaultsMatchTheFullLibrary()
     {
@@ -229,6 +254,9 @@ public sealed class ConfigurationBackupTests
     [InlineData("ParticleColor", "\"256,0,0\"")]
     [InlineData("AgreedToPrivacy", "true")]
     [InlineData("UnknownSetting", "true")]
+    [InlineData("ShowEffectOnApp", "0")]
+    [InlineData("ShowEffectOnApp", "\"false\"")]
+    [InlineData("ShowEffectOnApp", "null")]
     public void Parse_RejectsInvalidOrNonConfigurationValuesBeforeAnyPersistence(string key, string json)
     {
         var document = new ConfigurationBackupDocument();
@@ -290,13 +318,13 @@ public sealed class ConfigurationBackupTests
     [Fact]
     public void SettingCatalog_CoversAllEditableSettingsAndStatisticsWithUniqueKeys()
     {
-        Assert.Equal(31 + AdvancedFxSettings.Definitions.Count, ConfigurationBackup.Settings.Count);
+        Assert.Equal(32 + AdvancedFxSettings.Definitions.Count, ConfigurationBackup.Settings.Count);
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
         Assert.Equal(new[] { "Backup_Statistics", "Nav_Basic", "Nav_Visual", "Nav_Filter" },
             ConfigurationBackup.Settings.Select(item => item.GroupKey).Distinct());
         Assert.Contains(ConfigurationBackup.Settings, item => item.Key == "TotalClicks");
         foreach (string key in new[] { "Profiles", "ParticleColor",
-                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "MaxTouchEffects", "InputSamplingRate" })
+                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "MaxTouchEffects", "InputSamplingRate", "ShowEffectOnApp" })
             Assert.Contains(ConfigurationBackup.Settings, item => item.Key == key);
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key == "EffectOpacity");
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key is "TrailRefreshRate" or "FollowDisplayRefreshRate");

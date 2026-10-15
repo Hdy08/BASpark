@@ -595,7 +595,8 @@ public sealed partial class ControlPanelWindow
                 (SliderSpeed, "EffectSpeed"), (SliderTrailAnimSpeed, "TrailAnimationSpeed"), (SliderClickAnimSpeed, "ClickAnimationSpeed"),
                 (CheckApplyCurveDraw, "ApplyCurveDraw"), (SliderTrailSamplingRate, "InputSamplingRate"), (SliderGlow, "GlowIntensity"),
                 (CheckBaClickAdvancedSettings, "EnableBaClickAdvancedSettings"), (CheckEnvironmentFilter, "EnableEnvironmentFilter"),
-                (CheckHideInFullscreen, "HideInFullscreen"), (CheckShowEffectOnDesktop, "ShowEffectOnDesktop"), (ComboProfiles, "Profiles")
+                (CheckHideInFullscreen, "HideInFullscreen"), (CheckShowEffectOnDesktop, "ShowEffectOnDesktop"),
+                (CheckShowEffectOnApp, "ShowEffectOnApp"), (ComboProfiles, "Profiles")
             })
             {
                 if (!items.TryGetValue(entry.Key, out VisualResetItem? item)) continue;
@@ -744,7 +745,7 @@ public sealed partial class ControlPanelWindow
     {
         ResetScope.Basic => entry.Key is "UiLanguage" or "DarkMode" ? "Basic_Interface"
             : entry.Key is "AutoStart" or "StartSilent" or "HideTrayIcon" or "RunAsAdmin" ? "Basic_Runtime" : "Basic_Trigger",
-        ResetScope.Filter => entry.Key is "EnableEnvironmentFilter" or "HideInFullscreen" or "ShowEffectOnDesktop" ? "Filter_BasicSection" : "Filter_AdvancedSection",
+        ResetScope.Filter => entry.Key is "EnableEnvironmentFilter" or "HideInFullscreen" or "ShowEffectOnDesktop" or "ShowEffectOnApp" ? "Filter_BasicSection" : "Filter_AdvancedSection",
         ResetScope.Visual => entry.Key.StartsWith("BaClickFx/", StringComparison.Ordinal) || entry.Key is "EnableBaClickAdvancedSettings" or "HdrPreset" ? "Visual_AdvancedSection"
             : entry.Key.Contains("Scale", StringComparison.Ordinal) ? "Visual_ScaleSection"
             : entry.Key.Contains("Speed", StringComparison.Ordinal) ? "Visual_SpeedSection"
