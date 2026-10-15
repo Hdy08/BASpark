@@ -472,7 +472,7 @@
                             <Rectangle x:Name="VerticalTrackRect" Grid.RowSpan="3" Width="18" Fill="Transparent" />
                             <Rectangle x:Name="VerticalDecreaseRect" Grid.Row="2" Fill="Transparent" />
                             <Thumb x:Name="VerticalThumb" Grid.Row="1" Width="20" Height="6"
-                                   Background="Transparent" BorderBrush="White" BorderThickness="1"
+                                   Background="Transparent" BorderBrush="{ThemeResource TextFillColorPrimaryBrush}" BorderThickness="1"
                                    DataContext="{TemplateBinding Value}" AutomationProperties.AccessibilityView="Raw">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">

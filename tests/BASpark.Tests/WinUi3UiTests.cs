@@ -2920,7 +2920,7 @@ public class WinUi3UiTests
         XElement thumb = Assert.Single(sliderStyle.Descendants(), element => (string?)element.Attribute(Xaml + "Name") == "VerticalThumb");
         Assert.Equal("20", (string?)thumb.Attribute("Width"));
         Assert.Equal("6", (string?)thumb.Attribute("Height"));
-        Assert.Equal("White", (string?)thumb.Attribute("BorderBrush"));
+        Assert.Equal("{ThemeResource TextFillColorPrimaryBrush}", (string?)thumb.Attribute("BorderBrush"));
         Assert.Equal("3", (string?)Assert.Single(thumb.Descendants(), element => element.Name.LocalName == "Border").Attribute("CornerRadius"));
         XElement swatch = Assert.Single(document.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasColorSwatchStyle");
         foreach (string dimension in new[] { "Width", "Height" })
