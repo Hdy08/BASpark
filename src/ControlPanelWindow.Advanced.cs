@@ -39,23 +39,34 @@ public sealed partial class ControlPanelWindow
             PanelBaClickAdvanced.Children.Add(CreateAdvancedHeading(group.Key, "BasAdvancedGroupTitleStyle", group));
             foreach (var section in group.GroupBy(item => item.SectionKey))
             {
-                var content = new StackPanel();
+                var content = new StackPanel { Spacing = 4 };
                 foreach (AdvancedFxSetting setting in section)
                 {
                     if (setting.Path == HdrPaths[0]) content.Children.Add(CreateHdrPresetCard());
                     content.Children.Add(CreateAdvancedSettingCard(setting));
                 }
-                PanelBaClickAdvanced.Children.Add(new Expander
+                var expander = new Expander
                 {
                     Style = (Style)Application.Current.Resources["BasAdvancedExpanderStyle"],
                     Header = CreateAdvancedHeading(section.Key, "BasAdvancedSectionTitleStyle", section),
                     Content = content, IsExpanded = false,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
-                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                    Margin = new Thickness(0, 0, 0, 4)
-                });
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch
+                };
+                expander.Loaded += AdvancedSettingsExpander_Loaded;
+                PanelBaClickAdvanced.Children.Add(expander);
             }
         }
+    }
+
+    private void AdvancedSettingsExpander_Loaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is not Expander expander) return;
+        expander.ApplyTemplate();
+        if (FindVisualDescendant<ToggleButton>(expander, "ExpanderHeader") is ToggleButton header)
+            header.BorderThickness = new Thickness(0);
+        if (FindVisualDescendant<Border>(expander, "ExpanderContent") is Border content)
+            content.BorderThickness = new Thickness(0);
     }
 
     private StackPanel CreateAdvancedHeading(string key, string styleKey, IEnumerable<AdvancedFxSetting> settings)
@@ -146,7 +157,7 @@ public sealed partial class ControlPanelWindow
             state => IsDefaultSettingValue(state, setting.Key, setting.DefaultValue));
         Grid.SetColumn(content, 1);
         grid.Children.Add(content);
-        return new Border { Style = (Style)Application.Current.Resources["BasSettingCardStyle"], Child = grid };
+        return new Border { Style = (Style)Application.Current.Resources["BasSettingCardStyle"], Margin = new Thickness(0), Child = grid };
     }
 
     private Border CreateHdrPresetCard()
@@ -181,7 +192,7 @@ public sealed partial class ControlPanelWindow
                 SetAdvancedControlValue(path, AdvancedFxSettings.Definitions.Single(item => item.Path == path).DefaultValue);
         }, state => HdrPaths.Select(path => AdvancedFxSettings.Definitions.Single(item => item.Path == path))
             .All(setting => IsDefaultSettingValue(state, setting.Key, setting.DefaultValue)));
-        return new Border { Style = (Style)Application.Current.Resources["BasSettingCardStyle"], Child = grid };
+        return new Border { Style = (Style)Application.Current.Resources["BasSettingCardStyle"], Margin = new Thickness(0), Child = grid };
     }
 
     private void ApplyAdvancedLocalizedText()
