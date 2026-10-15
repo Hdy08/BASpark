@@ -40,11 +40,12 @@
             </Button>
         </Grid>
 
-        <ScrollViewer Grid.Row="1" Margin="{StaticResource BasStartupContentMargin}"
-                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="12">
-                <TextBlock x:Name="TxtSubtitle"
-                           Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="NoWrap" />
+        <Grid Grid.Row="1" Margin="{StaticResource BasStartupContentMargin}" RowSpacing="12">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <TextBlock x:Name="TxtSubtitle"
+                       Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="NoWrap" />
+            <ScrollViewer x:Name="StartupScrollViewer" Grid.Row="1" Margin="0,0,-24,0" Padding="0,0,24,0"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <Border x:Name="LanguageCard" Style="{StaticResource BasSettingCardStyle}" Margin="0">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
@@ -66,8 +67,8 @@
                         </ComboBox>
                     </Grid>
                 </Border>
-            </StackPanel>
-        </ScrollViewer>
+            </ScrollViewer>
+        </Grid>
 
         <Border Grid.Row="2" Style="{StaticResource BasStartupActionBarStyle}">
             <Button x:Name="BtnContinue"

@@ -39,6 +39,19 @@ public sealed class InstallerSessionTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DirectoryValidation_ReportsUnsafeLocationsBeforeCertificateConsent(bool consent)
+    {
+        var session = new InstallerSession(false, true, "setup.exe");
+        string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        foreach (string directory in new[] { programFiles, Path.Combine(Path.GetTempPath(), "BASpark"),
+                     Path.Combine(programFiles, "..", "BASpark") })
+            Assert.Equal("Installer_SecureDirectoryRequired", session.Validate(Choices(directory) with { TrustCertificate = consent }));
+        Assert.Equal(consent ? null : "Installer_CertificateRequired", session.Validate(Choices() with { TrustCertificate = consent }));
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("relative\\BASpark")]
     [InlineData("C:\\BASpark\"invalid")]

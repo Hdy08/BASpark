@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Windowing;
 
 namespace BASpark;
@@ -17,6 +18,8 @@ public sealed partial class InstallerWindow : UserControl
     private readonly UIElement[] _pages;
     private readonly Queue<string> _output = new();
     private Panel? _errorMessages;
+    private Storyboard? _errorStoryboard;
+    private bool _errorVisible;
     private bool _initializing = true;
     private bool _closed;
     private bool _busy;
@@ -117,8 +120,7 @@ public sealed partial class InstallerWindow : UserControl
     private void Navigate(int step)
     {
         _step = step;
-        ErrorInfo.IsOpen = false;
-        ErrorInfo.Visibility = Visibility.Collapsed;
+        SetErrorMessage(null, animate: false);
         Panel messages = step == 2 ? ConfirmCards : step == 4 ? CompleteMessages : ProgressOutput;
         if (!ReferenceEquals(_errorMessages, messages))
         {
@@ -174,13 +176,7 @@ public sealed partial class InstallerWindow : UserControl
     {
         if (_initializing) return;
         string? invalid = _session.Validate(GetChoices());
-        ErrorInfo.IsOpen = invalid != null && invalid != "Installer_CertificateRequired";
-        ErrorInfo.Visibility = ErrorInfo.IsOpen ? Visibility.Visible : Visibility.Collapsed;
-        if (ErrorInfo.IsOpen)
-        {
-            ErrorInfo.Message = Text(invalid!);
-            WelcomeInfo_Loaded(ErrorInfo, new RoutedEventArgs());
-        }
+        SetErrorMessage(invalid is null or "Installer_CertificateRequired" ? null : Text(invalid));
         UpdateActions();
     }
 
@@ -296,12 +292,50 @@ public sealed partial class InstallerWindow : UserControl
         }
     }
 
-    private void ShowError(Exception exception)
+    private void ShowError(Exception exception) => SetErrorMessage(exception.Message);
+
+    private void SetErrorMessage(string? message, bool animate = true)
     {
-        ErrorInfo.Message = exception.Message;
+        bool visible = !string.IsNullOrEmpty(message);
+        bool changed = _errorVisible != visible;
+        _errorVisible = visible;
+        if (visible) ErrorInfo.Message = message!;
+        if (!animate || !RootGrid.IsLoaded || !new Windows.UI.ViewManagement.UISettings().AnimationsEnabled)
+        {
+            CompleteErrorTransition();
+            return;
+        }
+        if (!changed) return;
+        double opacity = ErrorInfo.Visibility == Visibility.Collapsed ? 0 : ErrorInfo.Opacity;
+        _errorStoryboard?.Stop();
         ErrorInfo.IsOpen = true;
         ErrorInfo.Visibility = Visibility.Visible;
+        ErrorInfo.Opacity = 1;
         WelcomeInfo_Loaded(ErrorInfo, new RoutedEventArgs());
+        var storyboard = new Storyboard();
+        var duration = TimeSpan.Parse((string)Application.Current.Resources["ControlFastAnimationDuration"], System.Globalization.CultureInfo.InvariantCulture);
+        var fade = new DoubleAnimationUsingKeyFrames();
+        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = opacity });
+        fade.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(duration), Value = visible ? 1 : 0 });
+        Storyboard.SetTarget(fade, ErrorInfo);
+        Storyboard.SetTargetProperty(fade, "Opacity");
+        storyboard.Children.Add(fade);
+        _errorStoryboard = storyboard;
+        storyboard.Completed += (_, _) =>
+        {
+            if (ReferenceEquals(_errorStoryboard, storyboard)) CompleteErrorTransition();
+        };
+        storyboard.Begin();
+    }
+
+    private void CompleteErrorTransition()
+    {
+        _errorStoryboard?.Stop();
+        _errorStoryboard = null;
+        ErrorInfo.IsOpen = _errorVisible;
+        ErrorInfo.Visibility = _errorVisible ? Visibility.Visible : Visibility.Collapsed;
+        ErrorInfo.Opacity = 1;
+        if (_errorVisible) WelcomeInfo_Loaded(ErrorInfo, new RoutedEventArgs());
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs args) { if (!_busy) _ = CloseAsync(); }
@@ -310,6 +344,8 @@ public sealed partial class InstallerWindow : UserControl
     {
         if (_closed) return;
         _closed = true;
+        _errorStoryboard?.Stop();
+        _errorStoryboard = null;
         await StartupDialogHost.CloseAsync(_host);
         Closed?.Invoke(this, EventArgs.Empty);
     }

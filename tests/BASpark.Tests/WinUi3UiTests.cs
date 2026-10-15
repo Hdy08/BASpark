@@ -3849,7 +3849,12 @@ public class WinUi3UiTests
             Assert.Equal("{ThemeResource BasSidebarBackgroundBrush}", (string?)GetNamedElement(document, "RootGrid").Attribute("Background"));
             Assert.Equal("{ThemeResource BasSidebarBackgroundBrush}", (string?)GetNamedElement(document, "AppTitleBar").Attribute("Background"));
             XElement scroller = Assert.Single(document.Descendants(Presentation + "ScrollViewer"));
-            Assert.Equal("{StaticResource BasStartupContentMargin}", (string?)scroller.Attribute("Margin"));
+            Assert.Equal("0,0,-24,0", (string?)scroller.Attribute("Margin"));
+            Assert.Equal("0,0,24,0", (string?)scroller.Attribute("Padding"));
+            Assert.Equal("{StaticResource BasStartupContentMargin}", (string?)scroller.Parent!.Attribute("Margin"));
+            foreach (XElement title in document.Descendants(Presentation + "TextBlock").Where(element =>
+                         (string?)element.Attribute(Xaml + "Name") is "TxtSubtitle" or "VersionText" or "TxtTagline"))
+                Assert.DoesNotContain(scroller.Descendants(), element => ReferenceEquals(element, title));
             XElement footer = Assert.Single(document.Descendants(Presentation + "Border"), element => (string?)element.Attribute("Style") == "{StaticResource BasStartupActionBarStyle}");
             Assert.Equal("2", (string?)footer.Attribute("Grid.Row"));
             Assert.Equal("Right", (string?)footer.Elements().Single().Attribute("HorizontalAlignment"));

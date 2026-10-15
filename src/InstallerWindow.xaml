@@ -97,12 +97,14 @@
                         </Grid>
                     </Border>
             </StackPanel>
-            <ScrollViewer x:Name="WelcomePage" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="20">
-                    <StackPanel Spacing="4">
-                        <TextBlock x:Name="WelcomeTitle" Style="{StaticResource BasPageTitleStyle}" />
-                        <TextBlock x:Name="WelcomeTagline" Style="{StaticResource BasCaptionStyle}" />
-                    </StackPanel>
+            <Grid x:Name="WelcomePage" RowSpacing="20">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="WelcomeTitle" Style="{StaticResource BasPageTitleStyle}" />
+                    <TextBlock x:Name="WelcomeTagline" Style="{StaticResource BasCaptionStyle}" />
+                </StackPanel>
+                <ScrollViewer x:Name="WelcomeScroller" Grid.Row="1" Margin="0,0,-28,0" Padding="0,0,28,0"
+                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="12">
                         <TextBlock x:Name="WelcomeIntro" Style="{StaticResource InstallerBodyLargeStrongTextStyle}" />
                         <StackPanel Spacing="4">
@@ -126,14 +128,16 @@
                     </InfoBar>
                         </StackPanel>
                     </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
-            <ScrollViewer x:Name="ConfirmPage" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="20">
+                </ScrollViewer>
+            </Grid>
+            <Grid x:Name="ConfirmPage" RowSpacing="20">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="ConfirmTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="ConfirmDescription" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
+                <ScrollViewer x:Name="ConfirmScroller" Grid.Row="1" Margin="0,0,-28,0" Padding="0,0,28,0"
+                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel x:Name="ConfirmCards" Spacing="4">
                     <Border x:Name="DirectoryCard" Style="{StaticResource BasSettingCardStyle}" Margin="0">
                         <Grid ColumnSpacing="16">
@@ -163,8 +167,8 @@
                         </Grid>
                     </Border>
                 </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
+                </ScrollViewer>
+            </Grid>
             <Grid x:Name="ProgressPage" RowSpacing="16">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Spacing="4">

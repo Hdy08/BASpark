@@ -96,11 +96,11 @@ internal sealed class InstallerSession : IInstallerBackend
             choices.Directory.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return "Installer_InvalidDirectory";
         if (RequiresCertificate)
         {
-            if (!choices.TrustCertificate) return "Installer_CertificateRequired";
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
             string normalized = Path.TrimEndingDirectorySeparator(Path.GetFullPath(choices.Directory));
             if (!normalized.StartsWith(programFiles + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 return "Installer_SecureDirectoryRequired";
+            if (!choices.TrustCertificate) return "Installer_CertificateRequired";
         }
         if (choices.CreateStartMenu && (string.IsNullOrWhiteSpace(choices.StartMenuFolder) ||
             Path.IsPathRooted(choices.StartMenuFolder) || choices.StartMenuFolder.Contains("..", StringComparison.Ordinal) ||

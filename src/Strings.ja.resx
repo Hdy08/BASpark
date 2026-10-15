@@ -142,7 +142,7 @@
       <value>プロセスを追加</value>
     </data>
     <data name="Filter_Browse" xml:space="preserve">
-      <value>参照...</value>
+      <value>参照</value>
     </data>
     <data name="Filter_Delete" xml:space="preserve">
       <value>削除</value>

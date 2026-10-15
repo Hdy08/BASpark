@@ -264,7 +264,8 @@
                             </ToggleButton.Resources>
                         </ToggleButton>
                     </Grid>
-                <ScrollViewer x:Name="WelcomeScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer x:Name="WelcomeScrollViewer" Grid.Row="2" Margin="-28,0,-28,-28" Padding="28,0,28,28"
+                              VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <Border Style="{StaticResource BasSettingCardStyle}">
                         <Grid ColumnSpacing="16">
