@@ -170,10 +170,12 @@ public class WinUi3UiTests
         XElement header = Assert.Single(template.Elements());
         XElement title = Assert.Single(header.Elements(), item => item.Name.LocalName == "TextBlock");
         Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)title.Attribute("Style"));
-        Assert.Equal("0,8,16,12", (string?)header.Attribute("Margin"));
+        Assert.Equal("{StaticResource BasSectionHeaderStyle}", (string?)header.Attribute("Style"));
+        Assert.Equal("0,-4,16,0", (string?)header.Attribute("Margin"));
         string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
-        Assert.Contains("Margin = new Thickness(0, 8, 16, 12)", source, StringComparison.Ordinal);
-        Assert.Contains("header.Margin = group.IsFirst ? new Thickness() : new Thickness(0, 8, 16, 12)", source, StringComparison.Ordinal);
+        Assert.Contains("Margin = new Thickness(0, -4, 16, 0)", source, StringComparison.Ordinal);
+        Assert.Contains("header.Margin = group.IsFirst ? new Thickness() : new Thickness(0, -4, 16, 0)", source, StringComparison.Ordinal);
+        Assert.Contains("header.Height = group.IsFirst ? 0 : 48", source, StringComparison.Ordinal);
         Assert.Equal(2, header.Elements().Count(item => item.Name.LocalName == "Button"));
     }
 
@@ -3787,7 +3789,7 @@ public class WinUi3UiTests
         XElement overlay = GetNamedElement(panel, "RenameProfileOverlay");
         Assert.Single(overlay.Descendants(Presentation + "TextBlock"));
         Assert.Same(GetNamedElement(panel, "TxtOverlayRename"), overlay.Descendants(Presentation + "TextBlock").Single());
-        Assert.Equal("0,12,0,0", (string?)GetNamedElement(panel, "NewProfileNameInput").Attribute("Margin"));
+        Assert.Equal("0,24,0,0", (string?)GetNamedElement(panel, "NewProfileNameInput").Attribute("Margin"));
         Assert.DoesNotContain("TxtOverlayRenamePrompt", ReadSource("src", "ControlPanelWindow.xaml.cs"), StringComparison.Ordinal);
     }
 
@@ -3814,7 +3816,7 @@ public class WinUi3UiTests
             XElement search = GetNamedElement(panel, name);
             XElement toolbar = search.Parent!;
             Assert.Equal("1", (string?)toolbar.Attribute("Grid.Row"));
-            Assert.Equal("0,12,0,12", (string?)toolbar.Attribute("Margin"));
+            Assert.Equal(name == "SearchRunningProcess" ? "0,24,0,8" : "0,24,0,0", (string?)toolbar.Attribute("Margin"));
             Assert.Equal(2, toolbar.Elements(Presentation + "Button").Count());
             Assert.Equal(4, toolbar.Parent!.Elements(Presentation + "Grid.RowDefinitions").Single().Elements().Count());
         }
@@ -3874,7 +3876,7 @@ public class WinUi3UiTests
         Assert.Equal(new[] { "Informational", "Warning", "Success" }, privacy.Descendants(Presentation + "InfoBar").Select(element => (string?)element.Attribute("Severity")));
         foreach (string name in new[] { "VersionText", "TxtTagline", "TxtIntro", "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
             Assert.Equal(Presentation + "TextBlock", GetNamedElement(privacy, name).Name);
-        Assert.Equal("{StaticResource BasSectionTitleStyle}", (string?)GetNamedElement(privacy, "TxtIntro").Attribute("Style"));
+        Assert.Equal("{StaticResource BodyStrongTextBlockStyle}", (string?)GetNamedElement(privacy, "TxtIntro").Attribute("Style"));
         foreach (string name in new[] { "TxtOpenSourceTitle", "TxtSecurityTitle", "TxtPrivacyTitle" })
             Assert.Equal("{StaticResource BodyTextBlockStyle}", (string?)GetNamedElement(privacy, name).Attribute("Style"));
         Assert.Contains("Version {version.Major}.{version.Minor}.{version.Build}-release", ReadSource("src", "PrivacyWindow.xaml.cs"), StringComparison.Ordinal);
@@ -4360,10 +4362,15 @@ public class WinUi3UiTests
         Assert.Equal("{StaticResource BasCaptionStyle}", (string?)GetNamedElement(panel, "TxtWelcomeSubtitle").Attribute("Style"));
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement style = Assert.Single(styles.Descendants(Presentation + "Style"),
-            item => (string?)item.Attribute(Xaml + "Key") == "BasSettingsSectionTitleStyle");
-        string? spacing = (string?)Assert.Single(style.Elements(Presentation + "Setter"),
-            setter => (string?)setter.Attribute("Property") == "Margin").Attribute("Value");
-        Assert.Equal(spacing, (string?)GetNamedElement(panel, "StatsHeader").Attribute("Margin"));
+            item => (string?)item.Attribute(Xaml + "Key") == "BasSectionHeaderStyle");
+        Assert.Equal("48", (string?)Assert.Single(style.Elements(Presentation + "Setter"),
+            setter => (string?)setter.Attribute("Property") == "Height").Attribute("Value"));
+        foreach (string name in new[] { "StatsHeader", "SettingsSectionHeader", "AboutSectionHeader", "ResetGroupHeader", "BackupGroupHeader" })
+            Assert.Equal("{StaticResource BasSectionHeaderStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        Assert.Contains("SetupContentSpacing(StatsHeader, TxtStatsTitle, TxtWelcomeSubtitle)", pages, StringComparison.Ordinal);
+        Assert.Contains("SetupContentSpacing(SettingsSectionHeader, TxtActiveSettingsSection, TxtSettingsTitle)", pages, StringComparison.Ordinal);
+        Assert.Contains("SetupContentSpacing(AboutSectionHeader, TxtActiveAboutSection, TxtAboutDescription)", pages, StringComparison.Ordinal);
     }
 
     [Fact]

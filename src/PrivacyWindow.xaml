@@ -40,7 +40,7 @@
             </Button>
         </Grid>
 
-        <Grid Grid.Row="1" Margin="{StaticResource BasStartupContentMargin}" RowSpacing="4">
+        <Grid Grid.Row="1" Margin="{StaticResource BasStartupContentMargin}" RowSpacing="24">
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
             <StackPanel Spacing="4">
                 <TextBlock x:Name="VersionText" Style="{StaticResource BasPageTitleStyle}" />
@@ -50,8 +50,7 @@
                           HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="4">
                 <TextBlock x:Name="TxtIntro"
-                           Margin="0,8,0,0"
-                           Style="{StaticResource BasSectionTitleStyle}" />
+                           Style="{StaticResource BodyStrongTextBlockStyle}" />
 
                 <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Informational" Loaded="WelcomeInfoBar_Loaded">
                     <StackPanel Spacing="4" Margin="0,8,16,8">

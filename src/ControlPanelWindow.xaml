@@ -62,7 +62,7 @@
             </Border>
         </DataTemplate>
         <DataTemplate x:Key="SelectionHeadingTemplate" x:DataType="local:SelectionGroup">
-            <Grid x:Name="SelectionHeading" ColumnSpacing="8" Margin="0,8,16,12" Loaded="SelectionHeading_Loaded"
+            <Grid x:Name="SelectionHeading" Style="{StaticResource BasSectionHeaderStyle}" ColumnSpacing="8" Margin="0,-4,16,0" Loaded="SelectionHeading_Loaded"
                   Unloaded="SelectionHeading_Unloaded" DataContextChanged="SelectionHeading_DataContextChanged">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -70,9 +70,9 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding TitleWithCount}" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Click="InvertSelection_Click"
+                <Button Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" VerticalAlignment="Center" Click="InvertSelection_Click"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
-                <Button Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Click="SelectAll_Click"
+                <Button Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" VerticalAlignment="Center" Click="SelectAll_Click"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
             </Grid>
         </DataTemplate>
@@ -257,7 +257,7 @@
                 </StackPanel>
 
                     <!-- 实时统计 -->
-                    <Grid x:Name="StatsHeader" Grid.Row="1" Margin="0,20,0,8">
+                    <Grid x:Name="StatsHeader" Grid.Row="1" Style="{StaticResource BasSectionHeaderStyle}">
                         <TextBlock x:Name="TxtStatsTitle" Text="" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
                     </Grid>
                 <ScrollViewer x:Name="WelcomeScrollViewer" Grid.Row="2" Margin="-24,0,-24,-24" Padding="24,0,24,24"
@@ -304,7 +304,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- 页头：标题 + 应用按钮 -->
-                <Grid Grid.Row="0" Padding="24,24,24,12" ColumnSpacing="16">
+                <Grid Grid.Row="0" Padding="24,24,24,0" ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -335,7 +335,7 @@
                     </StackPanel>
                 </Grid>
 
-                <Grid Grid.Row="1" Padding="24,8,24,8" ColumnSpacing="12">
+                <Grid x:Name="SettingsSectionHeader" Grid.Row="1" Style="{StaticResource BasSectionHeaderStyle}" Padding="24,0" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -346,7 +346,7 @@
                             <FontIcon Glyph="&#xE777;" FontSize="16" />
                         </Button>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button x:Name="BtnRefreshScreens" Content="" Click="RefreshScreenOptions_Click" />
                     </StackPanel>
                 </Grid>
@@ -1544,7 +1544,7 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                <StackPanel Grid.Row="0" Margin="0,0,0,24">
                     <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -1567,7 +1567,7 @@
                                Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
 
-                <Border Grid.Row="1" Style="{StaticResource BasLogCardStyle}" Margin="0">
+                <Border x:Name="LogCard" Grid.Row="1" Style="{StaticResource BasLogCardStyle}" Margin="0">
                     <ScrollViewer x:Name="LogScrollViewer" VerticalScrollBarVisibility="Auto">
                         <TextBlock x:Name="TxtAppLog"
                                    Margin="16"
@@ -1589,7 +1589,9 @@
                     <TextBlock x:Name="TxtAboutTitle" Text="" Style="{StaticResource BasSettingsPageTitleStyle}" />
                     <TextBlock x:Name="TxtAboutDescription" Text="" Margin="0,8,0,0" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <TextBlock x:Name="TxtActiveAboutSection" Grid.Row="1" Margin="24,20,24,8" Style="{StaticResource BasSettingsSectionTitleStyle}" />
+                <Grid x:Name="AboutSectionHeader" Grid.Row="1" Style="{StaticResource BasSectionHeaderStyle}" Margin="24,0,24,0">
+                    <TextBlock x:Name="TxtActiveAboutSection" Style="{StaticResource BasSettingsSectionTitleStyle}" VerticalAlignment="Center" />
+                </Grid>
                 <ScrollViewer x:Name="AboutScrollViewer" Grid.Row="2" Padding="24,0,24,0"
                               HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel x:Name="AboutContent" Padding="0,0,0,24">
@@ -1755,7 +1757,7 @@
                                Text=""
                                TextWrapping="Wrap"
                                Style="{StaticResource BasSectionTitleStyle}" />
-                    <Grid Grid.Row="1" ColumnSpacing="8" Margin="0,12,0,12">
+                    <Grid x:Name="RunningSearchToolbar" Grid.Row="1" ColumnSpacing="8" Margin="0,24,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -1815,7 +1817,7 @@
                                Text=""
                                TextWrapping="Wrap"
                                Style="{StaticResource BasSectionTitleStyle}" />
-                    <Grid Grid.Row="1" ColumnSpacing="8" Margin="0,12,0,12">
+                    <Grid x:Name="ResetSearchToolbar" Grid.Row="1" ColumnSpacing="8" Margin="0,24,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -1838,16 +1840,16 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <Grid x:Name="ResetGroupHeader" ColumnSpacing="8" Margin="0,8,0,8" Visibility="Collapsed">
+                        <Grid x:Name="ResetGroupHeader" Style="{StaticResource BasSectionHeaderStyle}" ColumnSpacing="8" Visibility="Collapsed">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="TxtResetGroup" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
-                            <Button x:Name="BtnResetGroupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Click="InvertSelection_Click"
+                            <Button x:Name="BtnResetGroupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" VerticalAlignment="Center" Click="InvertSelection_Click"
                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
-                            <Button x:Name="BtnResetGroupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Click="SelectAll_Click"
+                            <Button x:Name="BtnResetGroupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" VerticalAlignment="Center" Click="SelectAll_Click"
                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
                         </Grid>
                     <ScrollViewer x:Name="ResetItemsScrollViewer" Grid.Row="1" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
@@ -1887,7 +1889,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock x:Name="TxtBackupSelectionTitle" Grid.Row="0" Text="" TextWrapping="Wrap"
                                Style="{StaticResource BasSectionTitleStyle}" />
-                    <Grid Grid.Row="1" ColumnSpacing="8" Margin="0,12,0,12">
+                    <Grid x:Name="BackupSearchToolbar" Grid.Row="1" ColumnSpacing="8" Margin="0,24,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -1910,16 +1912,16 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <Grid x:Name="BackupGroupHeader" ColumnSpacing="8" Margin="0,8,0,8" Visibility="Collapsed">
+                        <Grid x:Name="BackupGroupHeader" Style="{StaticResource BasSectionHeaderStyle}" ColumnSpacing="8" Visibility="Collapsed">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="TxtBackupGroup" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
-                            <Button x:Name="BtnBackupGroupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" Click="InvertSelection_Click"
+                            <Button x:Name="BtnBackupGroupInvert" Grid.Column="1" Width="32" Height="32" MinWidth="0" Padding="0" VerticalAlignment="Center" Click="InvertSelection_Click"
                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
-                            <Button x:Name="BtnBackupGroupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" Click="SelectAll_Click"
+                            <Button x:Name="BtnBackupGroupSelectAll" Grid.Column="2" Width="32" Height="32" MinWidth="0" Padding="0" VerticalAlignment="Center" Click="SelectAll_Click"
                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
                         </Grid>
                     <ScrollViewer x:Name="BackupItemsScrollViewer" Grid.Row="1" Margin="0,0,-16,0" VerticalScrollBarVisibility="Auto"
@@ -1953,7 +1955,7 @@
                                Text=""
                                TextWrapping="Wrap"
                                Style="{StaticResource BasSectionTitleStyle}" />
-                    <TextBox x:Name="NewProfileNameInput" Margin="0,12,0,0" />
+                    <TextBox x:Name="NewProfileNameInput" Margin="0,24,0,0" />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" HorizontalAlignment="Right">
                         <Button x:Name="BtnOverlayRenameCancel"
                                 Content=""

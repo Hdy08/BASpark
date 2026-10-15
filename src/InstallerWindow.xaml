@@ -15,10 +15,6 @@
         <Thickness x:Key="InfoBarTitleVerticalOrientationMargin">0</Thickness>
         <Thickness x:Key="InfoBarMessageVerticalOrientationMargin">0</Thickness>
         <Thickness x:Key="InfoBarPanelVerticalOrientationPadding">0,12,0,12</Thickness>
-        <Style x:Key="InstallerBodyLargeStrongTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyLargeTextBlockStyle}">
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
         <Style x:Key="InstallerInfoBarStyle" TargetType="InfoBar" BasedOn="{StaticResource BasStartupInfoBarStyle}">
             <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         </Style>
@@ -79,7 +75,7 @@
             </StackPanel>
         </StackPanel>
         <Grid x:Name="PagePool" Grid.Row="1" Visibility="Collapsed">
-            <StackPanel x:Name="LanguagePage" Spacing="20">
+            <StackPanel x:Name="LanguagePage" Spacing="24">
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="LanguageTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="LanguagePrompt" Style="{StaticResource BasCaptionStyle}" />
@@ -97,7 +93,7 @@
                         </Grid>
                     </Border>
             </StackPanel>
-            <Grid x:Name="WelcomePage" RowSpacing="20">
+            <Grid x:Name="WelcomePage" RowSpacing="24">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="WelcomeTitle" Style="{StaticResource BasPageTitleStyle}" />
@@ -106,7 +102,7 @@
                 <ScrollViewer x:Name="WelcomeScroller" Grid.Row="1" Margin="0,0,-24,-12" Padding="0,0,24,0"
                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="12">
-                        <TextBlock x:Name="WelcomeIntro" Style="{StaticResource InstallerBodyLargeStrongTextStyle}" />
+                        <TextBlock x:Name="WelcomeIntro" Style="{StaticResource BodyStrongTextBlockStyle}" />
                         <StackPanel Spacing="4">
                     <InfoBar Style="{StaticResource InstallerInfoBarStyle}" Severity="Informational" Loaded="WelcomeInfo_Loaded">
                         <StackPanel Spacing="4" Margin="0,8,16,8">
@@ -130,7 +126,7 @@
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
-            <Grid x:Name="ConfirmPage" RowSpacing="20">
+            <Grid x:Name="ConfirmPage" RowSpacing="24">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="ConfirmTitle" Style="{StaticResource BasPageTitleStyle}" />
@@ -171,7 +167,7 @@
             </Grid>
             <Grid x:Name="ProgressPage" RowSpacing="16">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                <StackPanel Spacing="4">
+                <StackPanel Spacing="4" Margin="0,0,0,8">
                     <TextBlock x:Name="ProgressTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="ProgressDescription" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
@@ -186,7 +182,7 @@
                     </Border>
                 </Grid>
             </Grid>
-            <StackPanel x:Name="CompletePage" Spacing="20">
+            <StackPanel x:Name="CompletePage" Spacing="24">
                 <TextBlock x:Name="CompleteTitle" Style="{StaticResource BasPageTitleStyle}" />
                 <StackPanel x:Name="CompleteMessages" Spacing="4">
                 <InfoBar x:Name="CompleteInfo" Style="{StaticResource InstallerInfoBarStyle}"
@@ -200,7 +196,7 @@
                 </InfoBar>
                 </StackPanel>
             </StackPanel>
-            <StackPanel x:Name="UninstallPage" Spacing="20">
+            <StackPanel x:Name="UninstallPage" Spacing="24">
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="UninstallTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="UninstallDescription" Style="{StaticResource BasCaptionStyle}" />

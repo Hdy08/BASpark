@@ -104,7 +104,8 @@ public sealed class SelectionCardLayout : VirtualizingLayout
             Margin = new Thickness(0, 0, 16, 4), Child = content
         };
         _headingTitle.Style = (Style)Application.Current.Resources["BasSectionTitleStyle"];
-        _measurementHeading = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 8, 16, 12) };
+        _measurementHeading = new Grid { Style = (Style)Application.Current.Resources["BasSectionHeaderStyle"],
+            ColumnSpacing = 8, Margin = new Thickness(0, -4, 16, 0) };
         _measurementHeading.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         _measurementHeading.Children.Add(_headingTitle);
         for (int column = 1; column <= 2; column++)
@@ -383,6 +384,14 @@ public sealed partial class ControlPanelWindow
 
     private void SetupPageHeaders()
     {
+        SetupContentSpacing(StatsHeader, TxtStatsTitle, TxtWelcomeSubtitle);
+        SetupContentSpacing(SettingsSectionHeader, TxtActiveSettingsSection, TxtSettingsTitle);
+        SetupContentSpacing(AboutSectionHeader, TxtActiveAboutSection, TxtAboutDescription);
+        SetupContentSpacing(LogCard, LogCard, TxtLogHint);
+        SetupContentSpacing(RunningSearchToolbar, SearchRunningProcess, TxtOverlayRunning);
+        SetupContentSpacing(ResetSearchToolbar, SearchVisualReset, TxtOverlayVisualReset);
+        SetupContentSpacing(BackupSearchToolbar, SearchBackupItems, TxtBackupSelectionTitle);
+        SetupContentSpacing(NewProfileNameInput, NewProfileNameInput, TxtOverlayRename);
         _settingsHeaders = new(SettingsContentScrollViewer, SettingsContent, (heading, animateResetButtons) =>
         {
             TxtActiveSettingsSection.Text = heading?.Label.Text ?? string.Empty;
@@ -429,11 +438,10 @@ public sealed partial class ControlPanelWindow
     private FrameworkElement WrapPageHeading(TextBlock label, StackPanel parent, SectionResetRequest? request, bool first)
     {
         int index = parent.Children.IndexOf(label);
-        Thickness margin = label.Margin;
         parent.Children.RemoveAt(index);
         label.Margin = new Thickness();
         label.VerticalAlignment = VerticalAlignment.Center;
-        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
         content.Children.Add(label);
         if (request != null)
         {
@@ -444,12 +452,31 @@ public sealed partial class ControlPanelWindow
             content.Children.Add(button);
             _sectionResetButtons.Add((button, label, request));
         }
-        var anchor = new Grid { Margin = first ? new Thickness() : margin, HorizontalAlignment = HorizontalAlignment.Left,
+        var anchor = new Grid { Style = (Style)Application.Current.Resources["BasSectionHeaderStyle"],
+            Margin = first ? new Thickness() : new Thickness(0, -4, 0, 0), HorizontalAlignment = HorizontalAlignment.Left,
             Opacity = first ? 0 : 1, IsHitTestVisible = !first };
         anchor.Children.Add(content);
         if (first) anchor.Height = 0;
         parent.Children.Insert(index, anchor);
         return anchor;
+    }
+
+    private static void SetupContentSpacing(FrameworkElement container, FrameworkElement content, FrameworkElement previous)
+    {
+        void UpdateSpacing()
+        {
+            if (!container.IsLoaded || content.ActualHeight <= 0 || previous.ActualHeight <= 0 || container.Parent is not UIElement parent) return;
+            double top = content.TransformToVisual(parent).TransformPoint(new Point()).Y;
+            double bottom = previous.TransformToVisual(parent).TransformPoint(new Point(0, previous.ActualHeight)).Y;
+            double adjustment = 24 - (top - bottom);
+            if (Math.Abs(adjustment) < 0.1) return;
+            Thickness margin = container.Margin;
+            container.Margin = new Thickness(margin.Left, margin.Top + adjustment, margin.Right, margin.Bottom);
+        }
+        container.Loaded += (_, _) => UpdateSpacing();
+        container.SizeChanged += (_, _) => UpdateSpacing();
+        if (!ReferenceEquals(container, content)) content.SizeChanged += (_, _) => UpdateSpacing();
+        previous.SizeChanged += (_, _) => UpdateSpacing();
     }
 
     private void RefreshPageHeaders(bool animateResetButtons = false)
@@ -882,9 +909,9 @@ public sealed partial class ControlPanelWindow
         UpdateSelectionCardBinding(element);
         bool first = element.DataContext is SelectionGroup { IsFirst: true };
         element.Margin = element.DataContext is SelectionGroup
-            ? first ? new Thickness() : new Thickness(0, 8, 16, 12)
+            ? first ? new Thickness() : new Thickness(0, -4, 16, 0)
             : new Thickness(0, 0, 16, 4);
-        element.Height = first ? 0 : double.NaN;
+        element.Height = element.DataContext is SelectionGroup ? first ? 0 : 48 : double.NaN;
         element.Opacity = first ? 0 : 1;
         element.IsHitTestVisible = !first;
     }
@@ -980,8 +1007,8 @@ public sealed partial class ControlPanelWindow
     private void InitializeSelectionHeading(object sender)
     {
         if (sender is not Grid { DataContext: SelectionGroup group } header) return;
-        header.Height = group.IsFirst ? 0 : double.NaN;
-        header.Margin = group.IsFirst ? new Thickness() : new Thickness(0, 8, 16, 12);
+        header.Height = group.IsFirst ? 0 : 48;
+        header.Margin = group.IsFirst ? new Thickness() : new Thickness(0, -4, 16, 0);
         if (_groupSelectionToolbars.TryGetValue(header, out var existing) && ReferenceEquals(existing.Group, group)) return;
         Button[] buttons = header.Children.OfType<Button>().ToArray();
         SelectionToolbar global = _selectionToolbars[group.List];

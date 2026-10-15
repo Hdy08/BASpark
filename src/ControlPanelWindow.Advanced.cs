@@ -60,7 +60,9 @@ public sealed partial class ControlPanelWindow
 
     private StackPanel CreateAdvancedHeading(string key, string styleKey, IEnumerable<AdvancedFxSetting> settings)
     {
-        var heading = new StackPanel();
+        bool group = styleKey == "BasAdvancedGroupTitleStyle";
+        var heading = new StackPanel { Orientation = Orientation.Horizontal,
+            Height = group ? 36 : double.NaN, Margin = group ? new Thickness(0, -4, 0, 0) : new Thickness() };
         TextBlock label = CreateAdvancedLabel(key, styleKey);
         heading.Children.Add(label);
         AdvancedFxSetting[] definitions = settings.ToArray();
