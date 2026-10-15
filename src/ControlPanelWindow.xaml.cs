@@ -1754,14 +1754,14 @@ public sealed partial class ControlPanelWindow : UserControl
         ColorPickerBody.Measure(new Size(Math.Max(0, EffectColorCard.ActualWidth - 34), double.PositiveInfinity));
         double contentHeight = ColorPickerBody.DesiredSize.Height + _colorContentHost.Padding.Top + _colorContentHost.Padding.Bottom;
         if (!_colorCardAnimating)
-            _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, expanding ? 60 : (float)EffectColorCard.ActualHeight);
+            _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, expanding ? (float)EffectColorCard.MinHeight : (float)EffectColorCard.ActualHeight);
         _colorCardAnimating = true;
         _colorContentHost.Height = contentHeight;
         _colorContentHost.IsHitTestVisible = expanding;
         EffectColorCard.UpdateLayout();
         var compositor = _colorCardGeometry.Compositor;
         ElementCompositionPreview.GetElementVisual(EffectColorCard).Clip = compositor.CreateGeometricClip(_colorCardGeometry);
-        float targetHeight = expanding ? (float)EffectColorCard.ActualHeight : 60;
+        float targetHeight = expanding ? (float)EffectColorCard.ActualHeight : (float)EffectColorCard.MinHeight;
         var animation = compositor.CreateScalarKeyFrameAnimation();
         animation.InsertExpressionKeyFrame(0, "this.StartingValue");
         animation.InsertKeyFrame(1, targetHeight,
@@ -3732,7 +3732,7 @@ public sealed partial class ControlPanelWindow : UserControl
             border.CornerRadius = new CornerRadius(4);
             border.Padding = new Thickness(16, 12, 16, 12);
             border.Margin = new Thickness(0, 0, 0, 4);
-            border.MinHeight = 60;
+            border.MinHeight = 64;
         }
 
         _screenToggles[item] = toggle;

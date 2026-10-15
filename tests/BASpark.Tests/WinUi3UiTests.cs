@@ -123,7 +123,7 @@ public class WinUi3UiTests
         foreach (XElement info in welcome.Descendants(Presentation + "InfoBar"))
         {
             Assert.Equal("WelcomeInfoBar_Loaded", (string?)info.Attribute("Loaded"));
-            Assert.Equal("0,12,16,12", (string?)info.Element(Presentation + "StackPanel")!.Attribute("Margin"));
+            Assert.Equal("0,8,16,8", (string?)info.Element(Presentation + "StackPanel")!.Attribute("Margin"));
         }
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement style = Assert.Single(styles.Descendants(), element => (string?)element.Attribute(Xaml + "Key") == "BasStartupInfoBarStyle");
@@ -2489,7 +2489,7 @@ public class WinUi3UiTests
         XElement styles = Assert.IsType<XElement>(LoadXaml("src", "DesignSystem.xaml").Root);
         XElement cardStyle = Assert.Single(styles.Elements(), element => (string?)element.Attribute(Xaml + "Key") == "BasSettingCardStyle");
         var setters = cardStyle.Elements().ToDictionary(element => (string)element.Attribute("Property")!, element => (string?)element.Attribute("Value"));
-        Assert.Equal("60", setters["MinHeight"]);
+        Assert.Equal("64", setters["MinHeight"]);
         Assert.Equal("16,12", setters["Padding"]);
         Assert.Equal("0,0,0,4", setters["Margin"]);
     }
@@ -3217,7 +3217,7 @@ public class WinUi3UiTests
         Assert.Equal("SelectionCard_PointerPressed", (string?)card.Attribute("PointerPressed"));
         Assert.Equal("SelectionCard_PointerReleased", (string?)card.Attribute("PointerReleased"));
         Assert.Null(card.Attribute("Tapped"));
-        Assert.Equal("0", (string?)card.Attribute("MinHeight"));
+        Assert.Null(card.Attribute("MinHeight"));
         Assert.Equal("0", (string?)card.Attribute("Margin"));
         Assert.Null(card.Attribute("Height"));
         XElement[] labels = card.Descendants(Presentation + "TextBlock").ToArray();
@@ -3667,7 +3667,7 @@ public class WinUi3UiTests
         Assert.Contains("_colorCardGeometry.StartAnimation(\"Size.Y\", animation)", animate, StringComparison.Ordinal);
         Assert.Contains("generation != _colorCardAnimationGeneration", animate, StringComparison.Ordinal);
         Assert.True(animate.IndexOf("EffectColorCard.UpdateLayout()", StringComparison.Ordinal) < animate.IndexOf("_colorCardGeometry.StartAnimation", StringComparison.Ordinal));
-        Assert.Contains("float targetHeight = expanding ? (float)EffectColorCard.ActualHeight : 60", animate, StringComparison.Ordinal);
+        Assert.Contains("float targetHeight = expanding ? (float)EffectColorCard.ActualHeight : (float)EffectColorCard.MinHeight", animate, StringComparison.Ordinal);
         string loaded = source[source.IndexOf("private void EffectColorExpander_Loaded", StringComparison.Ordinal)..source.IndexOf("private void EffectColorCard_SizeChanged", StringComparison.Ordinal)];
         Assert.Contains("_colorCardGeometry ??=", loaded, StringComparison.Ordinal);
         Assert.DoesNotContain("AnimateColorCard", loaded, StringComparison.Ordinal);
@@ -4357,6 +4357,7 @@ public class WinUi3UiTests
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
         Assert.Equal("0,4,0,0", (string?)GetNamedElement(panel, "TxtWelcomeSubtitle").Attribute("Margin"));
+        Assert.Equal("{StaticResource BasCaptionStyle}", (string?)GetNamedElement(panel, "TxtWelcomeSubtitle").Attribute("Style"));
         XDocument styles = LoadXaml("src", "DesignSystem.xaml");
         XElement style = Assert.Single(styles.Descendants(Presentation + "Style"),
             item => (string?)item.Attribute(Xaml + "Key") == "BasSettingsSectionTitleStyle");

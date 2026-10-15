@@ -100,7 +100,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         content.Children.Add(check);
         _measurementCard = new Border
         {
-            Style = (Style)Application.Current.Resources["BasSettingCardStyle"], MinHeight = 0,
+            Style = (Style)Application.Current.Resources["BasSettingCardStyle"],
             Margin = new Thickness(0, 0, 16, 4), Child = content
         };
         _headingTitle.Style = (Style)Application.Current.Resources["BasSectionTitleStyle"];

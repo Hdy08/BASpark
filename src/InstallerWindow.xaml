@@ -20,7 +20,6 @@
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
         <Style x:Key="InstallerInfoBarStyle" TargetType="InfoBar" BasedOn="{StaticResource BasStartupInfoBarStyle}">
-            <Setter Property="MinHeight" Value="60" />
             <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         </Style>
         <Style x:Key="InstallerChoiceStyle" TargetType="CheckBox" BasedOn="{StaticResource DefaultCheckBoxStyle}">
@@ -103,7 +102,7 @@
                     <TextBlock x:Name="WelcomeTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="WelcomeTagline" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <ScrollViewer x:Name="WelcomeScroller" Grid.Row="1" Margin="0,0,-28,0" Padding="0,0,28,0"
+                <ScrollViewer x:Name="WelcomeScroller" Grid.Row="1" Margin="0,0,-28,-12" Padding="0,0,28,0"
                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="12">
                         <TextBlock x:Name="WelcomeIntro" Style="{StaticResource InstallerBodyLargeStrongTextStyle}" />
@@ -136,7 +135,7 @@
                     <TextBlock x:Name="ConfirmTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="ConfirmDescription" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <ScrollViewer x:Name="ConfirmScroller" Grid.Row="1" Margin="0,0,-28,0" Padding="0,0,28,0"
+                <ScrollViewer x:Name="ConfirmScroller" Grid.Row="1" Margin="0,0,-28,-12" Padding="0,0,28,0"
                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel x:Name="ConfirmCards" Spacing="4">
                     <Border x:Name="DirectoryCard" Style="{StaticResource BasSettingCardStyle}" Margin="0">

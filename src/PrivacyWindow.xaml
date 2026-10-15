@@ -54,7 +54,7 @@
                            Style="{StaticResource BasSectionTitleStyle}" />
 
                 <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Informational" Loaded="WelcomeInfoBar_Loaded">
-                    <StackPanel Spacing="4" Margin="0,12,16,12">
+                    <StackPanel Spacing="4" Margin="0,8,16,8">
                         <TextBlock x:Name="TxtOpenSourceTitle"
                                    Style="{StaticResource BodyTextBlockStyle}" TextWrapping="NoWrap" />
                         <TextBlock x:Name="TxtOpenSourceBody"
@@ -63,7 +63,7 @@
                 </InfoBar>
 
                 <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Warning" Loaded="WelcomeInfoBar_Loaded">
-                    <StackPanel Spacing="4" Margin="0,12,16,12">
+                    <StackPanel Spacing="4" Margin="0,8,16,8">
                         <TextBlock x:Name="TxtSecurityTitle"
                                     Style="{StaticResource BodyTextBlockStyle}" TextWrapping="NoWrap" />
                         <TextBlock x:Name="TxtSecurityBody"
@@ -72,7 +72,7 @@
                 </InfoBar>
 
                 <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Success" Loaded="WelcomeInfoBar_Loaded">
-                    <StackPanel Spacing="4" Margin="0,12,16,12">
+                    <StackPanel Spacing="4" Margin="0,8,16,8">
                         <TextBlock x:Name="TxtPrivacyTitle"
                                    Style="{StaticResource BodyTextBlockStyle}" TextWrapping="NoWrap" />
                         <TextBlock x:Name="TxtPrivacyBody"

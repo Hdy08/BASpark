@@ -227,6 +227,7 @@
         <Setter Property="CornerRadius" Value="{StaticResource BasCardCornerRadius}" />
         <Setter Property="Padding" Value="{StaticResource BasCardPadding}" />
         <Setter Property="Margin" Value="{StaticResource BasCardMargin}" />
+        <Setter Property="MinHeight" Value="64" />
     </Style>
 
     <Style x:Key="BasLogCardStyle" TargetType="Border" BasedOn="{StaticResource BasCardStyle}">
@@ -262,7 +263,7 @@
         <Setter Property="IsOpen" Value="True" />
         <Setter Property="IsClosable" Value="False" />
         <Setter Property="IsIconVisible" Value="True" />
-        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="MinHeight" Value="64" />
         <Setter Property="Margin" Value="0" />
     </Style>
 
@@ -356,7 +357,7 @@
         <Setter Property="CornerRadius" Value="{StaticResource BasSettingCardCornerRadius}" />
         <Setter Property="Padding" Value="16,12" />
         <Setter Property="Margin" Value="0,0,0,4" />
-        <Setter Property="MinHeight" Value="60" />
+        <Setter Property="MinHeight" Value="64" />
     </Style>
 
     <Style x:Key="BasSettingToggleStyle" TargetType="ToggleSwitch" BasedOn="{StaticResource DefaultToggleSwitchStyle}">
@@ -400,7 +401,7 @@
     <Style x:Key="BasSettingExpanderStyle" TargetType="Expander">
         <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
         <Setter Property="MinWidth" Value="0" />
-        <Setter Property="MinHeight" Value="58" />
+        <Setter Property="MinHeight" Value="62" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Padding" Value="16,0,16,16" />

@@ -44,7 +44,7 @@
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
         <DataTemplate x:Key="SelectionCardTemplate" x:DataType="local:SelectionCardItem">
-            <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" MinHeight="0" Margin="0"
+            <Border x:Name="SelectionCard" Style="{StaticResource BasSettingCardStyle}" Margin="0"
                     Loaded="SelectionCard_Loaded" DataContextChanged="SelectionCard_DataContextChanged"
                     PointerPressed="SelectionCard_PointerPressed" PointerReleased="SelectionCard_PointerReleased">
                 <Grid ColumnSpacing="16">
@@ -253,7 +253,7 @@
                     <TextBlock x:Name="TxtWelcomeSubtitle"
                                Text=""
                                Margin="0,4,0,0"
-                               Style="{StaticResource BasPageSubtitleStyle}" />
+                               Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
 
                     <!-- 实时统计 -->
