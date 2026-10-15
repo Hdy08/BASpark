@@ -101,7 +101,7 @@
                 </StackPanel>
                 <ScrollViewer x:Name="WelcomeScroller" Grid.Row="1" Margin="0,0,-24,-12" Padding="0,0,24,0"
                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="8">
                         <TextBlock x:Name="WelcomeIntro" Style="{StaticResource BodyStrongTextBlockStyle}" />
                         <StackPanel x:Name="WelcomeCards" Spacing="4">
                     <InfoBar Style="{StaticResource InstallerInfoBarStyle}" Severity="Informational" Loaded="WelcomeInfo_Loaded">

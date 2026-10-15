@@ -34,7 +34,7 @@ public sealed partial class InstallerWindow : UserControl
         InitializeComponent();
         StartupDialogHost.AlignContentSpacing(LanguageCard, LanguageCard, LanguagePrompt);
         StartupDialogHost.AlignContentSpacing(WelcomeScroller, WelcomeIntro, WelcomeTagline);
-        StartupDialogHost.AlignContentSpacing(WelcomeCards, WelcomeCards, WelcomeIntro, 4);
+        StartupDialogHost.AlignContentSpacing(WelcomeCards, WelcomeCards, WelcomeIntro, 8);
         StartupDialogHost.AlignContentSpacing(ConfirmScroller, ConfirmCards, ConfirmDescription);
         StartupDialogHost.AlignContentSpacing(ProgressGap, ProgressGap, ProgressDescription, 0);
         StartupDialogHost.AlignContentSpacing(CompleteMessages, CompleteMessages, CompleteTitle);

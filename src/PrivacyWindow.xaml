@@ -52,7 +52,7 @@
                 <TextBlock x:Name="TxtIntro"
                            Style="{StaticResource BodyStrongTextBlockStyle}" />
 
-                <InfoBar Style="{StaticResource BasStartupInfoBarStyle}" Severity="Informational" Loaded="WelcomeInfoBar_Loaded">
+                <InfoBar x:Name="OpenSourceInfoBar" Style="{StaticResource BasStartupInfoBarStyle}" Severity="Informational" Loaded="WelcomeInfoBar_Loaded">
                     <StackPanel Spacing="4" Margin="0,8,16,8">
                         <TextBlock x:Name="TxtOpenSourceTitle"
                                    Style="{StaticResource BodyTextBlockStyle}" TextWrapping="NoWrap" />

@@ -32,6 +32,7 @@ public partial class PrivacyWindow : UserControl
     {
         InitializeComponent();
         StartupDialogHost.AlignContentSpacing(StartupScrollViewer, TxtIntro, TxtTagline);
+        StartupDialogHost.AlignContentSpacing(OpenSourceInfoBar, OpenSourceInfoBar, TxtIntro, 8);
         _host = new DcompPanelHost(fixedSize: true, minimumWidth: 1, minimumHeight: 1);
         WindowChrome.ApplyTitleBarIcon(AppTitleBar);
         StartupDialogHost.ConfigureCaptionButton(_host, RootGrid, BtnCaptionClose);
