@@ -134,6 +134,7 @@ Root: HKCU; Subkey: "Software\BASpark"; ValueType: string; ValueName: "UiLanguag
 Root: HKCU; Subkey: "Software\BASpark"; ValueType: dword; ValueName: "AgreedToPrivacy"; ValueData: "1"; Check: IsNativeInstallerWorker
 
 [Run]
+Filename: "{app}\BASpark.Setup.exe"; Parameters: "--repair-autostart"; Flags: runhidden runascurrentuser waituntilterminated
 #ifdef UiAccessCertificateThumbprint
 Filename: "{app}\BASpark.exe"; Description: "{cm:LaunchProgram,BASpark}"; Flags: nowait postinstall skipifsilent shellexec
 #else

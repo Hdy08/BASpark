@@ -901,10 +901,21 @@ public sealed partial class ControlPanelWindow
 
     private static void UpdateSelectionCardBinding(FrameworkElement card)
     {
-        if (card.FindName("SelectionCardCheck") is not CheckBox check) return;
+        if (card.FindName("SelectionCardCheckHost") is not Border host) return;
         if (card.DataContext is SelectionCardItem item)
         {
-            if (ReferenceEquals(check.GetBindingExpression(CheckBox.IsCheckedProperty)?.ParentBinding.Source, item)) return;
+            if (host.Child is CheckBox existing &&
+                ReferenceEquals(existing.GetBindingExpression(CheckBox.IsCheckedProperty)?.ParentBinding.Source, item)) return;
+            ClearSelectionCardCheck(host);
+            var check = new CheckBox
+            {
+                Name = "SelectionCardCheck",
+                Style = (Style)Application.Current.Resources["DefaultCheckBoxStyle"],
+                MinWidth = 0, Padding = new Thickness(),
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
+                IsChecked = item.IsSelected
+            };
+            AutomationProperties.SetName(check, item.Title);
             check.SetBinding(CheckBox.IsCheckedProperty, new Binding
             {
                 Source = item,
@@ -912,8 +923,49 @@ public sealed partial class ControlPanelWindow
                 Mode = BindingMode.TwoWay,
                 UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
             });
+            check.ApplyTemplate();
+            InitializeSelectionCardCheck(check);
+            host.Child = check;
         }
-        else check.ClearValue(CheckBox.IsCheckedProperty);
+        else ClearSelectionCardCheck(host);
+    }
+
+    private static void InitializeSelectionCardCheck(CheckBox check)
+    {
+        if (FindVisualDescendant<AnimatedIcon>(check, "CheckGlyph") == null ||
+            FindVisualDescendant<Grid>(check, "RootGrid") is not { } root) return;
+        VisualStateGroup? states = VisualStateManager.GetVisualStateGroups(root).FirstOrDefault(group => group.Name == "CombinedStates");
+        if (states == null) return;
+        states.CurrentStateChanged += SelectionCardCheck_StateChanged;
+        check.Loaded += SelectionCardCheck_Loaded;
+        UpdateSelectionCardGlyph(check, states.CurrentState?.Name);
+    }
+
+    private static void SelectionCardCheck_StateChanged(object sender, VisualStateChangedEventArgs args)
+    {
+        if (args.Control is CheckBox check) UpdateSelectionCardGlyph(check, args.NewState?.Name);
+    }
+
+    private static void SelectionCardCheck_Loaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is not CheckBox check || FindVisualDescendant<Grid>(check, "RootGrid") is not { } root) return;
+        UpdateSelectionCardGlyph(check, VisualStateManager.GetVisualStateGroups(root)
+            .FirstOrDefault(group => group.Name == "CombinedStates")?.CurrentState?.Name);
+    }
+
+    private static void UpdateSelectionCardGlyph(CheckBox check, string? state)
+    {
+        if (FindVisualDescendant<AnimatedIcon>(check, "CheckGlyph") is not { } glyph) return;
+        string interaction = state?.EndsWith("PointerOver", StringComparison.Ordinal) == true ? "PointerOver"
+            : state?.EndsWith("Pressed", StringComparison.Ordinal) == true ? "Pressed" : "Normal";
+        AnimatedIcon.SetState(glyph, interaction + (check.IsChecked == true ? "On" : "Off"));
+    }
+
+    private static void ClearSelectionCardCheck(Border host)
+    {
+        if (host.Child is not CheckBox check) return;
+        host.Child = null;
+        check.ClearValue(CheckBox.IsCheckedProperty);
     }
 
     private void SelectionHeading_Loaded(object sender, RoutedEventArgs args)
@@ -946,7 +998,7 @@ public sealed partial class ControlPanelWindow
         if (header != null) _groupSelectionToolbars.Remove(header);
         if (args.Element is FrameworkElement element)
         {
-            if (element.FindName("SelectionCardCheck") is CheckBox check) check.ClearValue(CheckBox.IsCheckedProperty);
+            if (element.FindName("SelectionCardCheckHost") is Border host) ClearSelectionCardCheck(host);
             element.DataContext = null;
         }
     }

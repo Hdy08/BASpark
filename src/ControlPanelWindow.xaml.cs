@@ -3870,8 +3870,8 @@ public sealed partial class ControlPanelWindow : UserControl
             throw new IOException(Localization.Get("Msg_SettingsSaveFailed"));
         }
 
-        _savedSettingsState = _savedSettingsState!.Accept(current, page);
         ApplyPageRuntimeSettings(page, screensChanged);
+        _savedSettingsState = _savedSettingsState!.Accept(current, page);
         if (page != SettingsSections.Basic) return;
 
         if (selectedLanguage != null)
@@ -3912,83 +3912,14 @@ public sealed partial class ControlPanelWindow : UserControl
         bool autoStart = useSavedSettings ? ConfigManager.AutoStart : CheckAutoStart.IsOn;
         bool runAsAdmin = useSavedSettings ? ConfigManager.RunAsAdmin : CheckRunAsAdmin.IsOn;
 
-        string? exePath = AutoStartManager.ResolveExecutablePath(
-            Environment.ProcessPath,
-            Process.GetCurrentProcess().MainModule?.FileName,
-            Assembly.GetExecutingAssembly().Location,
-            AppDomain.CurrentDomain.BaseDirectory);
-
-        if (string.IsNullOrEmpty(exePath))
-        {
-            return;
-        }
-
-        const string regKeyPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-        AutoStartPlan plan = AutoStartManager.CreatePlan(autoStart, runAsAdmin);
-
         try
         {
-            // 注册表 Run 条目（普通自启）与计划任务（管理员自启）是两条独立路径，
-            // 注册表打开失败不应阻止计划任务的创建/清理
-            using (RegistryKey? key = Registry.CurrentUser.CreateSubKey(regKeyPath, true))
-            {
-                if (key == null)
-                {
-                    AppLogger.Warn($"Failed to open registry key for auto-start: {regKeyPath}");
-                }
-                else if (plan.RegistryRunEnabled)
-                {
-                    key.SetValue(AutoStartManager.RunValueName, AutoStartManager.BuildRunCommand(exePath));
-                }
-                else
-                {
-                    key.DeleteValue(AutoStartManager.RunValueName, false);
-                }
-            }
-
-            ManageTaskScheduler(AutoStartManager.TaskName, exePath, plan.ScheduledTaskEnabled);
+            AutoStartManager.ApplySettings(autoStart, runAsAdmin);
         }
         catch (Exception ex)
         {
             AppLogger.Warn($"Failed to apply auto-start settings: {ex.Message}");
-        }
-    }
-
-    private static void ManageTaskScheduler(string taskName, string exePath, bool create)
-    {
-        string? taskFile = null;
-        try
-        {
-            if (create)
-            {
-                string userId = WindowsIdentity.GetCurrent().User?.Value
-                    ?? throw new InvalidOperationException("Cannot resolve the auto-start task user.");
-                taskFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"BASpark-autostart-{Guid.NewGuid():N}.xml");
-                System.IO.File.WriteAllText(taskFile, AutoStartManager.BuildScheduledTaskXml(exePath, userId));
-            }
-            string arguments = create
-                ? $"/create /tn \"{taskName}\" /xml \"{taskFile}\" /f"
-                : $"/delete /tn \"{taskName}\" /f";
-
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "schtasks.exe",
-                Arguments = arguments,
-                UseShellExecute = true,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-                Verb = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator) ? string.Empty : "runas"
-            };
-
-            using Process process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException("Cannot start the task scheduler configuration process.");
-            process.WaitForExit();
-            if (create && process.ExitCode != 0)
-                throw new InvalidOperationException($"Task scheduler configuration failed (exit code {process.ExitCode}).");
-        }
-        finally
-        {
-            if (taskFile != null) System.IO.File.Delete(taskFile);
+            throw;
         }
     }
 

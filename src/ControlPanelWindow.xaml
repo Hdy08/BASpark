@@ -56,9 +56,8 @@
                         <TextBlock Text="{Binding Title}" Style="{StaticResource BasSettingTitleStyle}" />
                         <TextBlock Text="{Binding Subtitle}" Visibility="{Binding SubtitleVisibility}" Style="{StaticResource BasCaptionStyle}" />
                     </StackPanel>
-                    <CheckBox x:Name="SelectionCardCheck" Grid.Column="1"
-                              MinWidth="0" Padding="0" HorizontalAlignment="Right" VerticalAlignment="Center"
-                              AutomationProperties.Name="{Binding Title}" />
+                    <Border x:Name="SelectionCardCheckHost" Grid.Column="1"
+                            HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
             </Border>
         </DataTemplate>
@@ -1571,9 +1570,10 @@
                                Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
 
-                <Border Grid.Row="1" Style="{StaticResource BasCardStyle}" Margin="0">
+                <Border Grid.Row="1" Style="{StaticResource BasLogCardStyle}" Margin="0">
                     <ScrollViewer x:Name="LogScrollViewer" VerticalScrollBarVisibility="Auto">
                         <TextBlock x:Name="TxtAppLog"
+                                   Margin="16"
                                    IsTextSelectionEnabled="True"
                                    TextWrapping="Wrap"
                                    FontSize="{StaticResource BasFontSizeCaption}" FontFamily="Consolas" />

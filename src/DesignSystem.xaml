@@ -229,6 +229,10 @@
         <Setter Property="Margin" Value="{StaticResource BasCardMargin}" />
     </Style>
 
+    <Style x:Key="BasLogCardStyle" TargetType="Border" BasedOn="{StaticResource BasCardStyle}">
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
     <!--
         模态卡片：必须不透明。页面里的分组卡片用的是带 alpha 的画刷（在 Mica 上
         层次更细腻），但浮在内容之上的对话框若透出底下的文字会完全不可读。

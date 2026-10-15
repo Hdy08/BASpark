@@ -52,6 +52,12 @@ public partial class App : Application
     {
         DispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
+        if (Environment.GetCommandLineArgs().Contains("--repair-autostart", StringComparer.Ordinal))
+        {
+            _ = RepairAutoStartAsync(exitWhenComplete: true);
+            return;
+        }
+
         if (InstallerSession.TryCreate(Environment.GetCommandLineArgs()[1..], out InstallerSession? installer))
         {
             _keeper.EnsureCreated();
@@ -145,6 +151,7 @@ public partial class App : Application
             }
         }
 
+        _ = RepairAutoStartAsync();
 
         Tray = new TrayIconController();
         Tray.Initialize(
@@ -162,6 +169,28 @@ public partial class App : Application
         else
         {
             ReclaimBackgroundMemory();
+        }
+    }
+
+    private async Task RepairAutoStartAsync(bool exitWhenComplete = false)
+    {
+        try
+        {
+            if (exitWhenComplete) ConfigManager.Load();
+            bool autoStart = ConfigManager.AutoStart;
+            bool runAsAdmin = ConfigManager.RunAsAdmin;
+            string executable = Path.Combine(AppContext.BaseDirectory, "BASpark.exe");
+            if (autoStart || exitWhenComplete)
+                await Task.Run(() => AutoStartManager.ApplySettings(autoStart, runAsAdmin, allowElevation: false, executablePath: executable));
+        }
+        catch (Exception exception)
+        {
+            AppLogger.Warn($"Failed to repair auto-start settings: {exception.Message}");
+            if (exitWhenComplete) Environment.ExitCode = 1;
+        }
+        finally
+        {
+            if (exitWhenComplete) Exit();
         }
     }
 

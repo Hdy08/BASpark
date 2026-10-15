@@ -3141,19 +3141,23 @@ public class WinUi3UiTests
         Assert.Equal("SelectionCard_DataContextChanged", (string?)card.Attribute("DataContextChanged"));
         Assert.Contains(card.Descendants(), element => (string?)element.Attribute("Style") == "{StaticResource BasSettingTitleStyle}");
         Assert.Contains(card.Descendants(), element => (string?)element.Attribute("Style") == "{StaticResource BasCaptionStyle}");
-        XElement check = GetNamedElement(panel, "SelectionCardCheck");
-        Assert.Equal("Right", (string?)check.Attribute("HorizontalAlignment"));
-        Assert.Equal("1", (string?)check.Attribute("Grid.Column"));
-        foreach (string action in new[] { "Loaded", "Checked", "Unchecked" })
-            Assert.Null(check.Attribute(action));
-        Assert.Null(check.Attribute("Style"));
-        Assert.Null(check.Attribute("Template"));
-        Assert.Null(check.Attribute("IsChecked"));
+        XElement checkHost = GetNamedElement(panel, "SelectionCardCheckHost");
+        Assert.Equal("Right", (string?)checkHost.Attribute("HorizontalAlignment"));
+        Assert.Equal("1", (string?)checkHost.Attribute("Grid.Column"));
+        Assert.Empty(checkHost.Elements());
         Assert.Contains("check.SetBinding(CheckBox.IsCheckedProperty, new Binding", pages, StringComparison.Ordinal);
         Assert.Contains("Source = item", pages, StringComparison.Ordinal);
         Assert.Contains("Path = new PropertyPath(nameof(SelectionCardItem.IsSelected))", pages, StringComparison.Ordinal);
         Assert.Contains("Mode = BindingMode.TwoWay", pages, StringComparison.Ordinal);
         Assert.Contains("check.ClearValue(CheckBox.IsCheckedProperty)", pages, StringComparison.Ordinal);
+        Assert.Contains("IsChecked = item.IsSelected", pages, StringComparison.Ordinal);
+        Assert.Contains("ClearSelectionCardCheck(host)", pages, StringComparison.Ordinal);
+        Assert.Contains("host.Child = check", pages, StringComparison.Ordinal);
+        int binding = pages.IndexOf("check.SetBinding(CheckBox.IsCheckedProperty", StringComparison.Ordinal);
+        Assert.True(pages.IndexOf("check.ApplyTemplate()", binding, StringComparison.Ordinal) <
+            pages.IndexOf("host.Child = check", binding, StringComparison.Ordinal));
+        int detached = pages.IndexOf("host.Child = null", StringComparison.Ordinal);
+        Assert.True(detached < pages.IndexOf("check.ClearValue(CheckBox.IsCheckedProperty)", detached, StringComparison.Ordinal));
         Assert.Contains("UpdateSelectionCardBinding(sender)", pages, StringComparison.Ordinal);
         Assert.Contains("if (!ReferenceEquals(row.DataContext, item)) row.DataContext = item", pages, StringComparison.Ordinal);
         Assert.Contains("GetRowElement(context, index)", pages, StringComparison.Ordinal);
@@ -3992,6 +3996,35 @@ public class WinUi3UiTests
         Assert.Equal("Wrap", (string?)log.Attribute("TextWrapping"));
         Assert.Same(GetNamedElement(panel, "LogScrollViewer"), log.Parent);
         Assert.DoesNotContain(GetNamedElement(panel, "PageLog").Descendants(), element => element.Name == Presentation + "TextBox");
+    }
+
+    [Theory]
+    [InlineData("ControlPanelWindow.xaml", "LogScrollViewer", "TxtAppLog")]
+    [InlineData("InstallerWindow.xaml", "OutputScroller", "OutputText")]
+    public void LogOutput_KeepsTheNativeScrollbarAtTheCardEdge(string file, string scrollName, string textName)
+    {
+        XDocument view = LoadXaml("src", file);
+        XElement scroll = GetNamedElement(view, scrollName);
+        Assert.Equal("{StaticResource BasLogCardStyle}", (string?)scroll.Parent!.Attribute("Style"));
+        Assert.Null(scroll.Attribute("Margin"));
+        Assert.Null(scroll.Attribute("Padding"));
+        Assert.Equal("16", (string?)GetNamedElement(view, textName).Attribute("Margin"));
+        XElement style = LoadXaml("src", "DesignSystem.xaml").Descendants(Presentation + "Style")
+            .Single(element => (string?)element.Attribute(Xaml + "Key") == "BasLogCardStyle");
+        Assert.Contains(style.Elements(), setter => (string?)setter.Attribute("Property") == "Padding" && (string?)setter.Attribute("Value") == "0");
+    }
+
+    [Fact]
+    public void AutoStart_IsReconciledAtLaunchInstallationAndImportWithoutOpeningThePanel()
+    {
+        string app = ReadSource("src", "App.xaml.cs");
+        Assert.Contains("_ = RepairAutoStartAsync();", app, StringComparison.Ordinal);
+        Assert.Contains("--repair-autostart", app, StringComparison.Ordinal);
+        Assert.Contains("AutoStartManager.ApplySettings(autoStart, runAsAdmin, allowElevation: false, executablePath: executable)", app, StringComparison.Ordinal);
+        Assert.Contains("Task.Run", app, StringComparison.Ordinal);
+        string setup = ReadSource("setup.iss");
+        Assert.Contains("Parameters: \"--repair-autostart\"; Flags: runhidden runascurrentuser waituntilterminated", setup, StringComparison.Ordinal);
+        Assert.Contains("ApplyAutoStartSettings(useSavedSettings: true)", ReadSource("src", "ControlPanelWindow.Backup.cs"), StringComparison.Ordinal);
     }
 
     [Fact]

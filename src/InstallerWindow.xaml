@@ -168,9 +168,9 @@
                     <TextBlock x:Name="ProgressDescription" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
                 <ProgressBar x:Name="InstallProgress" Grid.Row="1" Minimum="0" Maximum="100" Value="0" />
-                <Border Grid.Row="2" Style="{StaticResource BasCardStyle}" Margin="0">
+                <Border Grid.Row="2" Style="{StaticResource BasLogCardStyle}" Margin="0">
                     <ScrollViewer x:Name="OutputScroller" VerticalScrollBarVisibility="Auto">
-                        <TextBlock x:Name="OutputText" FontFamily="Consolas" FontSize="{StaticResource BasFontSizeCaption}"
+                        <TextBlock x:Name="OutputText" Margin="16" FontFamily="Consolas" FontSize="{StaticResource BasFontSizeCaption}"
                                    TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                     </ScrollViewer>
                 </Border>

@@ -1,10 +1,120 @@
 using System.Text;
+using System.Security.Principal;
 using System.Xml.Linq;
 
 namespace BASpark.Tests;
 
 public class AutoStartManagerTests
 {
+    private const string Executable = @"C:\Program Files\BASpark\BASpark.exe";
+    private const string UserId = "S-1-5-21-100-200-300-1001";
+
+    private sealed class Registration : IAutoStartRegistration
+    {
+        public string? RunCommand { get; set; }
+        public string? TaskXml { get; set; }
+        internal int Registrations { get; private set; }
+        internal int Deletions { get; private set; }
+        internal bool FailRegistration { get; init; }
+        internal bool IgnoreRegistration { get; init; }
+
+        public void RegisterTask(string xml)
+        {
+            if (FailRegistration) throw new UnauthorizedAccessException();
+            Registrations++;
+            if (!IgnoreRegistration) TaskXml = xml;
+        }
+
+        public void DeleteTask()
+        {
+            Deletions++;
+            TaskXml = null;
+        }
+    }
+
+    [Fact]
+    public void TaskVerification_AcceptsTheAccountNamesReturnedByTaskScheduler()
+    {
+        using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+        string sid = identity.User!.Value;
+        XDocument document = XDocument.Parse(AutoStartManager.BuildScheduledTaskXml(Executable, sid));
+        XNamespace task = document.Root!.Name.Namespace;
+        foreach (XElement user in document.Descendants(task + "UserId")) user.Value = identity.Name;
+        Assert.True(AutoStartManager.IsScheduledTaskCurrent(document.ToString(), Executable, sid));
+    }
+
+    [Fact]
+    public void Synchronize_RecreatesTheTaskRemovedByAnUninstallWithPreservedSettings()
+    {
+        var registration = new Registration();
+        AutoStartManager.Synchronize(AutoStartManager.CreatePlan(true, true), Executable, UserId, registration);
+        Assert.True(AutoStartManager.IsScheduledTaskCurrent(registration.TaskXml, Executable, UserId));
+        Assert.Equal(1, registration.Registrations);
+        AutoStartManager.Synchronize(AutoStartManager.CreatePlan(true, true), Executable, UserId, registration);
+        Assert.Equal(1, registration.Registrations);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("path")]
+    [InlineData("user")]
+    [InlineData("disabled")]
+    [InlineData("trigger")]
+    [InlineData("invalid")]
+    public void Synchronize_RepairsMissingStaleDisabledAndInvalidTasks(string change)
+    {
+        string xml = AutoStartManager.BuildScheduledTaskXml(change == "path" ? @"D:\Old\BASpark.exe" : Executable,
+            change == "user" ? "S-1-5-21-1-2-3-1001" : UserId);
+        XDocument document = XDocument.Parse(xml);
+        XNamespace task = document.Root!.Name.Namespace;
+        if (change == "disabled") document.Root.Element(task + "Settings")!.Add(new XElement(task + "Enabled", false));
+        if (change == "trigger") document.Descendants(task + "LogonTrigger").Single().Add(new XElement(task + "Enabled", false));
+        var registration = new Registration { TaskXml = change == "missing" ? null : change == "invalid" ? "invalid" : document.ToString() };
+        AutoStartManager.Synchronize(AutoStartManager.CreatePlan(true, true), Executable, UserId, registration);
+        Assert.Equal(1, registration.Registrations);
+        Assert.True(AutoStartManager.IsScheduledTaskCurrent(registration.TaskXml, Executable, UserId));
+    }
+
+    [Fact]
+    public void Synchronize_RepairsNormalStartupWithoutCreatingAnElevatedTask()
+    {
+        var registration = new Registration { TaskXml = AutoStartManager.BuildScheduledTaskXml(Executable, UserId) };
+        AutoStartManager.Synchronize(AutoStartManager.CreatePlan(true, false), Executable, UserId, registration);
+        Assert.Equal(AutoStartManager.BuildRunCommand(Executable), registration.RunCommand);
+        Assert.Null(registration.TaskXml);
+        Assert.Equal(1, registration.Deletions);
+        Assert.Equal(0, registration.Registrations);
+    }
+
+    [Fact]
+    public void Synchronize_DisablingStartupRemovesBothRegistrations()
+    {
+        var registration = new Registration
+        {
+            RunCommand = AutoStartManager.BuildRunCommand(Executable),
+            TaskXml = AutoStartManager.BuildScheduledTaskXml(Executable, UserId)
+        };
+        AutoStartManager.Synchronize(AutoStartManager.CreatePlan(false, true), Executable, UserId, registration);
+        Assert.Null(registration.RunCommand);
+        Assert.Null(registration.TaskXml);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Synchronize_FailedTaskRegistrationPreservesTheWorkingStartupEntryAndReportsFailure(bool ignored)
+    {
+        var registration = new Registration
+        {
+            RunCommand = AutoStartManager.BuildRunCommand(Executable),
+            FailRegistration = !ignored,
+            IgnoreRegistration = ignored
+        };
+        Assert.ThrowsAny<Exception>(() => AutoStartManager.Synchronize(
+            AutoStartManager.CreatePlan(true, true), Executable, UserId, registration));
+        Assert.Equal(AutoStartManager.BuildRunCommand(Executable), registration.RunCommand);
+    }
+
     [Fact]
     public void CreatePlan_UsesRegistryForNormalAutoStart()
     {
