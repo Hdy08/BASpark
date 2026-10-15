@@ -7,6 +7,44 @@ namespace BASpark
 
     public static class ColorPickerColorMath
     {
+        internal static Color[] CreateAccentPalette(Color color)
+        {
+            color.A = 255;
+            Color light = ReadableAccent(BlendAccent(color, true, 0.35), true);
+            Color dark = ReadableAccent(BlendAccent(color, false, 0.15), false);
+            return [color, BlendAccent(color, true, 0.15), light, BlendAccent(light, true, 0.45),
+                dark, BlendAccent(dark, false, 0.25), BlendAccent(dark, false, 0.5)];
+        }
+
+        private static Color BlendAccent(Color color, bool lighten, double amount)
+        {
+            double target = lighten ? 1 : 0;
+            return Color.FromArgb(255, ToByte(color.R / 255.0 * (1 - amount) + target * amount),
+                ToByte(color.G / 255.0 * (1 - amount) + target * amount),
+                ToByte(color.B / 255.0 * (1 - amount) + target * amount));
+        }
+
+        private static Color ReadableAccent(Color color, bool lighten)
+        {
+            for (int step = 0; step <= 100; step++)
+            {
+                Color candidate = BlendAccent(color, lighten, step / 100.0);
+                double luminance = AccentLuminance(candidate);
+                if (lighten ? luminance >= 0.175 : luminance <= 0.1833) return candidate;
+            }
+            return BlendAccent(color, lighten, 1);
+        }
+
+        internal static double AccentLuminance(Color color)
+        {
+            static double Linear(byte channel)
+            {
+                double value = channel / 255.0;
+                return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+            }
+            return 0.2126 * Linear(color.R) + 0.7152 * Linear(color.G) + 0.0722 * Linear(color.B);
+        }
+
         public static HsvColor RgbToHsv(Color color)
         {
             double red = color.R / 255.0;

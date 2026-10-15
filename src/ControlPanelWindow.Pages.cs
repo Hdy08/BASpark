@@ -592,7 +592,8 @@ public sealed partial class ControlPanelWindow
             Dictionary<string, VisualResetItem> items = CreateCardResetItems(scope).ToDictionary(item => item.SettingKey!);
             foreach (var entry in new (FrameworkElement Control, string Key)[]
             {
-                (ComboLanguage, "UiLanguage"), (RadioDarkMode, "DarkMode"), (CheckAlwaysTrailEffectSwitch, "EnableAlwaysTrailEffect"),
+                (ComboLanguage, "UiLanguage"), (RadioDarkMode, "BackgroundColor"), (RadioAccentColor, "UseSystemAccentColor"),
+                (CheckAlwaysTrailEffectSwitch, "EnableAlwaysTrailEffect"),
                 (CheckMasterSwitch, "IsEffectEnabled"), (RadioClickType, "ClickTriggerType"), (CheckMiddleClickTrigger, "EnableMiddleClickTrigger"),
                 (CheckTouchscreenMode, "IsTouchscreenMode"), (SliderMaxTouchEffects, "MaxTouchEffects"),
                 (CheckScreenshotCompatibilityMode, "ScreenshotCompatibilityMode"), (CheckAutoStart, "AutoStart"),
@@ -611,6 +612,12 @@ public sealed partial class ControlPanelWindow
                 if (heading != null) AddCardResetButton(heading.Value.Label, heading.Value.Parent, scope, entry.Key, item.Restore!,
                     state => entry.Key == "Profiles" ? AreProfilesDefault(state) :
                         item.DefaultValue is JsonElement defaultValue && IsDefaultSettingValue(state, entry.Key, defaultValue));
+            }
+            if (scope == ResetScope.Basic)
+            {
+                VisualResetItem accent = items["CustomAccentColor"];
+                AddCardResetButton(TxtCustomAccentColor, (Panel)AccentColorExpander.Header, scope, "CustomAccentColor", accent.Restore!,
+                    state => IsDefaultSettingValue(state, "CustomAccentColor", accent.DefaultValue!.Value));
             }
             if (scope == ResetScope.Visual)
             {
@@ -750,7 +757,7 @@ public sealed partial class ControlPanelWindow
 
     private static string GetResetSectionKey(CardResetButton entry) => entry.Scope switch
     {
-        ResetScope.Basic => entry.Key is "UiLanguage" or "DarkMode" ? "Basic_Interface"
+        ResetScope.Basic => entry.Key is "UiLanguage" or "BackgroundColor" or "UseSystemAccentColor" or "CustomAccentColor" ? "Basic_Interface"
             : entry.Key is "AutoStart" or "StartSilent" or "HideTrayIcon" or "RunAsAdmin" ? "Basic_Runtime" : "Basic_Trigger",
         ResetScope.Filter => entry.Key is "EnableEnvironmentFilter" or "HideInFullscreen" or "ShowEffectOnDesktop" or "ShowEffectOnApp" ? "Filter_BasicSection" : "Filter_AdvancedSection",
         ResetScope.Visual => entry.Key.StartsWith("BaClickFx/", StringComparison.Ordinal) || entry.Key is "EnableBaClickAdvancedSettings" or "HdrPreset" ? "Visual_AdvancedSection"
@@ -829,6 +836,7 @@ public sealed partial class ControlPanelWindow
             App.Overlay?.RefreshEnvironmentFilterState();
             ApplyAutoStartSettings(useSavedSettings: true);
             ApplyDarkMode();
+            App.ApplyAccentColor(RootGrid);
         }
         if (page == SettingsSections.Visual)
         {

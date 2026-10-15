@@ -51,6 +51,18 @@
     <data name="Window_Close" xml:space="preserve">
       <value>关闭</value>
     </data>
+    <data name="Basic_AccentColor" xml:space="preserve">
+      <value>强调颜色</value>
+    </data>
+    <data name="Basic_AccentColorCustom" xml:space="preserve">
+      <value>自定义</value>
+    </data>
+    <data name="Basic_AccentColorSystem" xml:space="preserve">
+      <value>系统</value>
+    </data>
+    <data name="Basic_CustomAccentColor" xml:space="preserve">
+      <value>自定义强调颜色</value>
+    </data>
     <data name="Basic_AutoStart" xml:space="preserve">
       <value>开机自动启动</value>
     </data>
@@ -114,8 +126,17 @@
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>启用鼠标常驻拖尾</value>
     </data>
-    <data name="Basic_DarkMode" xml:space="preserve">
-      <value>深色模式</value>
+    <data name="Basic_BackgroundColor" xml:space="preserve">
+      <value>背景颜色</value>
+    </data>
+    <data name="Basic_BackgroundColorLight" xml:space="preserve">
+      <value>浅色</value>
+    </data>
+    <data name="Basic_BackgroundColorDark" xml:space="preserve">
+      <value>深色</value>
+    </data>
+    <data name="Basic_BackgroundColorSystem" xml:space="preserve">
+      <value>系统</value>
     </data>
     <data name="Basic_DarkModeOff" xml:space="preserve">
       <value>关闭</value>
@@ -477,7 +498,7 @@
       <value>独立项默认 1.00 ×</value>
     </data>
     <data name="VisualReset_Color" xml:space="preserve">
-      <value>特效主题颜色</value>
+      <value>特效颜色</value>
     </data>
     <data name="VisualReset_Color_Sub" xml:space="preserve">
       <value>默认 RGB(76,167,255)</value>
@@ -540,7 +561,7 @@
       <value>点击动画速度</value>
     </data>
     <data name="Visual_Color" xml:space="preserve">
-      <value>特效主题颜色</value>
+      <value>特效颜色</value>
     </data>
     <data name="ColorPicker_Title" xml:space="preserve">
       <value>选择特效颜色</value>

@@ -51,6 +51,18 @@
     <data name="Window_Close" xml:space="preserve">
       <value>閉じる</value>
     </data>
+    <data name="Basic_AccentColor" xml:space="preserve">
+      <value>アクセントカラー</value>
+    </data>
+    <data name="Basic_AccentColorCustom" xml:space="preserve">
+      <value>カスタム</value>
+    </data>
+    <data name="Basic_AccentColorSystem" xml:space="preserve">
+      <value>システム</value>
+    </data>
+    <data name="Basic_CustomAccentColor" xml:space="preserve">
+      <value>カスタムアクセントカラー</value>
+    </data>
     <data name="Basic_AutoStart" xml:space="preserve">
       <value>Windows 起動時に実行</value>
     </data>
@@ -114,8 +126,17 @@
     <data name="Basic_TrailSwitch" xml:space="preserve">
       <value>マウスの常時トレイルを有効にする</value>
     </data>
-    <data name="Basic_DarkMode" xml:space="preserve">
-      <value>ダークモード</value>
+    <data name="Basic_BackgroundColor" xml:space="preserve">
+      <value>背景色</value>
+    </data>
+    <data name="Basic_BackgroundColorLight" xml:space="preserve">
+      <value>ライト</value>
+    </data>
+    <data name="Basic_BackgroundColorDark" xml:space="preserve">
+      <value>ダーク</value>
+    </data>
+    <data name="Basic_BackgroundColorSystem" xml:space="preserve">
+      <value>システム</value>
     </data>
     <data name="Basic_DarkModeOff" xml:space="preserve">
       <value>オフ</value>

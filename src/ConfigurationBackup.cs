@@ -34,7 +34,9 @@ public static class ConfigurationBackup
     [
         new("TotalClicks", "Backup_Statistics", "Backup_TotalClicks"),
         new("UiLanguage", "Nav_Basic", "Basic_Language"),
-        new("DarkMode", "Nav_Basic", "Basic_DarkMode"),
+        new("BackgroundColor", "Nav_Basic", "Basic_BackgroundColor"),
+        new("UseSystemAccentColor", "Nav_Basic", "Basic_AccentColor"),
+        new("CustomAccentColor", "Nav_Basic", "Basic_CustomAccentColor"),
         new("EnableAlwaysTrailEffect", "Nav_Basic", "Basic_TrailSwitch"),
         new("IsEffectEnabled", "Nav_Basic", "Basic_MasterSwitch"),
         new("ClickTriggerType", "Nav_Basic", "Basic_ClickType"),
@@ -180,6 +182,13 @@ public static class ConfigurationBackup
             if (document == null || document.Format != "BASpark.Configuration" || document.Version != 1 ||
                 document.Data == null || document.Data.Count is 0 or > 1024)
                 throw new InvalidDataException(Localization.Get("Backup_InvalidFile"));
+            if (document.Data.Remove("DarkMode", out JsonElement legacyBackground))
+            {
+                if (legacyBackground.ValueKind is not (JsonValueKind.String or JsonValueKind.Number) ||
+                    !ConfigManager.TryParseBackgroundColor(legacyBackground.ToString(), out BackgroundColorOption background))
+                    throw InvalidValue("BackgroundColor");
+                document.Data.TryAdd("BackgroundColor", JsonSerializer.SerializeToElement(background, JsonOptions));
+            }
             if (document.Data.Remove("EnableMultiTouchEffects", out JsonElement legacyMultiTouch))
             {
                 if (legacyMultiTouch.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw InvalidValue("MaxTouchEffects");
@@ -404,13 +413,16 @@ public static class ConfigurationBackup
                 if (type == typeof(int)) return value.GetInt32();
                 return Math.Round(number, 2);
             }
-            if (type == typeof(DarkModeOption))
+            if (type == typeof(BackgroundColorOption))
             {
-                DarkModeOption mode = value.Deserialize<DarkModeOption>(JsonOptions);
+                BackgroundColorOption mode = value.Deserialize<BackgroundColorOption>(JsonOptions);
                 return Enum.IsDefined(mode) ? mode : throw InvalidValue(key);
             }
             string text = value.GetString() ?? throw InvalidValue(key);
             if (key == "UiLanguage" && text is not ("zh-CN" or "en" or "ja")) throw InvalidValue(key);
+            if (key == "CustomAccentColor")
+                return ColorPickerColorMath.TryParseHex(text, out var accentColor)
+                    ? ColorPickerColorMath.ToHex(accentColor) : throw InvalidValue(key);
             if (key == "ParticleColor")
             {
                 if (ColorPickerColorMath.TryParseArgbHex(text, out var themeColor))

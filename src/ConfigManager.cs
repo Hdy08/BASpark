@@ -37,10 +37,10 @@ namespace BASpark
         OnScroll
     }
 
-    public enum DarkModeOption
+    public enum BackgroundColorOption
     {
-        Off,
-        On,
+        Light,
+        Dark,
         System
     }
 
@@ -65,6 +65,7 @@ namespace BASpark
     {
         private const string RegPath = @"Software\BASpark";
         public const string DefaultThemeColor = "#FF4CA7FF";
+        public const string DefaultAccentColor = "#0078D4";
 
         public static string ParticleColor { get; set; } = "76,167,255";
         public static bool IsEffectEnabled { get; set; } = true;
@@ -104,7 +105,9 @@ namespace BASpark
         public static string EnabledScreenIds { get; set; } = "";
         public static string ScreenSelections { get; set; } = "";
         public static string UiLanguage { get; set; } = "";
-        public static DarkModeOption DarkMode { get; set; } = DarkModeOption.System;
+        public static BackgroundColorOption BackgroundColor { get; set; } = BackgroundColorOption.System;
+        public static bool UseSystemAccentColor { get; set; } = true;
+        public static string CustomAccentColor { get; set; } = DefaultAccentColor;
         public static PanelScrollbarVisibility ScrollbarVisibility { get; set; } = PanelScrollbarVisibility.OnScroll;
         public static string SidebarBackgroundImagePath { get; set; } = "";
         public static double ControlPanelWidth { get; set; }
@@ -178,7 +181,11 @@ namespace BASpark
                         EnabledScreenIds = key.GetValue("EnabledScreenIds", "")?.ToString() ?? "";
                         ScreenSelections = key.GetValue("ScreenSelections", "")?.ToString() ?? "";
                         UiLanguage = key.GetValue("UiLanguage", "")?.ToString() ?? "";
-                        DarkMode = ParseDarkMode(key.GetValue("DarkMode", "System")?.ToString());
+                        BackgroundColor = ParseBackgroundColor((key.GetValue("BackgroundColor") ?? key.GetValue("DarkMode", "System"))?.ToString());
+                        if (key.GetValue("DarkMode") != null) Save("BackgroundColor", BackgroundColor);
+                        UseSystemAccentColor = Convert.ToBoolean(key.GetValue("UseSystemAccentColor", true));
+                        CustomAccentColor = ColorPickerColorMath.TryParseHex(key.GetValue("CustomAccentColor", DefaultAccentColor)?.ToString(), out var accentColor)
+                            ? ColorPickerColorMath.ToHex(accentColor) : DefaultAccentColor;
                         ScrollbarVisibility = ParseScrollbarVisibility(key.GetValue("ScrollbarVisibility", "OnScroll")?.ToString());
                         SidebarBackgroundImagePath = key.GetValue("SidebarBackgroundImagePath", "")?.ToString() ?? "";
                         ControlPanelWidth = Convert.ToDouble(key.GetValue("ControlPanelWidth", 0), CultureInfo.InvariantCulture);
@@ -273,19 +280,24 @@ namespace BASpark
             return PanelScrollbarVisibility.OnScroll;
         }
 
-        public static DarkModeOption ParseDarkMode(string? raw)
+        public static BackgroundColorOption ParseBackgroundColor(string? raw) =>
+            TryParseBackgroundColor(raw, out BackgroundColorOption color) ? color : BackgroundColorOption.System;
+
+        internal static bool TryParseBackgroundColor(string? raw, out BackgroundColorOption color)
         {
             if (string.Equals(raw, "Off", StringComparison.OrdinalIgnoreCase))
             {
-                return DarkModeOption.Off;
+                color = BackgroundColorOption.Light;
+                return true;
             }
 
             if (string.Equals(raw, "On", StringComparison.OrdinalIgnoreCase))
             {
-                return DarkModeOption.On;
+                color = BackgroundColorOption.Dark;
+                return true;
             }
 
-            return DarkModeOption.System;
+            return Enum.TryParse(raw, true, out color) && Enum.IsDefined(color);
         }
 
         public static void GetAnimationSpeedsForOverlay(out double trailSpeed, out double clickSpeed)
@@ -432,6 +444,12 @@ namespace BASpark
                     if (name == "MaxTouchEffects") value = ParseMaxTouchEffects(value);
                     if (name == "InputSamplingRate") value = ParseInputSamplingRate(value);
                     if (name == "BaClickAdvancedSettings") value = AdvancedFxSettings.Normalize(Convert.ToString(value, CultureInfo.InvariantCulture));
+                    if (name == "CustomAccentColor")
+                        value = ColorPickerColorMath.TryParseHex(Convert.ToString(value, CultureInfo.InvariantCulture), out var accentColor)
+                            ? ColorPickerColorMath.ToHex(accentColor) : throw new FormatException("Invalid accent color.");
+                    if (name == "BackgroundColor")
+                        value = TryParseBackgroundColor(Convert.ToString(value, CultureInfo.InvariantCulture), out var backgroundColor)
+                            ? backgroundColor : throw new FormatException("Invalid background color.");
                     if (name is "ParticleColor" or "EffectOpacity")
                     {
                         string color = name == "ParticleColor" ? Convert.ToString(value, CultureInfo.InvariantCulture)! : ParticleColor;
@@ -471,6 +489,7 @@ namespace BASpark
                         key.DeleteValue("TrailRefreshRate", false);
                         key.DeleteValue("FollowDisplayRefreshRate", false);
                     }
+                    if (name == "BackgroundColor") key.DeleteValue("DarkMode", false);
 
                     var prop = _propertyCache.GetOrAdd(name, n => typeof(ConfigManager).GetProperty(n));
                     if (prop != null)
@@ -763,7 +782,9 @@ namespace BASpark
                     EnabledScreenIds = "";
                     ScreenSelections = "";
                     UiLanguage = "";
-                    DarkMode = DarkModeOption.System;
+                    BackgroundColor = BackgroundColorOption.System;
+                    UseSystemAccentColor = true;
+                    CustomAccentColor = DefaultAccentColor;
                     SidebarBackgroundImagePath = "";
                                 }
             }

@@ -42,15 +42,70 @@ public partial class App : Application
     private InstallerWindow? _installerWindow;
     private int _backgroundMemoryGeneration;
     private readonly KeeperWindow _keeper = new();
+    private Windows.UI.ViewManagement.UISettings? _accentSettings;
+    private static readonly string[] AccentResourceKeys = ["SystemAccentColor", "SystemAccentColorLight1", "SystemAccentColorLight2",
+        "SystemAccentColorLight3", "SystemAccentColorDark1", "SystemAccentColorDark2", "SystemAccentColorDark3"];
 
     public App()
     {
         InitializeComponent();
     }
 
+    internal static void ApplyAccentColor(FrameworkElement? root = null)
+    {
+        if (Current is not App app) return;
+        if (app._accentSettings == null)
+        {
+            app._accentSettings = new Windows.UI.ViewManagement.UISettings();
+            app._accentSettings.ColorValuesChanged += app.AccentSettings_ColorValuesChanged;
+        }
+        Windows.UI.Color[] colors;
+        if (ConfigManager.UseSystemAccentColor)
+        {
+            colors = new[] { Windows.UI.ViewManagement.UIColorType.Accent, Windows.UI.ViewManagement.UIColorType.AccentLight1,
+                Windows.UI.ViewManagement.UIColorType.AccentLight2, Windows.UI.ViewManagement.UIColorType.AccentLight3,
+                Windows.UI.ViewManagement.UIColorType.AccentDark1, Windows.UI.ViewManagement.UIColorType.AccentDark2,
+                Windows.UI.ViewManagement.UIColorType.AccentDark3 }.Select(app._accentSettings.GetColorValue).ToArray();
+        }
+        else
+        {
+            if (!ColorPickerColorMath.TryParseHex(ConfigManager.CustomAccentColor, out var color))
+                ColorPickerColorMath.TryParseHex(ConfigManager.DefaultAccentColor, out color);
+            colors = ColorPickerColorMath.CreateAccentPalette(color);
+        }
+        bool changed = false;
+        for (int index = 0; index < AccentResourceKeys.Length; index++)
+            if (!Equals(app.Resources[AccentResourceKeys[index]], colors[index]))
+            {
+                app.Resources[AccentResourceKeys[index]] = colors[index];
+                changed = true;
+            }
+        if (!changed) return;
+        if (root != null)
+        {
+            ElementTheme requested = root.RequestedTheme;
+            foreach (ElementTheme theme in new[] { ElementTheme.Light, ElementTheme.Dark, ElementTheme.Default, requested })
+            {
+                root.RequestedTheme = theme;
+                root.UpdateLayout();
+            }
+        }
+    }
+
+    private void AccentSettings_ColorValuesChanged(Windows.UI.ViewManagement.UISettings sender, object args)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (Volatile.Read(ref _isExiting) != 0) return;
+            if (_controlPanel != null) _controlPanel.RefreshAccentColor();
+            else ApplyAccentColor();
+        });
+    }
+
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         DispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        ApplyAccentColor();
 
         if (Environment.GetCommandLineArgs().Contains("--repair-autostart", StringComparer.Ordinal))
         {
@@ -103,6 +158,7 @@ public partial class App : Application
 
         ConfigManager.Load();
         AppLogger.Initialize();
+        ApplyAccentColor();
 
         if (string.IsNullOrWhiteSpace(ConfigManager.UiLanguage))
         {
@@ -196,10 +252,10 @@ public partial class App : Application
 
     /// <summary>按配置解析当前应使用的 WinUI 元素主题。</summary>
     public static ElementTheme ResolveElementTheme() =>
-        ConfigManager.DarkMode switch
+        ConfigManager.BackgroundColor switch
         {
-            DarkModeOption.On => ElementTheme.Dark,
-            DarkModeOption.Off => ElementTheme.Light,
+            BackgroundColorOption.Dark => ElementTheme.Dark,
+            BackgroundColorOption.Light => ElementTheme.Light,
             _ => ElementTheme.Default
         };
 
@@ -275,10 +331,10 @@ public partial class App : Application
 
     /// <summary>按配置与系统设置解析当前是否处于深色模式。</summary>
     public static bool IsEffectiveDarkMode() =>
-        ConfigManager.DarkMode switch
+        ConfigManager.BackgroundColor switch
         {
-            DarkModeOption.On => true,
-            DarkModeOption.Off => false,
+            BackgroundColorOption.Dark => true,
+            BackgroundColorOption.Light => false,
             _ => IsSystemAppDarkMode()
         };
 
@@ -395,6 +451,7 @@ public partial class App : Application
 
         SystemEvents.SessionEnding -= OnSessionEnding;
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        if (_accentSettings != null) _accentSettings.ColorValuesChanged -= AccentSettings_ColorValuesChanged;
 
         try
         {

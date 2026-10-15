@@ -422,6 +422,83 @@
                                 </Grid>
                             </Border>
 
+                            <Border Style="{StaticResource BasSettingCardStyle}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtAccentColor" Style="{StaticResource BasSettingTitleStyle}" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Style="{StaticResource BasSegmentedSelectorStyle}">
+                                        <RadioButtons x:Name="RadioAccentColor" MaxColumns="2"
+                                                      Style="{StaticResource BasSegmentedRadioButtonsStyle}"
+                                                      SelectionChanged="RadioAccentColor_SelectionChanged"
+                                                      AutomationProperties.Name="{Binding Text, ElementName=TxtAccentColor}">
+                                            <RadioButton x:Name="RadioAccentColorCustom" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                            <RadioButton x:Name="RadioAccentColorSystem" IsChecked="True" Style="{StaticResource BasSegmentedRadioStyle}" />
+                                        </RadioButtons>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <Border x:Name="AccentColorCard" Style="{StaticResource BasSettingCardStyle}" Padding="0" Visibility="Collapsed"
+                                    SizeChanged="AccentColorCard_SizeChanged">
+                                <Expander x:Name="AccentColorExpander" Style="{StaticResource BasSettingExpanderStyle}"
+                                          VerticalAlignment="Top" Loaded="AccentColorExpander_Loaded"
+                                          Expanding="AccentColorExpander_Expanding" Collapsed="AccentColorExpander_Collapsed"
+                                          AutomationProperties.Name="{Binding Text, ElementName=TxtCustomAccentColor}">
+                                    <Expander.Resources>
+                                        <Thickness x:Key="ExpanderChevronMargin">8,0,16,0</Thickness>
+                                    </Expander.Resources>
+                                    <Expander.Header>
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="TxtCustomAccentColor" Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <TextBox x:Name="AccentColorHexInput" Width="104" MaxLength="7" VerticalContentAlignment="Center"
+                                                         Background="{ThemeResource BasSettingsControlBackgroundBrush}"
+                                                         BorderBrush="{ThemeResource BasSettingsControlBorderBrush}"
+                                                         LostFocus="AccentColorHexInput_LostFocus" KeyDown="AccentColorHexInput_KeyDown"
+                                                         AutomationProperties.Name="{Binding Text, ElementName=TxtCustomAccentColor}" />
+                                                <Border x:Name="AccentColorPreview" Width="32" Height="32" CornerRadius="4"
+                                                        BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Expander.Header>
+                                    <Grid x:Name="AccentColorPickerBody" ColumnSpacing="12" HorizontalAlignment="Left">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ColorPicker x:Name="AccentColorPicker" Style="{StaticResource BasColorPickerStyle}"
+                                                     IsAlphaEnabled="False" IsAlphaSliderVisible="False" IsAlphaTextInputVisible="False"
+                                                     ColorSpectrumComponents="SaturationValue" Loaded="AccentColorPicker_Loaded"
+                                                     IsColorPreviewVisible="False" IsColorChannelTextInputVisible="False" IsHexInputVisible="False"
+                                                     ColorChanged="AccentColorPicker_ColorChanged"
+                                                     AutomationProperties.Name="{Binding Text, ElementName=TxtCustomAccentColor}" />
+                                        <StackPanel Grid.Column="1" Margin="0,8,0,0" Spacing="10" VerticalAlignment="Top">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border x:Name="ExpandedAccentColorPreview" Width="64" Height="64" CornerRadius="6"
+                                                        BorderThickness="1" BorderBrush="{ThemeResource BasControlStrokeBrush}" />
+                                                <TextBlock x:Name="ExpandedAccentColorHex" Grid.Column="1" VerticalAlignment="Center"
+                                                           Style="{StaticResource BasSettingTitleStyle}" />
+                                            </Grid>
+                                            <RadioButtons x:Name="AccentColorPresets" MaxColumns="8" Style="{StaticResource BasColorPresetsStyle}"
+                                                          SelectionChanged="AccentColorPresets_SelectionChanged"
+                                                          AutomationProperties.Name="{Binding Text, ElementName=TxtCustomAccentColor}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Expander>
+                            </Border>
+
                             <TextBlock x:Name="TxtBasicTriggerTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                             <Border Style="{StaticResource BasSettingCardStyle}">
                                 <Grid ColumnSpacing="16">

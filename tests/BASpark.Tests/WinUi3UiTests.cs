@@ -180,16 +180,16 @@ public class WinUi3UiTests
     }
 
     [Theory]
-    [InlineData("Off", DarkModeOption.Off)]
-    [InlineData("off", DarkModeOption.Off)]
-    [InlineData("On", DarkModeOption.On)]
-    [InlineData("ON", DarkModeOption.On)]
-    [InlineData("System", DarkModeOption.System)]
-    [InlineData("unknown", DarkModeOption.System)]
-    [InlineData(null, DarkModeOption.System)]
-    public void ParseDarkMode_UsesStableThreeStateValues(string? raw, DarkModeOption expected)
+    [InlineData("Off", BackgroundColorOption.Light)]
+    [InlineData("off", BackgroundColorOption.Light)]
+    [InlineData("On", BackgroundColorOption.Dark)]
+    [InlineData("ON", BackgroundColorOption.Dark)]
+    [InlineData("System", BackgroundColorOption.System)]
+    [InlineData("unknown", BackgroundColorOption.System)]
+    [InlineData(null, BackgroundColorOption.System)]
+    public void ParseBackgroundColor_UsesStableThreeStateValues(string? raw, BackgroundColorOption expected)
     {
-        Assert.Equal(expected, ConfigManager.ParseDarkMode(raw));
+        Assert.Equal(expected, ConfigManager.ParseBackgroundColor(raw));
     }
 
     [Fact]
@@ -2930,8 +2930,9 @@ public class WinUi3UiTests
 
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         Assert.Contains("new Rect(-8, -8, spectrum.ActualWidth + 16, spectrum.ActualHeight + 16)", source, StringComparison.Ordinal);
-        Assert.Contains("CreateRoundedRectangleGeometry", source, StringComparison.Ordinal);
-        Assert.Contains("_colorCardGeometry.StartAnimation(\"Size.Y\", animation)", source, StringComparison.Ordinal);
+        string animation = ReadSource("src", "ControlPanelWindow.Accent.cs");
+        Assert.Contains("CreateRoundedRectangleGeometry", animation, StringComparison.Ordinal);
+        Assert.Contains("_geometry.StartAnimation(\"Size.Y\", animation)", animation, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -2945,7 +2946,7 @@ public class WinUi3UiTests
         Assert.Contains("updatePicker: false", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("EffectColorPicker.Color =", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("EffectColorCard.Height =", source, StringComparison.Ordinal);
-        Assert.Contains("CreateGeometricClip", source, StringComparison.Ordinal);
+        Assert.Contains("CreateGeometricClip", ReadSource("src", "ControlPanelWindow.Accent.cs"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3661,18 +3662,20 @@ public class WinUi3UiTests
     [Fact]
     public void ColorExpander_LayoutChangesDoNotCancelExpandOrCollapseAnimation()
     {
-        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
-        Assert.Contains("_colorCardGeometry != null && !_colorCardAnimating", source, StringComparison.Ordinal);
-        string animate = source[source.IndexOf("private void AnimateColorCard(bool expanding)", StringComparison.Ordinal)..source.IndexOf("private void EffectColorPicker_Loaded", StringComparison.Ordinal)];
-        Assert.True(animate.IndexOf("_colorCardAnimating = true", StringComparison.Ordinal) < animate.IndexOf("_colorContentHost.Height = contentHeight", StringComparison.Ordinal));
+        string source = ReadSource("src", "ControlPanelWindow.Accent.cs");
+        Assert.Contains("_geometry != null && !_animating", source, StringComparison.Ordinal);
+        string animate = source[source.IndexOf("internal void Animate(bool expanding)", StringComparison.Ordinal)..source.IndexOf("private ColorCardAnimation _effectColorCardAnimation", StringComparison.Ordinal)];
+        Assert.True(animate.IndexOf("_animating = true", StringComparison.Ordinal) < animate.IndexOf("_contentHost.Height = contentHeight", StringComparison.Ordinal));
         Assert.Contains("animation.InsertExpressionKeyFrame(0, \"this.StartingValue\")", animate, StringComparison.Ordinal);
-        Assert.Contains("_colorCardGeometry.StartAnimation(\"Size.Y\", animation)", animate, StringComparison.Ordinal);
-        Assert.Contains("generation != _colorCardAnimationGeneration", animate, StringComparison.Ordinal);
-        Assert.True(animate.IndexOf("EffectColorCard.UpdateLayout()", StringComparison.Ordinal) < animate.IndexOf("_colorCardGeometry.StartAnimation", StringComparison.Ordinal));
-        Assert.Contains("float targetHeight = expanding ? (float)EffectColorCard.ActualHeight : (float)EffectColorCard.MinHeight", animate, StringComparison.Ordinal);
-        string loaded = source[source.IndexOf("private void EffectColorExpander_Loaded", StringComparison.Ordinal)..source.IndexOf("private void EffectColorCard_SizeChanged", StringComparison.Ordinal)];
-        Assert.Contains("_colorCardGeometry ??=", loaded, StringComparison.Ordinal);
-        Assert.DoesNotContain("AnimateColorCard", loaded, StringComparison.Ordinal);
+        Assert.Contains("_geometry.StartAnimation(\"Size.Y\", animation)", animate, StringComparison.Ordinal);
+        Assert.Contains("generation != _generation", animate, StringComparison.Ordinal);
+        Assert.True(animate.IndexOf("card.UpdateLayout()", StringComparison.Ordinal) < animate.IndexOf("_geometry.StartAnimation", StringComparison.Ordinal));
+        Assert.Contains("float targetHeight = expanding ? (float)card.ActualHeight : (float)card.MinHeight", animate, StringComparison.Ordinal);
+        string loaded = source[source.IndexOf("internal void Loaded()", StringComparison.Ordinal)..source.IndexOf("internal void SizeChanged", StringComparison.Ordinal)];
+        Assert.Contains("_geometry ??=", loaded, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Animate(", loaded, StringComparison.Ordinal);
+        Assert.Contains("new(EffectColorCard, EffectColorExpander, ColorPickerBody", source, StringComparison.Ordinal);
+        Assert.Contains("new(AccentColorCard, AccentColorExpander, AccentColorPickerBody", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -4126,13 +4129,13 @@ public class WinUi3UiTests
     public void PageSettings_SaveAndDiscardValuesPreservePageBoundariesAndAdvancedPrecision()
     {
         var saved = new SettingsState(
-            "{\"UiLanguage\":\"zh-CN\",\"DarkMode\":2,\"MaxTouchEffects\":1}",
+            "{\"UiLanguage\":\"zh-CN\",\"BackgroundColor\":2,\"MaxTouchEffects\":1}",
             "{\"EffectScale\":1.2,\"ParticleColor\":\"76,167,255\",\"EffectOpacity\":0.75,\"EnableBaClickAdvancedSettings\":true,\"BaClickFx/overlayAlphaLimit\":0.85}",
             "[{\"IdentityKey\":\"screen\",\"DeviceName\":\"DISPLAY1\",\"IsEnabled\":true}]",
             "{\"EnableEnvironmentFilter\":true,\"ShowEffectOnApp\":false,\"Profiles\":[{\"Id\":\"profile\",\"Name\":\"Saved\",\"Mode\":1,\"Processes\":[\"saved.exe\"]}],\"ActiveProfileId\":\"profile\"}");
         Dictionary<string, object> basic = saved.GetValues(SettingsSections.Basic);
-        Assert.Equal(new[] { "DarkMode", "MaxTouchEffects", "UiLanguage" }, basic.Keys.Order().ToArray());
-        Assert.IsType<DarkModeOption>(basic["DarkMode"]);
+        Assert.Equal(new[] { "BackgroundColor", "MaxTouchEffects", "UiLanguage" }, basic.Keys.Order().ToArray());
+        Assert.IsType<BackgroundColorOption>(basic["BackgroundColor"]);
         Dictionary<string, object> visual = saved.GetValues(SettingsSections.Visual);
         Assert.Equal(0.75, visual["EffectOpacity"]);
         Assert.Equal(0.85, AdvancedFxSettings.Parse((string)visual["BaClickAdvancedSettings"])["overlayAlphaLimit"].GetDouble());

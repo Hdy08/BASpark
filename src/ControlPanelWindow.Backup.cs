@@ -188,6 +188,10 @@ public sealed partial class ControlPanelWindow
             int count = value.ValueKind == JsonValueKind.Object ? value.GetProperty("Items").GetArrayLength() : value.GetArrayLength();
             description = Localization.Format("Backup_ProfileCount", count);
         }
+        else if (key == "UseSystemAccentColor")
+            description = Localization.Get(value.GetBoolean() ? "Basic_AccentColorSystem" : "Basic_AccentColorCustom");
+        else if (key == "BackgroundColor")
+            description = Localization.Get("Basic_BackgroundColor" + ConfigManager.ParseBackgroundColor(value.ToString()));
         else if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
             description = Localization.Get(value.GetBoolean() ? "Basic_DarkModeOn" : "Basic_DarkModeOff");
         else if (key == "MaxTouchEffects" && value.GetInt32() == 0)
@@ -322,7 +326,13 @@ public sealed partial class ControlPanelWindow
                 SliderMaxTouchEffects.Value = _touchEffectLimitFormatter.ToSliderValue((int)maximum);
             if (values.TryGetValue("InputSamplingRate", out object? samplingRate))
                 SliderTrailSamplingRate.Value = _samplingRateFormatter.ToSliderValue((int)samplingRate);
-            if (values.TryGetValue("DarkMode", out object? darkMode)) SelectDarkMode((DarkModeOption)darkMode);
+            if (values.TryGetValue("BackgroundColor", out object? backgroundColor)) SelectBackgroundColor((BackgroundColorOption)backgroundColor);
+            if (values.TryGetValue("UseSystemAccentColor", out object? systemAccent)) RadioAccentColor.SelectedIndex = (bool)systemAccent ? 1 : 0;
+            if (values.TryGetValue("CustomAccentColor", out object? accentColor))
+            {
+                _customAccentColor = (string)accentColor;
+                UpdateAccentColorPreview();
+            }
             if (values.TryGetValue("ClickTriggerType", out object? trigger)) RadioClickType.SelectedIndex = (int)trigger;
             if (values.TryGetValue("UiLanguage", out object? language))
                 ComboLanguage.SelectedItem = ComboLanguage.Items.OfType<ComboBoxItem>().First(item => item.Tag as string == (string)language);
@@ -377,7 +387,8 @@ public sealed partial class ControlPanelWindow
         App.Overlay?.RefreshEnvironmentFilterState();
         if (selected.Any(ConfigurationBackup.IsScreenKey)) App.Overlay?.RefreshScreenSelection();
         if (selected.Any(key => key is "AutoStart" or "RunAsAdmin")) ApplyAutoStartSettings(useSavedSettings: true);
-        if (selected.Contains("DarkMode")) ApplyDarkMode();
+        if (selected.Contains("BackgroundColor")) ApplyDarkMode();
+        if (selected.Any(key => key is "UseSystemAccentColor" or "CustomAccentColor")) App.ApplyAccentColor(RootGrid);
         if (selected.Contains("UiLanguage"))
         {
             Localization.ApplyCulture(ConfigManager.UiLanguage);

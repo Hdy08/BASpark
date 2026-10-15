@@ -5,6 +5,139 @@ namespace BASpark.Tests;
 public sealed class ConfigurationBackupTests
 {
     [Theory]
+    [InlineData("#000000")]
+    [InlineData("#FFFFFF")]
+    [InlineData("#FFFF00")]
+    [InlineData("#0000FF")]
+    [InlineData("#D13438")]
+    public void AccentColor_PalettePreservesTheSelectedRgbAndReadableNativeControlForegrounds(string hex)
+    {
+        Assert.True(ColorPickerColorMath.TryParseHex(hex, out var color));
+        var palette = ColorPickerColorMath.CreateAccentPalette(color);
+        Assert.Equal(7, palette.Length);
+        Assert.Equal(color, palette[0]);
+        Assert.All(palette, shade => Assert.Equal(255, shade.A));
+        Assert.True((ColorPickerColorMath.AccentLuminance(palette[2]) + 0.05) / 0.05 >= 4.5);
+        Assert.True(1.05 / (ColorPickerColorMath.AccentLuminance(palette[4]) + 0.05) >= 4.5);
+        Assert.True(ColorPickerColorMath.AccentLuminance(palette[3]) >= ColorPickerColorMath.AccentLuminance(palette[2]));
+        Assert.True(ColorPickerColorMath.AccentLuminance(palette[4]) >= ColorPickerColorMath.AccentLuminance(palette[5]));
+        Assert.True(ColorPickerColorMath.AccentLuminance(palette[5]) >= ColorPickerColorMath.AccentLuminance(palette[6]));
+    }
+
+    [Theory]
+    [InlineData("Off", BackgroundColorOption.Light)]
+    [InlineData("On", BackgroundColorOption.Dark)]
+    [InlineData("System", BackgroundColorOption.System)]
+    [InlineData("Light", BackgroundColorOption.Light)]
+    [InlineData("Dark", BackgroundColorOption.Dark)]
+    [InlineData("0", BackgroundColorOption.Light)]
+    [InlineData("1", BackgroundColorOption.Dark)]
+    [InlineData("2", BackgroundColorOption.System)]
+    public void BackgroundColor_LegacyValuesMigrateToTheRenamedBackupKey(string legacy, BackgroundColorOption expected)
+    {
+        Assert.Equal(expected, ConfigManager.ParseBackgroundColor(legacy));
+        var source = new ConfigurationBackupDocument();
+        source.Data["DarkMode"] = JsonSerializer.SerializeToElement(legacy);
+        ConfigurationBackupDocument parsed = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source));
+        Assert.DoesNotContain("DarkMode", parsed.Data.Keys);
+        Assert.Equal(expected.ToString(), parsed.Data["BackgroundColor"].GetString());
+        var values = ConfigurationBackup.BuildImportValues(parsed, ["BackgroundColor"], CreateFixture());
+        Assert.Equal(expected, Assert.Single(values).Value);
+    }
+
+    [Theory]
+    [InlineData(BackgroundColorOption.Light)]
+    [InlineData(BackgroundColorOption.Dark)]
+    [InlineData(BackgroundColorOption.System)]
+    public void BackgroundColor_BackupUsesLightDarkSystemAndTheNewKey(BackgroundColorOption expected)
+    {
+        BackgroundColorOption previous = ConfigManager.BackgroundColor;
+        try
+        {
+            ConfigManager.BackgroundColor = expected;
+            var document = ConfigurationBackup.Select(ConfigurationBackup.Capture([]), ["BackgroundColor"]);
+            Assert.Equal(expected.ToString(), Assert.Single(document.Data).Value.GetString());
+            Assert.DoesNotContain("DarkMode", ConfigurationBackup.Serialize(document), StringComparison.Ordinal);
+            var values = ConfigurationBackup.BuildImportValues(ConfigurationBackup.Parse(ConfigurationBackup.Serialize(document)),
+                ["BackgroundColor"], CreateFixture());
+            Assert.Equal(expected, Assert.Single(values).Value);
+        }
+        finally { ConfigManager.BackgroundColor = previous; }
+    }
+
+    [Fact]
+    public void BackgroundColor_CurrentValueTakesPrecedenceWhenImportingALegacyBackup()
+    {
+        var source = new ConfigurationBackupDocument();
+        source.Data["DarkMode"] = JsonSerializer.SerializeToElement("On");
+        source.Data["BackgroundColor"] = JsonSerializer.SerializeToElement("Light");
+        ConfigurationBackupDocument parsed = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source));
+        Assert.Equal("Light", Assert.Single(parsed.Data).Value.GetString());
+    }
+
+    [Theory]
+    [InlineData(true, "#0078D4")]
+    [InlineData(false, "#FF0000")]
+    [InlineData(false, "#000000")]
+    [InlineData(false, "#FFFFFF")]
+    public void AccentColor_BackupRoundTripPreservesModeAndOpaqueRgbIndependently(bool useSystem, string hex)
+    {
+        bool previousMode = ConfigManager.UseSystemAccentColor;
+        string previousColor = ConfigManager.CustomAccentColor;
+        try
+        {
+            ConfigManager.UseSystemAccentColor = useSystem;
+            ConfigManager.CustomAccentColor = hex;
+            ConfigurationBackupDocument captured = ConfigurationBackup.Capture([]);
+            ConfigurationBackupDocument selected = ConfigurationBackup.Select(captured, ["UseSystemAccentColor", "CustomAccentColor"]);
+            ConfigurationBackupDocument parsed = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(selected));
+            Assert.Equal(2, parsed.Data.Count);
+            Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(parsed, parsed.Data.Keys, CreateFixture());
+            Assert.Equal(useSystem, values["UseSystemAccentColor"]);
+            Assert.Equal(hex, values["CustomAccentColor"]);
+            Assert.DoesNotContain("ParticleColor", values.Keys);
+            Assert.DoesNotContain("EffectOpacity", values.Keys);
+            Assert.Equal(useSystem, ConfigManager.UseSystemAccentColor);
+            Assert.Equal(hex, ConfigManager.CustomAccentColor);
+            foreach (string key in parsed.Data.Keys)
+                Assert.Equal("Nav_Basic", ConfigurationBackup.Settings.Single(setting => setting.Key == key).GroupKey);
+        }
+        finally
+        {
+            ConfigManager.UseSystemAccentColor = previousMode;
+            ConfigManager.CustomAccentColor = previousColor;
+        }
+    }
+
+    [Theory]
+    [InlineData("UseSystemAccentColor")]
+    [InlineData("CustomAccentColor")]
+    public void AccentColor_PartialImportLeavesOtherValuesUntouched(string key)
+    {
+        var source = new ConfigurationBackupDocument();
+        source.Data["UseSystemAccentColor"] = JsonSerializer.SerializeToElement(false);
+        source.Data["CustomAccentColor"] = JsonSerializer.SerializeToElement("#c0ffee");
+        var parsed = ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source));
+        Dictionary<string, object> values = ConfigurationBackup.BuildImportValues(parsed, [key], CreateFixture());
+        Assert.Equal(key, Assert.Single(values).Key);
+        if (key == "CustomAccentColor") Assert.Equal("#C0FFEE", values[key]);
+        else Assert.Equal(false, values[key]);
+    }
+
+    [Theory]
+    [InlineData("#FF0078D4")]
+    [InlineData("#800078D4")]
+    [InlineData("#GG78D4")]
+    [InlineData("76,167,255")]
+    [InlineData("")]
+    public void AccentColor_ImportRejectsAlphaAndInvalidRgb(string hex)
+    {
+        var source = new ConfigurationBackupDocument();
+        source.Data["CustomAccentColor"] = JsonSerializer.SerializeToElement(hex);
+        Assert.Throws<InvalidDataException>(() => ConfigurationBackup.Parse(ConfigurationBackup.Serialize(source)));
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void ShowEffectOnApp_BackupAndImportPreserveTheChoiceWithoutChangingOtherSettings(bool enabled)
@@ -318,15 +451,17 @@ public sealed class ConfigurationBackupTests
     [Fact]
     public void SettingCatalog_CoversAllEditableSettingsAndStatisticsWithUniqueKeys()
     {
-        Assert.Equal(32 + AdvancedFxSettings.Definitions.Count, ConfigurationBackup.Settings.Count);
+        Assert.Equal(34 + AdvancedFxSettings.Definitions.Count, ConfigurationBackup.Settings.Count);
         Assert.Equal(ConfigurationBackup.Settings.Count, ConfigurationBackup.Settings.Select(item => item.Key).Distinct().Count());
         Assert.Equal(new[] { "Backup_Statistics", "Nav_Basic", "Nav_Visual", "Nav_Filter" },
             ConfigurationBackup.Settings.Select(item => item.GroupKey).Distinct());
         Assert.Contains(ConfigurationBackup.Settings, item => item.Key == "TotalClicks");
         foreach (string key in new[] { "Profiles", "ParticleColor",
-                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "MaxTouchEffects", "InputSamplingRate", "ShowEffectOnApp" })
+                     "HideTrayIcon", "UiLanguage", "ScreenshotCompatibilityMode", "MaxTouchEffects", "InputSamplingRate", "ShowEffectOnApp",
+                     "BackgroundColor", "UseSystemAccentColor", "CustomAccentColor" })
             Assert.Contains(ConfigurationBackup.Settings, item => item.Key == key);
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key == "EffectOpacity");
+        Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key == "DarkMode");
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key is "TrailRefreshRate" or "FollowDisplayRefreshRate");
         Assert.DoesNotContain(ConfigurationBackup.Settings, item => item.Key is "Profile.Mode" or "Profile.Processes");
         Assert.Equal("Filter_ProfileGroup", Assert.Single(ConfigurationBackup.Settings, item => item.Key == "Profiles").TitleKey);

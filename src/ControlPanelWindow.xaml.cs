@@ -430,10 +430,6 @@ public sealed partial class ControlPanelWindow : UserControl
     private long _runningProcessSnapshotTimestamp;
     private readonly Dictionary<ScreenOptionItem, ToggleSwitch> _screenToggles = new();
     private bool _syncingColorControls;
-    private CompositionRoundedRectangleGeometry? _colorCardGeometry;
-    private Border? _colorContentHost;
-    private bool _colorCardAnimating;
-    private int _colorCardAnimationGeneration;
     private ColorPickerSlider? _colorAlphaSlider;
     private double _effectOpacity = 1;
     private string _particleColor = ConfigManager.ParticleColor;
@@ -485,6 +481,7 @@ public sealed partial class ControlPanelWindow : UserControl
     public ControlPanelWindow()
     {
         InitializeComponent();
+        SetupAccentColorControls();
         WindowChrome.ApplyTitleBarIcon(AppTitleBar);
         _host = new DcompPanelHost(minimumWidth: LanguageMinimumWidth);
         _selectionToolbars[ListRunningProcesses] = new(BtnRunningInvert, BtnRunningSelectAll, BtnOverlayConfirmAdd, TxtRunningNoResults, []) { Heading = TxtOverlayRunning };
@@ -517,7 +514,7 @@ public sealed partial class ControlPanelWindow : UserControl
             SetupAdvancedSettings();
             SetupSliderPairs();
             ConfigureInputControls();
-            foreach (var selector in new[] { RadioDarkMode, RadioClickType })
+            foreach (var selector in new[] { RadioDarkMode, RadioClickType, RadioAccentColor })
             {
                 _segmentedSelectors.Add(new SegmentedSelectorAnimator(selector));
             }
@@ -885,13 +882,15 @@ public sealed partial class ControlPanelWindow : UserControl
         TrackSettingsProperty(ComboLanguage, ComboBox.SelectedIndexProperty, SettingsSections.Basic);
         foreach (ComboBox combo in new[] { ComboProfiles, ComboProcessFilterMode })
             TrackSettingsProperty(combo, ComboBox.SelectedIndexProperty, SettingsSections.Filter);
-        foreach (RadioButtons selector in new[] { RadioDarkMode, RadioClickType })
+        foreach (RadioButtons selector in new[] { RadioDarkMode, RadioClickType, RadioAccentColor })
             TrackSettingsProperty(selector, RadioButtons.SelectedIndexProperty, SettingsSections.Basic);
         foreach (Slider slider in _sliderToBox.Keys)
             TrackSettingsProperty(slider, Slider.ValueProperty,
                 slider == SliderMaxTouchEffects ? SettingsSections.Basic : SettingsSections.Visual);
         TrackSettingsProperty(EffectColorPicker, ColorPicker.ColorProperty, SettingsSections.Visual);
         TrackSettingsProperty(EffectColorHexInput, TextBox.TextProperty, SettingsSections.Visual);
+        TrackSettingsProperty(AccentColorPicker, ColorPicker.ColorProperty, SettingsSections.Basic);
+        TrackSettingsProperty(AccentColorHexInput, TextBox.TextProperty, SettingsSections.Basic);
         Profiles.CollectionChanged += GeneralSettingsCollectionChanged;
         CurrentProfileProcesses.CollectionChanged += GeneralSettingsCollectionChanged;
         ScreenOptions.CollectionChanged += ScreenSettingsCollectionChanged;
@@ -915,7 +914,8 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private string CaptureBasicSettings() => JsonSerializer.Serialize(new
     {
-        UiLanguage = GetSelectedLanguage(), DarkMode = GetSelectedDarkMode(), ClickTriggerType = GetSelectedClickTrigger(),
+        UiLanguage = GetSelectedLanguage(), BackgroundColor = GetSelectedBackgroundColor(), ClickTriggerType = GetSelectedClickTrigger(),
+        UseSystemAccentColor = RadioAccentColor.SelectedIndex != 0, CustomAccentColor = GetCustomAccentColor(),
         IsEffectEnabled = CheckMasterSwitch.IsOn, AutoStart = CheckAutoStart.IsOn, StartSilent = CheckStartSilent.IsOn,
         HideTrayIcon = CheckHideTrayIcon.IsOn, EnableAlwaysTrailEffect = CheckAlwaysTrailEffectSwitch.IsOn,
         RunAsAdmin = CheckRunAsAdmin.IsOn, IsTouchscreenMode = CheckTouchscreenMode.IsOn,
@@ -1039,6 +1039,7 @@ public sealed partial class ControlPanelWindow : UserControl
         if (_isLoading || !IsUiReady || _savedSettingsState == null) return;
         _pendingSettingsSections |= sections;
         if ((_isColorDragging || _pendingSliderFeedback.Count != 0) && sections == SettingsSections.Visual) return;
+        if (_isAccentDragging && sections == SettingsSections.Basic) return;
         if (_settingsCheckQueued) return;
         _settingsCheckQueued = true;
         App.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
@@ -1213,7 +1214,7 @@ public sealed partial class ControlPanelWindow : UserControl
             input.Loaded += InputControl_Loaded;
         }
 
-        foreach (TextBox input in new[] { EffectColorHexInput, SearchRunningProcess, SearchVisualReset, NewProfileNameInput })
+        foreach (TextBox input in new[] { EffectColorHexInput, AccentColorHexInput, SearchRunningProcess, SearchVisualReset, NewProfileNameInput })
         {
             input.Loaded += InputControl_Loaded;
         }
@@ -1392,10 +1393,14 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtBasicTriggerTitle.Text = Localization.Get("Basic_Trigger");
         TxtBasicRuntimeTitle.Text = Localization.Get("Basic_Runtime");
         TxtBasicLanguage.Text = Localization.Get("Basic_Language");
-        TxtDarkMode.Text = Localization.Get("Basic_DarkMode");
-        RadioDarkModeOff.Content = Localization.Get("Basic_DarkModeOff");
-        RadioDarkModeOn.Content = Localization.Get("Basic_DarkModeOn");
-        RadioDarkModeSystem.Content = Localization.Get("Basic_DarkModeSystem");
+        TxtDarkMode.Text = Localization.Get("Basic_BackgroundColor");
+        RadioDarkModeOff.Content = Localization.Get("Basic_BackgroundColorLight");
+        RadioDarkModeOn.Content = Localization.Get("Basic_BackgroundColorDark");
+        RadioDarkModeSystem.Content = Localization.Get("Basic_BackgroundColorSystem");
+        TxtAccentColor.Text = Localization.Get("Basic_AccentColor");
+        RadioAccentColorCustom.Content = Localization.Get("Basic_AccentColorCustom");
+        RadioAccentColorSystem.Content = Localization.Get("Basic_AccentColorSystem");
+        TxtCustomAccentColor.Text = Localization.Get("Basic_CustomAccentColor");
 
         CheckAlwaysTrailEffectSwitch.Header = Localization.Get("Basic_TrailSwitch");
         CheckMasterSwitch.Header = Localization.Get("Basic_MasterSwitch");
@@ -1611,6 +1616,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void StopColorPreviewRendering()
     {
+        if (!_isClosed && (_isAccentDragging || _accentPreviewPending)) return;
         if (!_colorPreviewSubscribed) return;
         _colorPreviewSubscribed = false;
         CompositionTarget.Rendering -= ColorPreview_Rendering;
@@ -1646,6 +1652,16 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         bool sliderFeedbackPending = _pendingSliderFeedback.Count != 0;
         FlushSliderFeedback();
+        if (_accentPreviewPending)
+        {
+            UpdateAccentColorPreview(updatePicker: false);
+            _accentPreviewPending = _isAccentDragging;
+        }
+        if (_isAccentDragging && _pendingSettingsSections.HasFlag(SettingsSections.Basic))
+        {
+            _pendingSettingsSections &= ~SettingsSections.Basic;
+            UpdateApplySettingsState(SettingsSections.Basic, animateResetButtons: true);
+        }
         if (_colorPreviewPending)
         {
             _colorPreviewPending = false;
@@ -1718,25 +1734,12 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void EffectColorExpander_Loaded(object sender, RoutedEventArgs args)
     {
-        EffectColorExpander.ApplyTemplate();
-        _colorContentHost = FindVisualDescendant<Border>(EffectColorExpander, "ExpanderContentHost");
-        Visual visual = ElementCompositionPreview.GetElementVisual(EffectColorCard);
-        _colorCardGeometry ??= visual.Compositor.CreateRoundedRectangleGeometry();
-        _colorCardGeometry.CornerRadius = new Vector2(4);
-        visual.Clip = visual.Compositor.CreateGeometricClip(_colorCardGeometry);
-        if (_colorCardAnimating || _colorContentHost == null) return;
-        _colorContentHost.Height = EffectColorExpander.IsExpanded ? double.NaN : 0;
-        _colorContentHost.IsHitTestVisible = EffectColorExpander.IsExpanded;
-        EffectColorCard.UpdateLayout();
-        _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, (float)EffectColorCard.ActualHeight);
+        _effectColorCardAnimation.Loaded();
     }
 
     private void EffectColorCard_SizeChanged(object sender, SizeChangedEventArgs args)
     {
-        if (_colorCardGeometry != null && !_colorCardAnimating)
-        {
-            _colorCardGeometry.Size = new Vector2((float)args.NewSize.Width, (float)args.NewSize.Height);
-        }
+        _effectColorCardAnimation?.SizeChanged(args.NewSize);
     }
 
     private void EffectColorExpander_Expanding(Expander sender, object args) => AnimateColorCard(expanding: true);
@@ -1745,48 +1748,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void AnimateColorCard(bool expanding)
     {
-        if (_colorContentHost == null || _colorCardGeometry == null || !EffectColorCard.IsLoaded)
-        {
-            return;
-        }
-
-        int generation = ++_colorCardAnimationGeneration;
-        ColorPickerBody.Measure(new Size(Math.Max(0, EffectColorCard.ActualWidth - 34), double.PositiveInfinity));
-        double contentHeight = ColorPickerBody.DesiredSize.Height + _colorContentHost.Padding.Top + _colorContentHost.Padding.Bottom;
-        if (!_colorCardAnimating)
-            _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, expanding ? (float)EffectColorCard.MinHeight : (float)EffectColorCard.ActualHeight);
-        _colorCardAnimating = true;
-        _colorContentHost.Height = contentHeight;
-        _colorContentHost.IsHitTestVisible = expanding;
-        EffectColorCard.UpdateLayout();
-        var compositor = _colorCardGeometry.Compositor;
-        ElementCompositionPreview.GetElementVisual(EffectColorCard).Clip = compositor.CreateGeometricClip(_colorCardGeometry);
-        float targetHeight = expanding ? (float)EffectColorCard.ActualHeight : (float)EffectColorCard.MinHeight;
-        var animation = compositor.CreateScalarKeyFrameAnimation();
-        animation.InsertExpressionKeyFrame(0, "this.StartingValue");
-        animation.InsertKeyFrame(1, targetHeight,
-            compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0.7f), new Vector2(0.2f, 1)));
-        animation.Duration = TimeSpan.FromMilliseconds(expanding ? 220 : 180);
-        var batch = compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
-        _colorCardGeometry.StartAnimation("Size.Y", animation);
-        batch.Completed += (_, _) =>
-        {
-            batch.Dispose();
-            App.DispatcherQueue.TryEnqueue(() =>
-            {
-                if (_isClosed || generation != _colorCardAnimationGeneration)
-                {
-                    return;
-                }
-
-                _colorCardGeometry.StopAnimation("Size.Y");
-                _colorContentHost.Height = expanding ? double.NaN : 0;
-                EffectColorCard.UpdateLayout();
-                _colorCardAnimating = false;
-                _colorCardGeometry.Size = new Vector2((float)EffectColorCard.ActualWidth, (float)EffectColorCard.ActualHeight);
-            });
-        };
-        batch.End();
+        _effectColorCardAnimation.Animate(expanding);
     }
 
     private void EffectColorPicker_Loaded(object sender, RoutedEventArgs args)
@@ -2360,7 +2322,11 @@ public sealed partial class ControlPanelWindow : UserControl
         UpdateEffectScalePanelVisibility();
         UpdateAnimationSpeedPanelVisibility();
 
-        SelectDarkMode(ConfigManager.DarkMode);
+        SelectBackgroundColor(ConfigManager.BackgroundColor);
+        RadioAccentColor.SelectedIndex = ConfigManager.UseSystemAccentColor ? 1 : 0;
+        _customAccentColor = ConfigManager.CustomAccentColor;
+        UpdateAccentColorPreview();
+        SetSettingsVisibility(SectionBasic, false, (AccentColorCard, !ConfigManager.UseSystemAccentColor));
     }
 
     private void CheckAdminStatus()
@@ -2368,40 +2334,39 @@ public sealed partial class ControlPanelWindow : UserControl
         CheckRunAsAdmin.IsOn = ConfigManager.RunAsAdmin;
     }
 
-    private void SelectDarkMode(DarkModeOption mode)
+    private void SelectBackgroundColor(BackgroundColorOption mode)
     {
-        // RadioDarkMode 顺序：Off / On / System
         RadioDarkMode.SelectedIndex = mode switch
         {
-            DarkModeOption.Off => 0,
-            DarkModeOption.On => 1,
+            BackgroundColorOption.Light => 0,
+            BackgroundColorOption.Dark => 1,
             _ => 2
         };
     }
 
-    private DarkModeOption GetSelectedDarkMode()
+    private BackgroundColorOption GetSelectedBackgroundColor()
     {
         int index = RadioDarkMode.SelectedIndex;
         if (index < 0)
         {
             if (RadioDarkModeOff.IsChecked == true)
             {
-                return DarkModeOption.Off;
+                return BackgroundColorOption.Light;
             }
 
             if (RadioDarkModeOn.IsChecked == true)
             {
-                return DarkModeOption.On;
+                return BackgroundColorOption.Dark;
             }
 
-            return DarkModeOption.System;
+            return BackgroundColorOption.System;
         }
 
         return index switch
         {
-            0 => DarkModeOption.Off,
-            1 => DarkModeOption.On,
-            _ => DarkModeOption.System
+            0 => BackgroundColorOption.Light,
+            1 => BackgroundColorOption.Dark,
+            _ => BackgroundColorOption.System
         };
     }
 
@@ -2476,7 +2441,7 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateDependentSettingsVisibility(bool animate = false)
     {
         SetSettingsVisibility(SectionBasic, animate, (PanelClickEffectOptions, CheckMasterSwitch.IsOn),
-            (PanelMaxTouchEffects, CheckTouchscreenMode.IsOn));
+            (PanelMaxTouchEffects, CheckTouchscreenMode.IsOn), (AccentColorCard, RadioAccentColor.SelectedIndex == 0));
         SetSettingsVisibility(SectionVisual, animate, (PanelUnifiedEffectScale, CheckLinkedEffectScale.IsOn),
             (PanelSplitEffectScale, !CheckLinkedEffectScale.IsOn),
             (PanelUnifiedAnimationSpeed, CheckLinkedAnimationSpeed.IsOn),
@@ -3125,8 +3090,15 @@ public sealed partial class ControlPanelWindow : UserControl
         string group = GetResetGroup("Nav_Basic", "Basic_Interface");
         AddPageResetItem(group, TxtBasicLanguage.Text, Localization.Get("Basic_DarkModeSystem"), "UiLanguage", RestoreLanguageDefault,
             () => SaveResetValue("UiLanguage", GetSelectedLanguage() ?? Localization.CurrentCultureName), defaultValue: GetDefaultLanguage());
-        AddPageResetItem(group, TxtDarkMode.Text, Localization.Get("Basic_DarkModeSystem"), "DarkMode",
-            () => SelectDarkMode(DarkModeOption.System), () => SaveResetValue("DarkMode", DarkModeOption.System), defaultValue: DarkModeOption.System);
+        AddPageResetItem(group, TxtDarkMode.Text, Localization.Get("Basic_BackgroundColorSystem"), "BackgroundColor",
+            () => SelectBackgroundColor(BackgroundColorOption.System), () => SaveResetValue("BackgroundColor", BackgroundColorOption.System), defaultValue: BackgroundColorOption.System);
+        AddPageResetItem(group, TxtAccentColor.Text, Localization.Get("Basic_AccentColorSystem"), "UseSystemAccentColor",
+            () => RadioAccentColor.SelectedIndex = 1, () => SaveResetValue("UseSystemAccentColor", true), defaultValue: true);
+        AddPageResetItem(group, TxtCustomAccentColor.Text, ConfigManager.DefaultAccentColor, "CustomAccentColor", () =>
+        {
+            _customAccentColor = ConfigManager.DefaultAccentColor;
+            UpdateAccentColorPreview();
+        }, () => SaveResetValue("CustomAccentColor", ConfigManager.DefaultAccentColor), defaultValue: ConfigManager.DefaultAccentColor);
         group = GetResetGroup("Nav_Basic", "Basic_Trigger");
         AddToggleResetItem(group, CheckAlwaysTrailEffectSwitch, false, "EnableAlwaysTrailEffect");
         AddToggleResetItem(group, CheckMasterSwitch, true, "IsEffectEnabled");
@@ -3478,7 +3450,8 @@ public sealed partial class ControlPanelWindow : UserControl
             App.Overlay?.RefreshEnvironmentFilterState();
             if (selected.Any(item => item.SettingKey == "Screen")) App.Overlay?.RefreshScreenSelection();
             if (selected.Any(item => item.SettingKey is "AutoStart" or "RunAsAdmin")) ApplyAutoStartSettings(useSavedSettings: true);
-            if (selected.Any(item => item.SettingKey == "DarkMode")) ApplyDarkMode();
+            if (selected.Any(item => item.SettingKey == "BackgroundColor")) ApplyDarkMode();
+            if (selected.Any(item => item.SettingKey is "UseSystemAccentColor" or "CustomAccentColor")) App.ApplyAccentColor(RootGrid);
             if (selected.Any(item => item.SettingKey == "UiLanguage"))
             {
                 Localization.ApplyCulture(ConfigManager.UiLanguage);
@@ -4348,7 +4321,7 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         _ = sender;
 
-        if (ConfigManager.DarkMode != DarkModeOption.System ||
+        if (ConfigManager.BackgroundColor != BackgroundColorOption.System ||
             (e.Category != UserPreferenceCategory.General &&
              e.Category != UserPreferenceCategory.VisualStyle &&
              e.Category != UserPreferenceCategory.Color) ||
@@ -4361,7 +4334,7 @@ public sealed partial class ControlPanelWindow : UserControl
         App.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, () =>
         {
             Interlocked.Exchange(ref _themeRefreshPending, 0);
-            if (!_isClosed && ConfigManager.DarkMode == DarkModeOption.System)
+            if (!_isClosed && ConfigManager.BackgroundColor == BackgroundColorOption.System)
             {
                 ApplyDarkMode();
             }
@@ -4401,6 +4374,7 @@ public sealed partial class ControlPanelWindow : UserControl
         }
         foreach (TextBox input in _numberInputs.Values) input.Loaded -= InputControl_Loaded;
         EffectColorHexInput.Loaded -= InputControl_Loaded;
+        DisposeAccentColorControls();
         NewProfileNameInput.Loaded -= InputControl_Loaded;
         if (RootGrid.XamlRoot is { } root) root.Changed -= PanelXamlRoot_Changed;
         RootGrid.Loaded -= RootGrid_Loaded;
@@ -4435,7 +4409,8 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (var selector in _segmentedSelectors) selector.Dispose();
         StopColorPreviewRendering();
         _pendingSliderFeedback.Clear();
-        _colorCardGeometry?.StopAnimation("Size.Y");
+        _effectColorCardAnimation.Dispose();
+        _accentColorCardAnimation.Dispose();
         if (_colorAlphaSlider != null)
         {
             _colorAlphaSlider.ValueChanged -= ColorAlphaSlider_ValueChanged;
@@ -4475,8 +4450,6 @@ public sealed partial class ControlPanelWindow : UserControl
         _settingsCallbacks.Clear();
         _configuredColorSpectrum = null;
         _colorAlphaSlider = null;
-        _colorContentHost = null;
-        _colorCardGeometry = null;
         _pressedToggleSwitch = null;
         _selectedSettingsItem = null;
         _allRunningProcesses.Clear();
