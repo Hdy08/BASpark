@@ -1459,7 +1459,7 @@ public sealed partial class ControlPanelWindow : UserControl
         TxtVersionInfo.Text = Localization.Get("About_VersionInfo");
         TxtCommitDetails.Text = Localization.Get("About_CommitDetails");
         TxtBuildTime.Text = Localization.Get("About_BuildTime");
-        SetActionIcon(BtnCopyVersion, "\uE8C8", "About_Copy");
+        SetActionIcon(BtnUpdateVersion, "\uECC5", "About_Update");
         SetActionIcon(BtnCopyBuildTime, "\uE8C8", "About_Copy");
         SetActionIcon(BtnViewCommit, "\uE774", "About_OpenRepository");
         TxtAuthorsTitle.Text = Localization.Get("About_Authors");
@@ -1979,9 +1979,9 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void LoadVersion()
     {
-        BtnCopyVersion.IsEnabled = BuildInformation.Version.Length > 1;
-        AboutVersionText.Text = BtnCopyVersion.IsEnabled ? BuildInformation.Version : Localization.Get("Version_ReadFailed");
-        TxtSidebarVersion.Text = BtnCopyVersion.IsEnabled ? "BASpark " + BuildInformation.Version : AboutVersionText.Text;
+        bool hasVersion = BuildInformation.Version.Length > 1;
+        AboutVersionText.Text = hasVersion ? BuildInformation.Version : Localization.Get("Version_ReadFailed");
+        TxtSidebarVersion.Text = hasVersion ? "BASpark " + BuildInformation.Version : AboutVersionText.Text;
         AboutCommitText.Text = string.IsNullOrEmpty(BuildInformation.CommitHash) ? Localization.Get("About_InfoUnavailable") : BuildInformation.CommitHash;
         BtnViewCommit.Tag = BuildInformation.GetCommitUrl(BuildInformation.CommitHash);
         BtnViewCommit.IsEnabled = BtnViewCommit.Tag != null;

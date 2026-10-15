@@ -2582,11 +2582,11 @@ public class WinUi3UiTests
             if (pageName == "PageAbout")
             {
                 Assert.Null(page.Attribute("Padding"));
-                Assert.Equal("28,20,28,0", (string?)GetNamedElement(document, titleName).Parent!.Attribute("Margin"));
+                Assert.Equal("24,24,24,0", (string?)GetNamedElement(document, titleName).Parent!.Attribute("Margin"));
             }
             else if (pageName != "PageSettings")
             {
-                Assert.Equal("28,20,28,28", (string?)page.Attribute("Padding"));
+                Assert.Equal("{StaticResource BasPagePadding}", (string?)page.Attribute("Padding"));
             }
         }
     }
@@ -3253,13 +3253,13 @@ public class WinUi3UiTests
                  { ("SettingsContentScrollViewer", "SettingsContent"), ("AboutScrollViewer", "AboutContent") })
         {
             XElement scroll = GetNamedElement(panel, scrollName);
-            Assert.Equal("28,0,28,0", (string?)scroll.Attribute("Padding"));
+            Assert.Equal("24,0,24,0", (string?)scroll.Attribute("Padding"));
             Assert.Equal("Auto", (string?)scroll.Attribute("VerticalScrollBarVisibility"));
             Assert.Null(scroll.Attribute("Style"));
             Assert.Null(scroll.Attribute("Template"));
             XElement content = GetNamedElement(panel, contentName);
             Assert.Same(scroll, content.Parent);
-            Assert.Equal("0,0,0,28", (string?)content.Attribute("Padding"));
+            Assert.Equal("0,0,0,24", (string?)content.Attribute("Padding"));
         }
     }
 

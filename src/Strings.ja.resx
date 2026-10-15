@@ -803,6 +803,7 @@
     <data name="About_CommitDetails" xml:space="preserve"><value>コミット詳細</value></data>
     <data name="About_BuildTime" xml:space="preserve"><value>ビルド時刻</value></data>
     <data name="About_Copy" xml:space="preserve"><value>コピー</value></data>
+    <data name="About_Update" xml:space="preserve"><value>更新</value></data>
     <data name="About_View" xml:space="preserve"><value>表示</value></data>
     <data name="About_Authors" xml:space="preserve"><value>作者情報</value></data>
     <data name="About_DoomRole" xml:space="preserve"><value>BASpark の原作者</value></data>

@@ -170,11 +170,11 @@
     <CornerRadius x:Key="BasSettingCardCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="BasControlCornerRadius">4</CornerRadius>
     <Thickness x:Key="BasCardPadding">16</Thickness>
-    <Thickness x:Key="BasPagePadding">28</Thickness>
+    <Thickness x:Key="BasPagePadding">24</Thickness>
     <Thickness x:Key="BasCardMargin">0,0,0,4</Thickness>
     <Thickness x:Key="ContentDialogPadding">16</Thickness>
     <Thickness x:Key="ContentDialogSeparatorThickness">0</Thickness>
-    <Thickness x:Key="BasStartupContentMargin">24,20,24,0</Thickness>
+    <Thickness x:Key="BasStartupContentMargin">24,24,24,0</Thickness>
 
     <StaticResource x:Key="BasFontSizeCaption" ResourceKey="CaptionTextBlockFontSize" />
     <StaticResource x:Key="BasFontSizeBody" ResourceKey="BodyTextBlockFontSize" />

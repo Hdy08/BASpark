@@ -51,7 +51,7 @@
                 <FontIcon Glyph="&#xE8BB;" FontSize="10" />
             </Button>
         </Grid>
-        <ContentControl x:Name="PageContent" Grid.Row="1" Margin="28,16,28,0"
+        <ContentControl x:Name="PageContent" Grid.Row="1" Margin="24,24,24,0"
                         HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
             <ContentControl.ContentTransitions>
                 <TransitionCollection>
@@ -59,10 +59,10 @@
                 </TransitionCollection>
             </ContentControl.ContentTransitions>
         </ContentControl>
-        <StackPanel Grid.Row="2" Padding="28,12,28,16" Spacing="8">
+        <StackPanel x:Name="PageFooter" Grid.Row="2" Padding="24,12,24,24" Spacing="0">
             <CheckBox x:Name="CheckAgreement" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded"
                       IsChecked="False" Checked="Choice_Changed" Unchecked="Choice_Changed" />
-            <StackPanel x:Name="InstallChoices" Spacing="4">
+            <StackPanel x:Name="InstallChoices" Spacing="8">
                 <CheckBox x:Name="CheckDesktop" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded" IsChecked="False" />
                 <CheckBox x:Name="CheckCertificate" Style="{StaticResource InstallerChoiceStyle}" Loaded="Choice_Loaded"
                           IsChecked="False" Checked="Choice_Changed" Unchecked="Choice_Changed">
@@ -96,13 +96,13 @@
                         </Grid>
                     </Border>
             </StackPanel>
-            <Grid x:Name="WelcomePage" RowSpacing="20">
+            <Grid x:Name="WelcomePage" RowSpacing="12">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="WelcomeTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="WelcomeTagline" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <ScrollViewer x:Name="WelcomeScroller" Grid.Row="1" Margin="0,0,-28,-12" Padding="0,0,28,0"
+                <ScrollViewer x:Name="WelcomeScroller" Grid.Row="1" Margin="0,0,-24,-12" Padding="0,0,24,0"
                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="12">
                         <TextBlock x:Name="WelcomeIntro" Style="{StaticResource InstallerBodyLargeStrongTextStyle}" />
@@ -129,13 +129,13 @@
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
-            <Grid x:Name="ConfirmPage" RowSpacing="20">
+            <Grid x:Name="ConfirmPage" RowSpacing="8">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <StackPanel Spacing="4">
                     <TextBlock x:Name="ConfirmTitle" Style="{StaticResource BasPageTitleStyle}" />
                     <TextBlock x:Name="ConfirmDescription" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <ScrollViewer x:Name="ConfirmScroller" Grid.Row="1" Margin="0,0,-28,-12" Padding="0,0,28,0"
+                <ScrollViewer x:Name="ConfirmScroller" Grid.Row="1" Margin="0,0,-24,-12" Padding="0,0,24,0"
                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <StackPanel x:Name="ConfirmCards" Spacing="4">
                     <Border x:Name="DirectoryCard" Style="{StaticResource BasSettingCardStyle}" Margin="0">
@@ -156,7 +156,7 @@
                         <Grid ColumnSpacing="16">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="360" /></Grid.ColumnDefinitions>
                             <TextBlock x:Name="StartMenuLabel" Style="{StaticResource BasSettingTitleStyle}" VerticalAlignment="Center" />
-                            <Grid Grid.Column="1" ColumnSpacing="12">
+                            <Grid Grid.Column="1" ColumnSpacing="8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBox x:Name="StartMenuInput" Text="BASpark" VerticalAlignment="Center" VerticalContentAlignment="Center"
                                          Loaded="Input_Loaded" TextChanged="Directory_Changed" />

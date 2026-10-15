@@ -189,7 +189,13 @@ internal static class StartupDialogHost
             else if (child is InfoBarPanel panel)
             {
                 if (info.Content != null) panel.Visibility = Visibility.Collapsed;
-                else panel.VerticalAlignment = VerticalAlignment.Center;
+                else
+                {
+                    panel.VerticalAlignment = VerticalAlignment.Center;
+                    panel.HorizontalOrientationPadding = new Thickness(0);
+                    panel.VerticalOrientationPadding = new Thickness(0);
+                    panel.InvalidateMeasure();
+                }
             }
             else if (child is FrameworkElement icon && icon.Name is "IconBackground" or "StandardIcon" or "UserIconBox")
             {
@@ -197,8 +203,18 @@ internal static class StartupDialogHost
                 icon.Margin = new Thickness(icon.Margin.Left, 0, icon.Margin.Right, 0);
             }
             if (child is TextBlock label && label.Name is not ("IconBackground" or "StandardIcon"))
+            {
+                if (label.Name is "Title" or "Message")
+                {
+                    Thickness horizontal = InfoBarPanel.GetHorizontalOrientationMargin(label);
+                    Thickness vertical = InfoBarPanel.GetVerticalOrientationMargin(label);
+                    InfoBarPanel.SetHorizontalOrientationMargin(label, new Thickness(horizontal.Left, 0, horizontal.Right, 0));
+                    InfoBarPanel.SetVerticalOrientationMargin(label, new Thickness(vertical.Left, 0, vertical.Right, 0));
+                }
                 ConfigureTextCenter(label);
+            }
         }
+        info.InvalidateMeasure();
     }
 
     public static void AlignChoiceContent(CheckBox choice)

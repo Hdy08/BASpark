@@ -219,7 +219,7 @@
         <Grid>
 
             <!-- ===== 首页 ===== -->
-            <Grid x:Name="PageWelcome" Padding="28,20,28,28">
+            <Grid x:Name="PageWelcome" Padding="{StaticResource BasPagePadding}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -260,7 +260,7 @@
                     <Grid x:Name="StatsHeader" Grid.Row="1" Margin="0,20,0,8">
                         <TextBlock x:Name="TxtStatsTitle" Text="" Style="{StaticResource BasSectionTitleStyle}" VerticalAlignment="Center" />
                     </Grid>
-                <ScrollViewer x:Name="WelcomeScrollViewer" Grid.Row="2" Margin="-28,0,-28,-28" Padding="28,0,28,28"
+                <ScrollViewer x:Name="WelcomeScrollViewer" Grid.Row="2" Margin="-24,0,-24,-24" Padding="24,0,24,24"
                               VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <Border Style="{StaticResource BasSettingCardStyle}">
@@ -304,7 +304,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- 页头：标题 + 应用按钮 -->
-                <Grid Grid.Row="0" Padding="28,20,28,12" ColumnSpacing="16">
+                <Grid Grid.Row="0" Padding="24,24,24,12" ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -335,7 +335,7 @@
                     </StackPanel>
                 </Grid>
 
-                <Grid Grid.Row="1" Padding="28,8,28,8" ColumnSpacing="12">
+                <Grid Grid.Row="1" Padding="24,8,24,8" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -353,9 +353,9 @@
 
                 <ScrollViewer x:Name="SettingsContentScrollViewer"
                               Grid.Row="2"
-                              Padding="28,0,28,0"
+                              Padding="24,0,24,0"
                               VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="SettingsContent" Padding="0,0,0,28">
+                    <StackPanel x:Name="SettingsContent" Padding="0,0,0,24">
 
                         <!-- ===== 基础设置 ===== -->
                         <StackPanel x:Name="SectionBasic">
@@ -1538,7 +1538,7 @@
             </Grid>
 
             <!-- ===== 日志 ===== -->
-            <Grid x:Name="PageLog" Visibility="Collapsed" Padding="28,20,28,28">
+            <Grid x:Name="PageLog" Visibility="Collapsed" Padding="{StaticResource BasPagePadding}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
@@ -1585,14 +1585,14 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0" Margin="28,20,28,0">
+                <StackPanel Grid.Row="0" Margin="24,24,24,0">
                     <TextBlock x:Name="TxtAboutTitle" Text="" Style="{StaticResource BasSettingsPageTitleStyle}" />
                     <TextBlock x:Name="TxtAboutDescription" Text="" Margin="0,8,0,0" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <TextBlock x:Name="TxtActiveAboutSection" Grid.Row="1" Margin="28,20,28,8" Style="{StaticResource BasSettingsSectionTitleStyle}" />
-                <ScrollViewer x:Name="AboutScrollViewer" Grid.Row="2" Padding="28,0,28,0"
+                <TextBlock x:Name="TxtActiveAboutSection" Grid.Row="1" Margin="24,20,24,8" Style="{StaticResource BasSettingsSectionTitleStyle}" />
+                <ScrollViewer x:Name="AboutScrollViewer" Grid.Row="2" Padding="24,0,24,0"
                               HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="AboutContent" Padding="0,0,0,28">
+                <StackPanel x:Name="AboutContent" Padding="0,0,0,24">
                     <TextBlock x:Name="TxtBuildInfoTitle" Text="" Style="{StaticResource BasSettingsSectionTitleStyle}" />
                     <Border Style="{StaticResource BasSettingCardStyle}">
                         <Grid ColumnSpacing="16">
@@ -1604,8 +1604,8 @@
                                 <TextBlock x:Name="TxtVersionInfo" Text="" Style="{StaticResource BasSettingTitleStyle}" />
                                 <TextBlock x:Name="AboutVersionText" Text="" Style="{StaticResource BasCaptionStyle}" />
                             </StackPanel>
-                            <Button x:Name="BtnCopyVersion" Grid.Column="1" Content="" Tag="{Binding Text, ElementName=AboutVersionText}"
-                                    MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Center" Click="CopyAboutInformation_Click" />
+                            <Button x:Name="BtnUpdateVersion" Grid.Column="1" Content="" Tag="https://github.com/Hdy08/BASpark/releases/latest"
+                                    MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Center" Click="OpenRepository_Click" />
                         </Grid>
                     </Border>
                     <Border Style="{StaticResource BasSettingCardStyle}">

@@ -803,6 +803,7 @@
     <data name="About_CommitDetails" xml:space="preserve"><value>Commit details</value></data>
     <data name="About_BuildTime" xml:space="preserve"><value>Build time</value></data>
     <data name="About_Copy" xml:space="preserve"><value>Copy</value></data>
+    <data name="About_Update" xml:space="preserve"><value>Update</value></data>
     <data name="About_View" xml:space="preserve"><value>View</value></data>
     <data name="About_Authors" xml:space="preserve"><value>Authors</value></data>
     <data name="About_DoomRole" xml:space="preserve"><value>BASpark original author</value></data>

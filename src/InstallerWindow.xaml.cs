@@ -146,6 +146,7 @@ public sealed partial class InstallerWindow : UserControl
         CheckKeepData.Visibility = Show(_step == 5);
         CheckLaunch.Visibility = Show(_step == 4 && !_session.IsUninstall);
         ActionButtons.Visibility = Show(!_busy);
+        PageFooter.Padding = new Thickness(24, _busy ? 0 : 12, 24, 24);
         BtnCaptionClose.IsEnabled = !_busy;
         BtnCancel.Visibility = Show(_step != 4);
         BtnBack.Visibility = Show(_step is 1 or 2);
