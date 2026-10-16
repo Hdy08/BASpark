@@ -10,29 +10,30 @@
 
 🌐 **Languages:** English | [简体中文](./docs/README_zh.md)
 
-[Download](https://github.com/DoomVoss/BASpark/releases/latest) | [Bug Report](https://github.com/DoomVoss/BASpark/issues/new?template=en_bug_report.yml) | [Feature Request](https://github.com/DoomVoss/BASpark/issues/new?template=en_feature_request.yml)
+[Download](https://github.com/Hdy08/BASpark/releases/latest) | [Bug Report](https://github.com/Hdy08/BASpark/issues/new?template=en_bug_report.yml) | [Feature Request](https://github.com/Hdy08/BASpark/issues/new?template=en_feature_request.yml)
 
 </div>
 
 ---
 
-# BASpark
+# BASpark · WinUI 3
 
-> **A Windows Desktop Particle Effect Tool:** Reconstructing the iconic Blue Archive UI interactive visual dynamics using HTML5/Canvas.
+> Blue Archive-inspired click and trail effects for your Windows desktop, with a native WinUI 3 interface.
 
-**BASpark** is a lightweight, versatile Windows desktop interactive visual effect utility dedicated to precisely reproducing the clicking and particle fluid dynamics seen in the game *Blue Archive*.
+**BASpark · WinUI 3** is a Windows desktop effects tool based on [DoomVoss/BASpark](https://github.com/DoomVoss/BASpark), powered by [CialloKing/ba-click-fx](https://github.com/CialloKing/ba-click-fx). It brings Blue Archive-inspired rings, particles, glow and trails to mouse and touch input. This branch combines a native control panel, installer and uninstaller with configurable rendering, environment filtering and multi-monitor support.
 
 ---
 
 ## Features
 
-BASpark runs on a single-process hybrid architecture: a **WinUI 3 (Windows App SDK) interface** driving a **native layered window that hosts the WebView2 effect renderer**.
-
-* **Authentic Visual Fidelity:** Flawlessly replicates the particle responses, easing animations, and interactive textures of the classic Blue Archive visual framework.
-* **Native WinUI 3 Interface:** Every surface is built from WinUI 3 primitives — Mica backdrop, Fluent rounded cards, system accent colour, and stock `ToggleSwitch` / `ComboBox` / `Slider` / `InfoBar` / `RadioButtons` controls that follow the system light/dark theme automatically.
-* **Transparent Click-Through Overlay:** The effect layer is not a XAML window. It is a hand-built Win32 layered window (`WS_EX_LAYERED | WS_EX_TRANSPARENT`) hosting WebView2 directly, which is what makes true per-pixel transparency and mouse pass-through possible without stealing focus or appearing in Alt+Tab.
-* **Aggressive Resource Optimization:** Leveraging WebView2 lifecycle management, rendering procedures are invoked strictly upon input triggers. The graphics context completely hibernates when idle, causing zero overhead to active background processes or system resources.
-* **System-Wide Environment Perception:** Full compatibility with full-screen entertainment and production environments. Real-time hook intercepting accurately routes input feedback without interrupting target processes.
+* **Customizable Effects:** Adjust color, opacity, scale, animation speed, glow and trail sampling. The full edition of ba-click-fx also provides optional advanced settings for rendering, rings, disks, shards, trails and bloom; these settings are disabled by default.
+* **Mouse and Multi-Touch Input:** Enable click effects, persistent mouse trails and touch effects separately. Touch contacts are filtered independently and can produce simultaneous clicks and trails, with a configurable effect-count limit.
+* **Multi-Monitor Support:** Select which displays show effects, keep trails continuous across screen boundaries, and adapt to monitor layout and primary-display changes without restarting.
+* **Environment Filtering:** Control effects on the desktop, in full-screen applications and on BASpark windows. Switch between process-filter profiles and respect hidden-pointer scenarios. Screenshot compatibility mode temporarily hides effects for recognized screenshot actions.
+* **Native Windows Interface:** A WinUI 3 control panel, installer and uninstaller, with hierarchical navigation, settings cards and native dialogs. Choose a light, dark or system background and a system or custom accent color; the interface is available in Simplified Chinese, English and Japanese.
+* **Settings and Backups:** Apply or discard changes independently on each settings page, reset individual settings or groups, and selectively import or export settings, profiles, display selections and click statistics.
+* **Quick Controls:** Pause or resume effects from the home page or system tray, start silently, hide the tray icon, and view or copy logs. Overlay windows remain transparent to mouse input and do not take focus or appear in Alt+Tab.
+* **Local Operation:** Effect resources are bundled with the application. This branch removes telemetry, automatic update checks and announcement fetching, and reduces idle and sustained-trail work through input batching and shared rendering resources.
 
 ---
 
@@ -47,32 +48,9 @@ BASpark runs on a single-process hybrid architecture: a **WinUI 3 (Windows App S
 * **Runtime:** None required. The Windows App SDK and .NET runtime ship self-contained with the application.
 
 ### Installation
-1. Navigate to the official [Releases Hub](https://github.com/DoomVoss/BASpark/releases). Download the latest setup binary: `BASpark_Installer_vX.X.X_x64.exe`.
+1. Navigate to the official [Releases Hub](https://github.com/Hdy08/BASpark/releases). Download the latest setup binary: `BASpark_Installer_vX.X.X_x64.exe`.
 2. Execute the installer application and follow the deployment wizard instructions to initialize the localized directory.
 3. Launch the primary execution routine and enjoy the interactive effects.
-
----
-
-## Contribution Guide
-
-We encourage open-source community contributions. To set up your local workspace for BASpark engineering:
-
-### Environment Setup
-Clone the remote repository locally:
-
-```bash
-git clone https://github.com/DoomVoss/BASpark.git
-cd BASpark
-```
-
-Open the project folder using Visual Studio Code (Ensure the C# Dev Kit extension suite is installed):
-
-```bash
-code .
-```
-
-* **Live Frontend Engineering:** Because the central animation loops and visual textures are structurally compiled inside HTML5/Canvas components, you can dynamically view and troubleshoot elements in src/Web/ in real time via VS Code without rebuilding the whole C# runtime wrapper structure.
-* When submitting an issue solution or optimization, open a formal Pull Request (https://github.com/DoomVoss/BASpark/pulls). Ensure your implementation aligns with the project’s established formatting styles and code quality rules.
 
 ---
 

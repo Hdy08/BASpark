@@ -10,37 +10,29 @@
 
 🌐 **Languages:** [English](../README.md) | 简体中文
 
-[快速下载](https://github.com/DoomVoss/BASpark/releases/latest) | [反馈 Bug](https://github.com/DoomVoss/BASpark/issues/new?template=bug_report.yml) | [功能建议](https://github.com/DoomVoss/BASpark/issues/new?template=feature_request.yml)
+[快速下载](https://github.com/Hdy08/BASpark/releases/latest) | [反馈 Bug](https://github.com/Hdy08/BASpark/issues/new?template=bug_report.yml) | [功能建议](https://github.com/Hdy08/BASpark/issues/new?template=feature_request.yml)
 
 </div>
 
 ---
-# BASpark
+# BASpark · WinUI 3
 
 ### 项目简介
 
-> Windows 鼠标特效工具：基于 HTML5/Canvas 深度复刻《蔚蓝档案》UI 风格动效
-> A Windows mouse effect tool reconstructing Blue Archive UI style using HTML5/Canvas.
+> 为 Windows 桌面带来《蔚蓝档案》风格的点击与拖尾特效，搭配原生 WinUI 3 界面。
 
-**BASpark** 是一款轻量化多功能的桌面点击特效工具，深度复刻游戏 **《蔚蓝档案》(Blue Archive)** 的点击动效。
+**BASpark · WinUI 3** 是基于 [DoomVoss/BASpark](https://github.com/DoomVoss/BASpark)、采用 [CialloKing/ba-click-fx](https://github.com/CialloKing/ba-click-fx) 渲染的 Windows 桌面特效工具，为鼠标与触摸操作添加《蔚蓝档案》风格的圆环、粒子、辉光和拖尾。本分支提供原生控制面板、安装与卸载界面，并支持特效自定义、环境过滤和多显示器。
 
 ### 核心特性
 
-BASpark 采用 **“WinUI 3 界面 + 原生分层窗口承载 WebView2 渲染”** 的单进程混合架构。
-
-* 界面完全由 **WinUI 3 (Windows App SDK)** 构建：Mica 背景材质、Fluent 圆角卡片、系统强调色、原生 `ToggleSwitch` / `ComboBox` / `Slider` / `InfoBar` / `RadioButtons` 控件，并随系统深浅色主题自动切换。
-* 特效叠加层不使用 XAML 窗口，而是由一个自建的 Win32 分层窗口（`WS_EX_LAYERED | WS_EX_TRANSPARENT`）直接承载 WebView2，因此能实现**每像素透明**与**鼠标穿透**，且不抢焦点、不进入 Alt+Tab。
-* 精准还原《蔚蓝档案》标志性的交互质感。
-* 基于 WebView2 优化，特效触发即渲染，闲置即休眠，不抢占额外系统资源。
-* 支持全屏应用与游戏环境，实时感知鼠标动作。
-
-### TODO（Not To Do？）
-
-*  已完成 ＜（＾－＾）＞ 应用黑白名单，支持自定义进程过滤，实现全屏游戏或特定软件环境下自动隐藏特效。
-* （开发中...）插件化系统，开放粒子脚本接口，允许用户通过修改本地 js/css 文件轻松分享自定义的点击动效。
-* （计划中...）交互联动，捕获鼠标点击以外的交互逻辑，如键盘敲击触发粒子喷发或跟随音乐节奏律动。
-
-想要更多？前往 [功能建议](https://github.com/DoomVoss/BASpark/issues/new?template=feature_request.yml) 补充
+* **特效自定义：** 支持颜色、不透明度、缩放、动画速度、辉光和拖尾采样设置；集成完整版 ba-click-fx，可按需开启显示、圆环、光盘、碎片、拖尾和 BLOOM 高级设置，默认关闭。
+* **鼠标与多点触摸：** 可分别启用点击特效、鼠标常驻拖尾和触摸特效。各触点独立过滤，支持多处同时点击与拖尾，并可设置特效数量上限。
+* **多显示器：** 可选择显示特效的屏幕，拖尾跨屏连续；切换主显示器、调整屏幕位置或增减显示器后，无需重启即可适配。
+* **环境过滤：** 支持桌面、全屏应用和本应用窗口的特效控制，以及多配置组进程过滤，并保留隐藏指针场景的过滤行为。截图兼容模式可在识别到截图操作时临时隐藏特效。
+* **原生 Windows 界面：** 控制面板、安装器和卸载器采用 WinUI 3，提供层级导航、设置卡片和原生对话框。背景可选浅色、深色或跟随系统，强调颜色可跟随系统或自定义，支持简体中文、英文和日文。
+* **设置与备份：** 各设置页独立应用或放弃更改，支持单项、分组及整页重置；可选择导入、导出设置、配置组、显示器配置和点击统计。
+* **便捷操作：** 支持首页与托盘暂停或启用特效、静默启动、隐藏托盘图标及查看和复制日志。特效叠加层鼠标穿透，不抢焦点，不出现在 Alt+Tab 中。
+* **本地运行：** 特效资源随程序提供，本分支移除了遥测、自动更新检查和公告拉取；通过合并高频输入与共享渲染资源，减少闲置及持续拖尾时的额外开销。
 
 ---
 
@@ -55,36 +47,9 @@ BASpark 采用 **“WinUI 3 界面 + 原生分层窗口承载 WebView2 渲染”
 * 运行库: 无需额外安装，Windows App SDK 与 .NET 运行时已随程序自包含发布
 
 ### 2. 安装步骤
-1. 前往 [Releases](https://github.com/DoomVoss/BASpark/releases) 页面下载最新的安装包 BASpark_Installer_vX.X.X_x64.exe。
+1. 前往 [Releases](https://github.com/Hdy08/BASpark/releases) 页面下载最新的安装包 BASpark_Installer_vX.X.X_x64.exe。
 2. 运行安装程序并完成安装。
 3. Enjoy it！
-
----
-
-## 开发与贡献
-
-如果你想参与 BASpark 的开发，可以参考以下步骤：
-
-### 克隆仓库
-
-```bash
-git clone https://github.com/DoomVoss/BASpark.git
-```
-
-### 进入目录
-
-```bash
-cd BASpark
-```
-
-### 使用 VS Code 打开项目 (需安装 C# Dev Kit 扩展)
-
-```bash
-code .
-```
-
-* 由于动效逻辑由 HTML5/Canvas 实现，你可以直接在 VS Code 中实时预览和调试 src/Web/ 下的代码，而无需频繁编译整个项目。
-* 提交 [Pull Request](https://github.com/DoomVoss/BASpark/pulls)，并确保代码风格与现有一致
 
 ---
 
