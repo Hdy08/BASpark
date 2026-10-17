@@ -64,8 +64,38 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         InvalidateMeasure();
     }
 
-    internal SelectionGroup? GetActiveGroup(double offset) =>
-        _state?.Groups.LastOrDefault(entry => entry.Offset <= offset + 1).Group;
+    internal SelectionGroup? GetActiveGroup(double offset)
+    {
+        if (_state == null) return null;
+        int index = FindLastOffsetAtOrBefore(_state.Groups, offset + 1);
+        return index >= 0 ? _state.Groups[index].Group : null;
+    }
+
+    internal static int FindFirstVisibleIndex(double[] offsets, double top, int itemCount)
+    {
+        int first = 0;
+        int last = itemCount;
+        while (first < last)
+        {
+            int middle = first + (last - first) / 2;
+            if (offsets[middle + 1] < top) first = middle + 1;
+            else last = middle;
+        }
+        return first;
+    }
+
+    internal static int FindLastOffsetAtOrBefore<T>(IReadOnlyList<(double Offset, T Value)> entries, double target)
+    {
+        int first = 0;
+        int last = entries.Count;
+        while (first < last)
+        {
+            int middle = first + (last - first) / 2;
+            if (entries[middle].Offset <= target) first = middle + 1;
+            else last = middle;
+        }
+        return first - 1;
+    }
 
     private static UIElement GetRowElement(VirtualizingLayoutContext context, int index)
     {
@@ -168,9 +198,8 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         Rect visible = context.RealizationRect;
         double top = double.IsFinite(visible.Top) ? Math.Max(0, visible.Top) : 0;
         double bottom = double.IsFinite(visible.Bottom) && visible.Height > 0 ? visible.Bottom : top + 506;
-        for (int index = 0; index < context.ItemCount; index++)
+        for (int index = FindFirstVisibleIndex(state.Offsets, top, context.ItemCount); index < context.ItemCount; index++)
         {
-            if (state.Offsets[index + 1] < top) continue;
             if (state.Offsets[index] > bottom) break;
             UIElement element = GetRowElement(context, index);
             element.Measure(new Size(width, state.Offsets[index + 1] - state.Offsets[index]));

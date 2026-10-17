@@ -3197,6 +3197,25 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void SelectionCardLayout_FindsVisibleRowsWithBinarySearchAcrossEmptyGroups()
+    {
+        double[] offsets = [0, 0, 48, 96, 96, 144];
+        (double Offset, string Value)[] groups = [(0, "first"), (96, "second"), (96, "third"), (144, "fourth")];
+
+        Assert.Equal(0, SelectionCardLayout.FindFirstVisibleIndex(offsets, 0, 5));
+        Assert.Equal(1, SelectionCardLayout.FindFirstVisibleIndex(offsets, 1, 5));
+        Assert.Equal(1, SelectionCardLayout.FindFirstVisibleIndex(offsets, 48, 5));
+        Assert.Equal(2, SelectionCardLayout.FindFirstVisibleIndex(offsets, 49, 5));
+        Assert.Equal(2, SelectionCardLayout.FindFirstVisibleIndex(offsets, 96, 5));
+        Assert.Equal(4, SelectionCardLayout.FindFirstVisibleIndex(offsets, 97, 5));
+        Assert.Equal(5, SelectionCardLayout.FindFirstVisibleIndex(offsets, 145, 5));
+        Assert.Equal(-1, SelectionCardLayout.FindLastOffsetAtOrBefore(groups, -1));
+        Assert.Equal(0, SelectionCardLayout.FindLastOffsetAtOrBefore(groups, 0));
+        Assert.Equal(2, SelectionCardLayout.FindLastOffsetAtOrBefore(groups, 96));
+        Assert.Equal(3, SelectionCardLayout.FindLastOffsetAtOrBefore(groups, 144));
+    }
+
+    [Fact]
     public void PopupSelectionLists_UseStableScrollRangesAndToggleWholeCards()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
