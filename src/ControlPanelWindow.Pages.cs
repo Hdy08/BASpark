@@ -26,6 +26,8 @@ public sealed class SelectionGroup(string title, ItemsControl list, List<Selecti
 
 public sealed class SelectionCardLayout : VirtualizingLayout
 {
+    private const int MaximumRetainedElements = 128;
+
     private sealed class LayoutState
     {
         internal double Width = double.NaN;
@@ -34,7 +36,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         internal double[] Offsets = [];
         internal readonly List<(double Offset, SelectionGroup Group)> Groups = [];
         internal readonly List<(int Index, UIElement Element)> Realized = [];
-        internal readonly HashSet<int> RealizedIndices = [];
+        internal readonly Dictionary<int, UIElement> RealizedElements = [];
     }
 
     private readonly Windows.UI.ViewManagement.UISettings _uiSettings = new();
@@ -61,7 +63,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         if (context.LayoutState is not LayoutState state) return;
         foreach (var entry in state.Realized) context.RecycleElement(entry.Element);
         state.Realized.Clear();
-        state.RealizedIndices.Clear();
+        state.RealizedElements.Clear();
         state.Dirty = true;
         InvalidateMeasure();
     }
@@ -101,7 +103,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
 
     private static UIElement GetRowElement(VirtualizingLayoutContext context, int index)
     {
-        UIElement element = context.GetOrCreateElementAt(index);
+        UIElement element = context.GetOrCreateElementAt(index, ElementRealizationOptions.SuppressAutoRecycle);
         if (element is FrameworkElement row)
         {
             object item = context.GetItemAt(index);
@@ -161,7 +163,8 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         double width = double.IsFinite(availableSize.Width) ? availableSize.Width : context.RealizationRect.Width;
         if (!double.IsFinite(width) || width <= 0) width = 384;
         double textScale = _uiSettings.TextScaleFactor;
-        if (state.Dirty || state.Width != width || state.TextScale != textScale || state.Offsets.Length != context.ItemCount + 1)
+        bool measurementsChanged = state.Dirty || state.Width != width || state.TextScale != textScale || state.Offsets.Length != context.ItemCount + 1;
+        if (measurementsChanged)
         {
             if (_measuredWidth != width || _measuredTextScale != textScale) _cardHeights.Clear();
             var heights = new Dictionary<(string Title, string Subtitle), double>();
@@ -200,6 +203,9 @@ public sealed class SelectionCardLayout : VirtualizingLayout
             _measuredTextScale = textScale;
             state.Dirty = false;
         }
+        if (measurementsChanged)
+            foreach (var entry in state.Realized)
+                entry.Element.Measure(new Size(width, state.Offsets[entry.Index + 1] - state.Offsets[entry.Index]));
         Rect visible = context.RealizationRect;
         double top = double.IsFinite(visible.Top) ? Math.Max(0, visible.Top) : 0;
         double bottom = double.IsFinite(visible.Bottom) && visible.Height > 0 ? visible.Bottom : top + 506;
@@ -208,27 +214,35 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         bool IsNeeded(int index) => index == anchor ||
             (index >= firstVisible && index < context.ItemCount && state.Offsets[index] <= bottom);
 
-        for (int realizedIndex = state.Realized.Count - 1; realizedIndex >= 0; realizedIndex--)
+        for (int realizedIndex = 0; realizedIndex < state.Realized.Count && state.Realized.Count > MaximumRetainedElements;)
         {
             var entry = state.Realized[realizedIndex];
-            if (IsNeeded(entry.Index)) continue;
+            if (IsNeeded(entry.Index))
+            {
+                realizedIndex++;
+                continue;
+            }
             context.RecycleElement(entry.Element);
-            state.RealizedIndices.Remove(entry.Index);
+            state.RealizedElements.Remove(entry.Index);
             state.Realized.RemoveAt(realizedIndex);
         }
 
         for (int index = firstVisible; index < context.ItemCount; index++)
         {
             if (state.Offsets[index] > bottom) break;
-            UIElement element = GetRowElement(context, index);
+            if (!state.RealizedElements.TryGetValue(index, out UIElement? element))
+            {
+                element = GetRowElement(context, index);
+                state.RealizedElements.Add(index, element);
+                state.Realized.Add((index, element));
+            }
             element.Measure(new Size(width, state.Offsets[index + 1] - state.Offsets[index]));
-            if (state.RealizedIndices.Add(index)) state.Realized.Add((index, element));
         }
-        if (anchor >= 0 && anchor < context.ItemCount && !state.RealizedIndices.Contains(anchor))
+        if (anchor >= 0 && anchor < context.ItemCount && !state.RealizedElements.ContainsKey(anchor))
         {
             UIElement element = GetRowElement(context, anchor);
             element.Measure(new Size(width, state.Offsets[anchor + 1] - state.Offsets[anchor]));
-            state.RealizedIndices.Add(anchor);
+            state.RealizedElements.Add(anchor, element);
             state.Realized.Add((anchor, element));
         }
         return new Size(width, state.Offsets[^1]);

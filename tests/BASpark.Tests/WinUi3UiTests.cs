@@ -3246,7 +3246,7 @@ public class WinUi3UiTests
         int arrangeStart = pages.IndexOf("protected override Size ArrangeOverride(", measureStart, StringComparison.Ordinal);
         string measure = pages[measureStart..arrangeStart];
         Assert.Contains("context.RecycleElement(entry.Element)", measure, StringComparison.Ordinal);
-        Assert.Contains("state.RealizedIndices.Add(index)", measure, StringComparison.Ordinal);
+        Assert.Contains("state.RealizedElements.TryGetValue(index", measure, StringComparison.Ordinal);
         Assert.DoesNotContain("state.Realized.Clear()", measure, StringComparison.Ordinal);
     }
 
@@ -4464,6 +4464,36 @@ public class WinUi3UiTests
         Assert.Contains("if (context.LayoutState is not LayoutState state) return", itemsChanged, StringComparison.Ordinal);
         Assert.Contains("state = new LayoutState()", measure, StringComparison.Ordinal);
         Assert.Contains("context.LayoutState = state", measure, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SelectionVirtualizingLayout_OwnsRetainedElementsUntilExplicitRecycling()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        string realize = source[source.IndexOf("private static UIElement GetRowElement", StringComparison.Ordinal)..
+            source.IndexOf("private void InitializeMeasurementElements", StringComparison.Ordinal)];
+        string changed = source[source.IndexOf("protected override void OnItemsChangedCore", StringComparison.Ordinal)..
+            source.IndexOf("internal SelectionGroup? GetActiveGroup", StringComparison.Ordinal)];
+        Assert.Contains("ElementRealizationOptions.SuppressAutoRecycle", realize, StringComparison.Ordinal);
+        Assert.Contains("context.RecycleElement(entry.Element)", changed, StringComparison.Ordinal);
+        Assert.Contains("state.RealizedElements.Clear()", changed, StringComparison.Ordinal);
+        Assert.Contains("state.RealizedElements.Remove(entry.Index)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SelectionVirtualizingLayout_KeepsABoundedCacheAndRemeasuresWhenSizingChanges()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        string measure = source[source.IndexOf("protected override Size MeasureOverride(VirtualizingLayoutContext", StringComparison.Ordinal)..
+            source.IndexOf("protected override Size ArrangeOverride(VirtualizingLayoutContext", StringComparison.Ordinal)];
+        Assert.Contains("MaximumRetainedElements = 128", source, StringComparison.Ordinal);
+        Assert.Contains("state.Realized.Count > MaximumRetainedElements", measure, StringComparison.Ordinal);
+        int needed = measure.IndexOf("if (IsNeeded(entry.Index))", StringComparison.Ordinal);
+        int recycle = measure.IndexOf("context.RecycleElement(entry.Element)", StringComparison.Ordinal);
+        Assert.True(needed >= 0 && recycle > needed);
+        Assert.Contains("if (measurementsChanged)", measure, StringComparison.Ordinal);
+        Assert.Contains("foreach (var entry in state.Realized)", measure, StringComparison.Ordinal);
+        Assert.Contains("entry.Element.Measure", measure, StringComparison.Ordinal);
     }
 
     [Fact]
