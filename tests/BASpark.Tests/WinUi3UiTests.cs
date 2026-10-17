@@ -4440,14 +4440,30 @@ public class WinUi3UiTests
             source.IndexOf("private void CloseRunningProcessOverlay_Click", StringComparison.Ordinal)];
         int show = open.IndexOf("SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: true)", StringComparison.Ordinal);
         int awaitShow = open.IndexOf("await dialogOpen", StringComparison.Ordinal);
+        int clearItems = open.IndexOf("_allRunningProcesses.Clear()", StringComparison.Ordinal);
+        int clearSearch = open.IndexOf("SearchRunningProcess.Text = string.Empty", StringComparison.Ordinal);
         int awaitLoad = open.IndexOf("await processLoad", StringComparison.Ordinal);
-        Assert.True(show >= 0 && awaitShow > show && awaitLoad > awaitShow);
-        Assert.Contains("processLoad.IsCompletedSuccessfully", open, StringComparison.Ordinal);
+        Assert.True(show >= 0 && awaitShow > show && clearItems > awaitShow && clearSearch > awaitShow && awaitLoad > clearSearch);
+        Assert.DoesNotContain("processLoad.IsCompletedSuccessfully", open, StringComparison.Ordinal);
         Assert.Contains("catch (Exception ex)", open, StringComparison.Ordinal);
         Assert.Contains("Task.Run(GetRunningProcesses)", open, StringComparison.Ordinal);
         Assert.Contains("generation != _runningProcessLoadGeneration", open, StringComparison.Ordinal);
         Assert.Contains("RunningProcessList.ReplaceAll(filtered)", source, StringComparison.Ordinal);
         Assert.Contains("RunningProcessLoading.IsActive = showLoading", source, StringComparison.Ordinal);
+        Assert.Contains("ListRunningProcesses.Visibility = showLoading ? Visibility.Collapsed : Visibility.Visible", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SelectionVirtualizingLayout_HandlesCollectionChangesBeforeInitialization()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        string itemsChanged = source[source.IndexOf("protected override void OnItemsChangedCore", StringComparison.Ordinal)..
+            source.IndexOf("internal SelectionGroup? GetActiveGroup", StringComparison.Ordinal)];
+        string measure = source[source.IndexOf("protected override Size MeasureOverride(VirtualizingLayoutContext", StringComparison.Ordinal)..
+            source.IndexOf("protected override Size ArrangeOverride(VirtualizingLayoutContext", StringComparison.Ordinal)];
+        Assert.Contains("if (context.LayoutState is not LayoutState state) return", itemsChanged, StringComparison.Ordinal);
+        Assert.Contains("state = new LayoutState()", measure, StringComparison.Ordinal);
+        Assert.Contains("context.LayoutState = state", measure, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -4540,6 +4556,12 @@ public class WinUi3UiTests
 
     private static string FindWorkspaceRoot()
     {
+        string? configuredRoot = Environment.GetEnvironmentVariable("BASPARK_WORKSPACE_ROOT");
+        if (!string.IsNullOrWhiteSpace(configuredRoot) && File.Exists(Path.Combine(configuredRoot, "BASpark.sln")))
+        {
+            return Path.GetFullPath(configuredRoot);
+        }
+
         for (DirectoryInfo? directory = new(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
         {
             if (File.Exists(Path.Combine(directory.FullName, "BASpark.sln")))

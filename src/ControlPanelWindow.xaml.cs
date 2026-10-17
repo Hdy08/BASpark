@@ -2879,20 +2879,17 @@ public sealed partial class ControlPanelWindow : UserControl
         if (_isClosed || _loadingRunningProcesses || _modalDialogs.ContainsKey(RunningProcessOverlay)) return;
         int generation = ++_runningProcessLoadGeneration;
         _loadingRunningProcesses = true;
-        BtnSelectRunningProcess.IsEnabled = false;
         try
         {
-            _allRunningProcesses.Clear();
-            SearchRunningProcess.Text = string.Empty;
-            ApplyRunningProcessFilter(null);
+            BtnSelectRunningProcess.IsEnabled = false;
+            UpdateSelectionToolbar(ListRunningProcesses);
             Task<List<ProcessItem>> processLoad = GetRunningProcessesAsync();
-            if (processLoad.IsCompletedSuccessfully)
-            {
-                _allRunningProcesses.AddRange(CloneProcessItems(processLoad.Result));
-                ApplyRunningProcessFilter(SearchRunningProcess.Text);
-            }
             Task<bool> dialogOpen = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: true);
             if (!await dialogOpen || _isClosed || generation != _runningProcessLoadGeneration) return;
+            bool searchWasCleared = string.IsNullOrEmpty(SearchRunningProcess.Text);
+            _allRunningProcesses.Clear();
+            SearchRunningProcess.Text = string.Empty;
+            if (searchWasCleared) ApplyRunningProcessFilter(null);
             List<ProcessItem> processes = await processLoad;
             if (_isClosed || generation != _runningProcessLoadGeneration) return;
             _allRunningProcesses.Clear();
@@ -3346,9 +3343,10 @@ public sealed partial class ControlPanelWindow : UserControl
         if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
         if (list == ListRunningProcesses)
         {
-            bool showLoading = _loadingRunningProcesses && RunningProcessList.Count == 0;
+            bool showLoading = _loadingRunningProcesses;
             RunningProcessLoading.IsActive = showLoading;
             RunningProcessLoading.Visibility = showLoading ? Visibility.Visible : Visibility.Collapsed;
+            ListRunningProcesses.Visibility = showLoading ? Visibility.Collapsed : Visibility.Visible;
         }
         if (toolbar.Heading != null) toolbar.Heading.Text = SelectionGroup.FormatTitle(toolbar.HeadingText, toolbar.Items);
         bool available = list != ListBackupItems || !_backupBusy;

@@ -58,7 +58,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
 
     protected override void OnItemsChangedCore(VirtualizingLayoutContext context, object source, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
-        var state = (LayoutState)context.LayoutState;
+        if (context.LayoutState is not LayoutState state) return;
         foreach (var entry in state.Realized) context.RecycleElement(entry.Element);
         state.Realized.Clear();
         state.RealizedIndices.Clear();
@@ -152,7 +152,11 @@ public sealed class SelectionCardLayout : VirtualizingLayout
     protected override Size MeasureOverride(VirtualizingLayoutContext context, Size availableSize)
     {
         InitializeMeasurementElements();
-        var state = (LayoutState)context.LayoutState;
+        if (context.LayoutState is not LayoutState state)
+        {
+            state = new LayoutState();
+            context.LayoutState = state;
+        }
         _state = state;
         double width = double.IsFinite(availableSize.Width) ? availableSize.Width : context.RealizationRect.Width;
         if (!double.IsFinite(width) || width <= 0) width = 384;

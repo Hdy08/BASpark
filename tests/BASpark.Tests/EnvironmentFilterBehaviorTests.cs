@@ -234,6 +234,12 @@ public sealed class EnvironmentFilterBehaviorTests
 
     private static string FindWorkspaceRoot()
     {
+        string? configuredRoot = Environment.GetEnvironmentVariable("BASPARK_WORKSPACE_ROOT");
+        if (!string.IsNullOrWhiteSpace(configuredRoot) && File.Exists(Path.Combine(configuredRoot, "BASpark.sln")))
+        {
+            return Path.GetFullPath(configuredRoot);
+        }
+
         for (DirectoryInfo? directory = new(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
         {
             if (File.Exists(Path.Combine(directory.FullName, "BASpark.sln")))
