@@ -3216,6 +3216,41 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void SelectionList_SkipsRedundantWorkDuringScrollRecycling()
+    {
+        string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
+        int clearingStart = pages.IndexOf("private void SelectionElement_Clearing(", StringComparison.Ordinal);
+        int clearingEnd = pages.IndexOf("private void SelectionHeading_Unloaded(", clearingStart, StringComparison.Ordinal);
+        string clearing = pages[clearingStart..clearingEnd];
+        Assert.Contains("Grid? header = args.Element as Grid", clearing, StringComparison.Ordinal);
+        Assert.DoesNotContain("FindVisualDescendant", clearing, StringComparison.Ordinal);
+
+        int groupStart = pages.IndexOf("private void ShowSelectionGroup(", StringComparison.Ordinal);
+        int groupEnd = pages.IndexOf("private void UpdateSectionSelectionToolbars(", groupStart, StringComparison.Ordinal);
+        string showGroup = pages[groupStart..groupEnd];
+        int unchangedGroup = showGroup.IndexOf("if (ReferenceEquals(toolbar.Invert.Tag, group)) return", StringComparison.Ordinal);
+        int updateTitle = showGroup.IndexOf("title.Text = group?.TitleWithCount", StringComparison.Ordinal);
+        Assert.True(unchangedGroup >= 0 && updateTitle > unchangedGroup);
+
+        int updateHeaderStart = pages.IndexOf("private void UpdateSelectionHeader(", StringComparison.Ordinal);
+        int updateHeaderEnd = pages.IndexOf("private void SetGroupedSelectionRows(", updateHeaderStart, StringComparison.Ordinal);
+        string updateHeader = pages[updateHeaderStart..updateHeaderEnd];
+        Assert.Contains("_selectionLayouts.TryGetValue(list", updateHeader, StringComparison.Ordinal);
+        Assert.DoesNotContain("FindVisualDescendant", updateHeader, StringComparison.Ordinal);
+        Assert.Contains("CheckBox? check = host.Child as CheckBox", pages, StringComparison.Ordinal);
+        Assert.Contains("ClearSelectionCardCheck(host)", clearing, StringComparison.Ordinal);
+        Assert.DoesNotContain("preserveForReuse", pages, StringComparison.Ordinal);
+        Assert.DoesNotContain("host.Tag = check", pages, StringComparison.Ordinal);
+        Assert.Contains("GetSelectionCardCheckVisuals(check)", pages, StringComparison.Ordinal);
+        int measureStart = pages.IndexOf("protected override Size MeasureOverride(", StringComparison.Ordinal);
+        int arrangeStart = pages.IndexOf("protected override Size ArrangeOverride(", measureStart, StringComparison.Ordinal);
+        string measure = pages[measureStart..arrangeStart];
+        Assert.Contains("context.RecycleElement(entry.Element)", measure, StringComparison.Ordinal);
+        Assert.Contains("state.RealizedIndices.Add(index)", measure, StringComparison.Ordinal);
+        Assert.DoesNotContain("state.Realized.Clear()", measure, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PopupSelectionLists_UseStableScrollRangesAndToggleWholeCards()
     {
         XDocument panel = LoadXaml("src", "ControlPanelWindow.xaml");
@@ -3347,8 +3382,9 @@ public class WinUi3UiTests
             Assert.Equal(1, source.Split($"{name}(animate: true)", StringSplitOptions.None).Length - 1);
         }
         Assert.Contains("animate && !_isLoading && IsUiReady && PageSettings.Visibility == Visibility.Visible", source, StringComparison.Ordinal);
-        Assert.Contains("private void UpdatePageVisibility()\n    {\n        StopSettingsAnimations()", source, StringComparison.Ordinal);
-        Assert.Contains("private void UpdateSettingsSectionVisibility()\n    {\n        StopSettingsAnimations()", source, StringComparison.Ordinal);
+        string normalizedSource = source.ReplaceLineEndings("\n");
+        Assert.Contains("private void UpdatePageVisibility()\n    {\n        StopSettingsAnimations()", normalizedSource, StringComparison.Ordinal);
+        Assert.Contains("private void UpdateSettingsSectionVisibility()\n    {\n        StopSettingsAnimations()", normalizedSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -4397,15 +4433,52 @@ public class WinUi3UiTests
     }
 
     [Fact]
-    public void RunningProcessPicker_PreparesTheFirstSnapshotBeforeShowingTheList()
+    public void RunningProcessPicker_ShowsBeforeLoadingAndBatchesFilteredItems()
     {
         string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
         string open = source[source.IndexOf("private async void SelectRunningProcess_Click", StringComparison.Ordinal)..
             source.IndexOf("private void CloseRunningProcessOverlay_Click", StringComparison.Ordinal)];
-        Assert.True(open.IndexOf("await GetRunningProcessesAsync()", StringComparison.Ordinal) < open.IndexOf("ApplyRunningProcessFilter(null)", StringComparison.Ordinal));
-        Assert.True(open.IndexOf("ApplyRunningProcessFilter(null)", StringComparison.Ordinal) < open.IndexOf("SetModalOverlayVisibleAsync", StringComparison.Ordinal));
+        int show = open.IndexOf("SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: true)", StringComparison.Ordinal);
+        int awaitShow = open.IndexOf("await dialogOpen", StringComparison.Ordinal);
+        int awaitLoad = open.IndexOf("await processLoad", StringComparison.Ordinal);
+        Assert.True(show >= 0 && awaitShow > show && awaitLoad > awaitShow);
+        Assert.Contains("processLoad.IsCompletedSuccessfully", open, StringComparison.Ordinal);
+        Assert.Contains("catch (Exception ex)", open, StringComparison.Ordinal);
         Assert.Contains("Task.Run(GetRunningProcesses)", open, StringComparison.Ordinal);
         Assert.Contains("generation != _runningProcessLoadGeneration", open, StringComparison.Ordinal);
+        Assert.Contains("RunningProcessList.ReplaceAll(filtered)", source, StringComparison.Ordinal);
+        Assert.Contains("RunningProcessLoading.IsActive = showLoading", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResettableObservableCollection_ReplacesItemsWithOneResetNotification()
+    {
+        var collection = new ResettableObservableCollection<int> { 1, 2 };
+        var notifications = new List<System.Collections.Specialized.NotifyCollectionChangedEventArgs>();
+        collection.CollectionChanged += (_, args) => notifications.Add(args);
+
+        collection.ReplaceAll([3, 4, 5]);
+
+        Assert.Equal(new[] { 3, 4, 5 }, collection);
+        var notification = Assert.Single(notifications);
+        Assert.Equal(System.Collections.Specialized.NotifyCollectionChangedAction.Reset, notification.Action);
+    }
+
+    [Fact]
+    public void DialogScrim_FadesOutWithoutRestoringDarkOpacityOnClose()
+    {
+        string source = ReadSource("src", "ControlPanelWindow.xaml.cs");
+        string configure = source[source.IndexOf("private void ConfigureContentDialog", StringComparison.Ordinal)..
+            source.IndexOf("private void PrepareContentDialogPresentation", StringComparison.Ordinal)];
+        int closingStart = configure.IndexOf("dialog.Closing +=", StringComparison.Ordinal);
+        int closedStart = configure.IndexOf("dialog.Closed +=", closingStart, StringComparison.Ordinal);
+        string closing = configure[closingStart..closedStart];
+        string closed = configure[closedStart..];
+
+        Assert.Contains("AnimateScrim(false)", closing, StringComparison.Ordinal);
+        Assert.DoesNotContain("scrim?.ClearValue(OpacityProperty)", closing, StringComparison.Ordinal);
+        Assert.DoesNotContain("scrim?.ClearValue(OpacityProperty)", closed, StringComparison.Ordinal);
+        Assert.Contains("if (scrim != null) scrim.Opacity = 1", configure, StringComparison.Ordinal);
     }
 
     [Fact]

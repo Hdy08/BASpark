@@ -176,6 +176,20 @@ public abstract class SelectionCardItem : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
+public sealed class ResettableObservableCollection<T> : ObservableCollection<T>
+{
+    public void ReplaceAll(IEnumerable<T> items)
+    {
+        CheckReentrancy();
+        Items.Clear();
+        foreach (T item in items) Items.Add(item);
+        OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
+        OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+        OnCollectionChanged(new System.Collections.Specialized.NotifyCollectionChangedEventArgs(
+            System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
+    }
+}
+
 public sealed class SelectionCardTemplateSelector : DataTemplateSelector
 {
     public DataTemplate CardTemplate { get; set; } = null!;
@@ -475,7 +489,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
     public ObservableCollection<FilterProfile> Profiles { get; set; } = new();
     public ObservableCollection<string> CurrentProfileProcesses { get; set; } = new();
-    public ObservableCollection<ProcessItem> RunningProcessList { get; set; } = new();
+    public ResettableObservableCollection<ProcessItem> RunningProcessList { get; set; } = new();
     public ObservableCollection<VisualResetItem> VisualResetItems { get; set; } = new();
     public ObservableCollection<ScreenOptionItem> ScreenOptions { get; set; } = new();
     public ControlPanelWindow()
@@ -2866,32 +2880,48 @@ public sealed partial class ControlPanelWindow : UserControl
         int generation = ++_runningProcessLoadGeneration;
         _loadingRunningProcesses = true;
         BtnSelectRunningProcess.IsEnabled = false;
-        List<ProcessItem> processes;
         try
         {
-            processes = await GetRunningProcessesAsync();
+            _allRunningProcesses.Clear();
+            SearchRunningProcess.Text = string.Empty;
+            ApplyRunningProcessFilter(null);
+            Task<List<ProcessItem>> processLoad = GetRunningProcessesAsync();
+            if (processLoad.IsCompletedSuccessfully)
+            {
+                _allRunningProcesses.AddRange(CloneProcessItems(processLoad.Result));
+                ApplyRunningProcessFilter(SearchRunningProcess.Text);
+            }
+            Task<bool> dialogOpen = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: true);
+            if (!await dialogOpen || _isClosed || generation != _runningProcessLoadGeneration) return;
+            List<ProcessItem> processes = await processLoad;
+            if (_isClosed || generation != _runningProcessLoadGeneration) return;
+            _allRunningProcesses.Clear();
+            _allRunningProcesses.AddRange(CloneProcessItems(processes));
+            ApplyRunningProcessFilter(SearchRunningProcess.Text);
         }
+        catch (Exception ex) { if (!_isClosed) AppLogger.Warn($"Failed to load running processes: {ex.Message}"); }
         finally
         {
-            _loadingRunningProcesses = false;
-            if (!_isClosed) UpdateEnvironmentFilterInterlock();
+            if (!_isClosed && generation == _runningProcessLoadGeneration)
+            {
+                _loadingRunningProcesses = false;
+                UpdateEnvironmentFilterInterlock();
+                UpdateSelectionToolbar(ListRunningProcesses);
+            }
         }
-        if (_isClosed || generation != _runningProcessLoadGeneration) return;
-        _allRunningProcesses.Clear();
-        _allRunningProcesses.AddRange(processes.Select(item => new ProcessItem
-        {
-            DisplayName = item.DisplayName, ProcessName = item.ProcessName
-        }));
-        SearchRunningProcess.Text = string.Empty;
-        ApplyRunningProcessFilter(null);
-        _ = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: true);
     }
+
+    private static IEnumerable<ProcessItem> CloneProcessItems(IEnumerable<ProcessItem> items) => items.Select(item => new ProcessItem
+    {
+        DisplayName = item.DisplayName,
+        ProcessName = item.ProcessName
+    });
 
     private Task<List<ProcessItem>> GetRunningProcessesAsync()
     {
         long timestamp = Stopwatch.GetTimestamp();
-        if (_runningProcessSnapshot == null || _runningProcessSnapshot.IsCompleted &&
-            Stopwatch.GetElapsedTime(_runningProcessSnapshotTimestamp, timestamp) >= TimeSpan.FromSeconds(2))
+        if (_runningProcessSnapshot == null || _runningProcessSnapshot.IsFaulted || _runningProcessSnapshot.IsCanceled ||
+            _runningProcessSnapshot.IsCompleted && Stopwatch.GetElapsedTime(_runningProcessSnapshotTimestamp, timestamp) >= TimeSpan.FromSeconds(2))
         {
             _runningProcessSnapshotTimestamp = timestamp;
             _runningProcessSnapshot = Task.Run(GetRunningProcesses);
@@ -2903,6 +2933,10 @@ public sealed partial class ControlPanelWindow : UserControl
     {
         _ = sender;
         _ = e;
+        _runningProcessLoadGeneration++;
+        _loadingRunningProcesses = false;
+        UpdateEnvironmentFilterInterlock();
+        UpdateSelectionToolbar(ListRunningProcesses);
         _ = SetModalOverlayVisibleAsync(RunningProcessOverlay, visible: false);
     }
 
@@ -3019,19 +3053,10 @@ public sealed partial class ControlPanelWindow : UserControl
 
     private void ApplyRunningProcessFilter(string? filter)
     {
-        RunningProcessList.Clear();
-
-        foreach (ProcessItem item in _allRunningProcesses)
-        {
-            if (!string.IsNullOrWhiteSpace(filter) &&
-                item.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
-                item.ProcessName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                continue;
-            }
-
-            RunningProcessList.Add(item);
-        }
+        List<ProcessItem> filtered = _allRunningProcesses.Where(item => string.IsNullOrWhiteSpace(filter) ||
+            item.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0 ||
+            item.ProcessName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+        RunningProcessList.ReplaceAll(filtered);
         RefreshSelectionToolbar(ListRunningProcesses);
     }
 
@@ -3319,6 +3344,12 @@ public sealed partial class ControlPanelWindow : UserControl
     private void UpdateSelectionToolbar(ItemsControl list)
     {
         if (!_selectionToolbars.TryGetValue(list, out SelectionToolbar? toolbar)) return;
+        if (list == ListRunningProcesses)
+        {
+            bool showLoading = _loadingRunningProcesses && RunningProcessList.Count == 0;
+            RunningProcessLoading.IsActive = showLoading;
+            RunningProcessLoading.Visibility = showLoading ? Visibility.Visible : Visibility.Collapsed;
+        }
         if (toolbar.Heading != null) toolbar.Heading.Text = SelectionGroup.FormatTitle(toolbar.HeadingText, toolbar.Items);
         bool available = list != ListBackupItems || !_backupBusy;
         UpdateSelectionButtons(toolbar, available);
@@ -3975,6 +4006,16 @@ public sealed partial class ControlPanelWindow : UserControl
         {
             dialog.Opened -= Opened;
             dialog.Closing -= Closing;
+            if (dialog == RunningProcessOverlay && _loadingRunningProcesses)
+            {
+                _runningProcessLoadGeneration++;
+                _loadingRunningProcesses = false;
+                if (!_isClosed)
+                {
+                    UpdateEnvironmentFilterInterlock();
+                    UpdateSelectionToolbar(ListRunningProcesses);
+                }
+            }
             if (_modalDialogs.TryGetValue(dialog, out ModalDialogState? current) && ReferenceEquals(state, current))
                 _modalDialogs.Remove(dialog);
             if (gateHeld) _dialogGate.Release();
@@ -4010,7 +4051,6 @@ public sealed partial class ControlPanelWindow : UserControl
             if (scrim == null) return Task.CompletedTask;
             double opacity = scrim.Opacity;
             scrimAnimation?.Stop();
-            scrim.Opacity = 1;
             var completed = new TaskCompletionSource();
             scrimAnimation = new Storyboard();
             var fade = new DoubleAnimationUsingKeyFrames();
@@ -4030,7 +4070,11 @@ public sealed partial class ControlPanelWindow : UserControl
         dialog.Opened += (_, _) =>
         {
             scrim = UpdateDialogScrim(dialog);
-            if (!new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) return;
+            if (!new Windows.UI.ViewManagement.UISettings().AnimationsEnabled)
+            {
+                if (scrim != null) scrim.Opacity = 1;
+                return;
+            }
             int version = ++animationVersion;
             if (readyHandler != null) CompositionTarget.Rendering -= readyHandler;
             FrameworkElement? layout = VisualTreeHelper.GetOpenPopupsForXamlRoot(dialog.XamlRoot)
@@ -4092,9 +4136,8 @@ public sealed partial class ControlPanelWindow : UserControl
             if (readyHandler != null) CompositionTarget.Rendering -= readyHandler;
             readyHandler = null;
             _dialogPresentationsPending.Remove(dialog);
-            scrimAnimation?.Stop();
-            scrimAnimation = null;
-            scrim?.ClearValue(OpacityProperty);
+            if (new Windows.UI.ViewManagement.UISettings().AnimationsEnabled) AnimateScrim(false);
+            else if (scrim != null) scrim.Opacity = 0;
             VisualStateManager.GoToState(dialog, "DialogShowingWithoutSmokeLayer", false);
             FindVisualDescendant<Grid>(dialog, "LayoutRoot")?.ClearValue(OpacityProperty);
             if (_dialogPresentationGuards.TryGetValue(dialog, out Border? background)) background.ClearValue(OpacityProperty);
@@ -4353,6 +4396,11 @@ public sealed partial class ControlPanelWindow : UserControl
         foreach (SelectionToolbar toolbar in _selectionToolbars.Values)
             foreach (SelectionCardItem item in toolbar.Items) item.PropertyChanged -= SelectionItem_PropertyChanged;
         _selectionToolbars.Clear();
+        ListVisualResetItems.Loaded -= SelectionList_Loaded;
+        ListVisualResetItems.Unloaded -= SelectionList_Unloaded;
+        ListBackupItems.Loaded -= SelectionList_Loaded;
+        ListBackupItems.Unloaded -= SelectionList_Unloaded;
+        _selectionLayouts.Clear();
         foreach (var tracker in _comboWidthTrackers) tracker.Dispose();
         _comboWidthTrackers.Clear();
         ConfiguredProcessScroller.UnregisterPropertyChangedCallback(

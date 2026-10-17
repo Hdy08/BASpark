@@ -34,6 +34,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         internal double[] Offsets = [];
         internal readonly List<(double Offset, SelectionGroup Group)> Groups = [];
         internal readonly List<(int Index, UIElement Element)> Realized = [];
+        internal readonly HashSet<int> RealizedIndices = [];
     }
 
     private readonly Windows.UI.ViewManagement.UISettings _uiSettings = new();
@@ -60,6 +61,7 @@ public sealed class SelectionCardLayout : VirtualizingLayout
         var state = (LayoutState)context.LayoutState;
         foreach (var entry in state.Realized) context.RecycleElement(entry.Element);
         state.Realized.Clear();
+        state.RealizedIndices.Clear();
         state.Dirty = true;
         InvalidateMeasure();
     }
@@ -194,22 +196,35 @@ public sealed class SelectionCardLayout : VirtualizingLayout
             _measuredTextScale = textScale;
             state.Dirty = false;
         }
-        state.Realized.Clear();
         Rect visible = context.RealizationRect;
         double top = double.IsFinite(visible.Top) ? Math.Max(0, visible.Top) : 0;
         double bottom = double.IsFinite(visible.Bottom) && visible.Height > 0 ? visible.Bottom : top + 506;
-        for (int index = FindFirstVisibleIndex(state.Offsets, top, context.ItemCount); index < context.ItemCount; index++)
+        int firstVisible = FindFirstVisibleIndex(state.Offsets, top, context.ItemCount);
+        int anchor = context.RecommendedAnchorIndex;
+        bool IsNeeded(int index) => index == anchor ||
+            (index >= firstVisible && index < context.ItemCount && state.Offsets[index] <= bottom);
+
+        for (int realizedIndex = state.Realized.Count - 1; realizedIndex >= 0; realizedIndex--)
+        {
+            var entry = state.Realized[realizedIndex];
+            if (IsNeeded(entry.Index)) continue;
+            context.RecycleElement(entry.Element);
+            state.RealizedIndices.Remove(entry.Index);
+            state.Realized.RemoveAt(realizedIndex);
+        }
+
+        for (int index = firstVisible; index < context.ItemCount; index++)
         {
             if (state.Offsets[index] > bottom) break;
             UIElement element = GetRowElement(context, index);
             element.Measure(new Size(width, state.Offsets[index + 1] - state.Offsets[index]));
-            state.Realized.Add((index, element));
+            if (state.RealizedIndices.Add(index)) state.Realized.Add((index, element));
         }
-        int anchor = context.RecommendedAnchorIndex;
-        if (anchor >= 0 && anchor < context.ItemCount && !state.Realized.Any(entry => entry.Index == anchor))
+        if (anchor >= 0 && anchor < context.ItemCount && !state.RealizedIndices.Contains(anchor))
         {
             UIElement element = GetRowElement(context, anchor);
             element.Measure(new Size(width, state.Offsets[anchor + 1] - state.Offsets[anchor]));
+            state.RealizedIndices.Add(anchor);
             state.Realized.Add((anchor, element));
         }
         return new Size(width, state.Offsets[^1]);
@@ -230,6 +245,7 @@ public sealed partial class ControlPanelWindow
     private sealed record SectionResetRequest(ResetScope Scope, string? GroupKey);
     private sealed record CardResetButton(Button Button, TextBlock Label, ResetScope Scope, string Key, Action Restore, Func<SettingsState, bool> IsDefault, bool IsGroup);
     private sealed record StickyHeading(FrameworkElement Anchor, TextBlock Label, object? Action, Func<bool> Visible);
+    private sealed record SelectionCardCheckVisuals(VisualStateGroup States, AnimatedIcon Glyph);
 
     private sealed class ResetButtonAnimation(Button button) : IDisposable
     {
@@ -393,6 +409,7 @@ public sealed partial class ControlPanelWindow
 
     private readonly List<StickySectionTracker> _stickyTrackers = [];
     private readonly Dictionary<ItemsControl, ScrollViewer> _selectionScrollViewers = new();
+    private readonly Dictionary<ItemsControl, SelectionCardLayout> _selectionLayouts = new();
     private readonly Dictionary<Grid, (SelectionGroup Group, SelectionToolbar Toolbar)> _groupSelectionToolbars = new();
     private readonly Dictionary<ItemsControl, SelectionToolbar> _pinnedSelectionToolbars = new();
     private StickySectionTracker? _settingsHeaders;
@@ -894,14 +911,40 @@ public sealed partial class ControlPanelWindow
         InitializeSelectionToolbar(toolbar);
         _pinnedSelectionToolbars[list] = toolbar;
         _selectionScrollViewers[list] = scroll;
+        list.Loaded += SelectionList_Loaded;
+        list.Unloaded += SelectionList_Unloaded;
+        if (list.IsLoaded) CacheSelectionLayout(list);
         scroll.ViewChanged += (_, _) => UpdateSelectionHeader(list);
         list.SizeChanged += (_, _) => UpdateSelectionHeader(list);
     }
 
-    private void UpdateSelectionHeader(ItemsControl list)
+    private void SelectionList_Loaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is not ItemsControl list) return;
+        CacheSelectionLayout(list);
+        UpdateSelectionHeader(list);
+    }
+
+    private void SelectionList_Unloaded(object sender, RoutedEventArgs args)
+    {
+        if (sender is ItemsControl list) _selectionLayouts.Remove(list);
+    }
+
+    private void CacheSelectionLayout(ItemsControl list)
     {
         if (FindVisualDescendant<ItemsRepeater>(list)?.Layout is SelectionCardLayout layout)
-            ShowSelectionGroup(list, layout.GetActiveGroup(_selectionScrollViewers[list].VerticalOffset));
+            _selectionLayouts[list] = layout;
+    }
+
+    private void UpdateSelectionHeader(ItemsControl list)
+    {
+        if (!_selectionLayouts.TryGetValue(list, out SelectionCardLayout? layout))
+        {
+            if (!list.IsLoaded) return;
+            CacheSelectionLayout(list);
+            if (!_selectionLayouts.TryGetValue(list, out layout)) return;
+        }
+        ShowSelectionGroup(list, layout.GetActiveGroup(_selectionScrollViewers[list].VerticalOffset));
     }
 
     private void SetGroupedSelectionRows(ItemsControl list, IEnumerable<SelectionCardItem> items, Func<SelectionCardItem, string> groupName)
@@ -937,7 +980,8 @@ public sealed partial class ControlPanelWindow
         if (sender is FrameworkElement card)
         {
             UpdateSelectionCardBinding(card);
-            foreach (TextBlock label in SettingElements(card).OfType<TextBlock>()) AlignRowText(label);
+            if (card.FindName("SelectionCardTitle") is TextBlock title) AlignRowText(title);
+            if (card.FindName("SelectionCardSubtitle") is TextBlock subtitle) AlignRowText(subtitle);
         }
     }
 
@@ -948,10 +992,13 @@ public sealed partial class ControlPanelWindow
         if (card.FindName("SelectionCardCheckHost") is not Border host) return;
         if (card.DataContext is SelectionCardItem item)
         {
-            if (host.Child is CheckBox existing &&
-                ReferenceEquals(existing.GetBindingExpression(CheckBox.IsCheckedProperty)?.ParentBinding.Source, item)) return;
+            CheckBox? check = host.Child as CheckBox;
+            if (check != null &&
+                ReferenceEquals(check.GetBindingExpression(CheckBox.IsCheckedProperty)?.ParentBinding.Source, item))
+                return;
+
             ClearSelectionCardCheck(host);
-            var check = new CheckBox
+            check = new CheckBox
             {
                 Name = "SelectionCardCheck",
                 Style = (Style)Application.Current.Resources["DefaultCheckBoxStyle"],
@@ -974,15 +1021,22 @@ public sealed partial class ControlPanelWindow
         else ClearSelectionCardCheck(host);
     }
 
+    private static SelectionCardCheckVisuals? GetSelectionCardCheckVisuals(CheckBox check)
+    {
+        if (check.Tag is SelectionCardCheckVisuals existing) return existing;
+        if (FindVisualDescendant<AnimatedIcon>(check, "CheckGlyph") is not { } glyph) return null;
+        if (FindVisualDescendant<Grid>(check, "RootGrid") is not { } root) return null;
+        VisualStateGroup? states = VisualStateManager.GetVisualStateGroups(root).FirstOrDefault(group => group.Name == "CombinedStates");
+        if (states == null) return null;
+        return (SelectionCardCheckVisuals)(check.Tag = new SelectionCardCheckVisuals(states, glyph));
+    }
+
     private static void InitializeSelectionCardCheck(CheckBox check)
     {
-        if (FindVisualDescendant<AnimatedIcon>(check, "CheckGlyph") == null ||
-            FindVisualDescendant<Grid>(check, "RootGrid") is not { } root) return;
-        VisualStateGroup? states = VisualStateManager.GetVisualStateGroups(root).FirstOrDefault(group => group.Name == "CombinedStates");
-        if (states == null) return;
-        states.CurrentStateChanged += SelectionCardCheck_StateChanged;
         check.Loaded += SelectionCardCheck_Loaded;
-        UpdateSelectionCardGlyph(check, states.CurrentState?.Name);
+        if (GetSelectionCardCheckVisuals(check) is not { } visuals) return;
+        visuals.States.CurrentStateChanged += SelectionCardCheck_StateChanged;
+        UpdateSelectionCardGlyph(check, visuals, visuals.States.CurrentState?.Name);
     }
 
     private static void SelectionCardCheck_StateChanged(object sender, VisualStateChangedEventArgs args)
@@ -992,22 +1046,29 @@ public sealed partial class ControlPanelWindow
 
     private static void SelectionCardCheck_Loaded(object sender, RoutedEventArgs args)
     {
-        if (sender is not CheckBox check || FindVisualDescendant<Grid>(check, "RootGrid") is not { } root) return;
-        UpdateSelectionCardGlyph(check, VisualStateManager.GetVisualStateGroups(root)
-            .FirstOrDefault(group => group.Name == "CombinedStates")?.CurrentState?.Name);
+        if (sender is not CheckBox check || GetSelectionCardCheckVisuals(check) is not { } visuals) return;
+        visuals.States.CurrentStateChanged -= SelectionCardCheck_StateChanged;
+        visuals.States.CurrentStateChanged += SelectionCardCheck_StateChanged;
+        UpdateSelectionCardGlyph(check, visuals, visuals.States.CurrentState?.Name);
     }
 
     private static void UpdateSelectionCardGlyph(CheckBox check, string? state)
     {
-        if (FindVisualDescendant<AnimatedIcon>(check, "CheckGlyph") is not { } glyph) return;
+        if (GetSelectionCardCheckVisuals(check) is { } visuals) UpdateSelectionCardGlyph(check, visuals, state);
+    }
+
+    private static void UpdateSelectionCardGlyph(CheckBox check, SelectionCardCheckVisuals visuals, string? state)
+    {
         string interaction = state?.EndsWith("PointerOver", StringComparison.Ordinal) == true ? "PointerOver"
             : state?.EndsWith("Pressed", StringComparison.Ordinal) == true ? "Pressed" : "Normal";
-        AnimatedIcon.SetState(glyph, interaction + (check.IsChecked == true ? "On" : "Off"));
+        AnimatedIcon.SetState(visuals.Glyph, interaction + (check.IsChecked == true ? "On" : "Off"));
     }
 
     private static void ClearSelectionCardCheck(Border host)
     {
         if (host.Child is not CheckBox check) return;
+        SelectionCardCheckVisuals? visuals = GetSelectionCardCheckVisuals(check);
+        if (visuals != null) visuals.States.CurrentStateChanged -= SelectionCardCheck_StateChanged;
         host.Child = null;
         check.ClearValue(CheckBox.IsCheckedProperty);
     }
@@ -1038,7 +1099,7 @@ public sealed partial class ControlPanelWindow
 
     private void SelectionElement_Clearing(ItemsRepeater sender, ItemsRepeaterElementClearingEventArgs args)
     {
-        Grid? header = args.Element as Grid ?? FindVisualDescendant<Grid>(args.Element, "SelectionHeading");
+        Grid? header = args.Element as Grid;
         if (header != null) _groupSelectionToolbars.Remove(header);
         if (args.Element is FrameworkElement element)
         {
@@ -1069,8 +1130,8 @@ public sealed partial class ControlPanelWindow
         Grid header = list == ListVisualResetItems ? ResetGroupHeader : BackupGroupHeader;
         TextBlock title = list == ListVisualResetItems ? TxtResetGroup : TxtBackupGroup;
         SelectionToolbar toolbar = _pinnedSelectionToolbars[list];
-        title.Text = group?.TitleWithCount ?? string.Empty;
         if (ReferenceEquals(toolbar.Invert.Tag, group)) return;
+        title.Text = group?.TitleWithCount ?? string.Empty;
         header.Visibility = group == null ? Visibility.Collapsed : Visibility.Visible;
         toolbar.Items.Clear();
         if (group != null) toolbar.Items.AddRange(group.Items);
