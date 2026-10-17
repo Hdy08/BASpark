@@ -1666,7 +1666,7 @@
                     <TextBlock x:Name="TxtAboutTitle" Text="" Style="{StaticResource BasSettingsPageTitleStyle}" />
                     <TextBlock x:Name="TxtAboutDescription" Text="" Margin="0,8,0,0" Style="{StaticResource BasCaptionStyle}" />
                 </StackPanel>
-                <Grid x:Name="AboutSectionHeader" Grid.Row="1" Style="{StaticResource BasSectionHeaderStyle}" Margin="24,0,24,0">
+                <Grid x:Name="AboutSectionHeader" Grid.Row="1" Style="{StaticResource BasSectionHeaderStyle}" Margin="24,24,24,0">
                     <TextBlock x:Name="TxtActiveAboutSection" Style="{StaticResource BasSettingsSectionTitleStyle}" VerticalAlignment="Center" />
                 </Grid>
                 <ScrollViewer x:Name="AboutScrollViewer" Grid.Row="2" Padding="24,0,24,0"

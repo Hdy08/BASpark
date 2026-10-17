@@ -4370,6 +4370,7 @@ public class WinUi3UiTests
             setter => (string?)setter.Attribute("Property") == "Height").Attribute("Value"));
         foreach (string name in new[] { "StatsHeader", "SettingsSectionHeader", "AboutSectionHeader", "ResetGroupHeader", "BackupGroupHeader" })
             Assert.Equal("{StaticResource BasSectionHeaderStyle}", (string?)GetNamedElement(panel, name).Attribute("Style"));
+        Assert.Equal("24,24,24,0", (string?)GetNamedElement(panel, "AboutSectionHeader").Attribute("Margin"));
         string pages = ReadSource("src", "ControlPanelWindow.Pages.cs");
         Assert.Contains("StartupDialogHost.AlignContentSpacing(StatsHeader, TxtStatsTitle, TxtWelcomeSubtitle)", pages, StringComparison.Ordinal);
         Assert.Contains("StartupDialogHost.AlignContentSpacing(SettingsSectionHeader, TxtActiveSettingsSection, TxtSettingsTitle)", pages, StringComparison.Ordinal);
