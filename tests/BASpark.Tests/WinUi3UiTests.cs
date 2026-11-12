@@ -22,6 +22,12 @@ public class WinUi3UiTests
         internal MultiTouchScope(int maximum) => ConfigManager.MaxTouchEffects = maximum;
         public void Dispose() => ConfigManager.MaxTouchEffects = _previous;
     }
+    private sealed class VisibleCursorScope : IDisposable
+    {
+        internal readonly IntPtr Handle = CreateCursor(IntPtr.Zero, 0, 0, 32, 32, new byte[128], new byte[128]);
+        internal VisibleCursorScope() => Assert.NotEqual(IntPtr.Zero, Handle);
+        public void Dispose() => Assert.True(DestroyCursor(Handle));
+    }
     private sealed class SystemGestureCursorScope : IDisposable
     {
         private readonly IntPtr _module = LoadLibraryEx(Path.Combine(Environment.SystemDirectory, "NInput.dll"), IntPtr.Zero, 0x800);
@@ -829,10 +835,11 @@ public class WinUi3UiTests
     [InlineData(NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED, true, true)]
     public void TouchscreenInput_OnlyAllowsSuppressionCausedByTouchAndKeepsHiddenCursorFiltering(int flags, bool touch, bool visible)
     {
+        using var visibleCursor = new VisibleCursorScope();
         var cursorInfo = new NativeMethods.CURSORINFO
         {
             flags = flags,
-            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+            hCursor = visibleCursor.Handle
         };
         Assert.Equal(visible, NativeMethods.IsCursorVisible(cursorInfo, touch));
         cursorInfo.hCursor = IntPtr.Zero;
@@ -866,12 +873,13 @@ public class WinUi3UiTests
     [InlineData(true, false, true)]
     public void TouchscreenInput_WebViewRetainsItsOwnEligibilityWhenTouchClearsTheCursor(bool visible, bool sameWindow, bool expected)
     {
+        using var visibleCursor = new VisibleCursorScope();
         var state = new TouchCursorState();
         var window = new IntPtr(123);
         var cursor = new NativeMethods.CURSORINFO
         {
             flags = visible ? NativeMethods.CURSOR_SHOWING : 0,
-            hCursor = visible ? System.Windows.Forms.Cursors.Arrow.Handle : IntPtr.Zero
+            hCursor = visible ? visibleCursor.Handle : IntPtr.Zero
         };
         state.Observe(cursor, window);
         cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
@@ -888,13 +896,14 @@ public class WinUi3UiTests
     [InlineData(true)]
     public void TouchscreenInput_WebViewRemembersTheActualTouchWindowInsteadOfTheStationaryMouseWindow(bool suppressedFirst)
     {
+        using var visibleCursor = new VisibleCursorScope();
         var state = new TouchCursorState();
         var mouseWindow = new IntPtr(123);
         var touchWindow = new IntPtr(456);
         var cursor = new NativeMethods.CURSORINFO
         {
             flags = NativeMethods.CURSOR_SHOWING,
-            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+            hCursor = visibleCursor.Handle
         };
         state.Observe(cursor, mouseWindow);
         if (suppressedFirst) cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
@@ -950,13 +959,14 @@ public class WinUi3UiTests
     [Fact]
     public void TouchscreenInput_WebViewKeepsEachWindowsKnownHiddenStateWhenAnotherWindowIsObserved()
     {
+        using var visibleCursor = new VisibleCursorScope();
         var state = new TouchCursorState();
         var hiddenWindow = new IntPtr(123);
         var visibleWindow = new IntPtr(456);
         var cursor = new NativeMethods.CURSORINFO { flags = 0, hCursor = IntPtr.Zero };
         state.Observe(cursor, hiddenWindow);
         cursor.flags = NativeMethods.CURSOR_SHOWING;
-        cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+        cursor.hCursor = visibleCursor.Handle;
         state.Observe(cursor, visibleWindow);
         cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
         cursor.hCursor = IntPtr.Zero;
@@ -973,13 +983,14 @@ public class WinUi3UiTests
     [InlineData(true)]
     public void TouchscreenInput_WebViewContactSurvivesLeavingItsWindowUntilTheFingerIsReleased(bool clearSuppressionFlag)
     {
+        using var visibleCursor = new VisibleCursorScope();
         var state = new TouchCursorState();
         var origin = new IntPtr(123);
         var outside = new IntPtr(456);
         var cursor = new NativeMethods.CURSORINFO
         {
             flags = NativeMethods.CURSOR_SHOWING,
-            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+            hCursor = visibleCursor.Handle
         };
         state.Observe(cursor, origin);
         state.BeginContact(origin, true);
@@ -999,12 +1010,13 @@ public class WinUi3UiTests
     [Fact]
     public void TouchscreenInput_WebViewExplicitHidingAfterSuccessfulTouchStillBlocksEffects()
     {
+        using var visibleCursor = new VisibleCursorScope();
         var state = new TouchCursorState();
         var window = new IntPtr(123);
         var cursor = new NativeMethods.CURSORINFO
         {
             flags = NativeMethods.CURSOR_SHOWING,
-            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+            hCursor = visibleCursor.Handle
         };
         state.Observe(cursor, window);
         cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
@@ -1016,7 +1028,7 @@ public class WinUi3UiTests
         cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
         Assert.False(state.IsVisible(cursor, window, true));
         cursor.flags = NativeMethods.CURSOR_SHOWING;
-        cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+        cursor.hCursor = visibleCursor.Handle;
         state.Observe(cursor, window);
         Assert.True(state.IsVisible(cursor, window, true));
     }
@@ -1024,12 +1036,13 @@ public class WinUi3UiTests
     [Fact]
     public void TouchscreenInput_WebViewHiddenAndTransparentCursorsStayFilteredAfterTouch()
     {
+        using var visibleCursor = new VisibleCursorScope();
         var state = new TouchCursorState();
         var window = new IntPtr(123);
         var cursor = new NativeMethods.CURSORINFO { flags = 0, hCursor = IntPtr.Zero };
         state.Observe(cursor, window);
         cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
-        cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+        cursor.hCursor = visibleCursor.Handle;
         Assert.False(state.IsVisible(cursor, window, true));
         IntPtr transparent = CreateCursor(IntPtr.Zero, 0, 0, 32, 32,
             Enumerable.Repeat((byte)255, 128).ToArray(), new byte[128]);
@@ -1037,7 +1050,7 @@ public class WinUi3UiTests
         try
         {
             cursor.flags = NativeMethods.CURSOR_SHOWING;
-            cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+            cursor.hCursor = visibleCursor.Handle;
             state.Observe(cursor, window);
             cursor.flags = NativeMethods.CURSOR_SUPPRESSED;
             cursor.hCursor = transparent;
@@ -1460,11 +1473,12 @@ public class WinUi3UiTests
     [Fact]
     public void MultiTouch_CursorEligibilityAndReleaseAreIndependentPerContact()
     {
+        using var visibleCursor = new VisibleCursorScope();
         var state = new TouchCursorState();
         var visible = new IntPtr(123);
         var hidden = new IntPtr(456);
         state.Observe(new NativeMethods.CURSORINFO { flags = NativeMethods.CURSOR_SHOWING,
-            hCursor = System.Windows.Forms.Cursors.Arrow.Handle }, visible);
+            hCursor = visibleCursor.Handle }, visible);
         state.Observe(new NativeMethods.CURSORINFO(), hidden);
         state.BeginContact(visible, true, 2);
         state.BeginContact(hidden, true, 3);
@@ -1485,6 +1499,7 @@ public class WinUi3UiTests
     [InlineData(NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED)]
     public void MultiTouch_SystemGestureCursorKeepsNativeTrailsIndependentUntilRelease(int flags)
     {
+        using var visibleCursor = new VisibleCursorScope();
         using var gesture = new SystemGestureCursorScope();
         Assert.True(NativeMethods.IsSystemTouchGestureCursor(gesture.Handle));
         var state = new TouchCursorState();
@@ -1494,7 +1509,7 @@ public class WinUi3UiTests
         var cursor = new NativeMethods.CURSORINFO
         {
             flags = NativeMethods.CURSOR_SHOWING,
-            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+            hCursor = visibleCursor.Handle
         };
         state.Observe(cursor, origin);
         state.Observe(cursor, outside);
@@ -1536,6 +1551,7 @@ public class WinUi3UiTests
     [InlineData(NativeMethods.CURSOR_SUPPRESSED)]
     public void MultiTouch_SystemGestureCursorPreservesExplicitHiddenAndTransparentFiltering(int flags)
     {
+        using var visibleCursor = new VisibleCursorScope();
         using var gesture = new SystemGestureCursorScope();
         Assert.True(NativeMethods.IsSystemTouchGestureCursor(gesture.Handle));
         var state = new TouchCursorState();
@@ -1544,7 +1560,7 @@ public class WinUi3UiTests
         var cursor = new NativeMethods.CURSORINFO
         {
             flags = NativeMethods.CURSOR_SHOWING,
-            hCursor = System.Windows.Forms.Cursors.Arrow.Handle
+            hCursor = visibleCursor.Handle
         };
         state.Observe(cursor, allowed);
         state.Observe(new NativeMethods.CURSORINFO(), blocked);
@@ -1568,7 +1584,7 @@ public class WinUi3UiTests
         try
         {
             cursor.flags = NativeMethods.CURSOR_SHOWING;
-            cursor.hCursor = System.Windows.Forms.Cursors.Arrow.Handle;
+            cursor.hCursor = visibleCursor.Handle;
             Assert.True(state.IsVisible(cursor, allowed, false, 2));
             cursor.flags = flags;
             cursor.hCursor = transparent;
@@ -1589,13 +1605,14 @@ public class WinUi3UiTests
     [InlineData(NativeMethods.CURSOR_SHOWING | NativeMethods.CURSOR_SUPPRESSED)]
     public void MultiTouch_GesturesCanStartAdditionalContactsInPreviouslyUnobservedWindows(int flags)
     {
+        using var visibleCursor = new VisibleCursorScope();
         using var gesture = new SystemGestureCursorScope();
         var state = new TouchCursorState();
         var first = new IntPtr(123);
         var second = new IntPtr(456);
         var hidden = new IntPtr(789);
         var cursor = new NativeMethods.CURSORINFO { flags = NativeMethods.CURSOR_SHOWING,
-            hCursor = System.Windows.Forms.Cursors.Arrow.Handle };
+            hCursor = visibleCursor.Handle };
         state.Observe(cursor, first);
         state.Observe(new NativeMethods.CURSORINFO(), hidden);
         state.BeginContact(first, false, 2);
