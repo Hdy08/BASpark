@@ -649,6 +649,29 @@ public class WinUi3UiTests
     }
 
     [Fact]
+    public void OverlayHost_StaysOutOfWindowSwitchersAcrossShowAndHideCycles()
+    {
+        using var host = new LayeredWindowHost();
+        var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(Microsoft.UI.Win32Interop.GetWindowIdFromWindow(host.Handle));
+
+        Assert.False(appWindow.IsShownInSwitchers);
+        host.SetBounds(120, 120, 200, 120);
+        for (int cycle = 0; cycle < 3; cycle++)
+        {
+            host.Show();
+            Assert.True(host.IsVisible);
+            Assert.False(appWindow.IsShownInSwitchers);
+            Assert.False(IsWindowEnabled(host.Handle));
+            Assert.Equal(NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TRANSPARENT,
+                NativeMethods.GetWindowLong(host.Handle, NativeMethods.GWL_EXSTYLE)
+                & (NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TRANSPARENT));
+            host.Hide();
+            Assert.False(host.IsVisible);
+            Assert.False(appWindow.IsShownInSwitchers);
+        }
+    }
+
+    [Fact]
     public void SourceTree_HasNoWpfOrWinFormsUiDependencies()
     {
         string root = FindWorkspaceRoot();

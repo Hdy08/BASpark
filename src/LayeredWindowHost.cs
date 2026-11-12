@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using Microsoft.UI;
+using Microsoft.UI.Windowing;
 
 namespace BASpark;
 
@@ -85,7 +87,16 @@ internal sealed class LayeredWindowHost : IDisposable
                 $"叠加层宿主窗口创建失败，Win32 错误码 {error}。");
         }
 
-        DpiScale = ReadDpiScale();
+        try
+        {
+            AppWindow.GetFromWindowId(Win32Interop.GetWindowIdFromWindow(_hwnd)).IsShownInSwitchers = false;
+            DpiScale = ReadDpiScale();
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
     private static void EnsureWindowClassRegistered()
