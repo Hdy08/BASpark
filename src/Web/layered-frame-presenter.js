@@ -129,7 +129,7 @@
             return { texture, framebuffer, width, height };
         }
 
-        queue(pixels) {
+        queue(pixels, prepare = false) {
             const gl = this.gl;
             try {
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -150,11 +150,10 @@
                 gl.readPixels(0, 0, columns, rows, gl.RGBA, gl.UNSIGNED_BYTE, this.maskBytes);
                 const { current, dirty } = getDamage(this.maskBytes, columns, rows, this.sourceWidth,
                     this.sourceHeight, this.width, this.height, this.previous);
-                const firstFrame = !this.previous && current;
-                this.previous = current;
-                if (!dirty) return false;
+                if (!prepare) this.previous = current;
+                if (!prepare && !dirty) return false;
 
-                const [left, bottom, right, top] = dirty;
+                const [left, bottom, right, top] = prepare ? [0, 0, 1, 1] : dirty;
                 this.rectangle = [left, bottom, right - left, top - bottom];
                 gl.bindFramebuffer(gl.FRAMEBUFFER, this.bitmap.framebuffer);
                 gl.viewport(0, 0, this.width, this.height);
@@ -164,8 +163,12 @@
                 gl.useProgram(this.bitmapProgram);
                 gl.drawArrays(gl.TRIANGLES, 0, 3);
 
+                if (prepare) {
+                    gl.readPixels(...this.rectangle, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+                    return false;
+                }
                 this.length = (right - left) * (top - bottom) * 4;
-                if (firstFrame && pixels && this.length <= 1024 * 1024) {
+                if (pixels && this.length <= 2 * 1024 * 1024) {
                     gl.readPixels(...this.rectangle, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
                     return true;
                 }
@@ -223,6 +226,7 @@
         const body = document.body;
         const visibility = body.style.visibility;
         let verifiedContext, supported, lease, transfer, disabled, requestTime, submitTime, fenceTime;
+        let transferTimer, waitingForTransfer;
 
         function reset(notify) {
             if (notify && lease) send('frame-release', { id: lease.id });
@@ -231,6 +235,9 @@
             body.style.visibility = visibility;
             lease = transfer = null;
             requestTime = submitTime = fenceTime = 0;
+            clearTimeout(transferTimer);
+            transferTimer = 0;
+            waitingForTransfer = false;
         }
 
         function supportsNativeFrame(gl) {
@@ -267,6 +274,7 @@
             if (message?.generation !== generation || (lease && message.id !== lease.id)) return;
             if (message.type === 'baspark-frame-presented') {
                 submitTime = 0;
+                if (transfer?.fence) finishTransfer();
             } else if (message.type === 'baspark-frame-reset' || message.type === 'baspark-frame-disabled') {
                 disabled = message.type === 'baspark-frame-disabled';
                 reset(false);
@@ -274,13 +282,38 @@
             }
         });
 
-        function schedule(frame) {
-            if (fx.animationFrame == null) fx.animationFrame = window.requestAnimationFrame(frame);
-        }
-
         function submit() {
             submitTime = performance.now();
             send('frame-submit', { id: lease.id, rect: transfer.rectangle });
+        }
+
+        function fail(error) {
+            console.warn('[BASpark FX] Native frame presentation:', error);
+            disabled = true;
+            reset(true);
+            fx._requestRender();
+        }
+
+        function finishTransfer() {
+            clearTimeout(transferTimer);
+            transferTimer = 0;
+            if (!lease || !transfer?.fence || fx.paused || fx.destroyed) return;
+
+            try {
+                if (performance.now() - fenceTime > 500) throw new Error('The overlay frame transfer timed out.');
+                if (submitTime || !transfer.read(lease.pixels)) {
+                    transferTimer = setTimeout(finishTransfer, submitTime ? 16 : 3);
+                    return;
+                }
+                fenceTime = 0;
+                submit();
+                if (waitingForTransfer) {
+                    waitingForTransfer = false;
+                    fx._requestRender();
+                }
+            } catch (error) {
+                fail(error);
+            }
         }
 
         function frame(time) {
@@ -298,12 +331,9 @@
                     throw new Error('The overlay frame presenter did not respond.');
                 }
                 if (transfer?.fence) {
-                    if (submitTime || !transfer.read(lease.pixels)) {
-                        schedule(frame);
-                        return;
-                    }
-                    fenceTime = 0;
-                    submit();
+                    waitingForTransfer = true;
+                    if (!transferTimer) finishTransfer();
+                    return;
                 }
                 if (!lease && !requestTime) {
                     requestTime = now;
@@ -312,29 +342,27 @@
                 const needsPixels = fx._hasVisibleEffects() || transfer?.previous;
                 draw(time);
                 if (!lease) return;
-                if (!fx.webglEffectVisible || gl.isContextLost()) {
+                if (!fx.webglEffectVisible || gl !== fx.webglEffectRenderer?.gl || gl.isContextLost()) {
                     reset(true);
                     return;
                 }
-                if (!needsPixels) return;
 
                 if (!transfer || transfer.sourceWidth !== gl.drawingBufferWidth || transfer.sourceHeight !== gl.drawingBufferHeight) {
                     const previous = transfer?.previous;
                     transfer?.dispose();
                     transfer = new FrameTransfer(gl, lease.width, lease.height);
                     transfer.previous = previous;
+                    if (!needsPixels) transfer.queue(null, true);
                 }
+                if (!needsPixels) return;
                 body.style.visibility = 'hidden';
                 if (transfer.queue(submitTime ? null : lease.pixels)) submit();
                 if (transfer.fence) {
                     fenceTime = now;
-                    schedule(frame);
+                    finishTransfer();
                 }
             } catch (error) {
-                console.warn('[BASpark FX] Native frame presentation:', error);
-                disabled = true;
-                reset(true);
-                fx._requestRender();
+                fail(error);
             }
         }
 

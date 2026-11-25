@@ -16,7 +16,6 @@ internal sealed class LayeredFramePresenter : IDisposable
     private IntPtr _deviceContext;
     private IntPtr _bitmap;
     private IntPtr _originalBitmap;
-    private bool _hasPresented;
 
     internal string Id { get; } = Guid.NewGuid().ToString("N");
     internal IntPtr Handle => _host.Handle;
@@ -37,6 +36,8 @@ internal sealed class LayeredFramePresenter : IDisposable
             }
 
             _host.SetBounds(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+            InitializeBitmap();
+            UpdateWindow();
         }
         catch
         {
@@ -57,9 +58,8 @@ internal sealed class LayeredFramePresenter : IDisposable
         if (_host.IsVisible) _host.SetTopmost();
     }
 
-    private unsafe void EnsureBitmap()
+    private unsafe void InitializeBitmap()
     {
-        if (_bitmap != IntPtr.Zero) return;
         _deviceContext = CreateCompatibleDC(IntPtr.Zero);
         if (_deviceContext == IntPtr.Zero) throw new Win32Exception();
 
@@ -73,7 +73,7 @@ internal sealed class LayeredFramePresenter : IDisposable
         new Span<byte>((void*)_bitmapPixels, checked(_bounds.Width * _bounds.Height * 4)).Clear();
     }
 
-    internal unsafe void Present(JsonElement rectangle)
+    internal void Present(JsonElement rectangle)
     {
         if (rectangle.ValueKind != JsonValueKind.Array || rectangle.GetArrayLength() != 4 ||
             !rectangle[0].TryGetInt32(out int left) || !rectangle[1].TryGetInt32(out int bottom) ||
@@ -84,7 +84,6 @@ internal sealed class LayeredFramePresenter : IDisposable
             throw new ArgumentException("Invalid overlay frame rectangle.", nameof(rectangle));
         }
 
-        EnsureBitmap();
         int rowBytes = width * 4;
         int stride = _bounds.Width * 4;
         IntPtr destinationRow = _bitmapPixels + bottom * stride + left * 4;
@@ -103,6 +102,13 @@ internal sealed class LayeredFramePresenter : IDisposable
             Top = _bounds.Height - bottom - height,
             Bottom = _bounds.Height - bottom
         };
+        UpdateWindow(dirty);
+        if (!_host.IsVisible) _host.Show();
+    }
+
+    private unsafe void UpdateWindow(NativeMethods.RECT? area = null)
+    {
+        var dirty = area.GetValueOrDefault();
         var destination = new NativeMethods.POINT { x = _bounds.Left, y = _bounds.Top };
         var source = new NativeMethods.POINT();
         var size = new BitmapSize(_bounds.Width, _bounds.Height);
@@ -110,14 +116,9 @@ internal sealed class LayeredFramePresenter : IDisposable
         const uint usePerPixelAlpha = 2;
         var update = new LayeredWindowUpdate((uint)sizeof(LayeredWindowUpdate), IntPtr.Zero,
             (IntPtr)(&destination), (IntPtr)(&size), _deviceContext, (IntPtr)(&source),
-            0, (IntPtr)(&blend), usePerPixelAlpha, _hasPresented ? (IntPtr)(&dirty) : IntPtr.Zero);
+            0, (IntPtr)(&blend), usePerPixelAlpha, area.HasValue ? (IntPtr)(&dirty) : IntPtr.Zero);
 
         if (!UpdateLayeredWindowIndirect(Handle, in update)) throw new Win32Exception();
-        if (!_hasPresented)
-        {
-            _host.Show();
-            _hasPresented = true;
-        }
     }
 
     public void Dispose()
