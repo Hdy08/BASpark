@@ -143,8 +143,8 @@ public sealed class EnvironmentFilterBehaviorTests
 
         Assert.True(mouseMoveEnd > mouseMoveStart);
         string mouseMoveMethod = overlaySource[mouseMoveStart..mouseMoveEnd];
-        Assert.Contains("if (!ConfigManager.IsTrailEffectActive)", mouseMoveMethod, StringComparison.Ordinal);
-        Assert.Contains("ShouldSuppressEffects();", mouseMoveMethod, StringComparison.Ordinal);
+        Assert.Contains("if (!ConfigManager.IsTrailEffectActive ||", mouseMoveMethod, StringComparison.Ordinal);
+        Assert.Contains("ShouldSuppressEffects(inputPoint: point);", mouseMoveMethod, StringComparison.Ordinal);
     }
 
     [Theory]

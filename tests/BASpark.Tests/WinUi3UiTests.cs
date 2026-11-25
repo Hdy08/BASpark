@@ -1080,7 +1080,7 @@ public class WinUi3UiTests
         var touchInput = typeof(OverlayManager).GetField("_isTouchLikeInput", members)!;
         var history = (Queue<TrailSample>)typeof(OverlayManager).GetField("_trailHistory", members)!.GetValue(manager)!;
         var move = typeof(OverlayManager).GetMethod("OnPointerMove", members)!.CreateDelegate<Action<int, int, bool>>(manager);
-        var up = typeof(OverlayManager).GetMethod("OnPointerUp", members)!.CreateDelegate<Action<bool>>(manager);
+        var up = typeof(OverlayManager).GetMethod("OnPointerUp", members)!.CreateDelegate<Action<bool, NativeMethods.POINT?>>(manager);
         try
         {
             manager.UpdateTouchMode(true);
@@ -1088,7 +1088,7 @@ public class WinUi3UiTests
             touchInput.SetValue(manager, true);
             history.Enqueue(new TrailSample(200, 300, System.Diagnostics.Stopwatch.GetTimestamp()));
             move(400, 500, false);
-            up(false);
+            up(false, null);
             Assert.True((bool)pointerDown.GetValue(manager)!);
             Assert.True((bool)touchInput.GetValue(manager)!);
             Assert.Equal(200, Assert.Single(history).ScreenX);
@@ -1272,6 +1272,25 @@ public class WinUi3UiTests
         Assert.False(listener.ShouldIgnorePromotedTouch(200, 300));
         listener.Dispose();
         Assert.Equal(IntPtr.Zero, listener.Handle);
+    }
+
+    [Fact]
+    public void TouchscreenInput_StaleTouchDoesNotBlockMouseClicks()
+    {
+        using var mode = new MultiTouchScope(false);
+        var phases = new List<TouchInputPhase>();
+        using var listener = new TouchInputListener((_, phase, _, _) => phases.Add(phase));
+        const System.Reflection.BindingFlags members = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var contact = typeof(TouchInputListener).GetMethod("HandleContact", members)!
+            .CreateDelegate<Action<IntPtr, uint, bool, bool, int, int>>(listener);
+        contact(new IntPtr(1), 0, false, true, 200, 300);
+        listener.ObserveMouseInput(buttonDown: true);
+        Assert.Equal(TouchInputPhase.Down, Assert.Single(phases));
+        typeof(TouchInputListener).GetField("_lastTouchTime", members)!.SetValue(listener, Environment.TickCount64 - 2000);
+        listener.ObserveMouseInput(buttonDown: false);
+        Assert.Single(phases);
+        listener.ObserveMouseInput(buttonDown: true);
+        Assert.Equal(new[] { TouchInputPhase.Down, TouchInputPhase.Up }, phases);
     }
 
     [Fact]
@@ -4594,6 +4613,39 @@ public class WinUi3UiTests
         hook.Dispose();
         Assert.False(thread.IsAlive);
         Assert.Equal(IntPtr.Zero, hook.Handle);
+    }
+
+    [Fact]
+    public void MouseInputHook_FoldsOldMovesAndPreservesButtonOrder()
+    {
+        long now = System.Diagnostics.Stopwatch.Frequency;
+        var pending = new System.Collections.Concurrent.ConcurrentQueue<MouseInputHook.PendingInput>();
+        void Add(uint message, int coordinate, long timestamp, uint extraInfo = 0)
+        {
+            var input = new NativeMethods.MSLLHOOKSTRUCT
+            {
+                pt = new NativeMethods.POINT { x = coordinate },
+                dwExtraInfo = new UIntPtr(extraInfo)
+            };
+            pending.Enqueue(new MouseInputHook.PendingInput(message, input, timestamp));
+        }
+
+        for (int index = 0; index < 200; index++) Add(NativeMethods.WM_MOUSEMOVE, index, 0);
+        Add(NativeMethods.WM_LBUTTONDOWN, 200, 0);
+        for (int index = 201; index < 400; index++) Add(NativeMethods.WM_MOUSEMOVE, index, 0);
+        Add(NativeMethods.WM_MOUSEMOVE, 400, 0, 0xFF515780);
+        Add(NativeMethods.WM_LBUTTONUP, 401, 0);
+        Add(NativeMethods.WM_MOUSEMOVE, 402, now);
+        Add(NativeMethods.WM_MOUSEMOVE, 403, now);
+
+        var inputs = new List<(uint Message, int Coordinate)>();
+        while (MouseInputHook.TryTakeInput(pending, now, out var entry)) inputs.Add((entry.Message, entry.Input.pt.x));
+        Assert.Equal(new[]
+        {
+            (NativeMethods.WM_MOUSEMOVE, 199), (NativeMethods.WM_LBUTTONDOWN, 200),
+            (NativeMethods.WM_MOUSEMOVE, 399), (NativeMethods.WM_MOUSEMOVE, 400), (NativeMethods.WM_LBUTTONUP, 401),
+            (NativeMethods.WM_MOUSEMOVE, 402), (NativeMethods.WM_MOUSEMOVE, 403)
+        }, inputs);
     }
 
     private static XElement GetSettingCard(XElement control) =>

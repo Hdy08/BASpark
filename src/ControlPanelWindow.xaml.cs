@@ -4464,7 +4464,7 @@ public sealed partial class ControlPanelWindow : UserControl
 
         if (!_skipSaveOnClosing)
         {
-            ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
+            ConfigManager.SaveClickCount();
         }
 
         SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;

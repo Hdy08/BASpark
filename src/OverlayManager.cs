@@ -20,7 +20,8 @@ namespace BASpark
         private const int FullscreenTolerance = 2;
         private const int DisplaySettingsRecoveryDebounceMilliseconds = 400;
         private static readonly long SuppressionCacheDurationTicks = TimeSpan.FromMilliseconds(250).Ticks;
-        private const long ClickIntervalTicks = 300000;
+        private const uint ClickEffectIntervalMilliseconds = 30;
+        private static readonly long IdleEnvironmentCheckInterval = Stopwatch.Frequency / 60;
 
         private readonly Dictionary<string, OverlayWindow> _overlays = new(StringComparer.OrdinalIgnoreCase);
         private IKeyboardMouseEvents? _globalHook;
@@ -39,7 +40,8 @@ namespace BASpark
         private long _trailStrokeId;
         private static readonly long TrailHistoryRetentionTicks = Stopwatch.Frequency * 2;
         private long _lastMoveTimestamp;
-        private long _lastClickTicks;
+        private long _lastIdleEnvironmentCheck;
+        private long? _lastMouseClickEffectTimestamp;
         private long _lastPromotedTouchTimestamp;
         private NativeMethods.POINT _lastPromotedTouchPoint;
         private long _idleMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / 60);
@@ -247,7 +249,7 @@ namespace BASpark
                         true, true, beginStroke: true, finishStroke: false, pointerId: pointerId);
                 else
                 {
-                    ConfigManager.TotalClicks++;
+                    ConfigManager.RecordClick();
                     target.EmitDown(screenX, screenY, true, pointerId);
                 }
                 contact.Participants[target] = timestamp;
@@ -355,8 +357,12 @@ namespace BASpark
         private void HandleMouseInput(uint message, NativeMethods.MSLLHOOKSTRUCT input)
         {
             bool touchLike = NativeMethods.IsTouchInput(input.dwExtraInfo);
-            if (!touchLike && _touchContacts.Count > 0) return;
-            if (!touchLike) _touchInputListener?.ObserveCursor(mouseInput: true);
+            if (!touchLike)
+            {
+                bool buttonDown = message is NativeMethods.WM_LBUTTONDOWN or NativeMethods.WM_RBUTTONDOWN or NativeMethods.WM_MBUTTONDOWN;
+                _touchInputListener?.ObserveMouseInput(buttonDown);
+                if (_touchContacts.Count > 0) return;
+            }
             if (touchLike && _touchInputListener?.ShouldIgnorePromotedTouch(input.pt.x, input.pt.y) == true) return;
             switch (message)
             {
@@ -364,19 +370,19 @@ namespace BASpark
                     OnPointerMove(input.pt.x, input.pt.y, touchLike);
                     break;
                 case NativeMethods.WM_LBUTTONDOWN:
-                    OnPointerDown(MouseButtons.Left, input.pt.x, input.pt.y, touchLike);
+                    OnPointerDown(MouseButtons.Left, input.pt, touchLike);
                     break;
                 case NativeMethods.WM_RBUTTONDOWN:
-                    OnPointerDown(MouseButtons.Right, input.pt.x, input.pt.y, touchLike);
+                    OnPointerDown(MouseButtons.Right, input.pt, touchLike);
                     break;
                 case NativeMethods.WM_MBUTTONDOWN:
-                    OnPointerDown(MouseButtons.Middle, input.pt.x, input.pt.y, touchLike);
+                    OnPointerDown(MouseButtons.Middle, input.pt, touchLike);
                     break;
                 case NativeMethods.WM_LBUTTONUP:
                 case NativeMethods.WM_RBUTTONUP:
                 case NativeMethods.WM_MBUTTONUP:
                 case NativeMethods.WM_XBUTTONUP:
-                    OnPointerUp(touchLike);
+                    OnPointerUp(touchLike, input.pt);
                     break;
             }
         }
@@ -744,14 +750,14 @@ namespace BASpark
             _screenshotFailsafeTimer = null;
         }
 
-        private void OnPointerDown(MouseButtons button, int cursorX, int cursorY, bool touchLike)
+        private void OnPointerDown(MouseButtons button, NativeMethods.POINT point, bool touchLike)
         {
             // 点击特效开关
             if (!ConfigManager.IsClickEffectActive) return;
             if (touchLike && !ConfigManager.IsTouchscreenMode) return;
-            if (touchLike) _touchPoint = new NativeMethods.POINT { x = cursorX, y = cursorY };
+            if (touchLike) _touchPoint = point;
             // 每次点击都检测环境 避免切窗后首次点击渲染
-            if (ShouldSuppressEffects(forceRefresh: true, inputPoint: touchLike ? _touchPoint : null)) return;
+            if (ShouldSuppressEffects(forceRefresh: true, inputPoint: point)) return;
             if (!CanRenderEffects(touchLike, skipSuppressionCheck: true)) return;
 
             bool isLeft = button == MouseButtons.Left;
@@ -767,13 +773,7 @@ namespace BASpark
             bool shouldTrigger = shouldPrimaryTrigger || (ConfigManager.EnableMiddleClickTrigger && isMiddle);
             if (!shouldTrigger) return;
 
-            if (!touchLike && TryGetPhysicalCursorPosition(out int physicalX, out int physicalY))
-            {
-                cursorX = physicalX;
-                cursorY = physicalY;
-            }
-
-            OverlayWindow? target = ResolveTargetOverlay(cursorX, cursorY);
+            OverlayWindow? target = ResolveTargetOverlay(point.x, point.y);
             if (target == null)
             {
                 return;
@@ -792,64 +792,48 @@ namespace BASpark
             _isTouchLikeInput = touchLike;
             _activePointerOverlay = target;
 
-            long currentTicks = DateTime.Now.Ticks;
-            if (currentTicks - _lastClickTicks < ClickIntervalTicks) return;
-            _lastClickTicks = currentTicks;
-
-            ConfigManager.TotalClicks++;
+            ConfigManager.RecordClick();
+            long timestamp = Stopwatch.GetTimestamp();
             if (touchLike)
             {
-                _lastPromotedTouchTimestamp = Stopwatch.GetTimestamp();
-                _lastPromotedTouchPoint = new NativeMethods.POINT { x = cursorX, y = cursorY };
+                _lastPromotedTouchTimestamp = timestamp;
+                _lastPromotedTouchPoint = point;
             }
+            else
+            {
+                if (_lastMouseClickEffectTimestamp is long previousTimestamp
+                    && Stopwatch.GetElapsedTime(previousTimestamp, timestamp).TotalMilliseconds < ClickEffectIntervalMilliseconds) return;
+                _lastMouseClickEffectTimestamp = timestamp;
+            }
+
             ClearTrailHistory();
             target.TrailStrokeId = _trailStrokeId;
-            target.EmitDown(cursorX, cursorY, touchLike);
-            long timestamp = Stopwatch.GetTimestamp();
+            target.EmitDown(point.x, point.y, touchLike);
             _trailParticipants[target] = timestamp;
-            RecordTrailSample(cursorX, cursorY, timestamp);
+            RecordTrailSample(point.x, point.y, timestamp);
         }
 
         private void OnPointerMove(int cursorX, int cursorY, bool touchLike)
         {
             if (touchLike && (!ConfigManager.IsTouchscreenMode || !_isPrimaryPointerDown || !_isTouchLikeInput)) return;
             if (_isPrimaryPointerDown && touchLike != _isTouchLikeInput) return;
-            if (touchLike) _touchPoint = new NativeMethods.POINT { x = cursorX, y = cursorY };
-            // 拖尾仅在点击特效开启或常驻拖尾开启时渲染
-            if (!ConfigManager.IsTrailEffectActive)
-            {
-                if (ConfigManager.EnableEnvironmentFilter)
-                {
-                    ShouldSuppressEffects();
-                }
-
-                SwitchAlwaysTrailOverlay(null);
-                _lastTrailThrottleOverlay = null;
-                return;
-            }
-            if (!_isPrimaryPointerDown && !ConfigManager.EnableAlwaysTrailEffect)
-            {
-                if (ConfigManager.EnableEnvironmentFilter) ShouldSuppressEffects();
-                SwitchAlwaysTrailOverlay(null);
-                _lastTrailThrottleOverlay = null;
-                return;
-            }
-            if (!CanRenderEffects(touchLike))
-            {
-                _lastTrailThrottleOverlay = null;
-                return;
-            }
-
-            if (!touchLike && TryGetPhysicalCursorPosition(out int physicalX, out int physicalY))
-            {
-                cursorX = physicalX;
-                cursorY = physicalY;
-            }
-
-            OverlayWindow? hoveredTarget = ResolveTargetOverlay(cursorX, cursorY);
-            OverlayWindow? target = hoveredTarget;
-            bool targetChanged = !ReferenceEquals(target, _lastTrailThrottleOverlay);
+            var point = new NativeMethods.POINT { x = cursorX, y = cursorY };
+            if (touchLike) _touchPoint = point;
             long currentTimestamp = Stopwatch.GetTimestamp();
+            if (!ConfigManager.IsTrailEffectActive || (!_isPrimaryPointerDown && !ConfigManager.EnableAlwaysTrailEffect))
+            {
+                if (ConfigManager.EnableEnvironmentFilter && currentTimestamp - _lastIdleEnvironmentCheck >= IdleEnvironmentCheckInterval)
+                {
+                    _lastIdleEnvironmentCheck = currentTimestamp;
+                    ShouldSuppressEffects(inputPoint: point);
+                }
+                SwitchAlwaysTrailOverlay(null);
+                _lastTrailThrottleOverlay = null;
+                return;
+            }
+
+            OverlayWindow? target = ResolveTargetOverlay(cursorX, cursorY);
+            bool targetChanged = !ReferenceEquals(target, _lastTrailThrottleOverlay);
             long moveInterval = target?.TrailMoveIntervalTimestamp ?? _idleMoveIntervalTimestamp;
             if (!targetChanged && currentTimestamp - _lastMoveTimestamp < moveInterval)
             {
@@ -858,8 +842,7 @@ namespace BASpark
 
             _lastMoveTimestamp = currentTimestamp;
             _lastTrailThrottleOverlay = target;
-
-            RouteTrailMove(target, cursorX, cursorY, touchLike);
+            if (CanRenderEffects(touchLike, inputPoint: point)) RouteTrailMove(target, cursorX, cursorY, touchLike);
         }
 
         private void RouteTrailMove(OverlayWindow? target, int cursorX, int cursorY, bool touchLike)
@@ -953,7 +936,7 @@ namespace BASpark
             if (!resume) _trailParticipants.Clear();
         }
 
-        private void OnPointerUp(bool touchLike)
+        private void OnPointerUp(bool touchLike, NativeMethods.POINT? inputPoint)
         {
             if (!_isPrimaryPointerDown)
             {
@@ -962,7 +945,7 @@ namespace BASpark
             }
             if (touchLike != _isTouchLikeInput) return;
 
-            if (ShouldSuppressEffects())
+            if (ShouldSuppressEffects(inputPoint: inputPoint))
             {
                 ReleasePointerStateForEnvironmentSuppression();
                 return;
@@ -978,7 +961,7 @@ namespace BASpark
         /// 检查渲染环境条件（覆盖窗口存在性、环境过滤、光标可见性）。
         /// 业务开关（点击特效、常驻拖尾）由各调用点自行判断。
         /// </summary>
-        private bool CanRenderEffects(bool touchLike, bool skipSuppressionCheck = false)
+        private bool CanRenderEffects(bool touchLike, bool skipSuppressionCheck = false, NativeMethods.POINT? inputPoint = null)
         {
             if (App.IsEffectsPaused || _overlays.Count == 0)
             {
@@ -986,7 +969,7 @@ namespace BASpark
                 return false;
             }
 
-            if (!skipSuppressionCheck && ShouldSuppressEffects())
+            if (!skipSuppressionCheck && ShouldSuppressEffects(inputPoint: inputPoint))
             {
                 ReleasePointerStateForEnvironmentSuppression();
                 return false;
@@ -1420,9 +1403,6 @@ namespace BASpark
                    Math.Abs(windowRect.Bottom - monitorInfo.rcMonitor.Bottom) <= FullscreenTolerance;
         }
 
-        private static bool TryGetPhysicalCursorPosition(out int x, out int y) =>
-            NativeMethods.TryGetCursorPosition(out x, out y);
-
         private void HandleDisplaySettingsChanged(object? sender, EventArgs e)
         {
             _ = sender;
@@ -1582,9 +1562,12 @@ namespace BASpark
 
     internal sealed class MouseInputHook : IDisposable
     {
+        internal readonly record struct PendingInput(uint Message, NativeMethods.MSLLHOOKSTRUCT Input, long Timestamp);
+
+        private static readonly long MoveBacklogThreshold = Stopwatch.Frequency / 120;
         private readonly Func<Action, bool> _dispatch;
         private readonly Action<uint, NativeMethods.MSLLHOOKSTRUCT> _input;
-        private readonly ConcurrentQueue<(uint Message, NativeMethods.MSLLHOOKSTRUCT Input)> _pending = new();
+        private readonly ConcurrentQueue<PendingInput> _pending = new();
         private readonly NativeMethods.MouseHookProc _callback;
         private readonly Thread _thread;
         private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1635,7 +1618,8 @@ namespace BASpark
             {
                 try
                 {
-                    _pending.Enqueue((unchecked((uint)message.ToInt64()), Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(data)));
+                    _pending.Enqueue(new PendingInput(unchecked((uint)message.ToInt64()), Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(data),
+                        Stopwatch.GetTimestamp()));
                     QueueDrain();
                 }
                 catch (Exception exception) { Debug.WriteLine("Mouse input routing failed: " + exception.Message); }
@@ -1651,12 +1635,29 @@ namespace BASpark
             _pending.Clear();
         }
 
+        internal static bool TryTakeInput(ConcurrentQueue<PendingInput> pending, long now, out PendingInput entry)
+        {
+            if (!pending.TryDequeue(out entry)) return false;
+            long oldestFreshMove = now - MoveBacklogThreshold;
+            if (entry.Message == NativeMethods.WM_MOUSEMOVE && entry.Timestamp < oldestFreshMove)
+            {
+                bool touch = NativeMethods.IsTouchInput(entry.Input.dwExtraInfo);
+                while (pending.TryPeek(out var next) && next.Message == NativeMethods.WM_MOUSEMOVE
+                    && next.Timestamp < oldestFreshMove && NativeMethods.IsTouchInput(next.Input.dwExtraInfo) == touch
+                    && pending.TryDequeue(out var latest))
+                {
+                    entry = latest;
+                }
+            }
+            return true;
+        }
+
         private void Drain()
         {
             long start = Stopwatch.GetTimestamp();
             try
             {
-                while (Volatile.Read(ref _disposed) == 0 && _pending.TryDequeue(out var entry))
+                while (Volatile.Read(ref _disposed) == 0 && TryTakeInput(_pending, Stopwatch.GetTimestamp(), out var entry))
                 {
                     try { _input(entry.Message, entry.Input); }
                     catch (Exception exception) { Debug.WriteLine("Mouse input routing failed: " + exception.Message); }
@@ -1683,6 +1684,8 @@ namespace BASpark
 
     internal sealed class TouchInputListener : NativeWindow, IDisposable
     {
+        private const int RecentTouchMilliseconds = 1000;
+        private static readonly long MouseCursorObservationInterval = Stopwatch.Frequency / 120;
         private readonly Action<long, TouchInputPhase, int, int> _input;
         private readonly Action<IntPtr, uint, bool, bool, int, int> _contactInput;
         private readonly TouchCursorState _cursorState = new();
@@ -1699,6 +1702,7 @@ namespace BASpark
         private int _maxX;
         private int _maxY;
         private long _lastTouchTime;
+        private long _lastMouseCursorObservation;
         private bool _hasRecentTouch;
         private bool _touchSuppressesCursor;
         private bool _hasMouseCursor;
@@ -1743,6 +1747,23 @@ namespace BASpark
             }
         }
 
+        internal void ObserveMouseInput(bool buttonDown)
+        {
+            if (buttonDown && _contacts.Count > 0 && Environment.TickCount64 - _lastTouchTime > RecentTouchMilliseconds)
+            {
+                foreach (IntPtr device in _contacts.Keys.Select(contact => contact.Device).Distinct().ToArray())
+                    ReleaseDeviceContacts(device);
+            }
+
+            if (_contacts.Count > 0) return;
+            long now = Stopwatch.GetTimestamp();
+            if (buttonDown || _touchSuppressesCursor || now - _lastMouseCursorObservation >= MouseCursorObservationInterval)
+            {
+                _lastMouseCursorObservation = now;
+                ObserveCursor(mouseInput: true);
+            }
+        }
+
         internal bool IsCursorVisible(NativeMethods.POINT point, long pointerId = 1)
         {
             var cursor = new NativeMethods.CURSORINFO { cbSize = Marshal.SizeOf<NativeMethods.CURSORINFO>() };
@@ -1775,7 +1796,7 @@ namespace BASpark
         }
 
         internal bool ShouldIgnorePromotedTouch(int screenX, int screenY) => _contacts.Count > 0
-            || (_hasRecentTouch && Environment.TickCount64 - _lastTouchTime <= 1000
+            || (_hasRecentTouch && Environment.TickCount64 - _lastTouchTime <= RecentTouchMilliseconds
                 && screenX >= _minX - 24 && screenX <= _maxX + 24 && screenY >= _minY - 24 && screenY <= _maxY + 24);
 
         protected override void WndProc(ref Message message)

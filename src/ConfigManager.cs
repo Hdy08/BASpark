@@ -129,6 +129,20 @@ namespace BASpark
 
         // 保护并发 Save / _profiles 访问
         private static readonly object _syncLock = new();
+        private static bool _clickCountDirty;
+
+        internal static void RecordClick()
+        {
+            if (TotalClicks == int.MaxValue) return;
+            TotalClicks++;
+            _clickCountDirty = true;
+        }
+
+        internal static void SaveClickCount()
+        {
+            if (_clickCountDirty && Save(nameof(TotalClicks), TotalClicks))
+                _clickCountDirty = false;
+        }
 
         public static void Load()
         {
@@ -143,7 +157,8 @@ namespace BASpark
                         IsEffectEnabled = Convert.ToBoolean(key.GetValue("IsEffectEnabled", true));
                         AutoStart = Convert.ToBoolean(key.GetValue("AutoStart", false));
                         AgreedToPrivacy = Convert.ToBoolean(key.GetValue("AgreedToPrivacy", false));
-                                    TotalClicks = Convert.ToInt32(key.GetValue("TotalClicks", 0), CultureInfo.InvariantCulture);
+                        TotalClicks = Convert.ToInt32(key.GetValue("TotalClicks", 0), CultureInfo.InvariantCulture);
+                        _clickCountDirty = false;
                         LastNoticeContent = key.GetValue("LastNoticeContent", "")?.ToString() ?? "";
                         EnableAlwaysTrailEffect = Convert.ToBoolean(key.GetValue("EnableAlwaysTrailEffect", false));
                         StartSilent = Convert.ToBoolean(key.GetValue("StartSilent", false));
@@ -748,7 +763,8 @@ namespace BASpark
                     IsEffectEnabled = true;
                     AutoStart = false;
                     AgreedToPrivacy = false;
-                            TotalClicks = 0;
+                    TotalClicks = 0;
+                    _clickCountDirty = false;
                     LastNoticeContent = "";
                     EnableAlwaysTrailEffect = false;
                     StartSilent = false;

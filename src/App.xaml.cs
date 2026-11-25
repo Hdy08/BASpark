@@ -40,6 +40,7 @@ public partial class App : Application
 
     private ControlPanelWindow? _controlPanel;
     private InstallerWindow? _installerWindow;
+    private DispatcherQueueTimer? _clickCountSaveTimer;
     private int _backgroundMemoryGeneration;
     private readonly KeeperWindow _keeper = new();
     private Windows.UI.ViewManagement.UISettings? _accentSettings;
@@ -217,6 +218,11 @@ public partial class App : Application
 
         Overlay = new OverlayManager();
         Overlay.Start();
+        _clickCountSaveTimer = DispatcherQueue.CreateTimer();
+        _clickCountSaveTimer.Interval = TimeSpan.FromSeconds(5);
+        _clickCountSaveTimer.IsRepeating = true;
+        _clickCountSaveTimer.Tick += (_, _) => ConfigManager.SaveClickCount();
+        _clickCountSaveTimer.Start();
 
         if (!ConfigManager.StartSilent)
         {
@@ -462,7 +468,8 @@ public partial class App : Application
             // 关闭阶段尽力清理即可。
         }
 
-        ConfigManager.Save("TotalClicks", ConfigManager.TotalClicks);
+        _clickCountSaveTimer?.Stop();
+        ConfigManager.SaveClickCount();
 
         Tray?.Dispose();
         Tray = null;
