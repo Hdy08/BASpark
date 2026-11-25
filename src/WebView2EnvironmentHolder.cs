@@ -92,7 +92,8 @@ internal static class WebView2EnvironmentHolder
             AdditionalBrowserArguments =
                 "--disable-background-timer-throttling " +
                 "--disable-features=CalculateNativeWinOcclusion " +
-                "--enable-begin-frame-scheduling"
+                "--enable-begin-frame-scheduling " +
+                "--disable-direct-composition"
         };
 
         // WinRT 投影只提供 CreateWithOptionsAsync，且返回 IAsyncOperation
