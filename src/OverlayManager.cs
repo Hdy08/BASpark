@@ -1267,7 +1267,7 @@ namespace BASpark
 
         private bool IsOverlayWindow(IntPtr hwnd)
         {
-            return _overlays.Values.Any(o => o.Handle == hwnd);
+            return _overlays.Values.Any(overlay => overlay.OwnsWindow(hwnd));
         }
 
         private static bool IsCurrentProcessWindow(IntPtr hwnd)

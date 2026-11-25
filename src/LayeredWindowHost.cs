@@ -32,6 +32,7 @@ internal sealed class LayeredWindowHost : IDisposable
     private IntPtr _hwnd = IntPtr.Zero;
     private IntPtr _ownerHwnd = IntPtr.Zero;
     private bool _layeredStyleApplied;
+    private readonly bool _bitmapBacked;
     private bool _disposed;
 
     // 上一次实际下发的窗口矩形。叠加层每 5 秒会重新断言一次置顶，若每次都对全屏
@@ -47,14 +48,20 @@ internal sealed class LayeredWindowHost : IDisposable
 
     public double DpiScale { get; private set; } = 1.0;
 
-    public LayeredWindowHost()
+    public LayeredWindowHost() : this(bitmapBacked: false)
     {
+    }
+
+    internal LayeredWindowHost(bool bitmapBacked)
+    {
+        _bitmapBacked = bitmapBacked;
         EnsureWindowClassRegistered();
 
         // 创建时不带 WS_EX_LAYERED：窗口以隐藏状态建立，Show() 时再补上样式。
         int exStyle = NativeMethods.WS_EX_TRANSPARENT
                     | NativeMethods.WS_EX_TOOLWINDOW
                     | NativeMethods.WS_EX_NOACTIVATE;
+        if (bitmapBacked) exStyle |= NativeMethods.WS_EX_LAYERED;
 
         IntPtr hInstance = NativeMethods.GetModuleHandle(null);
         _ownerHwnd = NativeMethods.CreateWindowEx(
@@ -199,7 +206,7 @@ internal sealed class LayeredWindowHost : IDisposable
             return;
         }
 
-        ApplyLayeredStyle();
+        if (!_bitmapBacked) ApplyLayeredStyle();
         NativeMethods.ShowWindow(_hwnd, NativeMethods.SW_SHOWNOACTIVATE);
         SetTopmost();
     }

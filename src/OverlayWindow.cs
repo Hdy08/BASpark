@@ -26,6 +26,7 @@ internal sealed class OverlayWindow : IDisposable
 
     private CoreWebView2Controller? _controller;
     private CoreWebView2? _coreWebView;
+    private LayeredFramePresenter? _framePresenter;
 
     private long _trailMoveIntervalTimestamp = Math.Max(1, Stopwatch.Frequency / 60);
     private string? _lastReportedInputMode;
@@ -91,6 +92,8 @@ internal sealed class OverlayWindow : IDisposable
 
     public IntPtr Handle => _host.Handle;
 
+    internal bool OwnsWindow(IntPtr window) => Handle == window || _framePresenter?.Handle == window;
+
     public string ScreenDeviceName => _screenDeviceName;
 
     public long TrailMoveIntervalTimestamp => _trailMoveIntervalTimestamp;
@@ -110,6 +113,7 @@ internal sealed class OverlayWindow : IDisposable
             || actualBounds.Width != bounds.Width || actualBounds.Height != bounds.Height;
         double previousScale = _host.DpiScale;
         _host.SetBounds(bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+        if (boundsChanged || previousScale != _host.DpiScale) ResetFramePresenter(notifyRenderer: true);
 
         if (_controller != null && _controllerInitialized
             && (forceUpdate || boundsChanged || previousScale != _host.DpiScale))
@@ -249,6 +253,7 @@ internal sealed class OverlayWindow : IDisposable
 
         UpdateRendererBounds();
         _host.SetTopmost();
+        _framePresenter?.SetTopmost();
     }
 
     // ------------------------------------------------------------------
@@ -461,6 +466,7 @@ internal sealed class OverlayWindow : IDisposable
         string generationJson = JsonSerializer.Serialize(rendererGeneration);
         string adapterScript =
             $"window.__basparkRendererGeneration = {generationJson};\n" +
+            WebRendererResourceProvider.ReadResourceText(WebRendererResourceProvider.FramePresenterResourcePath) + "\n" +
             WebRendererResourceProvider.ReadResourceText(
                 WebRendererResourceProvider.RendererAdapterResourcePath);
 
@@ -474,6 +480,7 @@ internal sealed class OverlayWindow : IDisposable
 
     private void NavigateHtml(CoreWebView2 coreWebView, string html)
     {
+        ResetFramePresenter();
         // NavigationStarting 会在任何完成事件之前给出权威 ID。
         _webViewReadyForTopmost = false;
         _currentNavigationId = null;
@@ -576,6 +583,8 @@ internal sealed class OverlayWindow : IDisposable
             }
 
             string? type = GetJsonString(root, "type");
+            if (HandleFrameMessage(type, root)) return;
+
             string requestedEffectBackend =
                 GetJsonString(root, "requestedEffectBackend") ?? "unknown";
             string resolvedEffectBackend =
@@ -657,6 +666,66 @@ internal sealed class OverlayWindow : IDisposable
         return value.GetString();
     }
 
+    private bool HandleFrameMessage(string? type, JsonElement message)
+    {
+        if (type is not ("frame-request" or "frame-submit" or "frame-release")) return false;
+        CoreWebView2? browser = _coreWebView;
+        if (browser == null) return true;
+
+        try
+        {
+            if (type == "frame-request")
+            {
+                if (!ShouldOverlayBeVisible)
+                {
+                    SendFrameStatus(browser, "baspark-frame-reset", null);
+                    return true;
+                }
+
+                _framePresenter ??= new LayeredFramePresenter(browser.Environment, _screenBounds);
+                _framePresenter.Share(browser, _rendererGeneration);
+                return true;
+            }
+
+            LayeredFramePresenter? presenter = _framePresenter;
+            if (presenter == null || GetJsonString(message, "id") != presenter.Id) return true;
+
+            if (type == "frame-release" || !ShouldOverlayBeVisible)
+            {
+                ResetFramePresenter();
+                return true;
+            }
+
+            if (!message.TryGetProperty("rect", out JsonElement rectangle)) return true;
+            presenter.Present(rectangle);
+            SendFrameStatus(browser, "baspark-frame-presented", presenter.Id);
+        }
+        catch (Exception ex) when (IsExpectedWebViewShutdownException(ex))
+        {
+            ResetFramePresenter();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"Native frame presentation unavailable on '{_screenDeviceName}': {ex.Message}");
+            ResetFramePresenter(notifyRenderer: true, disabled: true);
+        }
+        return true;
+    }
+
+    private void ResetFramePresenter(bool notifyRenderer = false, bool disabled = false)
+    {
+        LayeredFramePresenter? presenter = _framePresenter;
+        _framePresenter = null;
+        presenter?.Dispose();
+        if (notifyRenderer && (presenter != null || disabled) && _coreWebView is { } browser)
+        {
+            TryDetach(() => SendFrameStatus(browser, disabled ? "baspark-frame-disabled" : "baspark-frame-reset", presenter?.Id));
+        }
+    }
+
+    private void SendFrameStatus(CoreWebView2 browser, string type, string? id) =>
+        browser.PostWebMessageAsJson(JsonSerializer.Serialize(new { type, id, generation = _rendererGeneration }));
+
     private static string FormatCompositingWarning(string? warning)
     {
         return string.IsNullOrWhiteSpace(warning)
@@ -737,6 +806,7 @@ internal sealed class OverlayWindow : IDisposable
         // 单向回退，避免损坏的 primary/legacy 组合反复导航。
         _legacyFallbackAttempted = true;
         _usingLegacyRenderer = true;
+        ResetFramePresenter();
         _rendererReady = true;
         _rendererGeneration = null;
         StopRendererReadyTimeout();
@@ -898,6 +968,7 @@ internal sealed class OverlayWindow : IDisposable
 
     private void ClearCoreWebViewEventState()
     {
+        ResetFramePresenter();
         _navigationStartingHandler = null;
         _navigationCompletedHandler = null;
         _processFailedHandler = null;
@@ -1004,6 +1075,7 @@ internal sealed class OverlayWindow : IDisposable
         }
         else
         {
+            ResetFramePresenter(notifyRenderer: true);
             PauseOverlayRuntime();
             _host.Hide();
         }

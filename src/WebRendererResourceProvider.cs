@@ -14,6 +14,7 @@ internal static class WebRendererResourceProvider
     internal const string LegacyRendererResourcePath = "Web/index.legacy.html";
     internal const string RendererVendorResourcePath = "Web/vendor/ba-click-fx.iife.js";
     internal const string RendererAdapterResourcePath = "Web/fx-adapter.js";
+    internal const string FramePresenterResourcePath = "Web/layered-frame-presenter.js";
 
     private static readonly Assembly ResourceAssembly = typeof(WebRendererResourceProvider).Assembly;
     private static readonly string AssemblyName =

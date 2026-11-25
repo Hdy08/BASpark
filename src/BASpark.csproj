@@ -8,6 +8,7 @@
 
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!-- WinUI 3 (Windows App SDK) replaces the former WPF/WinForms host. -->
     <UseWinUI>true</UseWinUI>
@@ -53,6 +54,7 @@
     <EmbeddedResource Include="Web\index.html" LogicalName="BASpark.Web.index.html" />
     <EmbeddedResource Include="Web\index.legacy.html" LogicalName="BASpark.Web.index.legacy.html" />
     <EmbeddedResource Include="Web\fx-adapter.js" LogicalName="BASpark.Web.fx-adapter.js" />
+    <EmbeddedResource Include="Web\layered-frame-presenter.js" LogicalName="BASpark.Web.layered-frame-presenter.js" />
     <EmbeddedResource Include="Web\vendor\ba-click-fx.iife.js" LogicalName="BASpark.Web.vendor.ba-click-fx.iife.js" />
   </ItemGroup>
 

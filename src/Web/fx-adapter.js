@@ -1146,6 +1146,7 @@
             }
 
             state.fx = new window.BAClickFX.BAClickFX({ ...BASE_RENDER_CONFIG });
+            window.attachLayeredFramePresenter?.(state.fx, postHostMessage, HOST_GENERATION);
             captureTrailScaleBaseline();
             captureGlowIntensityBaseline();
             state.advancedFxBaseline = state.fx.getFxConfig();
